@@ -87,7 +87,30 @@ const INTENT := {
 	"summon": ["intent_summon", Color("b8e0d8")],
 	"chaos": ["intent_chaos", Color("e060c8")],
 	"aim": ["intent_aim", Color("c8c8d8")],
+	"heal": ["intent_heal", Color("6ee07a")],
+	"drain": ["intent_drain", Color("e8455a")],
+	"burn": ["intent_burn", Color("ff8a3a")],
+	"chill": ["intent_chill", Color("8fd8ff")],
+	"scorch": ["intent_scorch", Color("ff6a2a")],
 }
+
+## Enemy trait -> [icon, colour, name, one-line rule]
+const TRAIT := {
+	"armor": ["trait_armor", Color("b8b2a8"), "Armor", "Its Block never expires."],
+	"thorns": ["trait_thorns", Color("8fcf5a"), "Thorns", "Hitting it reflects 3 damage."],
+	"ward": ["trait_ward", Color("b58aff"), "Ward", "Half damage while a minion stands."],
+	"pierce": ["trait_pierce", Color("ff7a4a"), "Pierce", "Its attacks ignore your Block."],
+}
+
+## Biome id -> accent colour (route card, lap pips, pause track, summary).
+const BIOME := {
+	"glade": Color("8fdc5a"), "crypt": Color("ffb36a"), "hollow": Color("ff8a3a"),
+	"frost": Color("8fd8ff"), "throne": Color("b58aff"), "magma": Color("ff6a2a"),
+}
+
+
+static func biome_color(id: String) -> Color:
+	return BIOME.get(id, GOLD)
 
 
 static func rune_color(rune: String) -> Color:
