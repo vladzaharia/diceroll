@@ -61,6 +61,11 @@ static func support_down(b: Basis) -> float:
 	return inner * s + r
 
 
+## Drops the cached mesh (call before quitting to avoid leak reports).
+static func clear_cache() -> void:
+	_mesh = null
+
+
 static func get_mesh() -> ArrayMesh:
 	if _mesh == null:
 		_mesh = _build()

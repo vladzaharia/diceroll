@@ -24,6 +24,8 @@ const FOV := 24.0
 @export var speed_scale := 1.0
 ## Base throw duration in seconds at speed_scale 1.
 @export var roll_duration := 1.05
+## Play throw/land/select sounds through the Audio autoload.
+@export var sfx_enabled := true
 
 var dice: Array[DieVisual] = []
 var interactive := true
@@ -339,7 +341,7 @@ func _on_die_landed(strength: float) -> void:
 
 func _play(id: String, vol_db: float) -> void:
 	var audio := get_node_or_null("/root/Audio")
-	if audio:
+	if audio and sfx_enabled:
 		audio.play_sfx(id, 0.08, vol_db)
 
 
