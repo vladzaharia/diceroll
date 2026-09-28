@@ -49,11 +49,13 @@ const MINIBOSSES := {
 }
 
 const ACT_MINIBOSS := ["mini_bone_champion", "mini_pumpkin_knight", "mini_grave_mage"]
+## Act bosses (content kept; the run flow now only fights FINAL_BOSS after the last lap).
 const ACT_BOSS := ["boss_bone_warden", "boss_hollow_king", "boss_lich"]
+const FINAL_BOSS := "boss_lich"
 const ACT_BIOME := ["crypt", "hollow", "throne"]
 const SUMMON_ID := "skeleton_minion"
 
-## Enemy pools per difficulty band (band = act + lap - 2, 0..4).
+## Enemy pools per difficulty band (band = (lap - 1) / 3, 0..4 over laps 1..15).
 const POOLS := [
 	["skeleton_minion", "skeleton_minion", "skeleton_archer"],
 	["skeleton_minion", "skeleton_archer", "skeleton_warrior", "cultist"],
@@ -64,8 +66,8 @@ const POOLS := [
 ## [min, max] enemies per tile for each band.
 const COUNTS := [[1, 2], [2, 2], [2, 3], [2, 3], [2, 3]]
 
-static func band(act: int, lap: int) -> int:
-	return clampi(act + lap - 2, 0, POOLS.size() - 1)
+static func band(lap: int) -> int:
+	return clampi((lap - 1) / 3, 0, POOLS.size() - 1)
 
 static func is_boss(id: String) -> bool:
 	return BOSSES.has(id)

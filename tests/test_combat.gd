@@ -62,8 +62,10 @@ func test_enemy_scaling() -> void:
 	run.lap = 3
 	c = CombatState.new()
 	c.begin(run, ["skeleton_warrior"], false, false, 3)
-	# warrior base 20 scaled by act 2, lap 3
-	assert_eq(c.enemies[0].hp, int(round(20 * Balance.enemy_scale(2, 3))))
+	# warrior base 20 scaled by lap 3
+	assert_eq(c.enemies[0].hp, int(round(20 * Balance.enemy_scale(3))))
+	assert_near(Balance.enemy_scale(1), 1.0)
+	assert_true(Balance.enemy_scale(15) > Balance.enemy_scale(7), "scales smoothly by lap")
 
 func test_damage_formula_pair() -> void:
 	_setup(["", "", ""])
@@ -289,6 +291,7 @@ func test_retarget_after_death() -> void:
 func test_buff_increases_future_attacks() -> void:
 	_setup(["", "", ""], ["bandit"])
 	c.enemies[0].intent = {"kind": "buff", "value": 2}
+	c.enemies[0].step = 0 # next cycle entry: attack 7
 	_dice([1, 3, 5])
 	c.attack(run)
 	assert_eq(c.enemies[0].atk_bonus, 2)

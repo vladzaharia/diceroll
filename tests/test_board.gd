@@ -9,7 +9,7 @@ func _count(b: Board, type: String) -> int:
 
 func test_generation_constraints_many_seeds() -> void:
 	for s in 40:
-		var b := Board.generate(Rng.new(s), 1)
+		var b := Board.generate(Rng.new(s), 1, 24)
 		assert_eq(b.tiles.size(), 24, "24 tiles")
 		assert_eq(b.tiles[0].type, "start")
 		assert_eq(b.tiles[6].type, "forge")
@@ -33,7 +33,7 @@ func test_generation_constraints_many_seeds() -> void:
 				assert_eq(t.enemies.size(), 0, "no enemies on non-enemy tile")
 
 func test_later_acts_have_an_elite() -> void:
-	var b := Board.generate(Rng.new(4), 2)
+	var b := Board.generate(Rng.new(4), 2, 24)
 	assert_eq(_count(b, "elite"), 1)
 	assert_eq(_count(b, "enemy"), 5)
 	for t in b.tiles:
@@ -42,12 +42,12 @@ func test_later_acts_have_an_elite() -> void:
 			assert_true(t.enemies.size() >= 1)
 
 func test_generation_deterministic() -> void:
-	var a := Board.generate(Rng.new(99), 1)
-	var b := Board.generate(Rng.new(99), 1)
+	var a := Board.generate(Rng.new(99), 1, 24)
+	var b := Board.generate(Rng.new(99), 1, 24)
 	assert_eq(JSON.stringify(a.to_dict()), JSON.stringify(b.to_dict()))
 
 func test_landing_and_path_wraparound() -> void:
-	var b := Board.generate(Rng.new(1), 1)
+	var b := Board.generate(Rng.new(1), 1, 24)
 	assert_eq(b.landing(22, 5), 3)
 	assert_eq(b.landing(0, 4), 4)
 	assert_eq(b.path(22, 5), [23, 0, 1, 2, 3])
@@ -56,24 +56,44 @@ func test_landing_and_path_wraparound() -> void:
 	assert_true(not b.crosses_start(0, 6), "leaving start does not")
 
 func test_zero_move_stays() -> void:
-	var b := Board.generate(Rng.new(1), 1)
+	var b := Board.generate(Rng.new(1), 1, 24)
 	assert_eq(b.landing(5, 0), 5)
 	assert_eq(b.path(5, 0), [])
 	assert_true(not b.crosses_start(23, 0))
 
 func test_portal_targets() -> void:
-	var b := Board.generate(Rng.new(1), 1)
+	var b := Board.generate(Rng.new(1), 1, 24)
 	assert_eq(b.portal_range(), 8)
 	assert_eq(b.portal_targets(18), [19, 20, 21, 22, 23, 0, 1, 2])
 
 # ---- board size parameter
 
-func test_default_size_is_balance_board_size() -> void:
-	var b := Board.generate(Rng.new(2), 1)
-	assert_eq(Balance.BOARD_SIZE, 24)
+func test_size_24_geometry() -> void:
+	var b := Board.generate(Rng.new(2), 1, 24)
 	assert_eq(b.size(), 24)
 	assert_eq(b.side(), 7)
 	assert_eq(b.corners(), {0: "start", 6: "forge", 12: "treasury", 18: "portal"})
+
+func test_default_size_is_28() -> void:
+	assert_eq(Balance.BOARD_SIZE, 28)
+	for s in 30:
+		var b := Board.generate(Rng.new(s), 1)
+		assert_eq(b.size(), 28)
+		assert_eq(b.side(), 8)
+		assert_eq(b.corners(), {0: "start", 7: "forge", 14: "treasury", 21: "portal"})
+		assert_eq(b.tiles[7].type, "forge")
+		assert_eq(b.tiles[21].type, "portal")
+		assert_eq(_count(b, "enemy"), 7)
+		assert_eq(_count(b, "chest"), 4)
+		assert_eq(_count(b, "event"), 4)
+		assert_eq(_count(b, "campfire"), 2)
+		assert_eq(_count(b, "trap"), 2)
+		assert_eq(_count(b, "empty"), 5)
+		for i in [1, 2]:
+			assert_true(b.tiles[i].type != "enemy" and b.tiles[i].type != "elite")
+	var b2 := Board.generate(Rng.new(1), 1)
+	assert_eq(b2.portal_range(), 9)
+	assert_eq(b2.landing(26, 5), 3)
 
 func test_size_32_geometry() -> void:
 	var b := Board.generate(Rng.new(2), 1, 32)
@@ -128,7 +148,7 @@ func test_side_helpers() -> void:
 
 func test_mutation() -> void:
 	var r := Rng.new(5)
-	var b := Board.generate(r, 1)
+	var b := Board.generate(r, 1, 24)
 	# clear one enemy tile and consume an event
 	var cleared := -1
 	var consumed := -1
@@ -160,14 +180,14 @@ func test_mutation() -> void:
 	assert_eq(b.tiles[6].type, "forge")
 
 func test_ahead_empty() -> void:
-	var b := Board.generate(Rng.new(1), 1)
+	var b := Board.generate(Rng.new(1), 1, 24)
 	var ahead := b.next_of_type(10, "empty", 3)
 	assert_true(ahead.size() <= 3)
 	for i in ahead:
 		assert_eq(b.tiles[i].type, "empty")
 
 func test_round_trip() -> void:
-	var b := Board.generate(Rng.new(8), 3)
+	var b := Board.generate(Rng.new(8), 3, 24)
 	var parsed: Dictionary = JSON.parse_string(JSON.stringify(b.to_dict()))
 	var c := Board.from_dict(parsed)
 	assert_eq(JSON.stringify(c.to_dict()), JSON.stringify(b.to_dict()))

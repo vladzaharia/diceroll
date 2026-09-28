@@ -4,7 +4,7 @@ const P := GameFlow.Phase
 
 ## Arithmetic in these tests assumes a 70 HP hero, independent of balance tuning.
 func _flow(cls := "knight", s := 1) -> GameFlow:
-	var f := GameFlow.new_run(cls, s)
+	var f := GameFlow.new_run(cls, s, 24)
 	f.run.max_hp = 70
 	f.run.hp = 70
 	return f
@@ -269,15 +269,16 @@ func test_draft_generation_respects_caps() -> void:
 func test_pass_start_lap_and_shop() -> void:
 	var f := _flow()
 	_blank(f)
+	f.run.lap = 3 # completing lap 3 opens the shop
 	f.run.pos = 22
 	f.run.hp = 40
 	_force_roll(f, 5)
 	var ev := f.choose_move(0)
 	assert_eq(_first(ev, "hero_moved").path, [23, 0, 1, 2, 3])
 	var lc := _first(ev, "lap_completed")
-	assert_eq(lc.lap, 1)
+	assert_eq(lc.lap, 3)
 	assert_eq(lc.healed, 11, "15% of 70 = 10.5 -> 11")
-	assert_eq(f.run.lap, 2)
+	assert_eq(f.run.lap, 4)
 	assert_eq(f.run.pos, 3)
 	assert_true(_types(ev).has("board_mutated"))
 	assert_eq(f.phase, P.SHOP)
@@ -293,11 +294,12 @@ func test_pass_start_lap_and_shop() -> void:
 func test_land_on_start_opens_shop() -> void:
 	var f := _flow()
 	_blank(f)
+	f.run.lap = 9
 	f.run.pos = 20
 	_force_roll(f, 4)
 	f.choose_move(0)
 	assert_eq(f.run.pos, 0)
-	assert_eq(f.run.lap, 2)
+	assert_eq(f.run.lap, 10)
 	assert_eq(f.phase, P.SHOP)
 	f.shop_leave()
 	assert_eq(f.phase, P.BOARD_READY)
@@ -552,18 +554,20 @@ func test_portal_across_start() -> void:
 	var f := _flow()
 	_blank(f)
 	f.run.pos = 18
+	f.run.lap = 3
 	f.phase = P.PORTAL
 	f.offer = {"kind": "portal", "tiles": [19, 20, 21, 22, 23, 0, 1, 2]}
 	var ev := f.portal_pick(2)
 	assert_true(_types(ev).has("lap_completed"))
-	assert_eq(f.run.lap, 2)
+	assert_eq(f.run.lap, 4)
 	assert_eq(f.run.pos, 2)
 	assert_eq(f.phase, P.SHOP)
 
-func test_lap3_completion_starts_boss() -> void:
+func test_final_lap_completion_starts_boss() -> void:
 	var f := _flow()
 	_blank(f)
-	f.run.lap = 3
+	f.run.lap = Balance.TOTAL_LAPS
+	f.run.act = 3
 	f.run.pos = 22
 	_force_roll(f, 5)
 	assert_eq(f.landing_preview()[0], 0, "preview stops on start")
@@ -572,43 +576,15 @@ func test_lap3_completion_starts_boss() -> void:
 	assert_eq(f.run.pos, 0)
 	assert_eq(f.phase, P.COMBAT)
 	assert_eq(f.combat.boss, true)
-	assert_eq(f.combat.enemies[0].id, "boss_bone_warden")
+	assert_eq(f.combat.enemies[0].id, "boss_lich")
 	assert_eq(_first(ev, "combat_started").boss, true)
+	assert_eq(_first(ev, "lap_completed").lap, 15)
 
-func test_boss_win_next_act() -> void:
-	var f := _flow()
-	_blank(f)
-	f.run.lap = 3
-	f.run.pos = 22
-	_force_roll(f, 5)
-	f.choose_move(0)
-	var ev := _win_fight(f)
-	# resolve any level-up drafts
-	var guard := 0
-	while f.phase == P.DRAFT or f.phase == P.FORGE:
-		guard += 1
-		if guard > 10:
-			break
-		if f.offer.kind == "draft" or f.offer.kind == "passive":
-			ev.append_array(f.pick_draft(0))
-		elif f.offer.kind == "rune_assign":
-			ev.append_array(f.rune_assign(0))
-		else:
-			ev.append_array(f.forge_apply(0, 0, "raise"))
-	var as_ := _first(ev, "act_started")
-	assert_eq(as_.act, 2)
-	assert_eq(as_.biome, "hollow")
-	assert_eq(f.run.act, 2)
-	assert_eq(f.run.lap, 1)
-	assert_eq(f.run.pos, 0)
-	assert_eq(f.run.board.tiles.size(), 24)
-	assert_eq(f.phase, P.SHOP, "shop opens at act start")
-
-func test_act3_boss_victory() -> void:
+func test_final_boss_victory() -> void:
 	var f := _flow()
 	_blank(f)
 	f.run.act = 3
-	f.run.lap = 3
+	f.run.lap = Balance.TOTAL_LAPS
 	f.run.pos = 22
 	_force_roll(f, 5)
 	f.choose_move(0)
@@ -790,13 +766,14 @@ func test_act_started_reports_treasury() -> void:
 	var f := _flow()
 	var ev: Array[Dictionary] = []
 	f.run.treasury = 77
-	f._next_act(ev)
-	assert_eq(_first(ev, "act_started").get("treasury", -1), Balance.TREASURY_START)
+	f.run.lap = 6
+	f._new_biome(3, ev)
+	assert_eq(_first(ev, "act_started").get("treasury", -1), 77, "the treasury carries over")
 
-func test_portal_lap3_stops_at_start() -> void:
+func test_portal_final_lap_stops_at_start() -> void:
 	var f := _flow()
 	_blank(f)
-	f.run.lap = 3
+	f.run.lap = Balance.TOTAL_LAPS
 	f.run.pos = 14
 	_force_roll(f, 4)
 	f.choose_move(0)
@@ -987,7 +964,8 @@ func test_board_32_run() -> void:
 func test_board_32_next_act_keeps_size() -> void:
 	var f := GameFlow.new_run("knight", 5, 32)
 	var ev: Array[Dictionary] = []
-	f._next_act(ev)
+	f.run.lap = 6
+	f._new_biome(0, ev)
 	assert_eq(f.run.board.size(), 32)
 	assert_eq(_first(ev, "act_started").board.tiles.size(), 32)
 

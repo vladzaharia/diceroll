@@ -71,9 +71,6 @@ func survive_lethal() -> String:
 		return "second_wind"
 	return ""
 
-func laps_per_act() -> int:
-	return Balance.laps_per_act(board_size)
-
 ## Heals up to max; returns the amount actually healed.
 func heal(amount: int) -> int:
 	var before := hp

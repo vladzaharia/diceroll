@@ -2,12 +2,23 @@ class_name Balance
 extends RefCounted
 ## Tunable numbers. See docs/plans/balance.md for the sim results behind them.
 
-## Default ring size (24 = 7x7 perimeter, 32 = 9x9). GameFlow.new_run takes a size override.
-const BOARD_SIZE := 24
-## Laps per act on the default board. Use laps_per_act(size) for other ring sizes.
-const LAPS_PER_ACT := 3
-const LAPS_BY_SIZE := {24: 3, 32: 3}
+## Default ring size: 28 = 8x8 perimeter (24 = 7x7 and 32 = 9x9 also supported).
+## GameFlow.new_run takes a size override.
+const BOARD_SIZE := 28
+
+# Run structure: one continuous board, TOTAL_LAPS laps ("floors"). The biome ("act") changes
+# when lap BIOME_LAPS[k] starts; completing the last lap stops on Start for the final boss.
+const TOTAL_LAPS := 15
+## First lap of each act/biome (act 1 starts at lap 1).
+const BIOME_LAPS := [1, 6, 11]
+## Laps per biome (presentation: lap pips per act).
+const LAPS_PER_ACT := 5
 const ACTS := 3
+## The shop opens after completing a multiple of SHOP_EVERY laps, and at every biome change.
+const SHOP_EVERY := 3
+## The mini-boss appears when this lap starts and is gone when the next biome starts.
+const MINIBOSS_LAP := 7
+const BIOME_HEAL_PCT := 0.30
 const MAX_DICE := 5
 const START_DICE := 2
 
@@ -21,7 +32,6 @@ const TREASURY_PAIR_MULT := 2
 const CHEST_GOLD_MIN := 12
 const CHEST_GOLD_MAX := 24
 const CHEST_RUNE_CHANCE := 0.5
-const ACT_START_HEAL_PCT := 0.5
 
 # Combat
 const COMBAT_REROLLS := 2
@@ -30,13 +40,15 @@ const MAX_BANKED_REROLLS := 2
 const BUFF_AMOUNT := 2
 const MAX_SUMMONED_ALIVE := 3
 
-# Enemy scaling: mult = 1 + ACT_STEP*(act-1) + LAP_STEP*(lap-1)
-const ENEMY_ACT_STEP := 0.8
-const ENEMY_LAP_STEP := 0.2
+# Enemy scaling by lap (1..15): mult = 1 + ENEMY_LAP_STEP*(lap-1)
+const ENEMY_LAP_STEP := 0.14
 const ELITE_HP_MULT := 1.3
 const ELITE_ATK_MULT := 1.15
 const ELITE_REWARD_MULT := 1.5
-const GOLD_ACT_STEP := 0.25
+## Regular enemy and chest gold: x(1 + GOLD_LAP_STEP*(lap-1)).
+const GOLD_LAP_STEP := 0.05
+## Chance an elite's passive reward is a boss-tier choice instead of a regular one.
+const ELITE_BOSS_PASSIVE_CHANCE := 0.15
 
 # Progression
 const DRAFT_MAX_HP := 8
@@ -91,8 +103,19 @@ static func xp_for_level(level: int) -> int:
 		return XP_THRESHOLDS[level - 1]
 	return XP_THRESHOLDS.back() + XP_STEP_AFTER * (level - XP_THRESHOLDS.size())
 
-static func laps_per_act(ring_size: int) -> int:
-	return int(LAPS_BY_SIZE.get(ring_size, LAPS_PER_ACT))
+## Act (biome, 1..3) that lap `lap` (1..TOTAL_LAPS) belongs to.
+static func act_for_lap(lap: int) -> int:
+	var a := 1
+	for k in BIOME_LAPS.size():
+		if lap >= int(BIOME_LAPS[k]):
+			a = k + 1
+	return a
 
-static func enemy_scale(act: int, lap: int) -> float:
-	return 1.0 + ENEMY_ACT_STEP * (act - 1) + ENEMY_LAP_STEP * (lap - 1)
+static func is_shop_lap(completed_lap: int) -> bool:
+	return completed_lap % SHOP_EVERY == 0 or BIOME_LAPS.has(completed_lap + 1)
+
+static func enemy_scale(lap: int) -> float:
+	return 1.0 + ENEMY_LAP_STEP * (lap - 1)
+
+static func gold_scale(lap: int) -> float:
+	return 1.0 + GOLD_LAP_STEP * (lap - 1)

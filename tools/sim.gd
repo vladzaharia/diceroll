@@ -36,6 +36,7 @@ func _init() -> void:
 		var combat_turns := 0
 		var cmd_sum := 0
 		var level_sum := 0
+		var lap_sum := 0
 		var fights_won_sum := 0
 		var deaths := {}
 		var stuck := 0
@@ -64,7 +65,9 @@ func _init() -> void:
 			if f.phase == GameFlow.Phase.VICTORY:
 				wins += 1
 			else:
-				var key := "act%d%s" % [f.run.act, "boss" if last_fight.contains("boss_") and f.run.lap == f.run.laps_per_act() else ""]
+				var key := "boss" if last_fight.contains("boss_") else "act%d" % f.run.act
+				if last_fight.contains("mini_"):
+					key = "mini"
 				deaths[key] = int(deaths.get(key, 0)) + 1
 				if verbose:
 					print("  died %s seed=%d at %s lvl=%d dice=%d" % [c, s, last_fight, f.run.level, f.run.dice.size()])
@@ -73,18 +76,19 @@ func _init() -> void:
 			combat_turns += int(f.run.stats.get("combat_turns", 0))
 			cmd_sum += f.commands.size()
 			level_sum += f.run.level
+			lap_sum += f.run.lap
 			fights_won_sum += int(f.run.stats.get("fights_won", 0))
 		rows.append([c, 100.0 * wins / runs, float(act_sum) / runs, float(board_turns) / runs,
-			float(combat_turns) / runs, float(cmd_sum) / runs, float(level_sum) / runs, float(fights_won_sum) / runs, deaths, stuck])
+			float(combat_turns) / runs, float(cmd_sum) / runs, float(level_sum) / runs, float(fights_won_sum) / runs, deaths, stuck, float(lap_sum) / runs])
 	print("")
-	print("| class | win% | avg act | avg board turns | avg combat turns | avg commands | avg level | avg fights won | deaths by act |")
-	print("|---|---|---|---|---|---|---|---|---|")
+	print("| class | win% | avg act | avg lap | avg board turns | avg combat turns | avg commands | avg level | avg fights won | deaths |")
+	print("|---|---|---|---|---|---|---|---|---|---|")
 	for row in rows:
-		print("| %s | %.1f | %.2f | %.1f | %.1f | %.0f | %.1f | %.1f | %s |" % [row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], _fmt(row[8])])
+		print("| %s | %.1f | %.2f | %.1f | %.1f | %.1f | %.0f | %.1f | %.1f | %s |" % [row[0], row[1], row[2], row[10], row[3], row[4], row[5], row[6], row[7], _fmt(row[8])])
 		if row[9] > 0:
 			print("  WARNING: %d runs hit the command cap" % row[9])
 	print("")
-	print("board=%d laps/act=%d" % [board, Balance.laps_per_act(board)])
+	print("board=%d laps=%d" % [board, Balance.TOTAL_LAPS])
 	print("runs/class=%d seed=%d errors=%d capped=%d time=%.1fs" % [runs, seed0, total_errors, total_stuck, (Time.get_ticks_msec() - t0) / 1000.0])
 	quit(0 if total_errors == 0 and total_stuck == 0 else 1)
 

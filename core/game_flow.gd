@@ -16,7 +16,8 @@ var offer: Dictionary = {}
 # extras
 var board_rerolls_left: int = 0
 ## Queue of steps still to resolve after the current modal/combat closes.
-## Step kinds: tile{idx}, shop, draft, rune_choice{source}, boss, next_act, victory.
+## Step kinds: tile{idx}, shop, draft, rune_choice{source}, passive_choice{source, tier}, boss,
+## bonus_move{steps}, victory.
 var pending: Array[Dictionary] = []
 ## Successful commands in order: [name, args...].
 var commands: Array = []
@@ -83,7 +84,7 @@ func _do_board_roll() -> Array[Dictionary]:
 func landing_preview() -> Array[int]:
 	var out: Array[int] = []
 	for v in board_roll:
-		if run.lap >= run.laps_per_act() and run.board.crosses_start(run.pos, v):
+		if run.lap >= Balance.TOTAL_LAPS and run.board.crosses_start(run.pos, v):
 			out.append(0)
 		else:
 			out.append(run.board.landing(run.pos, v))
@@ -128,6 +129,9 @@ func _pending_has(kind: String) -> bool:
 	return false
 
 ## Moves the hero `steps` tiles forward (or teleports), handling lap completion.
+## Passing Start completes a lap: heal, lap += 1, then either a new biome (laps 6 and 11:
+## regenerated board, act_started) or a board mutation (plus the mini-boss when lap 7 starts),
+## then the shop on shop laps. Completing the final lap stops on Start for the final boss.
 func _move(steps: int, teleport: bool) -> Array[Dictionary]:
 	var ev: Array[Dictionary] = []
 	if steps <= 0:
@@ -136,8 +140,9 @@ func _move(steps: int, teleport: bool) -> Array[Dictionary]:
 		return ev
 	var crossing := run.board.crosses_start(run.pos, steps)
 	var p := run.board.path(run.pos, steps)
-	if crossing and run.lap >= run.laps_per_act():
-		# stop on Start: act boss
+	var final_lap := run.lap >= Balance.TOTAL_LAPS
+	if crossing and final_lap:
+		# stop on Start: final boss
 		var cut: Array[int] = []
 		for t in p:
 			cut.append(t)
@@ -150,7 +155,7 @@ func _move(steps: int, teleport: bool) -> Array[Dictionary]:
 	if crossing:
 		var healed := run.heal(run.pct_of_max(Balance.LAP_HEAL_PCT))
 		var completed := run.lap
-		if run.lap >= run.laps_per_act():
+		if final_lap:
 			ev.append({"type": "lap_completed", "lap": completed, "healed": healed, "hp": run.hp, "boss": true})
 			ev.append({"type": "hp_changed", "amount": healed, "total": run.hp, "source": "lap", "max_hp": run.max_hp})
 			pending.push_front({"kind": "boss"})
@@ -158,22 +163,25 @@ func _move(steps: int, teleport: bool) -> Array[Dictionary]:
 		run.lap += 1
 		ev.append({"type": "lap_completed", "lap": completed, "healed": healed, "hp": run.hp, "boss": false})
 		ev.append({"type": "hp_changed", "amount": healed, "total": run.hp, "source": "lap", "max_hp": run.max_hp})
-		var changes := run.board.mutate(run.rng, run.act, run.lap, [dest])
-		if completed == 1:
-			# the act's mini-boss appears on the board after lap 1
-			var mb := run.board.spawn_miniboss(run.rng, EnemyDefs.ACT_MINIBOSS[run.act - 1], dest, [dest])
-			if not mb.is_empty():
-				for c in range(changes.size() - 1, -1, -1):
-					if changes[c].idx == mb.idx:
-						changes.remove_at(c)
-				changes.append(mb)
-		ev.append({"type": "board_mutated", "changes": changes})
+		if Balance.act_for_lap(run.lap) != run.act:
+			_new_biome(dest, ev)
+		else:
+			var changes := run.board.mutate(run.rng, run.act, run.lap, [dest])
+			if run.lap == Balance.MINIBOSS_LAP:
+				var mb := run.board.spawn_miniboss(run.rng, EnemyDefs.ACT_MINIBOSS[run.act - 1], dest, [dest])
+				if not mb.is_empty():
+					for c in range(changes.size() - 1, -1, -1):
+						if changes[c].idx == mb.idx:
+							changes.remove_at(c)
+					changes.append(mb)
+			ev.append({"type": "board_mutated", "changes": changes})
 		if run.has_passive("piggy_bank"):
 			var interest := mini(Balance.PASSIVE_PIGGY_MAX, int(run.gold * Balance.PASSIVE_PIGGY_PCT))
 			if interest > 0:
 				ev.append(_passive_ev("piggy_bank", interest))
 				_gold(ev, interest, "piggy_bank")
-		pending.push_back({"kind": "shop"})
+		if Balance.is_shop_lap(completed):
+			pending.push_back({"kind": "shop"})
 	if dest != 0:
 		pending.push_back({"kind": "tile", "idx": dest})
 	return ev
@@ -205,14 +213,12 @@ func _advance(ev: Array[Dictionary]) -> void:
 				var gone := run.board.remove_minibosses()
 				if not gone.is_empty():
 					ev.append({"type": "board_mutated", "changes": gone})
-				_start_combat([EnemyDefs.ACT_BOSS[run.act - 1]], false, true, 0, ev)
+				_start_combat([EnemyDefs.FINAL_BOSS], false, true, 0, ev)
 			"passive_choice":
-				_open_passive_choice(String(step.get("source", "elite")), ev)
+				_open_passive_choice(String(step.get("source", "elite")), ev, String(step.get("tier", "")))
 			"bonus_move":
 				ev.append(_passive_ev("fast_feet", int(step.steps)))
 				ev.append_array(_move(int(step.steps), false))
-			"next_act":
-				_next_act(ev)
 			"victory":
 				_finish(true, ev)
 
@@ -245,7 +251,7 @@ func _trigger_tile(idx: int, ev: Array[Dictionary]) -> void:
 			if run.rng.chance(Balance.CHEST_RUNE_CHANCE):
 				_open_rune_choice("chest", ev)
 			else:
-				var g := int(round(run.rng.randi_range(Balance.CHEST_GOLD_MIN, Balance.CHEST_GOLD_MAX) * (1.0 + Balance.GOLD_ACT_STEP * (run.act - 1))))
+				var g := int(round(run.rng.randi_range(Balance.CHEST_GOLD_MIN, Balance.CHEST_GOLD_MAX) * Balance.gold_scale(run.lap)))
 				if run.has_passive("treasure_sense"):
 					g = int(round(g * Balance.PASSIVE_TREASURE_MULT))
 					ev.append(_passive_ev("treasure_sense", g))
@@ -291,7 +297,7 @@ func _portal_tiles(from: int) -> Array:
 	var out: Array = []
 	for t in run.board.portal_targets(from):
 		out.append(t)
-		if t == 0 and run.lap >= run.laps_per_act():
+		if t == 0 and run.lap >= Balance.TOTAL_LAPS:
 			break
 	return out
 
@@ -363,7 +369,7 @@ func _on_combat_won(ev: Array[Dictionary]) -> void:
 	if c.tile >= 0 and not c.boss:
 		run.board.clear_enemies(c.tile)
 		ev.append({"type": "board_mutated", "changes": [run.board.change(c.tile)]})
-	if c.boss and run.act >= Balance.ACTS:
+	if c.boss:
 		_finish(true, ev)
 		return
 	var front: Array[Dictionary] = []
@@ -372,16 +378,13 @@ func _on_combat_won(ev: Array[Dictionary]) -> void:
 		run.level += 1
 		ev.append({"type": "level_up", "level": run.level, "xp": run.xp, "next": Balance.xp_for_level(run.level)})
 		front.append({"kind": "draft"})
-	# After the level-up drafts: elites give 1 of 3 regular passives; mini-bosses and the
-	# Act 1/2 bosses give 1 of 3 boss passives.
-	if c.boss:
-		front.append({"kind": "passive_choice", "source": "boss"})
-	elif c.miniboss:
+	# After the level-up drafts: the mini-boss gives 1 of 3 boss passives; elites give 1 of 3
+	# regular passives, or (ELITE_BOSS_PASSIVE_CHANCE) 1 of 3 boss passives.
+	if c.miniboss:
 		front.append({"kind": "passive_choice", "source": "miniboss"})
 	elif c.elite:
-		front.append({"kind": "passive_choice", "source": "elite"})
-	if c.boss:
-		front.append({"kind": "next_act"})
+		var tier := "boss" if run.rng.chance(Balance.ELITE_BOSS_PASSIVE_CHANCE) else "regular"
+		front.append({"kind": "passive_choice", "source": "elite", "tier": tier})
 	front.append_array(pending)
 	pending = front
 
@@ -404,20 +407,22 @@ func _summary() -> Dictionary:
 	s["dice"] = run.dice.size()
 	return s
 
-func _next_act(ev: Array[Dictionary]) -> void:
-	run.act += 1
-	run.lap = 1
-	run.pos = 0
-	run.treasury = Balance.TREASURY_START
+## Biome change (laps 6 and 11): act += 1, the board is regenerated around the hero (who keeps
+## their position; their landing tile is never a fight), 30% heal, Rune Bloom, reroll item
+## available again. Emits act_started {act, biome, lap, board, treasury}. Any mini-boss is gone.
+func _new_biome(dest: int, ev: Array[Dictionary]) -> void:
+	run.act = Balance.act_for_lap(run.lap)
 	run.shop_reroll_bought = false
-	run.board = Board.generate(run.rng, run.act, run.board_size)
+	run.board = Board.generate(run.rng, run.act, run.board_size, run.lap)
+	if not run.board.is_corner(dest) and Board._is_fight(String(run.board.tiles[dest].type)):
+		run.board.tiles[dest] = Board.make_tile("empty")
 	run.stats.max_act = maxi(int(run.stats.get("max_act", 1)), run.act)
-	ev.append({"type": "act_started", "act": run.act, "biome": EnemyDefs.ACT_BIOME[run.act - 1], "board": run.board.to_dict(), "treasury": run.treasury})
-	var h := run.heal(run.pct_of_max(Balance.ACT_START_HEAL_PCT))
+	ev.append({"type": "act_started", "act": run.act, "biome": EnemyDefs.ACT_BIOME[run.act - 1], "lap": run.lap,
+		"board": run.board.to_dict(), "treasury": run.treasury, "pos": run.pos})
+	var h := run.heal(run.pct_of_max(Balance.BIOME_HEAL_PCT))
 	ev.append({"type": "hp_changed", "amount": h, "total": run.hp, "source": "act_start", "max_hp": run.max_hp})
 	if run.has_passive("rune_bloom"):
 		_rune_bloom(ev)
-	pending.push_front({"kind": "shop"})
 
 # ================================================================ draft & runes
 
@@ -458,12 +463,13 @@ func _open_rune_choice(source: String, ev: Array[Dictionary]) -> void:
 # ================================================================ passives
 
 ## Offer {kind:"passive", options:[{id,label,desc,rarity,icon}], source} in phase DRAFT; the
-## player picks with pick_draft(i). source "elite" rolls regular passives; "boss"/"miniboss" roll
-## boss passives (falling back to rares when fewer than 3 remain). Nothing left: no offer.
-func _open_passive_choice(source: String, ev: Array[Dictionary]) -> void:
+## player picks with pick_draft(i). source "elite" rolls regular passives (tier "boss": boss
+## passives); "miniboss" rolls boss passives (falling back to rares when fewer than 3 remain).
+## Nothing left: no offer.
+func _open_passive_choice(source: String, ev: Array[Dictionary], tier := "") -> void:
 	var owned: Array = Array(run.passives)
 	var ids: Array[String]
-	if source == "boss" or source == "miniboss":
+	if tier == "boss" or source == "boss" or source == "miniboss":
 		ids = Passives.roll_boss(run.rng, 3, owned)
 	else:
 		ids = Passives.roll_regular(run.rng, 3, owned)
@@ -947,7 +953,7 @@ func debug_open(kind: String, arg := "") -> Array[Dictionary]:
 		"combat":
 			var ids: Array = Array(arg.split(",", false)) if arg != "" else ["skeleton_minion", "skeleton_archer"]
 			_start_combat(ids, false, false, run.pos, ev)
-		"boss": _start_combat([EnemyDefs.ACT_BOSS[run.act - 1]], false, true, 0, ev)
+		"boss": _start_combat([EnemyDefs.FINAL_BOSS], false, true, 0, ev)
 		_: return [_e("unknown debug kind " + kind)]
 	return ev
 

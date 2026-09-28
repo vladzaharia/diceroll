@@ -57,7 +57,7 @@ func _hit(values: Array, passives: Array, runes: Array = []) -> int:
 	return int(_first(ev, "combo").total)
 
 func _flow(cls := "knight", s := 1) -> GameFlow:
-	var f := GameFlow.new_run(cls, s)
+	var f := GameFlow.new_run(cls, s, 24)
 	f.run.max_hp = 70
 	f.run.hp = 70
 	for i in f.run.board.size():
@@ -197,30 +197,38 @@ func test_shrine_offers_passives() -> void:
 	assert_true(f.run.passives.has(id))
 	assert_eq(_first(out, "passive_gained").id, id)
 
-func test_act_boss_rewards_boss_passive_then_next_act() -> void:
-	var f := _flow()
-	f.run.lap = 3
-	f.run.pos = 22
-	_force_roll(f, [2, 2])
-	f.choose_move(0)
-	assert_eq(f.phase, P.COMBAT)
-	assert_true(f.combat.boss)
-	_win(f)
-	_drain_drafts(f)
-	assert_eq(f.offer.kind, "passive")
-	assert_eq(f.offer.source, "boss")
-	for o in f.offer.options:
-		assert_eq(o.rarity, "boss")
-	var ev := f.pick_draft(0)
-	assert_eq(_first(ev, "act_started").act, 2)
+func test_elite_sometimes_offers_boss_tier() -> void:
+	var boss_offers := 0
+	var regular_offers := 0
+	for s in 60:
+		var f := _flow("knight", s)
+		f.run.xp = 0
+		f.run.board.tiles[3] = Board.make_tile("elite", ["brute"], true)
+		_force_roll(f, [3, 1])
+		f.choose_move(0)
+		_win(f)
+		_drain_drafts(f)
+		assert_eq(f.offer.kind, "passive")
+		assert_eq(f.offer.source, "elite")
+		var tiers := {}
+		for o in f.offer.options:
+			tiers[Passives.is_boss(o.id)] = true
+		assert_eq(tiers.size(), 1, "one tier per offer")
+		if tiers.has(true):
+			boss_offers += 1
+		else:
+			regular_offers += 1
+	assert_true(boss_offers > 0, "rare boss-tier elite drop")
+	assert_true(regular_offers > boss_offers * 3, "mostly regular (%d vs %d)" % [regular_offers, boss_offers])
 
-func test_act3_boss_no_reward() -> void:
+func test_final_boss_no_reward() -> void:
 	var f := _flow()
 	f.run.act = 3
-	f.run.lap = 3
+	f.run.lap = Balance.TOTAL_LAPS
 	f.run.pos = 22
 	_force_roll(f, [2, 2])
 	f.choose_move(0)
+	assert_eq(f.combat.enemies[0].id, EnemyDefs.FINAL_BOSS)
 	_win(f)
 	assert_eq(f.phase, P.VICTORY)
 
@@ -553,7 +561,8 @@ func test_rune_bloom() -> void:
 	assert_eq(_all(ev, "rune_assigned").size(), 1)
 	f.run.dice.append(Die.new())
 	var ev2: Array[Dictionary] = []
-	f._next_act(ev2)
+	f.run.lap = 6
+	f._new_biome(0, ev2)
 	assert_true(f.run.dice[2].rune != "", "blooms again at act start")
 
 func test_pickup_events_for_all() -> void:
@@ -568,7 +577,10 @@ func test_pickup_events_for_all() -> void:
 
 # ---------------------------------------------------------------- mini-bosses
 
-func _lap_once(f: GameFlow) -> Array[Dictionary]:
+## Walks the hero across Start once, starting at `lap`.
+func _cross(f: GameFlow, lap: int) -> Array[Dictionary]:
+	f.run.lap = lap
+	f.run.act = Balance.act_for_lap(lap)
 	f.run.pos = f.run.board.size() - 2
 	_force_roll(f, [3, 5])
 	var ev := f.choose_move(0)
@@ -583,20 +595,24 @@ func _minis(f: GameFlow) -> Array[int]:
 			out.append(i)
 	return out
 
-func test_miniboss_spawns_after_lap_one() -> void:
+func test_miniboss_spawns_when_lap_7_starts() -> void:
 	for s in 25:
-		for size in [24, 32]:
+		for size in [24, 28, 32]:
 			var f := GameFlow.new_run("knight", s, size)
-			assert_eq(_minis(f).size(), 0)
-			var ev := _lap_once(f)
+			_cross(f, 5)
+			assert_eq(_minis(f).size(), 0, "not in lap 6")
+			var ev := _cross(f, 6)
+			assert_eq(f.run.lap, 7)
 			var m := _minis(f)
 			assert_eq(m.size(), 1, "one mini-boss (seed %d size %d)" % [s, size])
+			if m.is_empty():
+				continue
 			var idx: int = m[0]
 			var n := f.run.board.size()
 			var d := (idx - f.run.pos + n) % n
 			assert_true(mini(d, n - d) > 3, "not within 3 tiles of the hero")
 			assert_true(not f.run.board.is_corner(idx))
-			assert_eq(Array(f.run.board.tiles[idx].enemies), ["mini_bone_champion"])
+			assert_eq(Array(f.run.board.tiles[idx].enemies), ["mini_pumpkin_knight"], "act 2 biome mini-boss")
 			var found := false
 			for e in ev:
 				if e.type == "board_mutated":
@@ -604,27 +620,25 @@ func test_miniboss_spawns_after_lap_one() -> void:
 						if ch.idx == idx and ch.type == "miniboss":
 							found = true
 			assert_true(found, "reported in board_mutated")
-			_lap_once(f)
-			assert_eq(_minis(f).size(), 1, "no second mini-boss on lap 2")
+			_cross(f, 7)
+			assert_eq(_minis(f).size(), 1, "persists into lap 8")
+			_cross(f, 10)
+			assert_eq(f.run.act, 3)
+			assert_eq(_minis(f).size(), 0, "gone when lap 11 starts")
 
-func test_miniboss_ids_per_act() -> void:
+func test_miniboss_ids() -> void:
 	assert_eq(EnemyDefs.ACT_MINIBOSS, ["mini_bone_champion", "mini_pumpkin_knight", "mini_grave_mage"])
 	for id in EnemyDefs.ACT_MINIBOSS:
 		assert_true(EnemyDefs.MINIBOSSES.has(id))
-	var f := _flow()
-	f.run.act = 2
-	_lap_once(f)
-	var m := _minis(f)
-	assert_eq(Array(f.run.board.tiles[m[0]].enemies), ["mini_pumpkin_knight"])
 
 func test_miniboss_fight_rewards_boss_passive() -> void:
 	var f := _flow()
-	f.run.board.tiles[5] = Board.make_tile("miniboss", ["mini_bone_champion"])
+	f.run.board.tiles[5] = Board.make_tile("miniboss", ["mini_pumpkin_knight"])
 	_force_roll(f, [5, 1])
 	var ev := f.choose_move(0)
 	var cs := _first(ev, "combat_started")
 	assert_eq(cs.miniboss, true)
-	assert_eq(f.combat.enemies[0].id, "mini_bone_champion")
+	assert_eq(f.combat.enemies[0].id, "mini_pumpkin_knight")
 	assert_true(f.combat.enemies[0].hp > 90, "tanky")
 	ev = _win(f)
 	assert_true(_first(ev, "combat_won").gold > 0)
@@ -636,10 +650,10 @@ func test_miniboss_fight_rewards_boss_passive() -> void:
 	f.pick_draft(0)
 	assert_eq(f.run.board.tiles[5].enemies.size(), 0, "cleared")
 
-func test_miniboss_vanishes_when_act_boss_starts() -> void:
+func test_miniboss_vanishes_when_final_boss_starts() -> void:
 	var f := _flow()
-	f.run.board.tiles[10] = Board.make_tile("miniboss", ["mini_bone_champion"])
-	f.run.lap = 3
+	f.run.board.tiles[10] = Board.make_tile("miniboss", ["mini_pumpkin_knight"])
+	f.run.lap = Balance.TOTAL_LAPS
 	f.run.pos = 22
 	_force_roll(f, [2, 2])
 	var ev := f.choose_move(0)
@@ -652,3 +666,70 @@ func test_miniboss_vanishes_when_act_boss_starts() -> void:
 				if ch.idx == 10 and ch.type == "empty":
 					found = true
 	assert_true(found)
+
+# ---------------------------------------------------------------- run structure (15 laps)
+
+func test_structure_constants() -> void:
+	assert_eq(Balance.TOTAL_LAPS, 15)
+	assert_eq(Balance.act_for_lap(1), 1)
+	assert_eq(Balance.act_for_lap(5), 1)
+	assert_eq(Balance.act_for_lap(6), 2)
+	assert_eq(Balance.act_for_lap(10), 2)
+	assert_eq(Balance.act_for_lap(11), 3)
+	assert_eq(Balance.act_for_lap(15), 3)
+	var shops: Array = []
+	for lap in range(1, 15):
+		if Balance.is_shop_lap(lap):
+			shops.append(lap)
+	assert_eq(shops, [3, 5, 6, 9, 10, 12], "every 3 laps plus biome changes")
+
+func test_lap_completion_without_shop() -> void:
+	var f := GameFlow.new_run("knight", 3)
+	var ev := _cross(f, 1)
+	assert_eq(_first(ev, "lap_completed").lap, 1)
+	assert_eq(f.run.lap, 2)
+	for e in ev:
+		assert_true(not (e.type == "offer_opened" and e.offer.kind == "shop"), "no shop after lap 1")
+
+func test_biome_change_regenerates_board() -> void:
+	var f := GameFlow.new_run("knight", 4)
+	f.run.max_hp = 100
+	f.run.hp = 50
+	f.run.lap = 5
+	f.run.pos = 26
+	_force_roll(f, [4, 4])
+	var ev := f.choose_move(0)
+	assert_eq(f.run.lap, 6)
+	assert_eq(f.run.act, 2)
+	assert_eq(f.run.pos, 2, "hero keeps their position")
+	var as_ := _first(ev, "act_started")
+	assert_eq(as_.act, 2)
+	assert_eq(as_.biome, "hollow")
+	assert_eq(as_.lap, 6)
+	assert_eq(as_.board.tiles.size(), 28)
+	assert_eq(_count_type(f, "elite"), 1, "later biomes carry an elite")
+	var t := String(f.run.board.tiles[2].type)
+	assert_true(t != "enemy" and t != "elite", "landing tile is never a fight")
+	var heals := 0
+	for e in ev:
+		if e.type == "hp_changed" and e.source == "act_start":
+			heals = e.amount
+	assert_eq(heals, 30, "30% biome heal")
+	assert_eq(f.phase, P.SHOP, "shop at biome change")
+
+func _count_type(f: GameFlow, type: String) -> int:
+	var n := 0
+	for t in f.run.board.tiles:
+		if t.type == type:
+			n += 1
+	return n
+
+func test_no_mid_run_bosses() -> void:
+	var f := GameFlow.new_run("knight", 8)
+	for lap in range(1, Balance.TOTAL_LAPS):
+		var ev := _cross(f, lap)
+		for e in ev:
+			assert_true(e.type != "combat_started" or not e.boss, "no boss before the last lap")
+	var ev := _cross(f, Balance.TOTAL_LAPS)
+	assert_eq(f.phase, P.COMBAT)
+	assert_eq(f.combat.enemies[0].id, "boss_lich")

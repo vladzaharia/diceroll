@@ -49,7 +49,7 @@ func begin(run: RunState, ids: Array, p_elite: bool, p_boss: bool, p_tile: int, 
 static func make_enemy(rng: Rng, id: String, p_act: int, p_lap: int, p_elite: bool, summoned := false) -> Dictionary:
 	var is_boss := EnemyDefs.is_boss(id)
 	var def := EnemyDefs.def(id)
-	var scale := 1.0 if is_boss else Balance.enemy_scale(p_act, p_lap)
+	var scale := 1.0 if is_boss else Balance.enemy_scale(p_lap)
 	var hp_mult := scale * (Balance.ELITE_HP_MULT if p_elite else 1.0)
 	var atk_mult := scale * (Balance.ELITE_ATK_MULT if p_elite else 1.0)
 	var hp := int(round(float(def.hp) * hp_mult))
@@ -512,7 +512,7 @@ func _execute_intent(run: RunState, i: int) -> Array[Dictionary]:
 
 func _win(run: RunState) -> Array[Dictionary]:
 	result = "won"
-	var gold_mult := 1.0 + Balance.GOLD_ACT_STEP * (act - 1)
+	var gold_mult := Balance.gold_scale(lap)
 	var g := 0.0
 	var x := 0.0
 	for e in enemies:

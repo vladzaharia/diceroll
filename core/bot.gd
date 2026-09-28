@@ -84,7 +84,7 @@ static func tile_score(f: GameFlow, idx: int, crossing: bool) -> float:
 			s = 2.0
 		"start":
 			s = 3.0
-	if crossing and f.run.lap < f.run.laps_per_act():
+	if crossing and f.run.lap < Balance.TOTAL_LAPS:
 		s += 3.0
 	return s
 

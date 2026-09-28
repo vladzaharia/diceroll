@@ -12,10 +12,12 @@ const CORNER_TYPES := ["start", "forge", "treasury", "portal"]
 ## LAYOUTS[size].event.
 const LAYOUTS := {
 	24: {"enemy": 6, "chest": 3, "event": 3, "campfire": 2, "trap": 2, "empty": 4},
+	28: {"enemy": 7, "chest": 4, "event": 4, "campfire": 2, "trap": 2, "empty": 5},
 	32: {"enemy": 8, "chest": 4, "event": 4, "campfire": 3, "trap": 3, "empty": 6},
 }
 const MUTATE := {
 	24: ["enemy", "enemy", "elite"],
+	28: ["enemy", "enemy", "elite"],
 	32: ["enemy", "enemy", "enemy", "elite"],
 }
 
@@ -78,7 +80,8 @@ static func mutate_spawns_for(ring_size: int) -> Array:
 
 # ---------------------------------------------------------------- generation
 
-static func generate(rng: Rng, act: int, ring_size: int = Balance.BOARD_SIZE) -> Board:
+## act >= 2 swaps one Enemy for an Elite; `lap` sets the enemy band on the new tiles.
+static func generate(rng: Rng, act: int, ring_size: int = Balance.BOARD_SIZE, lap: int = 1) -> Board:
 	assert(ring_size % 4 == 0 and ring_size >= 16, "ring size must be 4(n-1)")
 	var b := Board.new()
 	var bag: Array[String] = []
@@ -110,7 +113,7 @@ static func generate(rng: Rng, act: int, ring_size: int = Balance.BOARD_SIZE) ->
 		b.tiles[i] = make_tile(corner_map[i])
 	for k in edge.size():
 		var type := bag[k]
-		b.tiles[edge[k]] = _spawn(rng, type, act, 1)
+		b.tiles[edge[k]] = _spawn(rng, type, act, lap)
 	return b
 
 static func _is_fight(type: String) -> bool:
@@ -124,7 +127,7 @@ static func _spawn(rng: Rng, type: String, act: int, lap: int) -> Dictionary:
 	return make_tile(type)
 
 static func roll_enemies(rng: Rng, act: int, lap: int, elite: bool) -> Array[String]:
-	var band := EnemyDefs.band(act, lap)
+	var band := EnemyDefs.band(lap)
 	var pool: Array = EnemyDefs.POOLS[band]
 	var out: Array[String] = []
 	if elite:
