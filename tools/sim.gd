@@ -1,7 +1,9 @@
 extends SceneTree
-## Balance simulator: plays N runs per class with the greedy Bot.
+## Balance simulator: plays N runs per class with the greedy Bot (the balance reference) or the
+## player-facing AUTO policy (Bot.decide with every scope on and no stop conditions).
 ## Usage: godot --headless --path . -s tools/sim.gd -- --runs=300 --class=all --seed=1
 ##        [--board=24|28|32] [--route=glade,frost,magma] [--boss=boss_lich] [--verbose]
+##        [--policy=greedy|smart] [--focus=balanced|damage|defense|economy]
 ## Without --route each run draws its own route (one biome per tier) and bosses from its seed.
 ## Prints per class: win%, avg act reached, avg board turns, avg combat turns, avg run length in
 ## commands; then win% per route, per final boss and per route + boss over all classes. Any
@@ -16,6 +18,8 @@ func _init() -> void:
 	var verbose := false
 	var board := Balance.BOARD_SIZE
 	var opts := {}
+	var policy := "greedy"
+	var focus := "balanced"
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--runs="):
 			runs = arg.substr(7).to_int()
@@ -33,6 +37,18 @@ func _init() -> void:
 				return
 		elif arg.begins_with("--boss="):
 			opts["boss"] = arg.substr(7)
+		elif arg.begins_with("--policy="):
+			policy = arg.substr(9)
+			if not (policy in ["greedy", "smart"]):
+				print("bad --policy (greedy|smart): ", policy)
+				quit(2)
+				return
+		elif arg.begins_with("--focus="):
+			focus = arg.substr(8)
+			if not AutoRules.FOCUSES.has(focus):
+				print("bad --focus (%s): %s" % ["|".join(AutoRules.FOCUSES), focus])
+				quit(2)
+				return
 		elif arg == "--verbose":
 			verbose = true
 	var classes: Array = HeroDefs.IDS if cls == "all" else [cls]
@@ -43,6 +59,11 @@ func _init() -> void:
 	var by_boss := {}
 	var by_combo := {}
 	var by_mini := {}    # mini-boss -> [wins, fights]
+	var rules := AutoRules.all_on(focus)
+	var decide_us := 0
+	var decide_max_us := 0
+	var decide_calls := 0
+	var stops := 0
 	var t0 := Time.get_ticks_msec()
 	for c in classes:
 		var wins := 0
@@ -61,7 +82,21 @@ func _init() -> void:
 			var n := 0
 			var last_fight := ""
 			while not f.is_over() and n < MAX_COMMANDS:
-				var cmd := Bot.next_command(f)
+				var cmd: Array
+				if policy == "smart":
+					var t1 := Time.get_ticks_usec()
+					var d := Bot.decide(f, rules)
+					var dt := Time.get_ticks_usec() - t1
+					decide_us += dt
+					decide_max_us = maxi(decide_max_us, dt)
+					decide_calls += 1
+					if d.stop:
+						stops += 1
+						cmd = Bot.next_command(f)
+					else:
+						cmd = d.cmd
+				else:
+					cmd = Bot.next_command(f)
 				var ev := f.apply(cmd)
 				n += 1
 				for e in ev:
@@ -116,7 +151,9 @@ func _init() -> void:
 	_table("route / final boss", by_combo)
 	_table("mini-boss", by_mini, false)
 	print("")
-	print("board=%d laps=%d opts=%s" % [board, Balance.TOTAL_LAPS, str(opts)])
+	print("policy=%s%s board=%d laps=%d opts=%s" % [policy, (" focus=" + focus) if policy == "smart" else "", board, Balance.TOTAL_LAPS, str(opts)])
+	if policy == "smart":
+		print("decide(): %d calls, avg %.2f ms, max %.1f ms, unexpected stops %d" % [decide_calls, decide_us / 1000.0 / maxi(1, decide_calls), decide_max_us / 1000.0, stops])
 	print("runs/class=%d seed=%d errors=%d capped=%d time=%.1fs" % [runs, seed0, total_errors, total_stuck, (Time.get_ticks_msec() - t0) / 1000.0])
 	quit(0 if total_errors == 0 and total_stuck == 0 else 1)
 

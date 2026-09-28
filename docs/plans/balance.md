@@ -111,6 +111,59 @@ About the numbers:
 - Tier-3 boards are balanced so both reach the boss about 65% of the time: Magma's lava and
   burns cost HP on the way, the Bone Throne's extra elites and bone knights fight harder.
 
+## AUTO policy (smart bot) vs greedy
+
+The player-facing AUTO (`Bot.decide(flow, rules)`, rules in `core/auto_rules.gd`) plays far
+better than the greedy `Bot.next_command()`. The greedy bot stays the balance reference; content
+was **not** rebalanced for the smart bot. Re-run with:
+
+    godot --headless --path . -s tools/sim.gd -- --runs=300 --class=all --seed=1 --policy=smart [--focus=balanced|damage|defense|economy]
+
+The sim plays AUTO with `AutoRules.all_on(focus)` (every scope on, no stop conditions) and prints
+decide() timings. 300 runs per class, board 28, seed 1, random routes:
+
+| class | greedy win% | smart balanced | smart damage | smart defense | smart economy |
+|---|---|---|---|---|---|
+| knight | 37.3 | 89.0 | 79.7 | 95.3 | 81.7 |
+| barbarian | 35.3 | 88.3 | 74.7 | 97.3 | 86.0 |
+| mage | 24.7 | 90.0 | 75.7 | 95.0 | 85.3 |
+| rogue | 34.7 | 91.3 | 76.0 | 96.7 | 81.3 |
+
+- Smart deaths are almost all in act 3 regular fights; it rarely loses to the final boss (greedy
+  loses a third of its runs there).
+- **Wild and Heavy stacking dominates.** Smart runs end with mostly Heavy (≈2.5 per run) and
+  Wild (≈1.8 per run) dice. Several Wild dice turn every roll into Four/Five/Six of a Kind
+  (×5/×10/×15): over 120 smart runs, runs ending with 3+ Wild dice won 35/36, with none 13/20.
+  If AUTO should not out-play humans this much, the lever is Wild (epic rune weight, or capping
+  the Wild multiplier), not the bot.
+- Defense focus beats balanced: HP is the binding constraint in act 3. Balanced already weighs HP
+  1.3x (`Bot.FOCUS`); damage focus trades HP for kill speed and loses more act-3 runs.
+
+How AUTO decides (all scoring in "PV points" ~ one damage per combat turn for the rest of the run):
+
+- **Combat:** every keep-set of the free dice (not cursed, not Wild) is valued by expected value
+  over the remaining rerolls: exact enumeration up to 36 outcomes, else 96 common-random-number
+  samples (64 with 6 dice); V1 = E[S], Vr = E[max(S, V(r-1))]. S scores a final hand against the
+  best target: damage (overkill wasted, ward/Block applied), kills (prevents that enemy's intent
+  now plus its future threat), Guard Block vs incoming intents, poison, Ember, Thunder, Frost,
+  heals, gold and Lucky banks, with a death penalty. One step per call: mark dice one at a time,
+  reroll, set the target, attack.
+- **Board:** reroll-or-go compares the landing tile's value with the expected value of a reroll
+  (96 simulated pool rolls through `GameFlow.pick_move_dice`). Tile values: fights by rewards vs
+  estimated HP loss and death risk, campfires by missing HP, traps/lava/ice by expected damage,
+  the mini-boss per `fight_miniboss`, the final boss by missing HP.
+- **Drafts, shop, forge, events, runes, passives:** deltas of pool value (a single-roll
+  simulation of the pool against two dummy enemies), so synergy is automatic: Echo/Wild gain with
+  pool size, Heavy/Blade go on high-face dice, face raises/mirrors on dice that form combos.
+  Non-combat passives use estimates. Focus multiplies each category (damage, defense, economy).
+  The shop buys the best value per gold, keeps 40 gold for the next shop's die while the pool has
+  room, restocks once when rich, then leaves.
+- **Purity:** decide() never mutates the flow or advances the run's Rng; samples come from a
+  private Rng seeded by a hash of the state. Decisions are deterministic.
+- **Timing** (tests/test_bot_perf.gd, cold caches, single process on the dev Mac): combat
+  decide() median 1–13 ms with 5 dice and 17–23 ms with 6; a whole run averages ~1.4 ms per call
+  with a 15 ms max. With 16 sims running in parallel the max per call rose to ~50–65 ms.
+
 ## Biomes and routes (`core/content/biomes.gd`)
 
 Each run draws one biome per tier with the run Rng (`run.route`, serialised), then its mini-boss
