@@ -221,6 +221,18 @@ func _board_mutated(ev: Dictionary) -> void:
 		c.board.set_tile(idx, ch, true)
 		n += 1
 		await _wait(0.07)
+	if n >= 3:
+		var foes := 0
+		var chests := 0
+		for ch: Dictionary in changes:
+			if String(ch.type) in ["enemy", "elite"] and not Array(ch.get("enemies", [])).is_empty():
+				foes += 1
+			elif String(ch.type) == "chest":
+				chests += 1
+		if foes > 0:
+			c.overlay.toast("New foes appear on the board!", "skull", UiPalette.HP_BRIGHT)
+		elif chests > 0:
+			c.overlay.toast("Chests bloom on the board!", "chest", UiPalette.GOLD_BRIGHT)
 	if n > 0:
 		await _wait(0.3)
 

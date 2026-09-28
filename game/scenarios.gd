@@ -90,8 +90,8 @@ class _Driver extends Node:
 				await c.run_command("roll_board")
 			"game_combat", "game_combo":
 				var ids := String(args.get("enemies", "skeleton_warrior,skeleton_minion,skeleton_archer"))
-				f.run.pos = 3
-				c.board.place_hero(3)
+				f.run.pos = int(args.get("tile", "3"))
+				c.board.place_hero(f.run.pos)
 				await c.play_events(f.debug_open("combat", ids))
 				# mark dice for a reroll like a player would (bot choice), stop before ATTACK
 				for k in 8:
