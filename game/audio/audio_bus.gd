@@ -55,6 +55,13 @@ const MUSIC := {
 	"act2": M + "mixkit-ambient-251.mp3",
 	"act3": M + "mixkit-vastness-184.mp3",
 	"calm": M + "mixkit-nature-meditation-345.mp3",
+	# biome beds (by BiomeDefs id)
+	"glade": M + "mixkit-nature-meditation-345.mp3",
+	"crypt": M + "mixkit-spirit-in-the-woods-2-147.mp3",
+	"hollow": M + "mixkit-ambient-251.mp3",
+	"frost": M + "mixkit-zanarkand-forest-169.mp3",
+	"throne": M + "mixkit-vastness-184.mp3",
+	"magma": M + "mixkit-vastness-184.mp3",
 }
 const MUSIC_DB := -8.0
 

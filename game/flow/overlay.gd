@@ -237,6 +237,55 @@ func passive_card(id: String, hold := 1.7) -> void:
 	t.tween_callback(p.queue_free)
 
 
+## Biome arrival card: the biome's medallion, a caption (tier / lap), its name and its
+## one-line twist, in the biome's colour. Non-blocking; holds for `hold` seconds.
+func biome_card(id: String, title: String, caption: String, desc: String, hold := 2.4) -> void:
+	var bc := UiPalette.biome_color(id)
+	var p := PanelContainer.new()
+	var sb := UiTheme.pad(UiTheme.box(Color(0.05, 0.05, 0.12, 0.93), 30, 4, bc, 24, Color(bc, 0.4), Vector2.ZERO), 26, 18)
+	p.add_theme_stylebox_override("panel", sb)
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(p)
+	move_child(p, _fade.get_index())
+	var col := UiTheme.vbox(4)
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	p.add_child(col)
+	var icon := UiIcons.rect(UiIcons.biome_icon(id), 104)
+	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	col.add_child(icon)
+	var cap := UiTheme.label(caption.to_upper(), 20, bc.lightened(0.25), false, 0, false, 800)
+	cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(cap)
+	var fs := 64
+	var w := minf(560.0, size.x - 90.0)
+	var tw := UiTheme.display_font().get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + fs * 0.4
+	if tw > w:
+		fs = int(fs * w / tw)
+	var tl := UiTheme.label(title.to_upper(), fs, bc.lerp(UiPalette.GOLD_BRIGHT, 0.35), true, int(fs * 0.16))
+	tl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(tl)
+	if desc != "":
+		var d := UiTheme.para(desc, 24, UiPalette.TEXT, 500)
+		d.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		d.custom_minimum_size.x = w
+		col.add_child(d)
+	p.reset_size()
+	var s := p.get_combined_minimum_size()
+	p.size = s
+	var y := size.y * 0.3 - s.y * 0.5
+	p.position = Vector2((size.x - s.x) * 0.5, y)
+	p.pivot_offset = s * 0.5
+	p.scale = Vector2(0.5, 0.5)
+	p.modulate.a = 0.0
+	var t := create_tween()
+	t.tween_property(p, "scale", Vector2.ONE, _d(0.35)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t.parallel().tween_property(p, "modulate:a", 1.0, _d(0.2))
+	t.tween_interval(_d(hold))
+	t.tween_property(p, "modulate:a", 0.0, _d(0.4))
+	t.parallel().tween_property(p, "position:y", y - 40.0, _d(0.4))
+	t.tween_callback(p.queue_free)
+
+
 ## Small passive trigger pop: the passive's icon flashes at a screen point with a short label.
 func passive_pop(at: Vector2, id: String, text := "") -> void:
 	var rc := UiPalette.passive_color(Passives.rarity(id)) if Passives.DEFS.has(id) else UiPalette.GOLD

@@ -14,8 +14,8 @@ extends RefCounted
 ##  game_passive  passive reward modal (--source=miniboss|elite|boss; miniboss = boss tier)
 ##  game_die_inspect   die inspector on a Giant die with a rune (--die=N)
 ##  game_miniboss the lap 7 mini-boss appearing on the board (--fight=1: fight it)
-##  game_biome_change  lap 6 starts mid-move: the crypt sinks, the hollow rises
-##                (--to=3: lap 11, hollow -> bone throne). Use --wait and --frames.
+##  game_biome_change  lap 6 starts mid-move: tier 1 sinks, tier 2 rises (--to=<biome id>
+##                picks the arriving biome; tier 3 ids start at lap 11). Use --wait and --frames.
 ##  game_boss     final boss fight with its intro (--act=1..3)
 ##  game_victory / game_defeat   summary screens (with passives)
 ##  game_continue runs --steps=N bot commands, JSON round-trips the run and presents it
@@ -26,6 +26,7 @@ extends RefCounted
 ##                game end or --timeout. Run it with a large --wait (e.g. --wait=5000).
 ##
 ## Common args: --class=knight|barbarian|mage|rogue --seed=N --act=N --speed=N
+##   --route=a,b,c --biome=<id> --boss=<id> --miniboss=<id> (new_run opts)
 
 const NAMES := ["game_title", "game_board", "game_rolled", "game_combat", "game_combo", "game_shop", "game_draft",
 	"game_forge", "game_event", "game_portal", "game_boss", "game_victory", "game_defeat", "game_manual", "game_continue",
@@ -76,12 +77,14 @@ class _Driver extends Node:
 	func _flow() -> GameFlow:
 		var cls := String(args.get("class", "knight"))
 		var seed := int(args.get("seed", "7"))
-		var f := GameFlow.new_run(cls, seed)
+		var f := GameFlow.new_run(cls, seed, Balance.BOARD_SIZE, run_opts())
 		var act := int(args.get("act", "1"))
+		if args.has("biome"):
+			act = BoardScenarios.tier_of(String(args.biome))
 		if act > 1:
 			f.run.act = act
 			f.run.lap = int(Balance.BIOME_LAPS[act - 1]) + 1
-			f.run.board = Board.generate(f.run.rng, act, Balance.BOARD_SIZE, f.run.lap)
+			f.run.board = Board.generate(f.run.rng, act, Balance.BOARD_SIZE, f.run.lap, f.run.biome())
 			f.run.level = 2 + act * 3
 			f.run.max_hp += 16 * (act - 1)
 			f.run.hp = f.run.max_hp
@@ -90,6 +93,24 @@ class _Driver extends Node:
 		for k in int(args.get("passives", "0")):
 			f.run.passives.append(DEMO_PASSIVES[k % DEMO_PASSIVES.size()])
 		return f
+
+	## new_run opts from the args: --route=glade,frost,magma (or --biome=<id>, which puts that
+	## biome on a default route), --boss=<id>, --miniboss=<id>.
+	func run_opts() -> Dictionary:
+		var o := {}
+		var route: Array = ["crypt", "hollow", "throne"]
+		if args.has("route"):
+			route = Array(String(args.route).split(",", false))
+		if args.has("biome"):
+			var b := String(args.biome)
+			route[BoardScenarios.tier_of(b) - 1] = b
+		if args.has("route") or args.has("biome"):
+			o["route"] = route
+		if args.has("boss"):
+			o["boss"] = String(args.boss)
+		if args.has("miniboss"):
+			o["miniboss"] = String(args.miniboss)
+		return o
 
 	## A die pool of `n` (2..5) with a spread of kinds (and one rune) for dice-heavy shots.
 	func _pool(f: GameFlow, n: int) -> void:
@@ -174,7 +195,7 @@ class _Driver extends Node:
 			"game_portal":
 				await c.play_events(f.debug_open("portal"))
 			"game_boss":
-				await c.play_events(f.debug_open("boss"))
+				await c.play_events(f.debug_open("boss", String(args.get("boss", ""))))
 			"game_victory", "game_defeat":
 				f.run.stats.merge({"fights_won": 21, "damage_dealt": 2140, "damage_taken": 388, "gold_earned": 512,
 					"best_combo": "Full House", "best_mult": 4.0, "board_turns": 47, "max_act": 3 if scenario == "game_victory" else 2}, true)
@@ -200,7 +221,7 @@ class _Driver extends Node:
 	func _miniboss(f: GameFlow) -> void:
 		await get_tree().create_timer(0.5).timeout
 		f.run.lap = Balance.MINIBOSS_LAP
-		var mb := f.run.board.spawn_miniboss(f.run.rng, EnemyDefs.ACT_MINIBOSS[1], f.run.pos, [f.run.pos])
+		var mb := f.run.board.spawn_miniboss(f.run.rng, f.run.miniboss_id, f.run.pos, [f.run.pos])
 		if mb.is_empty():
 			return
 		await c.play_events([{"type": "board_mutated", "changes": [mb]}])
@@ -211,14 +232,19 @@ class _Driver extends Node:
 			f._start_combat(f.run.board.tiles[f.run.pos].enemies, false, false, f.run.pos, ev, true)
 			await c.play_events(ev)
 
-	## The hero crosses Start into lap 6 (or 11 with --to=3): the biome changes around them.
+	## The hero crosses Start into lap 6 (or 11): the biome changes around them. --to=<biome
+	## id> picks the arriving biome (tier 2 -> lap 6, tier 3 -> lap 11); --to=2|3 as before.
 	func _biome_change(f: GameFlow) -> void:
-		var to := int(args.get("to", "2"))
-		if to == 3:
+		var to_arg := String(args.get("to", "2"))
+		var tier := int(to_arg) if to_arg.is_valid_int() else BoardScenarios.tier_of(to_arg)
+		tier = clampi(tier, 2, 3)
+		if not to_arg.is_valid_int():
+			f.run.route[tier - 1] = to_arg
+		if tier == 3:
 			f.run.act = 2
-			f.run.board = Board.generate(f.run.rng, 2, Balance.BOARD_SIZE, 10)
-			c.board.build(2, f.run.board.to_dict().tiles)
-		f.run.lap = int(Balance.BIOME_LAPS[to - 1]) - 1
+			f.run.board = Board.generate(f.run.rng, 2, Balance.BOARD_SIZE, 10, f.run.biome())
+			c.board.build(f.run.biome(), f.run.board.to_dict().tiles)
+		f.run.lap = int(Balance.BIOME_LAPS[tier - 1]) - 1
 		var n := f.run.board.size()
 		f.run.pos = n - 3
 		c.board.place_hero(f.run.pos)

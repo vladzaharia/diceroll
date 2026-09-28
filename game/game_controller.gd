@@ -152,7 +152,7 @@ func start(f: GameFlow) -> void:
 	board.hero_class = f.run.class_id
 
 	board.hero_idx = f.run.pos
-	board.build(f.run.act, f.run.board.to_dict().tiles)
+	board.build(f.run.biome(), f.run.board.to_dict().tiles)
 	if f.phase == GameFlow.Phase.BOARD_READY:
 		rig.home(board.hero, true)
 	else:
@@ -167,7 +167,7 @@ func start(f: GameFlow) -> void:
 		show_move_target(t, steps if steps > 0 or f.board_move == 0 else f.run.board.size(), f.is_board_double())
 	if f.phase == GameFlow.Phase.PORTAL:
 		player._show_portal(f.offer)
-	Audio.play_music("act%d" % f.run.act)
+	Audio.play_music(f.run.biome())
 	overlay.set_black(true)
 	overlay.fade_in(0.5)
 	if f.phase == GameFlow.Phase.COMBAT and f.combat != null:
@@ -435,7 +435,7 @@ func _boss_intro(tile: int, enemies: Array) -> void:
 		await get_tree().process_frame
 	stage.reframe()
 	overlay.vignette(0.0, 0.8)
-	Audio.play_music("act3", 1.2)
+	Audio.play_music(flow.run.biome(), 1.2)
 	ui.combat_hud.visible = true
 	ui.combat_hud.modulate.a = 0.0
 	var ht := ui.combat_hud.create_tween()
@@ -487,33 +487,35 @@ func change_biome(ev: Dictionary) -> void:
 	var act := int(ev.get("act", flow.run.act))
 	var lap := int(ev.get("lap", flow.run.lap))
 	var pos := int(ev.get("pos", flow.run.pos))
+	var bid := String(ev.get("biome", flow.run.biome()))
 	var tiles: Array = ev.board.tiles
 	stage.clear()
 	in_combat = false
 	rig.overview(board.ring_bounds())
 	await wait(0.25)
 	await board.sink_wave(pos, 0.9 / speed)
-	var look := Biome.look(act)
+	var look := Biome.look(bid)
 	Audio.play_sfx("portal")
 	var vs := get_viewport().get_visible_rect().size
 	var centre := hero_screen(0.8) / Vector2(maxf(vs.x, 1.0), maxf(vs.y, 1.0))
 	await overlay.dissolve(true, Color(look.sky_top).lerp(Color(look.sky_glow), 0.25), Color(look.sky_glow), 0.7, centre)
 	board.hero_idx = pos
-	board.build(act, tiles)
+	board.build(bid, tiles)
 	board.hide_tiles()
 	rig.overview(board.ring_bounds(), true)
-	Audio.play_music("act%d" % act, 1.2)
+	Audio.play_music(bid, 1.2)
 	await wait(0.15)
 	centre = hero_screen(0.8) / Vector2(maxf(vs.x, 1.0), maxf(vs.y, 1.0))
 	overlay.dissolve(false, Color(look.sky_top), Color(look.sky_glow), 0.9, centre)
 
 	await wait(0.25)
 	board.rise_wave(pos, 1.1 / speed)
-	var name := String(SummaryScreen.ACT_NAMES[clampi(act - 1, 0, 2)])
-	overlay.announce(name.to_upper(), "Lap %d of %d  ·  Act %s" % [lap, Balance.TOTAL_LAPS, ["I", "II", "III"][clampi(act - 1, 0, 2)]],
-		Color(look.sky_glow).lerp(UiPalette.GOLD_BRIGHT, 0.5), 1.6)
+	var name := String(ev.get("biome_name", BiomeDefs.name_of(bid)))
+	var tier: String = ["I", "II", "III"][clampi(act - 1, 0, 2)]
+	overlay.biome_card(bid, name, "Tier %s  ·  Lap %d of %d" % [tier, lap, Balance.TOTAL_LAPS],
+		String(ev.get("biome_desc", BiomeDefs.desc_of(bid))), 2.2)
 	Audio.play_sfx("fanfare")
-	await wait(1.9)
+	await wait(2.6)
 
 
 # --- input -----------------------------------------------------------------------------------

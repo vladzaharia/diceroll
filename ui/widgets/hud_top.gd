@@ -31,6 +31,8 @@ var _tip_tween: Tween
 var _act_chip: PanelContainer
 var _act := 1
 var _lap := 1
+## The run's biome ids per tier (lap chip colour and tooltip); empty = legacy act colours.
+var route: Array = []
 var _block_label: Label
 var _row: HBoxContainer
 var _scrim: TextureRect
@@ -176,6 +178,7 @@ func refresh(flow: GameFlow, animate := false) -> void:
 	var prev := Balance.xp_for_level(run.level - 1) if run.level > 1 else 0
 	var need := Balance.xp_for_level(run.level)
 	level_badge.set_level(run.level, float(run.xp - prev) / float(maxi(1, need - prev)), animate)
+	route = Array(run.route)
 	set_lap(run.act, run.lap)
 	set_block(run.block if flow.phase == GameFlow.Phase.COMBAT else 0, animate)
 	set_passives(Array(run.passives))
@@ -188,6 +191,7 @@ func copy_from(o: HudTop) -> void:
 	gold.set_value(o.gold.value, false)
 	treasury.set_value(o.treasury.value, false)
 	level_badge.set_level(o.level_badge.level, o.level_badge.xp_frac, false)
+	route = o.route
 	set_lap(o._act, o._lap)
 	set_passives(o._passive_ids)
 
@@ -205,10 +209,10 @@ func set_lap(act: int, lap: int) -> void:
 	_act = act
 	_lap = lap
 	var final := lap >= Balance.TOTAL_LAPS
-	var bc: Color = BIOME_COLORS[clampi(act - 1, 0, 2)]
+	var bc := biome_color(act)
 	act_label.text = "FINAL LAP" if final else "LAP %d/%d" % [lap, Balance.TOTAL_LAPS]
 	act_label.label_settings = UiTheme.label_settings(22, UiPalette.HP_BRIGHT if final else bc.lerp(UiPalette.GOLD_BRIGHT, 0.45), true, 5)
-	_act_chip.tooltip_text = "%s  ·  Act %s  ·  Lap %d of %d" % [SummaryScreen.ACT_NAMES[clampi(act - 1, 0, 2)],
+	_act_chip.tooltip_text = "%s  ·  Tier %s  ·  Lap %d of %d" % [biome_name(act),
 		ROMAN[clampi(act - 1, 0, 3)], lap, Balance.TOTAL_LAPS]
 	var sb := UiTheme.panel_box("pill").duplicate() as StyleBoxFlat
 	sb.border_color = Color(bc, 0.7)
@@ -306,10 +310,23 @@ func set_block(v: int, animate := false) -> void:
 		UiTheme.pop(block_badge, 1.3, 0.3)
 
 
+## Accent colour / name of the biome at tier `act` on this run's route.
+func biome_color(act: int) -> Color:
+	if act >= 1 and act <= route.size():
+		return UiPalette.biome_color(String(route[act - 1]))
+	return BIOME_COLORS[clampi(act - 1, 0, 2)]
+
+
+func biome_name(act: int) -> String:
+	if act >= 1 and act <= route.size():
+		return BiomeDefs.name_of(String(route[act - 1]))
+	return String(SummaryScreen.ACT_NAMES[clampi(act - 1, 0, 2)])
+
+
 func _set_laps(act: int, lap: int) -> void:
 	UiTheme.clear(lap_pips)
 	var first := int(Balance.BIOME_LAPS[clampi(act - 1, 0, Balance.BIOME_LAPS.size() - 1)])
-	var bc: Color = BIOME_COLORS[clampi(act - 1, 0, 2)]
+	var bc := biome_color(act)
 	for i in Balance.LAPS_PER_ACT:
 		var n := first + i
 		var dot := _Pip.new()
