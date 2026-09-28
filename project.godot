@@ -6,6 +6,9 @@ config_version=5
 config/name="Diceroll"
 run/main_scene="res://main.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
+boot_splash/bg_color=Color(0.1, 0.06, 0.06, 1)
+boot_splash/show_image=false
+config/icon="res://assets/icon/icon.png"
 
 [autoload]
 
@@ -26,5 +29,7 @@ window/handheld/orientation=1
 
 renderer/rendering_method="forward_plus"
 renderer/rendering_method.mobile="mobile"
+renderer/rendering_method.web="gl_compatibility"
 anti_aliasing/quality/msaa_3d=2
 textures/canvas_textures/default_texture_filter=1
+textures/vram_compression/import_etc2_astc=true

@@ -186,3 +186,13 @@ Meta currencies, gear, pets, online features, more than 4 classes, Ranger class,
 - A full run is playable on macOS (the Godot run and an exported .app) and in the iOS Simulator, from title through 3 acts to victory or defeat, with no errors in the log.
 - All core tests pass. The balance sim shows a greedy-bot win rate of roughly 20–45% per class.
 - Screenshots of every screen and scenario are reviewed and look polished: consistent lighting, no clipping or placeholder art, readable UI at phone and desktop sizes.
+
+## 15. Revisions (2026-09-28, from Vlad)
+
+- **Dice pool:** every class starts with **2 dice**, and the pool maxes out at **5**. This supersedes §5 and §7.
+- **Die kinds with unusual faces:** each die has a `kind` whose face set can be any values from 0 to 9, for example Low 1,1,2,2,3,3 · High 4,4,5,5,6,6 · Even · Odd · Loaded · Twin · Gambler 0,0,6,6,6,6 · Giant 4–9.
+  - **0 is a blank face:** it moves 0 tiles and never forms a combo. Values above 6 are drawn as numerals.
+  - Kinds are sold in the shop and offered in drafts.
+  - Combos work over any values: sets use equal non-zero values, and straights use consecutive non-zero values.
+- **Board:** a 9×9 ring of **32 tiles**, with corners at 0/8/16/24, replaces the 24-tile ring. Size is a parameter in the rules and the board view.
+- **Camera:** the camera zooms in and out with the flow: overview when dice are rolled (all landing targets visible), follow while the hero moves, combat framing for fights, then back.
