@@ -74,7 +74,7 @@ func begin_on_board(board: BoardView, idx: int, enemy_list: Array, rig: CameraRi
 	var centre := Vector3.ZERO
 	for f: Vector3 in focus:
 		centre += f
-	board.clear_area(centre / focus.size(), 4.2)
+	board.clear_area(centre / focus.size(), 5.5)
 	if rig:
 		rig.combat(board.hero.global_position, enemy_positions(), false, enemy_heights())
 		var vs := get_viewport().get_visible_rect().size
@@ -95,6 +95,11 @@ func reframe() -> void:
 				hs.append(heights[i])
 		if not pos.is_empty():
 			_rig.combat(hero_home, pos, false, hs)
+			if _board:
+				var focus: Array = pos.duplicate()
+				focus.append(hero_home)
+				var vs := get_viewport().get_visible_rect().size
+				_board.hide_occluders(_rig.desired_transform(), _rig.camera.fov, vs.x / maxf(vs.y, 1.0), focus)
 
 
 ## Undoes begin_on_board(): clears the stage, restores props and returns the camera to

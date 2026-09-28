@@ -9,10 +9,11 @@ extends RefCounted
 ##  boss_act1..3    boss fights (Bone Warden, Hollow King, Lich + minions)
 ##  fx_gallery      every FX firing in a loop on the act 1 board
 ##  enemy_gallery   every enemy look with its HUD, on the act 1 island
+##  combat_sequence full beat loop (attack, hit, death, enemy attack, hero hit, summon, end)
 ## Optional args: --hero=<class>, --tile=<idx>.
 
 const NAMES := ["board_act1", "board_act2", "board_act3", "board_follow", "board_mutate", "board_portal", "combat_act1",
-	"combat_act2", "combat_act3", "boss_act1", "boss_act2", "boss_act3", "fx_gallery", "enemy_gallery"]
+	"combat_act2", "combat_act3", "boss_act1", "boss_act2", "boss_act3", "fx_gallery", "enemy_gallery", "combat_sequence"]
 
 
 static func names() -> PackedStringArray:
@@ -152,6 +153,8 @@ class _Driver extends Node3D:
 				board.set_hero_class("rogue")
 			"combat_act1", "combat_act2", "combat_act3", "boss_act1", "boss_act2", "boss_act3":
 				await _combat(act, wait)
+			"combat_sequence":
+				await _sequence()
 			"enemy_gallery":
 				var ids := EnemyLooks.DEFS.keys()
 				var pts := PackedVector3Array()
@@ -210,6 +213,37 @@ class _Driver extends Node3D:
 		rig.shake(0.5, 0.3)
 		if scenario == "combat_act1":
 			Fx.flash(self, Color(1.0, 0.85, 0.5, 0.25))
+
+	func _sequence() -> void:
+		var idx := 9
+		board.place_hero(idx)
+		stage = CombatStage.new()
+		add_child(stage)
+		rig.overview(board.ring_bounds(), true)
+		await get_tree().create_timer(0.3).timeout
+		await stage.begin_on_board(board, idx, BoardScenarios.mock_enemies("act1"), rig)
+		print("SEQ begun")
+		await stage.hero_attack(0)
+		await stage.enemy_hit(0, 12, false)
+		await stage.enemy_die(0)
+		print("SEQ enemy 0 died")
+		stage.reframe()
+		await stage.enemy_attack(1)
+		await stage.hero_hit(6, 2)
+		Fx.status_burst(stage, stage.enemy_position(2) + Vector3.UP, "poison")
+		stage.set_enemy(2, {"poison": 2, "intent": {"kind": "block", "value": 5}})
+		await stage.hero_attack(2, "magic")
+		await stage.enemy_hit(2, 30, true, 0)
+		await stage.enemy_die(2)
+		var i := stage.add_enemy({"id": "skeleton_minion", "name": "Skeleton", "hp": 12, "max_hp": 12,
+			"block": 0, "intent": {"kind": "attack", "value": 4}})
+		stage.reframe()
+		print("SEQ summoned ", i)
+		await get_tree().create_timer(1.0).timeout
+		Fx.level_up(stage, board.hero.global_position)
+		Fx.coin_burst(stage, board.hero.global_position, 8)
+		stage.end_on_board()
+		print("SEQ ended")
 
 	func _fx_all() -> void:
 		var p := board.tile_position(3)

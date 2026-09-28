@@ -39,6 +39,7 @@ var _props: Array = []          # per tile: Node3D or null (prop + figures)
 var _figures: Array = []        # per tile: Array[Character]
 var _hero_turn_tween: Tween
 var _hidden: Array[Node3D] = []
+var _hidden_fx: Array[Node3D] = []
 
 
 func _init() -> void:
@@ -597,12 +598,16 @@ func hide_occluders(cam_xform: Transform3D, fov_deg: float, aspect: float, focus
 	lo -= Vector2(0.12, 0.12)
 	hi += Vector2(0.12, 0.25)
 	var candidates: Array[Node3D] = []
+	var fx: Array[Node3D] = []
 	for holder_name in ["Dressing", "SetPiece"]:
 		var holder := biome.get_node_or_null(holder_name)
 		if holder:
 			for c in holder.get_children():
-				if c is Node3D and not (c is Light3D) and not (c is GPUParticles3D):
+				if c is Light3D or c is GPUParticles3D:
+					fx.append(c)
+				elif c is Node3D:
 					candidates.append(c)
+	var sunk: Array[AABB] = []
 	for i in RING:
 		if _props[i] and i != hero_idx:
 			candidates.append(_props[i])
@@ -620,9 +625,24 @@ func hide_occluders(cam_xform: Transform3D, fov_deg: float, aspect: float, focus
 			var sp := Vector2(v.x / (d * tx), v.y / (d * ty))
 			slo = slo.min(sp)
 			shi = shi.max(sp)
+		# 1) anything fully in front of the fighters that overlaps them on screen
 		var hit := dmax < near - 0.2 and slo.x < hi.x and shi.x > lo.x and slo.y < hi.y and shi.y > lo.y
+		# 2) tall foreground clutter anywhere in the frame (walls, pillars, trees)
+		if not hit and box.size.y > 1.6:
+			var vc := inv * box.get_center()
+			var on_screen := slo.x < 1.0 and shi.x > -1.0 and slo.y < 1.0 and shi.y > -1.0
+			hit = on_screen and -vc.z < near - 0.8
 		if hit:
 			_sink(n)
+			sunk.append(box.grow(0.9))
+	for f in fx:
+		if not f.visible:
+			continue
+		for b in sunk:
+			if b.has_point(f.global_position):
+				_hidden_fx.append(f)
+				f.visible = false
+				break
 
 
 ## Sinks tile dressing (props + enemy previews) within `radius` of a world point, except the
@@ -639,6 +659,8 @@ func clear_area(center: Vector3, radius: float) -> void:
 
 
 func _sink(n: Node3D) -> void:
+	if _hidden.has(n):
+		return
 	_hidden.append(n)
 	n.set_meta("occl_scale", n.scale)
 	var t := n.create_tween()
@@ -648,6 +670,10 @@ func _sink(n: Node3D) -> void:
 
 
 func restore_occluders() -> void:
+	for f in _hidden_fx:
+		if is_instance_valid(f):
+			f.visible = true
+	_hidden_fx.clear()
 	for n in _hidden:
 		if not is_instance_valid(n):
 			continue
