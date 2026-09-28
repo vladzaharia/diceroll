@@ -17,6 +17,12 @@ var selected := false:
 			UiTheme.pop(self, 1.03, 0.2)
 var accent: Color = UiPalette.GOLD
 var sold := false
+## Boss-tier look: gold double frame with a warm glow.
+var premium := false:
+	set(v):
+		premium = v
+		queue_redraw()
+var _faces_row: HBoxContainer
 var _hover := false
 var _title: Label
 var _tag: Label
@@ -70,6 +76,9 @@ func _build(title: String, desc: String) -> void:
 	_tag_panel.add_child(_tag)
 	_desc = UiTheme.para(desc, 22, UiPalette.TEXT_DIM, 500)
 	col.add_child(_desc)
+	_faces_row = UiTheme.hbox(5)
+	_faces_row.visible = false
+	col.add_child(_faces_row)
 	_right = UiTheme.vbox(0)
 	_right.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_child(_right)
@@ -106,6 +115,38 @@ func set_rune(rune: String) -> void:
 	_medal_holder.add_child(RuneBadge.make(rune, 80))
 	var rarity := Runes.rarity(rune)
 	set_tag(rarity.to_upper() + " RUNE", UiPalette.rarity_color(rarity))
+
+
+## A die of `kind`: the medallion becomes a die (its best face, kind mark) and a row of
+## all six faces appears under the description.
+func set_die(kind: String, rune := "") -> void:
+	UiTheme.clear(_medal_holder)
+	_medal_holder.visible = true
+	var faces := DiceKinds.faces(kind)
+	var best := 0
+	for v in faces:
+		best = maxi(best, v)
+	var big := DieFace.make(best, rune, false, 74)
+	big.kind = kind
+	_medal_holder.add_child(big)
+	UiTheme.clear(_faces_row)
+	for v in faces:
+		var f := DieFace.make(v, rune, false, 34)
+		f.kind = kind
+		_faces_row.add_child(f)
+	_faces_row.visible = true
+	var rar := String(DiceKinds.def(kind).rarity)
+	set_tag(rar.to_upper() + " DIE", UiPalette.kind_color(kind) if kind != "standard" else UiPalette.rarity_color(rar))
+
+
+## A passive: rarity-ringed passive badge and a "<RARITY> PASSIVE" tag (boss tier: premium).
+func set_passive(id: String) -> void:
+	UiTheme.clear(_medal_holder)
+	_medal_holder.visible = true
+	_medal_holder.add_child(PassiveIcon.make(id, 80))
+	var rar := Passives.rarity(id) if Passives.DEFS.has(id) else "common"
+	set_tag(("BOSS" if rar == "boss" else rar.to_upper()) + " PASSIVE", UiPalette.passive_color(rar))
+	premium = rar == "boss"
 
 
 func set_tag(text: String, color: Color) -> void:
@@ -150,6 +191,9 @@ func _get_minimum_size() -> Vector2:
 
 func _draw() -> void:
 	var rect := Rect2(Vector2.ZERO, size)
+	if premium:
+		var gl := 0.35 + (0.25 if selected else 0.0)
+		draw_style_box(UiTheme.box(Color(0, 0, 0, 0), 26, 0, Color.TRANSPARENT, 26, Color(1.0, 0.62, 0.15, gl), Vector2.ZERO), rect)
 	if selected:
 		draw_style_box(UiTheme.box(Color(0, 0, 0, 0), 24, 0, Color.TRANSPARENT, 20, Color(1.0, 0.72, 0.2, 0.5), Vector2.ZERO), rect)
 	var bg := UiPalette.NAVY_2
@@ -165,9 +209,23 @@ func _draw() -> void:
 	sheen.corner_radius_bottom_right = 0
 	draw_style_box(sheen, Rect2(rect.position, Vector2(rect.size.x, rect.size.y * 0.45)))
 	# accent edge
+	if premium:
+		# warm inner wash + gold double frame with corner studs
+		var wash := UiTheme.box(Color(1.0, 0.6, 0.15, 0.08), 24)
+		draw_style_box(wash, rect)
+		var outer := UiTheme.box(Color.TRANSPARENT, 24, 3, UiPalette.GOLD_BRIGHT)
+		outer.draw_center = false
+		draw_style_box(outer, rect)
+		var inner := UiTheme.box(Color.TRANSPARENT, 18, 2, Color(UiPalette.GOLD, 0.6))
+		inner.draw_center = false
+		draw_style_box(inner, rect.grow(-7))
+		for p in [Vector2(14, 14), Vector2(rect.size.x - 14, 14), Vector2(14, rect.size.y - 14), Vector2(rect.size.x - 14, rect.size.y - 14)]:
+			draw_colored_polygon(PackedVector2Array([p + Vector2(0, -6), p + Vector2(6, 0), p + Vector2(0, 6), p + Vector2(-6, 0)]), UiPalette.GOLD_BRIGHT)
+		return
 	var edge := UiTheme.box(Color.TRANSPARENT, 24, 3 if not selected else 4, UiPalette.GOLD_BRIGHT if selected else Color(accent, 0.5))
 	edge.draw_center = false
 	draw_style_box(edge, rect)
+
 
 
 class Medallion:

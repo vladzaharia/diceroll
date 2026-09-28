@@ -46,6 +46,8 @@ func refresh(flow: GameFlow) -> void:
 		var c := OptionCard.make(String(o.get("label", id)), String(o.get("desc", "")))
 		if id == "rune" and o.has("rune"):
 			c.set_rune(String(o.rune))
+		elif id == "new_die":
+			c.set_die(String(o.get("kind", "standard")))
 		else:
 			c.set_icon(ICONS.get(id, "star"))
 			c.set_tag("BOON", UiPalette.GOLD)

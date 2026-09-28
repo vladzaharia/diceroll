@@ -231,6 +231,278 @@ ICONS["trophy"] = (fill("M7 3.4h10v6a5 5 0 0 1-10 0z") + lines(["M7 5.6H4.2a3 3 
 ICONS["campfire"] = fill("M3.8 19.2l16.4-3.6.6 2.6-16.4 3.6z") + fill("M20.2 19.2L3.8 15.6l-.6 2.6 16.4 3.6z") \
     + fill("M12 2.8c.7 2.5 4.4 4.1 4.4 7.9a4.4 4.4 0 0 1-8.8 0c0-1.9 1.1-3.1 1.9-4 .2 1.4.8 2.3 1.6 2.7-.2-2.4.2-4.4.9-6.6z")
 
+# ---------------------------------------------------------------- passive abilities ("relics")
+# One glyph per Passives.IDS entry, written as passive_<id>. Fixed accents (never tinted):
+GOLD = "#FFD24A"
+RED = "#E8564A"
+
+
+def g(body, tf):
+    return f'<g transform="{tf}">{body}</g>'
+
+
+def union(elems, w=3.2):
+    """Merges overlapping shapes into one silhouette: outline underlay first, then the tint fills."""
+    under = "".join(e[:-2] + f' fill="{O}" stroke="{O}" stroke-width="{w}" stroke-linejoin="round"/>' for e in elems)
+    over = "".join(e[:-2] + f' fill="{F}"/>' for e in elems)
+    return under + over
+
+
+def rrect(x, y, w, h, r, extra=""):
+    return f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{r}"{extra}/>'
+
+
+PIPS = {1: [(.5, .5)], 2: [(.29, .29), (.71, .71)], 3: [(.29, .29), (.5, .5), (.71, .71)],
+        4: [(.29, .29), (.71, .29), (.29, .71), (.71, .71)],
+        5: [(.29, .29), (.71, .29), (.5, .5), (.29, .71), (.71, .71)],
+        6: [(.29, .27), (.71, .27), (.29, .5), (.71, .5), (.29, .73), (.71, .73)]}
+
+
+def die(x, y, s, n, rot=0, flip=False, pip=0.105):
+    """A die face at (x, y) with side s showing n pips (flip mirrors the pip layout)."""
+    rx = s * 0.24
+    body = (f'<rect x="{x:.2f}" y="{y:.2f}" width="{s:.2f}" height="{s:.2f}" rx="{rx:.2f}" fill="{F}" stroke="{O}" stroke-width="{SW}"/>'
+            + shade(f"M{x + s:.2f} {y + s * 0.3:.2f}V{y + s - rx:.2f}A{rx:.2f} {rx:.2f} 0 0 1 {x + s - rx:.2f} {y + s:.2f}"
+                    f"H{x + s * 0.3:.2f}Q{x + s * 0.85:.2f} {y + s * 0.85:.2f} {x + s:.2f} {y + s * 0.3:.2f}z", 0.14))
+    for px, py in PIPS[n]:
+        if flip:
+            px = 1 - px
+        body += circ(round(x + px * s, 2), round(y + py * s, 2), round(s * pip, 2), O, False)
+    if rot:
+        body = g(body, f"rotate({rot} {x + s / 2:.2f} {y + s / 2:.2f})")
+    return body
+
+
+def heart(cx, cy, s, color=RED, w=1.3):
+    """The HEART glyph shrunk to scale s around (cx, cy) with a ~w px outline."""
+    return g(f'<path d="{HEART}" fill="{color}" stroke="{O}" stroke-width="{w / s:.2f}" stroke-linejoin="round"/>',
+             f"translate({cx} {cy}) scale({s}) translate(-12 -13.2)")
+
+
+def coin(cx, cy, r):
+    return (circ(cx, cy, r, GOLD)
+            + f'<circle cx="{cx}" cy="{cy}" r="{r * 0.55:.2f}" fill="none" stroke="{O}" stroke-opacity="0.4" stroke-width="1"/>'
+            + hl(f"M{cx - r * 0.62:.2f} {cy - r * 0.1:.2f}a{r * 0.62:.2f} {r * 0.62:.2f} 0 0 1 {r * 0.5:.2f}-{r * 0.5:.2f}", 0.9, 0.7))
+
+
+def sparkle(cx, cy, r, color=F, w=1.2):
+    return f'<path d="{poly(star_pts(cx, cy, r, r * 0.36, 4, -90))}" fill="{color}" stroke="{O}" stroke-width="{w}" stroke-linejoin="round"/>'
+
+
+def bez(p0, p1, p2, p3, t):
+    u = 1 - t
+    return tuple(u ** 3 * a + 3 * u * u * t * b + 3 * u * t * t * c + t ** 3 * d for a, b, c, d in zip(p0, p1, p2, p3))
+
+
+def arc(cx, cy, r, a0, a1):
+    """SVG arc path from angle a0 to a1 (degrees, clockwise); also returns the end point."""
+    x0, y0 = cx + r * math.cos(math.radians(a0)), cy + r * math.sin(math.radians(a0))
+    x1, y1 = cx + r * math.cos(math.radians(a1)), cy + r * math.sin(math.radians(a1))
+    large = 1 if abs(a1 - a0) > 180 else 0
+    return f"M{x0:.2f} {y0:.2f}A{r} {r} 0 {large} 1 {x1:.2f} {y1:.2f}", (x1, y1)
+
+
+def hand(tf="", w=3.2):
+    """Open palm, fingers up, thumb out to the left (merged silhouette + finger creases)."""
+    parts = [rrect(6.6, 5.4, 2.7, 9, 1.35), rrect(9.3, 3.2, 2.7, 10, 1.35), rrect(12.0, 3.8, 2.7, 10, 1.35),
+             rrect(14.7, 6.0, 2.6, 8, 1.3),
+             '<path d="M6.6 11h10.7v4.6a5.4 5.4 0 0 1-5.4 5.4 5.4 5.4 0 0 1-5.3-5.4z"/>',
+             rrect(5.0, 9.6, 2.8, 7.8, 1.4, ' transform="rotate(-32 7.2 16.6)"')]
+    body = (union(parts, w)
+            + shade("M17.3 11v4.6a5.4 5.4 0 0 1-5.4 5.4c2.6-1.6 3.8-4.4 3.8-7.4V11z", 0.14)
+            + f'<path d="M9.3 8.4v4.4M12 7v5.6M14.7 8.6v4.2" stroke="{O}" stroke-opacity="0.45" stroke-width="1" stroke-linecap="round"/>')
+    return g(body, tf) if tf else body
+
+
+BOOT = "M7.4 4.2h6.6v7l4.8 2c2 .9 3.2 2.6 3.2 4.6v.4H7.4z"
+
+
+def boot(tf=""):
+    body = (fill(BOOT) + shade("M14 11.2l4.8 2c2 .9 3.2 2.6 3.2 4.6v.4h-5.6c.4-2.8-.4-5-2.4-7z", 0.16)
+            + fill("M6.8 18h15.6v1.4a1.2 1.2 0 0 1-1.2 1.2h-8.8v1H6.8z")
+            + rrect(6.6, 2.4, 8.2, 3.4, 1, f' fill="{F}" stroke="{O}" stroke-width="{SW}"')
+            + f'<path d="M14 12.4l-2.2 1.4M16.2 13.4l-2 1.6" stroke="{O}" stroke-opacity="0.55" stroke-width="1.1" stroke-linecap="round"/>')
+    return g(body, tf) if tf else body
+
+
+P = {}
+
+P["pair_master"] = die(2.6, 2.6, 11.6, 2, -10) + die(9.8, 9.8, 11.6, 2, 8)
+
+P["full_house_party"] = (fill("M3 11.8L12 3.4l9 8.4h-2.5v9H5.5v-9z") + fill("M15.6 4.4h2.6v4.4l-2.6-2.4z")
+                         + shade("M12 3.4l9 8.4h-2.5v9H12z", 0.14) + heart(12, 15.6, 0.44))
+
+P["straight_shooter"] = (lines(["M4.4 19.6L18 6"], 2.6)
+                         + fill(poly([(21.4, 2.6), (19.8, 10.4), (13.6, 4.2)]))
+                         + lines(["M2.4 17.4H5.8V20.8", "M4.8 15H8.2V18.4"], 1.8)
+                         + die(6.6, 6.6, 10.4, 3, flip=True))
+
+P["triple_threat"] = die(2.4, 12.6, 9.0, 3) + die(12.6, 12.6, 9.0, 3) + die(7.5, 2.8, 9.0, 3)
+
+P["snake_eyes"] = (lines(["M3.6 18.8C6.6 22.2 17 22 19 17.6C20.8 13.6 15.6 11.6 12 13C9 14.2 6.4 12.6 7.2 9.6"], 3.4)
+                   + f'<path d="M14.4 6.6l2.6-1.2M17 5.4l1.4-1.4M17 5.4l1.9.2" stroke="{RED}" stroke-width="1.2" stroke-linecap="round"/>'
+                   + die(4.6, 2.8, 9.2, 1, -14, pip=0.14))
+
+P["boxcars"] = die(3.4, 3.4, 17.2, 6, pip=0.1)
+
+TOOTH = ("M7.2 3.8C4.2 3.8 3.4 7.2 4.2 10c.8 2.8 1.8 4.6 2.2 8.2.3 2.6 2.6 2.8 3.2.4l.9-3.6c.4-1.4 2.6-1.4 3 0"
+         "l.9 3.6c.6 2.4 2.9 2.2 3.2-.4.4-3.6 1.4-5.4 2.2-8.2.8-2.8 0-6.2-3-6.2-2 0-3 1-4.8 1s-2.8-1-4.8-1z")
+P["gold_tooth"] = (fill(TOOTH) + shade("M16.8 3.8c3 0 3.8 3.4 3 6.2-.8 2.8-1.8 4.6-2.2 8.2-.3 2.6-2.6 2.8-3.2.4 1.8-3.6 3.4-8.6 2.4-14.8z", 0.16)
+                   + f'<path d="M4.4 9.4c5 1.6 10.2 1.6 15.2 0l-.5 2.6c-4.8 1.4-9.4 1.4-14.2 0z" fill="{GOLD}" stroke="{O}" stroke-width="1.2" stroke-linejoin="round"/>'
+                   + hl("M6.4 6.2a2 2 0 0 1 1.8-.9") + sparkle(19.4, 4.4, 3.4, GOLD))
+
+P["steady_hand"] = hand()
+
+P["loaded_hands"] = (die(2.2, 9.4, 10.4, 5, -12) + die(11.4, 10.6, 10.4, 6, 10)
+                     + sparkle(18.4, 4.6, 3.8, GOLD) + sparkle(11.6, 3.6, 2.2, GOLD, 1.0))
+
+P["double_trouble"] = (lines(["M6.4 10C7.2 4.2 15.2 3.4 17.4 8.4"], 2.2, [poly([(18.4, 11.2), (15.0, 8.4), (19.8, 7.4)])])
+                       + die(2.0, 11.8, 9.4, 4) + die(12.6, 11.8, 9.4, 4))
+
+STONE = "M6.2 3h5a2.4 2.4 0 0 1 2.4 2.4v13.2a2.4 2.4 0 0 1-2.4 2.4h-5a2.4 2.4 0 0 1-2.4-2.4V5.4A2.4 2.4 0 0 1 6.2 3z"
+P["rune_echo"] = (lines(["M16.4 8.2a5.2 5.2 0 0 1 0 7.6", "M19.4 5.2a9.4 9.4 0 0 1 0 13.6"], 2.0) + fill(STONE)
+                  + shade("M8.7 3h2.5a2.4 2.4 0 0 1 2.4 2.4v13.2a2.4 2.4 0 0 1-2.4 2.4H8.7z", 0.14)
+                  + f'<path d="M8.7 6.4v11.2M8.7 8.4l2.4 2.2M8.7 12.2l2.4-2.2M8.7 12.6l-2.2 2.2" stroke="{O}" stroke-width="1.5" stroke-linecap="round" fill="none"/>')
+
+GEM = poly([(7.2, 4.2), (16.8, 4.2), (21, 9.4), (12, 20.6), (3, 9.4)])
+P["collector"] = (fill(GEM) + shade("M12 4.2h4.8L21 9.4 12 20.6z", 0.16)
+                  + f'<path d="M3 9.4h18M7.2 4.2l2.3 5.2L12 4.2l2.5 5.2 2.3-5.2M9.5 9.4L12 20.6l2.5-11.2" fill="none" stroke="{O}" stroke-opacity="0.5" stroke-width="1" stroke-linejoin="round"/>'
+                  + hl("M6 8.2l1.4-1.8", 1.2) + heart(18.4, 17.8, 0.36))
+
+P["pathfinder"] = boot("rotate(-8 14 12) translate(0.6 0)") + "".join(circ(x, y, r) for x, y, r in ((3.6, 19.4, 1.6), (2.6, 14.6, 1.35), (3.8, 10.2, 1.15)))
+
+P["treasure_sense"] = (fill("M4.6 12L6 5.8a2 2 0 0 1 1.9-1.5h8.2a2 2 0 0 1 1.9 1.5L19.4 12z")
+                       + shade("M6.6 11.6l1-4.6h8.8l1 4.6z", 0.28)
+                       + circ(8.8, 11.4, 2.2, GOLD) + circ(15.2, 11.4, 2.2, GOLD) + circ(12, 10.4, 2.4, GOLD)
+                       + fill("M3.6 12h16.8v7.4a1.4 1.4 0 0 1-1.4 1.4H5a1.4 1.4 0 0 1-1.4-1.4z")
+                       + shade("M12 12h8.4v7.4a1.4 1.4 0 0 1-1.4 1.4H12z", 0.14)
+                       + f'<rect x="10.3" y="11" width="3.4" height="4.4" rx="0.9" fill="{O}"/>'
+                       + sparkle(20.2, 3.8, 2.8, GOLD, 1.1))
+
+P["piggy_bank"] = (union(['<ellipse cx="11.2" cy="13.8" rx="8" ry="5.8"/>', rrect(17.4, 11.2, 4.2, 4.4, 1.6),
+                          '<path d="M13.2 8.8l2.2-3.6 1.8 4.6z"/>', rrect(6.4, 17, 2.8, 4.2, 1), rrect(13.2, 17, 2.8, 4.2, 1)])
+                   + lines(["M3.4 12.4c-1.6-.4-1.6-2.4 0-2.2"], 1.1)
+                   + shade("M19.2 13.8c0 3.2-3.6 5.8-8 5.8-2 0-3.8-.5-5.2-1.4 5 .5 10.4-1.2 11.2-4.4z", 0.14)
+                   + circ(15.6, 12, 0.95, O, False) + circ(19.4, 13.4, 0.6, O, False)
+                   + f'<path d="M9.2 8.6h3.4" stroke="{O}" stroke-width="1.5" stroke-linecap="round"/>'
+                   + coin(10.9, 4.4, 2.8))
+
+TAG = "M12.6 3h7.2a1.2 1.2 0 0 1 1.2 1.2v7.2L11.6 20.8a1.4 1.4 0 0 1-2 0l-6.4-6.4a1.4 1.4 0 0 1 0-2z"
+P["haggler"] = (fill(TAG) + shade("M21 11.4L11.6 20.8a1.4 1.4 0 0 1-2 0l-1-1L21 7.4z", 0.16)
+                + circ(17, 7, 1.6, O, False)
+                + f'<path d="M8.6 15.4l5-5" stroke="{O}" stroke-width="1.5" stroke-linecap="round"/>'
+                + circ(9.2, 11, 1.25, O, False) + circ(13, 14.8, 1.25, O, False))
+
+BOOK = "M12 6.6C9.4 4.8 6.4 4.4 2.8 4.9v13.8c3.6-.5 6.6 0 9.2 1.7 2.6-1.7 5.6-2.2 9.2-1.7V4.9c-3.6-.5-6.6-.1-9.2 1.7z"
+P["scholar"] = (fill(BOOK) + shade("M12 6.6c2.6-1.8 5.6-2.2 9.2-1.7v13.8c-3.6-.5-6.6 0-9.2 1.7z", 0.14)
+                + f'<path d="M12 6.6v13.6" stroke="{O}" stroke-width="1.4"/>'
+                + f'<path d="M5 8.6c1.6-.2 3.2 0 4.8.7M5 11.6c1.6-.2 3.2 0 4.8.7M5 14.6c1.6-.2 3.2 0 4.8.7M14.2 9.3c1.6-.7 3.2-.9 4.8-.7M14.2 12.3c1.6-.7 3.2-.9 4.8-.7" '
+                  f'fill="none" stroke="{O}" stroke-opacity="0.45" stroke-width="1.1" stroke-linecap="round"/>'
+                + sparkle(17.4, 15.4, 2.2, GOLD, 1.0))
+
+ANVIL = "M2.8 7h13.4c0 2.6 2.1 4 5 4v1.6c-2.6 0-4.1 1.1-4.6 2.6H14v2.2h3v2.9H6.8v-2.9h3v-2.2H8.4C7 13.4 5 11.6 2.8 11.2z"
+P["blacksmith"] = (g(f'<path d="{ANVIL}" fill="{F}" stroke="{O}" stroke-width="2" stroke-linejoin="round"/>'
+                     + shade("M2.8 9.4h13.9c.9 1 2.5 1.6 4.5 1.6v1.6c-2.6 0-4.1 1.1-4.6 2.6H8.4C7 13.4 5 11.6 2.8 11.2z", 0.14),
+                     "translate(12 21.2) scale(0.8) translate(-12 -20.8)")
+                   + lines(["M7 5.4L15.2 9.4"], 1.8)
+                   + g(rrect(2.6, 3, 7.6, 3.8, 0.8)[:-2] + f' fill="{F}" stroke="{O}" stroke-width="{SW}"/>'
+                       + shade("M2.6 5.2h7.6v1.6H2.6z", 0.16), "rotate(-62 6.4 4.9)")
+                   + sparkle(18.6, 4.6, 2.6, GOLD, 1.0) + sparkle(14.8, 2.6, 1.5, GOLD, 0.9))
+
+THORN_CURVE = ((3.2, 20.2), (8.6, 18.6), (6.6, 12.4), (12, 11.2)), ((12, 11.2), (17.4, 10), (15.6, 4.8), (20.8, 3.6))
+thorns, side = [], 1
+for seg in THORN_CURVE:
+    for t in (0.3, 0.72):
+        x, y = bez(*seg, t)
+        x2, y2 = bez(*seg, t + 0.02)
+        ln = math.hypot(x2 - x, y2 - y)
+        tx, ty = (x2 - x) / ln, (y2 - y) / ln
+        nx, ny = -ty * side, tx * side
+        thorns.append(f'<path d="{poly([(x - tx * 2.2, y - ty * 2.2), (x + nx * 5.2 + tx * 1.4, y + ny * 5.2 + ty * 1.4), (x + tx * 2.2, y + ty * 2.2)])}"/>')
+        side = -side
+VINE = "M3.2 20.2C8.6 18.6 6.6 12.4 12 11.2S15.6 4.8 20.8 3.6"
+P["thorns"] = ("".join(t[:-2] + f' fill="{O}" stroke="{O}" stroke-width="3.2" stroke-linejoin="round"/>' for t in thorns)
+               + f'<path d="{VINE}" fill="none" stroke="{O}" stroke-width="6.2" stroke-linecap="round"/>'
+               + "".join(t[:-2] + f' fill="{F}"/>' for t in thorns)
+               + f'<path d="{VINE}" fill="none" stroke="{F}" stroke-width="3.0" stroke-linecap="round"/>')
+
+P["iron_skin"] = (fill(SHIELD) + shade("M12 2.9v18.3c4.4-1.4 7.6-5 7.6-9.7V5.8z")
+                  + f'<path d="M4.6 9.8h14.8M5.4 14.6h13.2M12 2.9v18.3" fill="none" stroke="{O}" stroke-width="1.4"/>'
+                  + "".join(circ(x, y, 0.8, O, False) for x, y in ((7, 7.4), (17, 7.4), (7, 12.2), (17, 12.2), (9, 17), (15, 17))))
+
+P["bloodthirst"] = (fill("M2.6 3.6C7.6 7.2 16.4 7.2 21.4 3.6v3.6C16.4 11 7.6 11 2.6 7.2z")
+                    + fill("M5.8 8.6c.3 3.6 1.4 6.4 3.2 8.6.6-2.6.9-5.2.9-7.6z")
+                    + fill("M18.2 8.6c-.3 3.6-1.4 6.4-3.2 8.6-.6-2.6-.9-5.2-.9-7.6z")
+                    + shade("M2.6 5.4c5 3.4 13.8 3.4 18.8 0v1.8C16.4 11 7.6 11 2.6 7.2z", 0.16)
+                    + f'<path d="M12 12.2c2 2.6 3.4 4.4 3.4 6.2a3.4 3.4 0 0 1-6.8 0c0-1.8 1.4-3.6 3.4-6.2z" fill="{RED}" stroke="{O}" stroke-width="1.4" stroke-linejoin="round"/>'
+                    + hl("M10.4 18a1.6 1.6 0 0 0 .6 1.6", 1.0, 0.7))
+
+bp = []
+for i in range(16):
+    r = (11.4 if i % 4 == 0 else 9.2) if i % 2 == 0 else 5.2
+    a = math.radians(-90 + i * 22.5)
+    bp.append((12 + r * math.cos(a), 12 + r * math.sin(a)))
+P["opening_salvo"] = (fill(poly(bp)) + shade(poly([(12, 12)] + bp[1:9]), 0.14)
+                      + f'<path d="{poly(star_pts(12, 12, 5.2, 2.7, 8, -90))}" fill="#fff" fill-opacity="0.55"/>')
+
+P["second_wind"] = (lines(["M3 9h10.6a2.8 2.8 0 1 0-2.8-2.8", "M3 13h14.2a3 3 0 1 1-3 3", "M3 17h5.6"], 2.2)
+                    + heart(18.6, 7.4, 0.34))
+
+P["glass_cannon"] = (lines(["M16.4 6.4c1.2-1.6 2.6-2.2 4-1.8"], 1.4) + fill("M14.2 5.2l3.4 3.4-2.2 2.2-3.4-3.4z")
+                     + circ(10.6, 13.6, 7.6) + shade("M16 8.2a7.6 7.6 0 0 1-10.8 10.8A7.6 7.6 0 0 0 16 8.2z", 0.18)
+                     + f'<path d="M9.6 7.4l1.4 3-2.4 2 2 2.6-1.2 2.6M11 10.4l2.6.6M8.6 12.4l-2.4.4" fill="none" stroke="{O}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>'
+                     + hl("M5.8 12a5 5 0 0 1 1.6-3", 1.3, 0.75) + sparkle(20.8, 4, 2.4, GOLD, 1.0))
+
+P["extra_hand"] = hand("translate(-1.2 1.8) scale(0.9)", 3.4) + lines(["M18.8 2.6v6.8M15.4 6h6.8"], 2.4)
+
+JESTER = ["M5.2 16.4C4.6 12.4 3.8 9.4 1.8 7.4c4.6 0 8 2.8 9.4 9z",
+          "M8.8 16.4C9.4 11.2 10.6 6.4 12 3.6c1.4 2.8 2.6 7.6 3.2 12.8z",
+          "M18.8 16.4c.6-4 1.4-7 3.4-9-4.6 0-8 2.8-9.4 9z"]
+P["crowd_pleaser"] = ("".join(fill(d) for d in JESTER) + shade("M12 3.6c1.4 2.8 2.6 7.6 3.2 12.8H12z", 0.16)
+                      + circ(2.4, 7.4, 1.7, GOLD) + circ(12, 3.2, 1.7, GOLD) + circ(21.6, 7.4, 1.7, GOLD)
+                      + fill("M4 16h16v4.6H4z") + shade("M12 16h8v4.6h-8z", 0.14)
+                      + circ(8, 18.3, 1.05, O, False) + circ(12, 18.3, 1.05, O, False) + circ(16, 18.3, 1.05, O, False))
+
+enc_arc, (ex, ey) = arc(12, 12, 7.8, -40, 250)
+P["encore"] = (lines([enc_arc], 2.4, [poly([(ex - 3.4, ey - 1.2), (ex + 2.8, ey - 2.8), (ex + 0.6, ey + 3.4)])])
+               + fill(poly(star_pts(12, 12.5, 4.8, 2.1))))
+
+petals = ""
+for k in range(5):
+    petals += g(f'<ellipse cx="12" cy="6.4" rx="3.3" ry="4.6" fill="{F}" stroke="{O}" stroke-width="{SW}"/>'
+                + f'<path d="M12 4.6v3.4M12 5.6l1.3 1" stroke="{O}" stroke-opacity="0.55" stroke-width="1" stroke-linecap="round"/>',
+                f"rotate({k * 72} 12 12)")
+P["rune_bloom"] = petals + circ(12, 12, 3.0, GOLD) + hl("M10.6 11.4a1.6 1.6 0 0 1 1-1.2", 0.9, 0.7)
+
+feathers = []
+for ang, ln in ((184, 9.2), (210, 8.4), (236, 7.0)):
+    a = math.radians(ang)
+    cx, cy = 10.2 + math.cos(a) * ln / 2, 10.2 + math.sin(a) * ln / 2
+    feathers.append(f'<ellipse cx="{cx:.2f}" cy="{cy:.2f}" rx="{ln / 2:.2f}" ry="2.0" transform="rotate({ang} {cx:.2f} {cy:.2f})"/>')
+P["fast_feet"] = (boot("translate(2 1.2) scale(0.9)") + union(feathers)
+                  + f'<path d="M3.2 8.6l6 1.2M5.4 4.6l4 4.4" fill="none" stroke="{O}" stroke-opacity="0.55" stroke-width="1.1" stroke-linecap="round"/>')
+
+P["resonance"] = (lines(["M12 5.2a6.8 6.8 0 1 1 0 13.6a6.8 6.8 0 1 1 0-13.6z"], 1.6)
+                  + lines([arc(12, 12, 10.4, -40, 40)[0], arc(12, 12, 10.4, 140, 220)[0]], 1.8)
+                  + fill(poly([(12, 8.6), (15.4, 12), (12, 15.4), (8.6, 12)])) + shade(poly([(12, 8.6), (15.4, 12), (12, 15.4)]), 0.16))
+
+FEATHER = "M4.4 19.6C4.8 12.4 9.6 5.2 20.6 2.8c-.4 3-1.6 4.8-3.2 5.8 1.2.2 2 0 2.8-.4-1 3.2-3 5-5.4 6 1 .2 1.8.2 2.6-.2-2.6 3.2-6.8 5-12.8 5.6z"
+P["phoenix"] = (fill(FEATHER)
+                + shade("M20.6 2.8c-.4 3-1.6 4.8-3.2 5.8 1.2.2 2 0 2.8-.4-1 3.2-3 5-5.4 6 1 .2 1.8.2 2.6-.2-2.6 3.2-6.8 5-12.8 5.6 4.8-4 9.8-9.6 16-16.8z", 0.16)
+                + f'<path d="M12.6 8.2c1-1.2 2.4-2 3.8-2.6M10.2 11.6c1.4-.6 2.8-.8 4.2-.8" fill="none" stroke="{O}" stroke-opacity="0.45" stroke-width="1" stroke-linecap="round"/>'
+                + lines(["M2.4 21.6L16.4 7.2"], 1.3)
+                + f'<path d="M20.4 3.2c-.8 2.6-2.4 4.2-4.2 5.2 1.4 0 2.6-.2 3.8-.8" fill="none" stroke="{RED}" stroke-width="1.4" stroke-linecap="round"/>')
+
+P["midas_fist"] = (union([rrect(3.6, 5.4, 3.6, 5.6, 1.8), rrect(7.2, 4.6, 3.6, 5.8, 1.8), rrect(10.8, 4.8, 3.6, 5.8, 1.8),
+                          rrect(14.4, 5.8, 3.4, 5.4, 1.7), '<path d="M3.6 8.4h14.2v7.2a4.4 4.4 0 0 1-4.4 4.4H8a4.4 4.4 0 0 1-4.4-4.4z"/>'])
+                   + shade("M17.8 8.4v7.2a4.4 4.4 0 0 1-4.4 4.4h-1.6c2.6-1.2 4-3.4 4-6.4V8.4z", 0.14)
+                   + f'<path d="M7.2 6v4.4M10.8 5.4v5M14.4 6.2v4.4" stroke="{O}" stroke-width="1.2" stroke-linecap="round"/>'
+                   + fill("M3.4 11.6c2.8-.4 6-.2 8.6.8a1.9 1.9 0 0 1-.6 3.7c-2.6-.3-5.4-.1-8 .6z")
+                   + coin(18.2, 16.8, 4.4))
+
+for pid, body in P.items():
+    ICONS["passive_" + pid] = body
+
 os.makedirs(OUT, exist_ok=True)
 for name, body in ICONS.items():
     with open(os.path.join(OUT, name + ".svg"), "w") as fh:

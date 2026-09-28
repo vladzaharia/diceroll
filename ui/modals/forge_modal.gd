@@ -160,7 +160,7 @@ func _valid() -> bool:
 		return false
 	var d: Die = _flow.run.dice[_die]
 	if _op == "raise":
-		return d.faces[_face] < 6
+		return d.can_raise(_face)
 	return _src >= 0 and _src != _face and d.faces[_src] != d.faces[_face]
 
 
@@ -175,7 +175,7 @@ func _update() -> void:
 	_raise_btn.call("_refresh")
 	_mirror_btn.call("_refresh")
 	for b in _face_btns:
-		var maxed := _op == "raise" and d.faces[b.face_idx] >= 6
+		var maxed := _op == "raise" and not d.can_raise(b.face_idx)
 		b.face.dimmed = maxed
 		b.disabled = maxed
 	# mirror sources
@@ -200,12 +200,15 @@ func _update() -> void:
 		var before := d.faces[_face]
 		var after := before
 		if _op == "raise":
-			after = mini(6, before + 1)
+			after = mini(d.raise_cap(), before + 1)
 		elif _src >= 0:
 			after = d.faces[_src]
-		_preview.add_child(_captioned(DieFace.make(before, d.rune, d.edited[_face] == 1, 72), "Before"))
+		var bf := DieFace.make(before, d.rune, d.edited[_face] == 1, 72)
+		bf.kind = d.kind
+		_preview.add_child(_captioned(bf, "Before"))
 		_preview.add_child(UiIcons.rect("arrow_right", 44, UiPalette.GOLD))
 		var af := DieFace.make(after, d.rune, after != before or d.edited[_face] == 1, 72)
+		af.kind = d.kind
 		if _op == "mirror" and _src < 0:
 			af.glyph = "?"
 		_preview.add_child(_captioned(af, "After"))
@@ -234,6 +237,7 @@ class _FaceButton:
 		b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		b.custom_minimum_size = Vector2(px, px)
 		b.face = DieFace.make(d.faces[f], d.rune, d.edited[f] == 1, px)
+		b.face.kind = d.kind
 		UiTheme.full_rect(b.face)
 		b.add_child(b.face)
 		b.pressed.connect(func() -> void:
@@ -275,8 +279,11 @@ class _DieTab:
 			draw_texture_rect(tex, Rect2(br.get_center() - Vector2(gs, gs) * 0.5, Vector2(gs, gs)), false)
 		else:
 			draw_circle(br.get_center(), s * 0.09, UiPalette.DIE_PIP)
+		if die.kind != "standard":
+			DieFace.draw_kind_mark(self, UiPalette.kind_mark(die.kind), br.position + Vector2(s * 0.16, s * 0.16), s * 0.09,
+				UiPalette.kind_color(die.kind))
 		var f := UiTheme.display_font()
-		var t := "DIE %d" % (idx + 1)
+		var t := ("DIE %d" % (idx + 1)) if die.kind == "standard" else String(DiceKinds.def(die.kind).name).to_upper()
 		var w := f.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
 		draw_string(f, Vector2((size.x - w) * 0.5, size.y - 10), t, HORIZONTAL_ALIGNMENT_LEFT, -1, 18,
 			UiPalette.GOLD_BRIGHT if selected else UiPalette.TEXT_DIM)

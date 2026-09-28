@@ -179,8 +179,14 @@ func _layout() -> void:
 	_bottom.reset_size()
 	var h := _bottom.get_combined_minimum_size().y
 	var bottom := size.y - UiTheme.tray_height(size) - 20.0
-	_bottom.size = Vector2(w, h)
-	_bottom.position = Vector2((size.x - w) * 0.5, bottom - h)
+	var slot := UiTheme.side_slot(size)
+	if slot.size.x > 0.0:
+		w = slot.size.x
+		_bottom.size = Vector2(w, h)
+		_bottom.position = Vector2(slot.position.x, slot.end.y - h)
+	else:
+		_bottom.size = Vector2(w, h)
+		_bottom.position = Vector2((size.x - w) * 0.5, bottom - h)
 	if sheet.visible:
 		var sw := minf(560.0, w)
 		sheet.reset_size()
@@ -254,6 +260,8 @@ static func project(flow: GameFlow) -> Dictionary:
 
 ## Top edge (canvas y) of the bottom panel; 3D framing should stay above it.
 func content_top(view: Vector2) -> float:
+	if UiTheme.side_slot(view).size.x > 0.0:
+		return view.y - UiTheme.tray_height(view) - 20.0
 	return view.y - UiTheme.tray_height(view) - 20.0 - _bottom.get_combined_minimum_size().y
 
 

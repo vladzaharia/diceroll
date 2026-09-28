@@ -1,7 +1,8 @@
 shader_type spatial;
 render_mode unshaded, depth_test_disabled, depth_draw_never, cull_disabled, shadows_disabled, fog_disabled;
 // Round intent badge with a crisp SDF icon.
-// kind: 0 attack (sword) 1 block (shield) 2 buff (up arrow) 3 curse (padlock) 4 summon (skull) 5 unknown (dot)
+// kind: 0 attack (sword) 1 block (shield) 2 buff (up arrow) 3 curse (padlock) 4 summon (skull)
+// 5 unknown (dot) 6 aim (crosshair: the archer takes aim, no attack this turn) 7 chaos (spiral)
 
 uniform int kind = 0;
 uniform vec4 bg_color : source_color = vec4(0.85, 0.2, 0.2, 1.0);
@@ -57,6 +58,17 @@ float icon(vec2 p) {
 		float nose = tri_up(p - vec2(0.0, -0.1), 0.05, 0.08);
 		float teeth = box(p - vec2(0.0, -0.26), vec2(0.012, 0.07));
 		return max(max(s, -eyes), -min(nose, teeth));
+	} else if (kind == 6) {
+		float ring = abs(circle(p, 0.3)) - 0.055;
+		float ticks = min(min(box(p - vec2(0.0, 0.42), vec2(0.045, 0.12)), box(p + vec2(0.0, 0.42), vec2(0.045, 0.12))),
+			min(box(p - vec2(0.42, 0.0), vec2(0.12, 0.045)), box(p + vec2(0.42, 0.0), vec2(0.12, 0.045))));
+		float dot_c = circle(p, 0.08);
+		return min(min(ring, ticks), dot_c);
+	} else if (kind == 7) {
+		float r = length(p);
+		float a = atan(p.y, p.x);
+		float spiral = abs(fract((r * 3.2 - a / 6.2831853) + 0.5) - 0.5) / 3.2 - 0.05;
+		return max(spiral, r - 0.46);
 	}
 	return circle(p, 0.18);
 }

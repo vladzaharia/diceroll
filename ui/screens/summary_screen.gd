@@ -10,6 +10,8 @@ const ACT_NAMES := ["The Crypt", "The Hollow", "The Bone Throne"]
 
 var _hero: HBoxContainer
 var _grid: GridContainer
+var _passive_title: Label
+var _passives: HFlowContainer
 var _headline: Label
 
 
@@ -26,6 +28,14 @@ func _build() -> void:
 	_grid.add_theme_constant_override("h_separation", 12)
 	_grid.add_theme_constant_override("v_separation", 12)
 	body.add_child(_grid)
+	_passive_title = UiModal.section_label("Passives")
+	body.add_child(_passive_title)
+	_passives = HFlowContainer.new()
+	_passives.alignment = FlowContainer.ALIGNMENT_CENTER
+	_passives.add_theme_constant_override("h_separation", 8)
+	_passives.add_theme_constant_override("v_separation", 8)
+	_passives.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	body.add_child(_passives)
 	body.add_child(UiTheme.spacer(4))
 	var row := UiTheme.hbox(14)
 	body.add_child(row)
@@ -45,7 +55,7 @@ func refresh(flow: GameFlow) -> void:
 	var won := flow.phase == GameFlow.Phase.VICTORY or bool(st.get("victory", false))
 	set_title("VICTORY!" if won else "DEFEATED", UiPalette.GOLD if won else UiPalette.DANGER)
 	var act := clampi(int(st.get("max_act", r.act)), 1, 3)
-	_headline.text = "The Lich has fallen. The Bone Throne is yours." if won else "Fallen in Act %d, %s." % [act, ACT_NAMES[act - 1]]
+	_headline.text = "The Lich has fallen. The Bone Throne is yours." if won else "Fallen on lap %d of %d, in %s." % [r.lap, Balance.TOTAL_LAPS, ACT_NAMES[act - 1]]
 	_headline.label_settings = UiTheme.label_settings(28, UiPalette.GOLD_BRIGHT if won else UiPalette.TEXT, true, 0, UiPalette.OUTLINE, true)
 	UiTheme.clear(_hero)
 	var cls: Dictionary = HeroDefs.DATA.get(r.class_id, HeroDefs.DATA.knight)
@@ -54,7 +64,7 @@ func refresh(flow: GameFlow) -> void:
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	_hero.add_child(col)
 	col.add_child(UiTheme.label(String(cls.name), 40, UiPalette.TEXT, true, 6))
-	col.add_child(UiTheme.label("Level %d  ·  Act %d  ·  %d dice" % [r.level, act, r.dice.size()], 22, UiPalette.TEXT_DIM, false, 0, false, 600))
+	col.add_child(UiTheme.label("Level %d  ·  Lap %d/%d  ·  %d dice" % [r.level, r.lap, Balance.TOTAL_LAPS, r.dice.size()], 22, UiPalette.TEXT_DIM, false, 0, false, 600))
 	UiTheme.clear(_grid)
 	var best := String(st.get("best_combo", ""))
 	var bm := float(st.get("best_mult", 0.0))
@@ -68,7 +78,14 @@ func refresh(flow: GameFlow) -> void:
 	]
 	for t in tiles:
 		_grid.add_child(_tile(t[0], t[1], t[2]))
+	UiTheme.clear(_passives)
+	for id in r.passives:
+		_passives.add_child(PassiveIcon.make(String(id), 56, true))
+	_passive_title.text = "PASSIVES (%d)" % r.passives.size()
+	_passive_title.visible = not r.passives.is_empty()
+	_passives.visible = not r.passives.is_empty()
 	relayout()
+
 
 
 static func _num(n: int) -> String:

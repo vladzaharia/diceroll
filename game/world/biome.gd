@@ -3,15 +3,23 @@ extends RefCounted
 ## Builds everything around the board for an act: sky/fog/post, lights, the floating
 ## island, edge dressing, the centre set piece and ambient particles.
 ##
-##   var world := Biome.build(1)    # 1 crypt, 2 hollow, 3 throne
+##   var world := Biome.build(1, board.ring_extent())    # 1 crypt, 2 hollow, 3 throne
 ##   add_child(world)
 ##
-## Layout contract (world units): ring tile centres sit on the square |x|,|z| = 3 * PITCH
-## (~6.3); the ring occupies |x|,|z| <= 7.4. The centre set piece stays within r ~2.4, so
-## the moat between it and the ring (combat staging) is free. Dressing lives at |x|,|z| > 7.8.
+## Layout contract (world units): the dressing is authored for a 7x7 ring whose outer tile
+## edge is at |x|,|z| = BASE_EXTENT (7.35). build() scales the layout to the real ring
+## extent: dressing positions spread out by s = extent / BASE_EXTENT (walls and fences are
+## stretched along their length so rows stay closed), the island and floor grow, and the
+## centre set piece scales up a little. The set piece stays within r ~2.4 * s, so the moat
+## between it and the ring (combat staging) is free.
 
 const NAMES := {1: "crypt", 2: "hollow", 3: "throne"}
 const ISLAND_HALF := 11.0
+## Outer ring edge the dressing layout was authored for (7x7 ring, PITCH 2.1).
+const BASE_EXTENT := 7.35
+
+## Layout scale for the biome being built (see build()).
+static var _s := 1.0
 
 ## Per-act look. Colours are sRGB.
 const LOOKS := {
@@ -64,8 +72,9 @@ static func look(act: int) -> Dictionary:
 	return LOOKS[clampi(act, 1, 3)]
 
 
-static func build(act: int) -> Node3D:
+static func build(act: int, extent := BASE_EXTENT) -> Node3D:
 	act = clampi(act, 1, 3)
+	_s = maxf(extent / BASE_EXTENT, 0.6)
 	var root := Node3D.new()
 	root.name = "Biome_" + String(NAMES[act])
 	var lk := look(act)
@@ -73,7 +82,7 @@ static func build(act: int) -> Node3D:
 	_add_lights(root, lk)
 	var island := MeshInstance3D.new()
 	island.name = "Island"
-	island.mesh = island_mesh(ISLAND_HALF, 13.0, lk.island_top, lk.island_side, lk.island_bottom, act * 17)
+	island.mesh = island_mesh(ISLAND_HALF * _s, 13.0 * sqrt(_s), lk.island_top, lk.island_side, lk.island_bottom, act * 17)
 	root.add_child(island)
 	_add_floating_rocks(root, lk, act)
 	root.add_child(_cloud_sea(lk))
@@ -90,8 +99,33 @@ static func build(act: int) -> Node3D:
 			_hollow(dressing, centre)
 		3:
 			_throne(dressing, centre)
-	root.add_child(ambient_particles(String(lk.particles)))
+	_spread(dressing)
+	centre.scale = Vector3.ONE * minf(1.0 + (_s - 1.0) * 1.4, 1.45)
+	if _s > 1.05:
+		_inner_corners(root, act, centre.scale.x)
+	var amb := ambient_particles(String(lk.particles))
+	amb.scale = Vector3(_s, 1.0, _s)
+	root.add_child(amb)
 	return root
+
+
+## Spreads authored dressing out to the real ring size: positions scale by _s in x/z and
+## wall-like pieces stretch along their own length so rows stay closed. The floor is built
+## at full size already and is skipped.
+static func _spread(d: Node3D) -> void:
+	if absf(_s - 1.0) < 0.001:
+		return
+	for c in d.get_children():
+		var n := c as Node3D
+		if n == null or n.name == "Floor":
+			continue
+		n.position.x *= _s
+		n.position.z *= _s
+		var path := String(n.scene_file_path)
+		if path.contains("wall") or path.contains("fence") or path.contains("barrier"):
+			n.scale.x *= _s
+		if n is OmniLight3D:
+			(n as OmniLight3D).omni_range *= sqrt(_s)
 
 
 # --- environment -------------------------------------------------------------------
@@ -259,6 +293,7 @@ static func _add_floating_rocks(root: Node3D, lk: Dictionary, act: int) -> void:
 	var spots := [Vector3(-15.5, -3.5, -9.0), Vector3(15.0, -5.0, -12.0), Vector3(-13.0, -7.0, 9.0),
 		Vector3(16.5, -2.0, 4.0), Vector3(-6.0, -4.0, -17.0), Vector3(8.0, -6.5, -18.0)]
 	for i in spots.size():
+		spots[i] = Vector3(spots[i].x * _s, spots[i].y, spots[i].z * _s)
 		var mi := MeshInstance3D.new()
 		var h := 0.9 + 0.35 * float(i % 3)
 		mi.mesh = island_mesh(h, h * 2.2, lk.island_top, lk.island_side, lk.island_bottom, act * 31 + i)
@@ -271,11 +306,16 @@ static func _add_floating_rocks(root: Node3D, lk: Dictionary, act: int) -> void:
 		bob.tween_property(mi, "position:y", spots[i].y - 0.35, 2.4 + 0.3 * i).set_trans(Tween.TRANS_SINE)
 
 
-static func _floor(parent: Node3D, paths: Array, y: float, half := 10.0, step := 4.0,
+static func _floor(p_parent: Node3D, paths: Array, y: float, half := 10.0, step := 4.0,
 		seed := 3, tint := Color(0, 0, 0, 0)) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed
-	var n := int(round(half * 2.0 / step))
+	var parent := Node3D.new()
+	parent.name = "Floor"
+	p_parent.add_child(parent)
+	half *= _s
+	var n := int(ceil(half * 2.0 / step - 0.2))
+	half = n * step * 0.5
 	for ix in n:
 		for iz in n:
 			var p := Vector3(-half + step * (ix + 0.5), y, -half + step * (iz + 0.5))
@@ -569,7 +609,39 @@ static func _throne(d: Node3D, c: Node3D) -> void:
 	flicker_light(c, Vector3(0, 1.5, 2.6), Color(0.65, 0.4, 1.0), 3.0, 6.0)
 
 
+## Larger rings leave a wider moat: low, lit props on its four inner corners keep it
+## dressed (they sit off the combat lanes and are sunk by the occluder pass if needed).
+static func _inner_corners(root: Node3D, act: int, k: float) -> void:
+	var holder := Node3D.new()
+	holder.name = "InnerCorners"
+	root.add_child(holder)
+	var D := Props.DUN
+	var H := Props.HAL
+	var r := 3.55 * k
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			var p := Vector3(sx * r, 0.0, sz * r)
+			var yaw := rad_to_deg(atan2(-sx, -sz))
+			match act:
+				1:
+					Props.put(holder, D + "pillar.gltf", p, yaw, 0.32)
+					Props.put(holder, D + "candle_triple.gltf", p + Vector3(0, 1.28, 0), yaw, 0.7)
+					flame(holder, p + Vector3(0, 1.9, 0), Color(1.0, 0.6, 0.25), 0.18, 5)
+					Props.put(holder, D + "barrel_small.gltf", p + Vector3(-sx * 0.75, 0, sz * 0.15), yaw, 0.55)
+				2:
+					Props.put(holder, H + "pumpkin_orange_jackolantern.gltf", p, yaw, 0.62)
+					Props.put(holder, H + "gravemarker_A.gltf", p + Vector3(-sx * 0.2, 0, -sz * 0.75), yaw + 10.0, 0.7)
+					Props.put(holder, H + "pumpkin_yellow_small.gltf", p + Vector3(-sx * 0.7, 0, sz * 0.1), yaw, 0.7)
+					flicker_light(holder, p + Vector3(0, 0.7, 0), Color(1.0, 0.5, 0.15), 1.2, 3.2)
+				_:
+					Props.put(holder, H + "skull_candle.gltf", p, yaw, 0.85)
+					Props.put(holder, H + "bone_B.gltf", p + Vector3(-sx * 0.6, 0, sz * 0.2), yaw + 40.0, 0.7)
+					flame(holder, p + Vector3(0, 1.15, 0), Color(0.62, 0.4, 1.0), 0.18, 5)
+					flicker_light(holder, p + Vector3(0, 1.3, 0), Color(0.65, 0.4, 1.0), 1.2, 3.2)
+
+
 static func _spin_bob(n: Node3D, y: float) -> void:
+
 	var spin := n.create_tween().set_loops()
 	spin.tween_property(n, "rotation:y", TAU, 12.0).from(0.0)
 	var tilt := n.create_tween().set_loops()

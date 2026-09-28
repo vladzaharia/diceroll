@@ -239,6 +239,23 @@ static func tray_height(view: Vector2) -> float:
 	return round(view.y * TRAY_FRACTION)
 
 
+## Width of the dice tray (portrait: nearly full width; landscape: capped and centred).
+static func tray_width(view: Vector2) -> float:
+	return view.x - 24.0 if view.y > view.x else minf(view.x - 48.0, 920.0)
+
+
+## Landscape only: the free band to the right of the dice tray, where the bottom HUD
+## (ROLL / GO / Reroll / Attack) lives so the world keeps the height above the tray.
+## Empty Rect2 in portrait or when the band is too narrow.
+static func side_slot(view: Vector2) -> Rect2:
+	if view.y > view.x:
+		return Rect2()
+	var th := tray_height(view)
+	var x0 := (view.x + tray_width(view)) * 0.5 + 20.0
+	var r := Rect2(x0, view.y - th - 40.0, view.x - x0 - 28.0, th + 20.0)
+	return r if r.size.x >= 420.0 else Rect2()
+
+
 ## Vertical gradient texture (top -> bottom colours, optional middle stop).
 ## Built synchronously from an Image (GradientTexture2D updates deferred and can draw blank).
 static func vgradient(top: Color, bottom: Color, mid: Variant = null) -> Texture2D:

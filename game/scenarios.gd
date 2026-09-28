@@ -3,14 +3,23 @@ extends RefCounted
 ## (GameController + GameFlow) in a given state. They never touch the player's save.
 ##
 ##  game_title    title screen over the orbiting act 1 board
-##  game_board    fresh run, BOARD_READY          game_rolled   after ROLL (targets shown)
-##  game_combat   mid-fight, dice marked for a reroll
+##  game_board    fresh run, BOARD_READY (--passives=N shows N passives in the HUD bar)
+##  game_rolled   after ROLL: the two moving dice lifted, the rest dimmed, the move pill,
+##                the target marker and GO. 4 dice by default (--dice=N, 2..5); --double=1
+##                searches seeds for a doubles roll (celebration + treasury)
+##  game_combat   mid-fight, dice marked for a reroll (--tile=N, --enemies=a,b,c)
 ##  game_combo    mid-fight right after ATTACK (combo banner held on screen)
-##  game_shop / game_draft / game_forge / game_event / game_portal   modals and picks
-##  game_boss     act boss fight (--act=1..3)
-##  game_victory / game_defeat   summary screens
+##  game_shop     shop with a die kind and a passive card (+ the regular stock)
+##  game_draft / game_forge / game_event / game_portal   modals and picks
+##  game_passive  passive reward modal (--source=miniboss|elite|boss; miniboss = boss tier)
+##  game_die_inspect   die inspector on a Giant die with a rune (--die=N)
+##  game_miniboss the lap 7 mini-boss appearing on the board (--fight=1: fight it)
+##  game_biome_change  lap 6 starts mid-move: the crypt sinks, the hollow rises
+##                (--to=3: lap 11, hollow -> bone throne). Use --wait and --frames.
+##  game_boss     final boss fight with its intro (--act=1..3)
+##  game_victory / game_defeat   summary screens (with passives)
 ##  game_continue runs --steps=N bot commands, JSON round-trips the run and presents it
-##  game_manual   drives the UI like a player (ROLL -> tap die -> fight -> ATTACK -> draft),
+##  game_manual   drives the UI like a player (ROLL -> GO -> fight -> ATTACK -> draft),
 ##                saving a shot per step: <shot>_step_NN.png
 ##  play_auto     full run driven by Bot through the real presentation; periodic shots
 ##                <shot>_NN.png (--shots=N --every=S), final shot <shot>_final.png, quits at
@@ -19,7 +28,10 @@ extends RefCounted
 ## Common args: --class=knight|barbarian|mage|rogue --seed=N --act=N --speed=N
 
 const NAMES := ["game_title", "game_board", "game_rolled", "game_combat", "game_combo", "game_shop", "game_draft",
-	"game_forge", "game_event", "game_portal", "game_boss", "game_victory", "game_defeat", "game_manual", "game_continue", "play_auto"]
+	"game_forge", "game_event", "game_portal", "game_boss", "game_victory", "game_defeat", "game_manual", "game_continue",
+	"play_auto", "game_passive", "game_die_inspect", "game_miniboss", "game_biome_change"]
+## Passives shown by --passives=N (a mix of rarities, boss tier last).
+const DEMO_PASSIVES := ["pair_master", "iron_skin", "pathfinder", "rune_echo", "treasure_sense", "fast_feet", "midas_fist"]
 
 
 static func names() -> PackedStringArray:
@@ -68,26 +80,58 @@ class _Driver extends Node:
 		var act := int(args.get("act", "1"))
 		if act > 1:
 			f.run.act = act
-			f.run.board = Board.generate(f.run.rng, act)
+			f.run.lap = int(Balance.BIOME_LAPS[act - 1]) + 1
+			f.run.board = Board.generate(f.run.rng, act, Balance.BOARD_SIZE, f.run.lap)
 			f.run.level = 2 + act * 3
 			f.run.max_hp += 16 * (act - 1)
 			f.run.hp = f.run.max_hp
-			for k in act:
-				f.run.dice.append(Die.new())
+			for k in ["high", "giant", "twin"].slice(0, act):
+				f.run.dice.append(Die.make("", k))
+		for k in int(args.get("passives", "0")):
+			f.run.passives.append(DEMO_PASSIVES[k % DEMO_PASSIVES.size()])
 		return f
+
+	## A die pool of `n` (2..5) with a spread of kinds (and one rune) for dice-heavy shots.
+	func _pool(f: GameFlow, n: int) -> void:
+		var kinds := ["standard", "standard", "giant", "low", "gambler"]
+		f.run.dice.clear()
+		for k in clampi(n, 2, 5):
+			f.run.dice.append(Die.make("", kinds[k]))
+		if n >= 3:
+			f.run.dice[2].rune = "blade"
 
 	func _state() -> void:
 		var f := _flow()
 		match scenario:
 			"game_portal":
-				f.run.pos = 18
+				f.run.pos = f.run.board.size() * 3 / 4
 			"game_boss":
 				f.run.pos = 0
+				f.run.lap = Balance.TOTAL_LAPS
+			"game_rolled":
+				_pool(f, int(args.get("dice", "4")))
+				if args.get("double", "0") == "1":
+					f = _double_seed(f)
+			"game_die_inspect":
+				_pool(f, 4)
+				f.run.dice[2].rune = "ember"
+				f.run.dice[2].raise_face(0)
+			"game_shop":
+				_pool(f, 3)
 		c.start(f)
 		await get_tree().create_timer(0.3).timeout
 		match scenario:
 			"game_rolled":
 				await c.run_command("roll_board")
+			"game_passive":
+				await c.play_events(f.debug_open("passive", String(args.get("source", "miniboss"))))
+			"game_die_inspect":
+				await get_tree().create_timer(0.4).timeout
+				c.inspect_die(int(args.get("die", "2")))
+			"game_miniboss":
+				await _miniboss(f)
+			"game_biome_change":
+				await _biome_change(f)
 			"game_combat", "game_combo":
 				var ids := String(args.get("enemies", "skeleton_warrior,skeleton_minion,skeleton_archer"))
 				f.run.pos = int(args.get("tile", "3"))
@@ -105,8 +149,22 @@ class _Driver extends Node:
 						await c.run_command("combat_reroll")
 					await c.run_command("combat_attack")
 			"game_shop":
-				f.run.gold = 120
-				await c.play_events(f.debug_open("shop"))
+				f.run.gold = 160
+				var ev := f.debug_open("shop")
+				# make sure the stock shows a die kind and a passive card
+				var items: Array = f.offer.items
+				var die_item := f._shop_item("die", {})
+				die_item.kind = "giant"
+				die_item.label = DiceKinds.label("giant")
+				die_item.desc = String(DiceKinds.DEFS.giant.desc)
+				die_item.price = int(DiceKinds.DEFS.giant.price)
+				var pas := f._shop_item("passive", {})
+				items.clear()
+				items.append(die_item)
+				items.append(pas)
+				items.append(f._shop_item("rune", {}))
+				items.append(f._shop_item("potion", {}))
+				await c.play_events(ev)
 			"game_draft":
 				await c.play_events(f.debug_open("draft"))
 			"game_forge":
@@ -124,7 +182,52 @@ class _Driver extends Node:
 				f._finish(scenario == "game_victory", ev)
 				await c.play_events(ev)
 
-	## Plays --steps bot commands without presentation, round-trips the run through JSON (as
+	## A copy of `f` re-seeded until its first board roll is a doubles roll (so the scenario
+	## shows the doubles celebration). Falls back to `f`.
+	func _double_seed(f: GameFlow) -> GameFlow:
+		var base := int(args.get("seed", "7"))
+		for s in range(base, base + 400):
+			var g := GameFlow.new_run(f.run.class_id, s)
+			g.run.dice = f.run.dice
+			var probe := GameFlow.from_dict(g.to_dict())
+			probe.roll_board()
+			if probe.is_board_double() and probe.board_move > 0:
+				print("DOUBLE_SEED ", s)
+				return g
+		return f
+
+	## Lap 7 begins: the mini-boss tile bursts onto the act 2 board (--fight=1: then fight it).
+	func _miniboss(f: GameFlow) -> void:
+		await get_tree().create_timer(0.5).timeout
+		f.run.lap = Balance.MINIBOSS_LAP
+		var mb := f.run.board.spawn_miniboss(f.run.rng, EnemyDefs.ACT_MINIBOSS[1], f.run.pos, [f.run.pos])
+		if mb.is_empty():
+			return
+		await c.play_events([{"type": "board_mutated", "changes": [mb]}])
+		if args.get("fight", "0") == "1":
+			f.run.pos = int(mb.idx)
+			c.board.place_hero(f.run.pos)
+			var ev: Array[Dictionary] = []
+			f._start_combat(f.run.board.tiles[f.run.pos].enemies, false, false, f.run.pos, ev, true)
+			await c.play_events(ev)
+
+	## The hero crosses Start into lap 6 (or 11 with --to=3): the biome changes around them.
+	func _biome_change(f: GameFlow) -> void:
+		var to := int(args.get("to", "2"))
+		if to == 3:
+			f.run.act = 2
+			f.run.board = Board.generate(f.run.rng, 2, Balance.BOARD_SIZE, 10)
+			c.board.build(2, f.run.board.to_dict().tiles)
+		f.run.lap = int(Balance.BIOME_LAPS[to - 1]) - 1
+		var n := f.run.board.size()
+		f.run.pos = n - 3
+		c.board.place_hero(f.run.pos)
+		c.ui.sync(f)
+		c.rig.home(c.board.hero, true)
+		await get_tree().create_timer(0.6).timeout
+		var ev := f._move(5, false)
+		f._advance(ev)
+		await c.play_events(ev)
 	## the save does) and presents the loaded copy: checks Continue for mid-run phases.
 	func _continue() -> void:
 		var f := _flow()
@@ -140,10 +243,11 @@ class _Driver extends Node:
 
 	func _manual() -> void:
 		var f := _flow()
-		# Make the tiles 2..6 ahead enemies so any board roll lands in a fight.
-		for i in range(1, 7):
-			f.run.board.tiles[i] = Board.make_tile("enemy", ["skeleton_minion"])
-		f.run.xp = 9  # the first win levels up -> draft
+		# Make the edge tiles 1..12 enemies so any 2-dice roll lands in a fight.
+		for i in range(1, 13):
+			if not f.run.board.is_corner(i):
+				f.run.board.tiles[i] = Board.make_tile("enemy", ["skeleton_minion"])
+		f.run.xp = Balance.xp_for_level(1) - 1  # the first win levels up -> draft
 		c.start(f)
 		var step := 0
 		await _pause(0.8)
@@ -151,13 +255,10 @@ class _Driver extends Node:
 		c.ui.board_hud.roll_pressed.emit()
 		await c.idle
 		step = await _step(step, "rolled")
-		# tap the die with the highest value
-		var best := 0
-		for i in f.board_roll.size():
-			if f.board_roll[i] > f.board_roll[best]:
-				best = i
-		c.tray.die_pressed.emit(best)
+		# the move is automatic: press GO
+		c.ui.board_hud.go_pressed.emit()
 		await c.idle
+
 		step = await _step(step, "fight started")
 		var guard := 0
 		while f.phase == GameFlow.Phase.COMBAT and guard < 30:

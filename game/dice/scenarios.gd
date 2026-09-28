@@ -5,6 +5,8 @@ extends RefCounted
 ##               Use --wait=0.5 --frames=6 to capture mid-roll frames.
 ##  dice_tray_3  3 plain dice settled on 4 4 2 with the pair highlighted as a combo group.
 ##  dice_tray_gallery  two trays showing all 12 rune looks, with edited (gold-rim) faces up.
+##  dice_kinds   two trays: every die kind with its corner mark, blank 0 and numerals 7/8/9;
+##               the lower tray shows a board move (two chosen dice lifted, the rest dimmed).
 
 const MOCK_6 := [
 	{"faces": [1, 2, 3, 4, 6, 6], "rune": "", "edited": [0, 0, 0, 0, 1, 0]},
@@ -17,7 +19,7 @@ const MOCK_6 := [
 
 
 static func names() -> PackedStringArray:
-	return PackedStringArray(["dice_tray", "dice_tray_3", "dice_tray_gallery"])
+	return PackedStringArray(["dice_tray", "dice_tray_3", "dice_tray_gallery", "dice_kinds"])
 
 
 static func build(name: String) -> Node:
@@ -71,6 +73,8 @@ class _Host:
 				tray.highlight_group([0, 1], Color(1.0, 0.8, 0.3))
 			"dice_tray_gallery":
 				_gallery()
+			"dice_kinds":
+				_kinds()
 
 	func _gallery() -> void:
 		var runes := ["", "blade", "guard", "venom", "ember", "vampire", "lucky", "frost", "thunder", "echo", "heavy", "gilded"]
@@ -87,6 +91,25 @@ class _Host:
 			trays[t].set_values([1, 2, 3, 4, 5, 6] if t == 0 else [6, 5, 4, 3, 2, 1])
 		var w := trays[0].dice[0]
 		w.set_data({"faces": [1, 2, 3, 4, 5, 6], "rune": "wild", "edited": [0, 0, 0, 0, 0, 0]})
+
+	func _kinds() -> void:
+		var top := DiceTray.new()
+		add_child(top)
+		top.position = tray.position - Vector2(0, tray.size.y + 20)
+		top.size = tray.size
+		var a: Array = []
+		for k in ["gambler", "giant", "giant", "giant", "twin"]:
+			a.append(Die.make("", k))
+		a[3].rune = "blade"
+		top.set_dice(a)
+		top.set_values([0, 7, 8, 9, 3])
+		var b: Array = []
+		for k in ["low", "high", "even", "odd", "loaded"]:
+			b.append(Die.make("", k))
+		b[2].rune = "frost"
+		tray.set_dice(b)
+		tray.set_values([2, 5, 2, 3, 6])
+		tray.set_chosen([0, 2])
 
 	func _place() -> void:
 		var vs := size if size.x > 0.0 else get_viewport_rect().size

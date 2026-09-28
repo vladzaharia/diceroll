@@ -36,6 +36,8 @@ var _board_idx := -1
 var _rig: CameraRig
 var _ground_y := 0.0
 var _distance := DISTANCE
+## Sideways shift of the enemy line (world units along `side`) so it clears the hero on screen.
+var _lateral := 0.0
 
 
 func _init() -> void:
@@ -52,6 +54,7 @@ func begin(p_hero: Character, anchor: Dictionary, enemy_list: Array) -> void:
 	side = (anchor.get("side", facing.cross(Vector3.UP)) as Vector3).normalized()
 	_ground_y = float(anchor.get("ground_y", hero_home.y - 0.45))
 	_distance = float(anchor.get("distance", DISTANCE))
+	_lateral = float(anchor.get("lateral", 0.0))
 	_face(hero, hero.global_position + facing, 0.3)
 	_arena()
 	var n := enemy_list.size()
@@ -70,7 +73,17 @@ func begin_on_board(board: BoardView, idx: int, enemy_list: Array, rig: CameraRi
 	_board_idx = idx
 	_rig = rig
 	board.set_tile_dressing_visible(idx, false)
-	begin(board.hero, board.combat_anchor(idx), enemy_list)
+	var anchor := board.combat_anchor(idx)
+	if rig:
+		# The combat camera swings behind the hero; shift the line toward screen-right so the
+		# enemy nearest the hero isn't hidden behind them.
+		var sw := deg_to_rad(rig.combat_swing_portrait if rig.is_portrait() else rig.combat_swing_landscape)
+		var right: Vector3 = (anchor.facing as Vector3).rotated(Vector3.UP, -sw)
+		var sgn := signf((anchor.side as Vector3).dot(right))
+		anchor["lateral"] = sgn * (1.0 if rig.is_portrait() else 0.5)
+
+	begin(board.hero, anchor, enemy_list)
+
 	var focus: Array = enemy_positions()
 	focus.append(board.hero.global_position)
 	var centre := Vector3.ZERO
@@ -142,7 +155,8 @@ func enemy_position(i: int) -> Vector3:
 func enemy_heights() -> Array:
 	var out := []
 	for i in enemies.size():
-		out.append(_hud_height(String(data[i].get("id", ""))) + (1.1 if bool(data[i].get("boss", false)) else 0.7))
+		var tall := bool(data[i].get("boss", false)) or bool(data[i].get("miniboss", false))
+		out.append(_hud_height(String(data[i].get("id", ""))) + (1.1 if tall else 0.7))
 	return out
 
 
@@ -156,7 +170,7 @@ func enemy_positions() -> Array[Vector3]:
 func _slot(i: int, n: int) -> Vector3:
 	var c := float(i) - float(n - 1) * 0.5
 	var along := _distance + (0.35 if n > 1 else 0.3) + absf(c) * -0.3
-	var base := hero_home + facing * along + side * c * SPACING
+	var base := hero_home + facing * along + side * (c * SPACING + _lateral * (1.0 if n > 1 else 0.5))
 	return Vector3(base.x, _ground_y + _floor_offset(), base.z)
 
 
@@ -178,9 +192,10 @@ func _add(d: Dictionary, i: int, n: int, rise_delay := -1.0) -> void:
 	var dd := d.duplicate(true)
 	dd["boss"] = bool(d.get("boss", EnemyLooks.is_boss(id)))
 	data.append(dd)
+	dd["miniboss"] = bool(d.get("miniboss", EnemyLooks.is_miniboss(id)))
 	var hud := UnitHud.new()
 	add_child(hud)
-	hud.scale = Vector3.ONE * (1.2 if dd.boss else 1.0)
+	hud.scale = Vector3.ONE * (1.2 if dd.boss else (1.1 if dd.miniboss else 1.0))
 	hud.global_position = pos + Vector3.UP * _hud_height(id)
 	hud.set_data(dd, false)
 	huds.append(hud)
@@ -192,7 +207,7 @@ func _add(d: Dictionary, i: int, n: int, rise_delay := -1.0) -> void:
 
 
 func _hud_height(id: String) -> float:
-	var h := 2.55 * UNIT_SCALE * EnemyLooks.scale_of(id)
+	var h := 2.2 * UNIT_SCALE * EnemyLooks.scale_of(id)
 	if id == "brute":
 		h *= 1.2
 	return h + 0.35
@@ -220,7 +235,8 @@ func _rise(ch: Character, id: String, hud: UnitHud, delay: float) -> void:
 		hud.visible = true
 		hud.scale = Vector3.ONE * 0.01
 		var ht := hud.create_tween().set_speed_scale(speed)
-		ht.tween_property(hud, "scale", Vector3.ONE * (1.2 if EnemyLooks.is_boss(id) else 1.0), 0.25) \
+		ht.tween_property(hud, "scale", Vector3.ONE * (1.2 if EnemyLooks.is_boss(id) else (1.1 if EnemyLooks.is_miniboss(id) else 1.0)), 0.25) \
+
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT))
 	Audio.play_sfx("trap", 0.1)
 
@@ -278,7 +294,7 @@ func enemy_attack(i: int) -> void:
 	var ch := enemies[i]
 	var id := String(data[i].get("id", ""))
 	var home := ch.global_position
-	var ranged := id == "skeleton_archer" or id == "cultist" or id == "boss_lich"
+	var ranged := id in ["skeleton_archer", "cultist", "boss_lich", "mini_grave_mage"]
 	var lunge := home + (hero.global_position - home).normalized() * (0.2 if ranged else 0.9)
 	var t := ch.create_tween().set_speed_scale(speed)
 	t.tween_property(ch, "global_position", lunge, 0.18).set_trans(Tween.TRANS_SINE)

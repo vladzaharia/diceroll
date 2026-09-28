@@ -146,15 +146,25 @@ func start(f: GameFlow) -> void:
 	get_tree().paused = false
 	stage.clear()
 	stage.speed = speed
+	tray.modulate.a = 1.0
+	ui.combat_hud.modulate.a = 1.0
+	overlay.vignette(0.0, 0.01)
 	board.hero_class = f.run.class_id
+
 	board.hero_idx = f.run.pos
 	board.build(f.run.act, f.run.board.to_dict().tiles)
-	rig.overview(board.ring_bounds(), true)
+	if f.phase == GameFlow.Phase.BOARD_READY:
+		rig.home(board.hero, true)
+	else:
+		rig.overview(board.ring_bounds(), true)
 	tray.visible = true
 	tray.set_dice(f.run.dice)
 	if f.phase == GameFlow.Phase.BOARD_ROLLED and not f.board_roll.is_empty():
 		tray.set_values(f.board_roll)
-		show_roll_targets(f.landing_preview(), f.board_roll)
+		tray.set_chosen(f.board_choice)
+		var t := f.board_target()
+		var steps := posmod(t - f.run.pos, f.run.board.size()) if f.board_move > 0 else 0
+		show_move_target(t, steps if steps > 0 or f.board_move == 0 else f.run.board.size(), f.is_board_double())
 	if f.phase == GameFlow.Phase.PORTAL:
 		player._show_portal(f.offer)
 	Audio.play_music("act%d" % f.run.act)
@@ -299,18 +309,22 @@ func _enter_idle() -> void:
 		GameFlow.Phase.BOARD_READY:
 			board.clear_targets()
 			tray.clear_highlight()
+			tray.clear_chosen()
 			for i in tray.dice.size():
 				tray.set_marked(i, false)
 				tray.set_locked(i, false)
 			if not in_combat:
-				rig.overview(board.ring_bounds())
+				rig.home(board.hero)
+				clear_view()
 		GameFlow.Phase.BOARD_ROLLED:
+			board.restore_occluders()
 			rig.overview(board.ring_bounds())
 		GameFlow.Phase.PORTAL:
 			rig.overview(board.ring_bounds())
 		_:
 			pass
-	tray.set_interactive(ph == GameFlow.Phase.BOARD_ROLLED or ph == GameFlow.Phase.COMBAT)
+	# Board phases: tapping a tray die opens the die inspector; combat: marks it for a reroll.
+	tray.set_interactive(ph in [GameFlow.Phase.BOARD_READY, GameFlow.Phase.BOARD_ROLLED, GameFlow.Phase.COMBAT])
 	if flow.is_over():
 		tray.visible = false
 		delete_save()
@@ -321,14 +335,14 @@ func _enter_idle() -> void:
 
 
 func any_modal_open() -> bool:
-	for m: UiModal in [ui.draft, ui.rune_assign, ui.shop, ui.forge, ui.event, ui.summary]:
+	for m: UiModal in [ui.draft, ui.passive, ui.rune_assign, ui.shop, ui.forge, ui.event, ui.summary, ui.inspector]:
 		if m.visible and m.is_open():
 			return true
 	return false
 
 
 func close_modals() -> void:
-	for m: UiModal in [ui.draft, ui.rune_assign, ui.shop, ui.forge, ui.event]:
+	for m: UiModal in [ui.draft, ui.passive, ui.rune_assign, ui.shop, ui.forge, ui.event]:
 		if m.visible:
 			m.close()
 
@@ -348,19 +362,20 @@ func hero_screen(height := 2.0) -> Vector2:
 	return rig.camera.unproject_position(hero_pos() + Vector3.UP * height)
 
 
-## Landing markers for a board roll; identical (tile, value) pairs are shown once.
-func show_roll_targets(targets: Array, values: Array) -> void:
-	var t: Array = []
-	var v: Array = []
-	var seen := {}
-	for k in targets.size():
-		var key := "%d:%d" % [int(targets[k]), int(values[k])]
-		if seen.has(key):
-			continue
-		seen[key] = true
-		t.append(int(targets[k]))
-		v.append(int(values[k]))
-	board.show_targets(t, v)
+## Sinks set pieces / dressing that would hide the hero from the camera's current target
+## framing (close follow / home views on the far side of the island). Undone by the next
+## overview (board.restore_occluders()).
+func clear_view() -> void:
+	if in_combat or board.hero == null:
+		return
+	board.restore_occluders()
+	var vs := get_viewport().get_visible_rect().size
+	board.hide_occluders(rig.desired_transform(), rig.camera.fov, vs.x / maxf(vs.y, 1.0), [board.hero.global_position])
+
+
+## The single landing marker for the current board move (tile + move size).
+func show_move_target(target: int, move: int, double := false) -> void:
+	board.show_move_target(target, move, double)
 
 
 func begin_combat(ev: Dictionary) -> void:
@@ -369,27 +384,76 @@ func begin_combat(ev: Dictionary) -> void:
 	if tile < 0:
 		tile = flow.run.pos
 	var enemies: Array = ev.get("enemies", [])
-	if bool(ev.get("boss", false)):
-		var nm := String(enemies[0].get("name", "Boss")) if not enemies.is_empty() else "Boss"
-		overlay.announce(nm.to_upper(), "BOSS FIGHT", UiPalette.DANGER, 1.3)
-		Audio.play_sfx("fanfare")
-	elif bool(ev.get("elite", false)):
-		overlay.announce("ELITE", "Tougher foes, rune reward", UiPalette.GOLD_BRIGHT, 0.9)
+	var boss := bool(ev.get("boss", false))
+	var mini := bool(ev.get("miniboss", false))
 	in_combat = true
 	stage.speed = speed
 	board.hero.anim_player.speed_scale = speed
 	ui.sync(flow)
 	ui.combat_hud.set_busy(true)
+	if boss:
+		await _boss_intro(tile, enemies)
+		return
+	if mini:
+		var nm := String(enemies[0].get("name", "Mini-boss")) if not enemies.is_empty() else "Mini-boss"
+		overlay.announce(nm.to_upper(), "MINI-BOSS  ·  Boss-tier reward", Color("ff9a3a"), 1.1)
+		Audio.play_sfx("fanfare")
+		rig.shake(0.5, 0.4)
+	elif bool(ev.get("elite", false)):
+		overlay.announce("ELITE", "Tougher foes, passive reward", UiPalette.GOLD_BRIGHT, 0.9)
 	await stage.begin_on_board(board, tile, enemies, rig)
 	stage.set_target(flow.combat.target if flow.combat else 0)
 
 
+## Final boss entrance: the screen darkens, the Lich rises in a storm of light, then a
+## name card slams in. The camera starts close on the boss and eases to combat framing.
+func _boss_intro(tile: int, enemies: Array) -> void:
+	var nm := String(enemies[0].get("name", "Boss")) if not enemies.is_empty() else "Boss"
+	Audio.play_music("calm", 0.6)
+	overlay.vignette(0.85, 0.6)
+	# cinematic: no HUD bottom bar or tray while the boss rises
+	ui.combat_hud.visible = false
+	var tt := tray.create_tween()
+	tt.tween_property(tray, "modulate:a", 0.0, 0.3 / speed)
+	await wait(0.4)
+	var begun := [false]
+	stage.began.connect(func() -> void: begun[0] = true, CONNECT_ONE_SHOT)
+	stage.begin_on_board(board, tile, enemies, rig)
+	# frame the boss's rise tight, from low, then settle into the fight framing
+	var bp := stage.enemy_position(0)
+	var pts := PackedVector3Array([bp + Vector3(-1.4, 0, -1.4), bp + Vector3(1.4, 0, 1.4), bp + Vector3.UP * 4.2])
+	rig.frame_points(pts, rad_to_deg(rig.combat_yaw()), 14.0, true)
+	Fx.flash(self, Color(0.75, 0.55, 1.0, 0.5), 0.5)
+	rig.shake(0.8, 1.2)
+	Audio.play_sfx("portal")
+	await wait(0.9)
+	Audio.play_sfx("fanfare")
+	overlay.boss_card(nm.to_upper(), "Lord of the Bone Throne" if nm == "The Lich" else "Final boss", UiPalette.DANGER)
+	rig.shake(0.9, 0.5)
+	await wait(1.6)
+	while not begun[0] and is_inside_tree():
+		await get_tree().process_frame
+	stage.reframe()
+	overlay.vignette(0.0, 0.8)
+	Audio.play_music("act3", 1.2)
+	ui.combat_hud.visible = true
+	ui.combat_hud.modulate.a = 0.0
+	var ht := ui.combat_hud.create_tween()
+	ht.tween_property(ui.combat_hud, "modulate:a", 1.0, 0.4 / speed)
+	var tt2 := tray.create_tween()
+	tt2.tween_property(tray, "modulate:a", 1.0, 0.4 / speed)
+
+	stage.set_target(flow.combat.target if flow.combat else 0)
+	await wait(0.3)
+
+
 func end_combat(ev: Dictionary) -> void:
-	# swap to the board HUD (bottom bar stays hidden while the rest of the batch plays)
+	# swap to the board HUD (bottom bar stays hidden while the rest of the batch plays); its
+	# top bar takes over the combat HUD's numbers so rewards animate from there
 	ui.combat_hud.visible = false
 	ui.board_hud.set_busy(true)
 	ui.board_hud.visible = true
-	ui.board_hud.refresh(flow)
+	ui.board_hud.top.copy_from(ui.combat_hud.top)
 	tray.clear_highlight()
 	for i in tray.dice.size():
 		tray.set_marked(i, false)
@@ -402,41 +466,73 @@ func end_combat(ev: Dictionary) -> void:
 		parts.append("+%d gold" % int(ev.gold))
 	if int(ev.get("xp", 0)) > 0:
 		parts.append("+%d XP" % int(ev.xp))
-	overlay.announce("BOSS DEFEATED!" if bool(ev.get("boss", false)) else "VICTORY", "  ·  ".join(parts),
-		UiPalette.GOLD_BRIGHT, 0.9)
+	var title := "VICTORY"
+	if bool(ev.get("boss", false)):
+		title = "BOSS DEFEATED!"
+	elif bool(ev.get("miniboss", false)):
+		title = "MINI-BOSS SLAIN!"
+	overlay.announce(title, "  ·  ".join(parts), UiPalette.GOLD_BRIGHT, 0.9)
 	await wait(1.3)
 	board.hero.anim_player.speed_scale = 1.0
-	stage.end_on_board(true)
+	stage.end_on_board(false)
 	in_combat = false
 	await wait(0.2)
 
 
-## Fade to black, rebuild the board for the new act, fade back in with the act title.
-func transition_to_act(act: int, tiles: Array) -> void:
-	await overlay.fade_out(0.5)
+## Biome change (laps 6 and 11): the old board sinks tile by tile, a swirling dissolve
+## covers the screen in the new biome's colours, the island is rebuilt around the hero
+## (who keeps their tile), the new tiles rise in a wave from the hero and the new music
+## and title come in.
+func change_biome(ev: Dictionary) -> void:
+	var act := int(ev.get("act", flow.run.act))
+	var lap := int(ev.get("lap", flow.run.lap))
+	var pos := int(ev.get("pos", flow.run.pos))
+	var tiles: Array = ev.board.tiles
 	stage.clear()
 	in_combat = false
-	board.hero_idx = 0
+	rig.overview(board.ring_bounds())
+	await wait(0.25)
+	await board.sink_wave(pos, 0.9 / speed)
+	var look := Biome.look(act)
+	Audio.play_sfx("portal")
+	var vs := get_viewport().get_visible_rect().size
+	var centre := hero_screen(0.8) / Vector2(maxf(vs.x, 1.0), maxf(vs.y, 1.0))
+	await overlay.dissolve(true, Color(look.sky_top).lerp(Color(look.sky_glow), 0.25), Color(look.sky_glow), 0.7, centre)
+	board.hero_idx = pos
 	board.build(act, tiles)
+	board.hide_tiles()
 	rig.overview(board.ring_bounds(), true)
-	Audio.play_music("act%d" % act)
-	await wait(0.2)
-	overlay.fade_in(0.7)
-	overlay.announce("ACT %s" % ["I", "II", "III"][clampi(act - 1, 0, 2)], String(SummaryScreen.ACT_NAMES[clampi(act - 1, 0, 2)]),
-		UiPalette.GOLD_BRIGHT, 1.3)
-	await wait(1.6)
+	Audio.play_music("act%d" % act, 1.2)
+	await wait(0.15)
+	centre = hero_screen(0.8) / Vector2(maxf(vs.x, 1.0), maxf(vs.y, 1.0))
+	overlay.dissolve(false, Color(look.sky_top), Color(look.sky_glow), 0.9, centre)
+
+	await wait(0.25)
+	board.rise_wave(pos, 1.1 / speed)
+	var name := String(SummaryScreen.ACT_NAMES[clampi(act - 1, 0, 2)])
+	overlay.announce(name.to_upper(), "Lap %d of %d  ·  Act %s" % [lap, Balance.TOTAL_LAPS, ["I", "II", "III"][clampi(act - 1, 0, 2)]],
+		Color(look.sky_glow).lerp(UiPalette.GOLD_BRIGHT, 0.5), 1.6)
+	Audio.play_sfx("fanfare")
+	await wait(1.9)
 
 
 # --- input -----------------------------------------------------------------------------------
 
 func _on_die_pressed(idx: int) -> void:
-	if busy or flow == null:
+	if busy or flow == null or any_modal_open():
 		return
 	match flow.phase:
-		GameFlow.Phase.BOARD_ROLLED:
-			run_command("choose_move", [idx])
+		GameFlow.Phase.BOARD_READY, GameFlow.Phase.BOARD_ROLLED:
+			inspect_die(idx)
 		GameFlow.Phase.COMBAT:
 			run_command("combat_toggle", [idx])
+
+
+## Opens the die inspector (six faces, kind, rune) for pool die `idx`.
+func inspect_die(idx: int) -> void:
+	if flow == null or idx < 0 or idx >= flow.run.dice.size():
+		return
+	ui.inspect_die(flow, idx)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -457,12 +553,14 @@ func _key(code: int) -> void:
 	if code == KEY_ESCAPE or code == KEY_P:
 		pause()
 		return
-	if busy or ui.pause.visible:
+	if busy or ui.pause.visible or any_modal_open():
 		return
 	var ph := flow.phase
 	if code == KEY_SPACE or code == KEY_ENTER:
 		if ph == GameFlow.Phase.BOARD_READY:
 			run_command("roll_board")
+		elif ph == GameFlow.Phase.BOARD_ROLLED:
+			run_command("confirm_move")
 		elif ph == GameFlow.Phase.COMBAT:
 			run_command("combat_attack")
 	elif code == KEY_R:
@@ -470,21 +568,13 @@ func _key(code: int) -> void:
 			run_command("board_reroll")
 		elif ph == GameFlow.Phase.COMBAT:
 			run_command("combat_reroll")
-	elif code >= KEY_1 and code <= KEY_6:
-		_on_die_pressed(code - KEY_1)
+	elif code >= KEY_1 and code <= KEY_6 and ph == GameFlow.Phase.COMBAT:
+		# combat only: mark / unmark die N for a reroll (the board move is automatic)
+		run_command("combat_toggle", [code - KEY_1])
 
 
 func _tap(pos: Vector2) -> void:
 	match flow.phase:
-		GameFlow.Phase.BOARD_ROLLED:
-			var t := pick_tile(pos)
-			if t < 0:
-				return
-			var targets := flow.landing_preview()
-			for i in targets.size():
-				if targets[i] == t:
-					run_command("choose_move", [i])
-					return
 		GameFlow.Phase.PORTAL:
 			var t := pick_tile(pos)
 			if t >= 0 and Array(flow.offer.get("tiles", [])).has(t):
@@ -511,7 +601,7 @@ func pick_tile(pos: Vector2) -> int:
 		if t <= 0.0:
 			continue
 		var p := board.to_local(from + dir * t)
-		for i in BoardView.RING:
+		for i in board.ring_size:
 			var tp := board.tile_position(i)
 			var d := Vector2(p.x - tp.x, p.z - tp.z).length()
 			if d < BoardView.PITCH * 0.55 and d < best_d:
@@ -553,8 +643,7 @@ static func _seg_dist(p: Vector2, a: Vector2, b: Vector2) -> float:
 func _layout_tray() -> void:
 	var vs := get_viewport().get_visible_rect().size
 	var th := UiTheme.tray_height(vs)
-	var portrait := vs.y > vs.x
-	var w := vs.x - 24.0 if portrait else minf(vs.x - 48.0, 920.0)
+	var w := UiTheme.tray_width(vs)
 	tray.position = Vector2((vs.x - w) * 0.5, vs.y - th + 4.0)
 	tray.size = Vector2(w, th - 16.0)
 	_update_combat_rect()
@@ -569,12 +658,14 @@ func _update_combat_rect() -> void:
 	if vs.y > vs.x:
 		var top := 0.12
 		rig.combat_rect_portrait = Rect2(0.05, top, 0.9, maxf(bottom - top, 0.3))
+
 	else:
-		var top := 0.12
-		rig.combat_rect_landscape = Rect2(0.2, top, 0.6, maxf(bottom - top, 0.3))
-		# board overview: keep the ring above the ROLL bar (it sits right above the tray)
-		var bar_top := (vs.y - UiTheme.tray_height(vs) - 20.0 - 124.0) / vs.y
-		rig.safe_rect_landscape = Rect2(0.12, 0.1, 0.76, maxf(bar_top - 0.1, 0.3))
+		# the bottom controls sit beside the tray: the world gets everything above it
+		var top := 0.1
+		rig.combat_rect_landscape = Rect2(0.1, top, 0.8, maxf(bottom - top, 0.3))
+		var bar_top := (ui.board_hud.content_top(vs) - 6.0) / vs.y
+		rig.safe_rect_landscape = Rect2(0.12, 0.09, 0.76, maxf(bar_top - 0.09, 0.3))
+
 
 
 func _process(dt: float) -> void:

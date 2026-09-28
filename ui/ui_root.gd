@@ -12,7 +12,7 @@ extends Control
 ## them to two signals and shows the right one for flow.phase. It never calls GameFlow itself.
 
 ## A GameFlow command to run: name is the GameFlow method, args its arguments.
-## roll_board, board_reroll, combat_reroll, combat_attack, pick_draft[i], rune_assign[die],
+## roll_board, board_reroll, confirm_move, combat_reroll, combat_attack, pick_draft[i], rune_assign[die],
 ## shop_buy[i, die], shop_reroll, shop_leave, forge_apply[die, face, op, src], event_choose[i].
 signal command(name: String, args: Array)
 ## Navigation: new_run, continue, class_chosen(class_id), back_to_title, resume, pause,
@@ -25,6 +25,8 @@ var board_hud: BoardHud
 var combat_hud: CombatHud
 var banner: ComboBanner
 var draft: DraftModal
+var passive: PassiveModal
+var inspector: DieInspector
 var rune_assign: RuneAssignModal
 var shop: ShopModal
 var forge: ForgeModal
@@ -47,6 +49,8 @@ func _init() -> void:
 	portal = PortalBanner.new()
 	banner = ComboBanner.new()
 	draft = DraftModal.new()
+	passive = PassiveModal.new()
+	inspector = DieInspector.new()
 	rune_assign = RuneAssignModal.new()
 	shop = ShopModal.new()
 	forge = ForgeModal.new()
@@ -56,9 +60,9 @@ func _init() -> void:
 	class_select = ClassSelect.new()
 	pause = PauseMenu.new()
 	settings = SettingsPanel.new()
-	for c in [board_hud, combat_hud, portal, banner, draft, rune_assign, shop, forge, event, summary, title, class_select, pause, settings]:
+	for c in [board_hud, combat_hud, portal, banner, draft, passive, rune_assign, shop, forge, event, summary, inspector, title, class_select, pause, settings]:
 		add_child(c)
-	_modals = [draft, rune_assign, shop, forge, event, summary]
+	_modals = [draft, passive, rune_assign, shop, forge, event, summary]
 	board_hud.visible = false
 	combat_hud.visible = false
 	title.visible = false
@@ -66,11 +70,13 @@ func _init() -> void:
 
 	board_hud.roll_pressed.connect(_cmd.bind("roll_board", []))
 	board_hud.reroll_pressed.connect(_cmd.bind("board_reroll", []))
+	board_hud.go_pressed.connect(_cmd.bind("confirm_move", []))
 	board_hud.pause_pressed.connect(open_pause)
 	combat_hud.reroll_pressed.connect(_cmd.bind("combat_reroll", []))
 	combat_hud.attack_pressed.connect(_cmd.bind("combat_attack", []))
 	combat_hud.pause_pressed.connect(open_pause)
 	draft.draft_picked.connect(func(i: int) -> void: _cmd("pick_draft", [i]))
+	passive.passive_picked.connect(func(i: int) -> void: _cmd("pick_draft", [i]))
 	rune_assign.rune_assign.connect(func(d: int) -> void: _cmd("rune_assign", [d]))
 	shop.shop_buy.connect(func(i: int, d: int) -> void: _cmd("shop_buy", [i, d]))
 	shop.shop_reroll_pressed.connect(_cmd.bind("shop_reroll", []))
@@ -115,6 +121,8 @@ func _hide_run() -> void:
 	board_hud.visible = false
 	combat_hud.visible = false
 	portal.visible = false
+	if inspector.visible:
+		inspector.close()
 	for m in _modals:
 		if m.visible:
 			m.close()
@@ -130,6 +138,23 @@ func open_pause() -> void:
 func open_settings() -> void:
 	settings.refresh()
 	settings.open()
+
+
+## Opens the die inspector on pool die `idx`.
+func inspect_die(flow: GameFlow, idx: int) -> void:
+	inspector.show_die(flow, idx)
+
+
+## A passive was gained: pops it into both HUD passive bars.
+func add_passive(_flow: GameFlow, id: String) -> void:
+	board_hud.top.add_passive(id)
+	combat_hud.top.add_passive(id)
+
+
+## A passive triggered: flashes its icon in the visible HUD bar.
+func flash_passive(id: String) -> void:
+	board_hud.top.flash_passive(id)
+	combat_hud.top.flash_passive(id)
 
 
 ## Shows the HUD and modal matching flow.phase. Call after every command.
@@ -151,7 +176,12 @@ func sync(flow: GameFlow) -> void:
 	var kind := String(flow.offer.get("kind", ""))
 	match ph:
 		GameFlow.Phase.DRAFT:
-			want = rune_assign if kind == "rune_assign" else draft
+			if kind == "rune_assign":
+				want = rune_assign
+			elif kind == "passive":
+				want = passive
+			else:
+				want = draft
 		GameFlow.Phase.SHOP:
 			want = shop
 		GameFlow.Phase.FORGE:
@@ -163,7 +193,10 @@ func sync(flow: GameFlow) -> void:
 	for m in _modals:
 		if m != want and m.visible:
 			m.close()
+	if want and inspector.visible:
+		inspector.close()
 	if want:
+
 		want.call("refresh", flow)
 		if not want.visible:
 			want.open()

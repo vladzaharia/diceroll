@@ -4,10 +4,11 @@ extends Node3D
 ## HP numbers, a block badge, the intent badge + value, and status pips. The node turns to
 ## face the active camera every frame, so the layout stays screen-aligned and crisp.
 
-const INTENT_KINDS := {"attack": 0, "block": 1, "buff": 2, "curse": 3, "summon": 4}
+const INTENT_KINDS := {"attack": 0, "block": 1, "buff": 2, "curse": 3, "summon": 4, "aim": 6, "chaos": 7}
 const INTENT_COLORS := {
 	"attack": Color(0.9, 0.24, 0.22), "block": Color(0.28, 0.55, 0.95), "buff": Color(0.98, 0.55, 0.18),
-	"curse": Color(0.6, 0.3, 0.9), "summon": Color(0.35, 0.7, 0.45),
+	"curse": Color(0.6, 0.3, 0.9), "summon": Color(0.35, 0.7, 0.45), "aim": Color(0.42, 0.46, 0.6),
+	"chaos": Color(0.85, 0.28, 0.72),
 }
 const BAR_SIZE := Vector2(1.3, 0.2)
 
@@ -116,14 +117,16 @@ func set_data(data: Dictionary, animate := true) -> void:
 	status_label.text = "  ".join(st)
 	status_label.modulate = Fx.STATUS_COLORS["poison"] if int(data.get("poison", 0)) > 0 else Fx.STATUS_COLORS["frost"]
 	var nm := String(data.get("name", ""))
-	name_label.visible = boss and nm != ""
+	var mini := bool(data.get("miniboss", false))
+	name_label.visible = (boss or mini) and nm != ""
 	name_label.text = nm.to_upper()
+	name_label.modulate = Color(1.0, 0.7, 0.45) if mini else Color(1.0, 0.86, 0.5)
 
 
 func set_intent(kind: String, value: int, animate := true) -> void:
 	var key := "%s:%d" % [kind, value]
 	intent_badge.visible = kind != ""
-	intent_label.visible = kind != "" and value > 0 and kind != "curse" and kind != "summon"
+	intent_label.visible = kind != "" and value > 0 and not kind in ["curse", "summon", "aim", "chaos"]
 	if kind == "":
 		_intent_key = key
 		return

@@ -40,20 +40,35 @@ func _one(ev: Dictionary) -> void:
 		"dice_rolled":
 			await _dice_rolled(ev)
 		"board_rolled":
-			c.show_roll_targets(ev.targets, ev.values)
-			c.rig.overview(c.board.ring_bounds())
-			await _wait(0.25)
+			await _board_rolled(ev)
 		"hero_moved":
 			await _hero_moved(ev)
+		"hero_stayed":
+			c.tray.clear_chosen()
+			c.board.clear_targets()
+			c.board.hero.play_once("hit", "idle", 0.05)
+			c.board.pulse_tile(c.board.hero_idx, Color(0.7, 0.7, 0.8))
+			c.overlay.popup(c.hero_screen(2.2), "Blank! You stay put", UiPalette.TEXT_DIM, "", 30)
+			Audio.play_sfx("error")
+			await _wait(0.7)
 		"lap_completed":
 			c.board.pulse_tile(0, Color(1.0, 0.85, 0.4))
 			Fx.heal_glow(c.board, c.board.hero.position)
 			Audio.play_sfx("heal")
+			var done := int(ev.lap)
 			if bool(ev.get("boss", false)):
-				c.overlay.announce("THE BOSS AWAITS", "Lap %d complete" % int(ev.lap), UiPalette.DANGER, 1.2)
-				await _wait(1.3)
-			else:
+				c.overlay.vignette(0.55, 0.6)
+				c.overlay.announce("THE BOSS AWAITS", "Lap %d of %d complete" % [done, Balance.TOTAL_LAPS], UiPalette.DANGER, 1.2)
+				c.rig.shake(0.4, 0.8)
+				await _wait(1.4)
+			elif done + 1 == Balance.TOTAL_LAPS:
+				c.overlay.announce("FINAL LAP", "The Lich waits at the Start", UiPalette.DANGER.lightened(0.2), 1.1)
+				await _wait(1.2)
+			elif not Balance.BIOME_LAPS.has(done + 1):
+				c.overlay.popup(c.hero_screen(2.4), "LAP %d / %d" % [done + 1, Balance.TOTAL_LAPS], UiPalette.GOLD_BRIGHT, "flag", 34)
 				await _wait(0.6)
+			else:
+				await _wait(0.4)
 		"board_mutated":
 			await _board_mutated(ev)
 		"tile_triggered":
@@ -97,9 +112,32 @@ func _one(ev: Dictionary) -> void:
 			await _wait(0.3)
 		"die_added":
 			c.tray.set_dice(c.flow.run.dice)
-			c.overlay.toast("New die added to your pool", "dice", UiPalette.GOLD_BRIGHT)
+			var kind := String(ev.get("kind", "standard"))
+			var di := int(ev.get("die_idx", c.tray.dice.size() - 1))
+			c.overlay.toast("%s added to your pool" % DiceKinds.label(kind), "dice", UiPalette.kind_color(kind).lightened(0.3))
+			c.tray.highlight_group([di] as Array[int], UiPalette.kind_color(kind))
 			Audio.play_sfx("dice_select")
-			await _wait(0.3)
+			await _wait(0.5)
+			c.tray.clear_highlight()
+		"die_changed":
+			c.tray.set_dice(c.flow.run.dice)
+			var kind := String(ev.get("kind", "standard"))
+			var di := int(ev.get("die_idx", 0))
+			c.overlay.toast("Die %d reforged: %s" % [di + 1, DiceKinds.label(kind)], "anvil", UiPalette.kind_color(kind).lightened(0.3))
+			c.tray.highlight_group([di] as Array[int], UiPalette.kind_color(kind))
+			Audio.play_sfx("buff")
+			await _wait(0.5)
+			c.tray.clear_highlight()
+		"passive_gained":
+			var pid := String(ev.get("id", ""))
+			c.ui.add_passive(c.flow, pid)
+			c.overlay.passive_card(pid)
+			Audio.play_sfx("levelup" if String(ev.get("rarity", "")) == "boss" else "buff")
+			if String(ev.get("rarity", "")) == "boss":
+				Fx.level_up(c.world_parent(), c.hero_pos())
+			await _wait(1.0)
+		"passive_triggered":
+			await _passive_triggered(ev)
 		"rune_assigned":
 			if c.flow.phase != GameFlow.Phase.SHOP:
 				c.close_modals()
@@ -129,7 +167,7 @@ func _one(ev: Dictionary) -> void:
 			c.overlay.announce("LEVEL UP!", "Level %d" % int(ev.level), UiPalette.XP.lightened(0.3), 0.9)
 			await _wait(1.2)
 		"act_started":
-			await c.transition_to_act(int(ev.act), ev.board.tiles)
+			await c.change_biome(ev)
 		"game_over":
 			await _game_over(ev)
 		# --- combat --------------------------------------------------------------------
@@ -196,8 +234,103 @@ func _dice_rolled(ev: Dictionary) -> void:
 	if c.tray.dice.size() != c.flow.run.dice.size():
 		c.tray.set_dice(c.flow.run.dice)
 	c.tray.clear_highlight()
+	if String(ev.get("context", "")) == "board":
+		# the camera pulls out while the dice tumble, so the landing tile is in view
+		c.tray.clear_chosen()
+		c.board.clear_targets()
+		c.board.restore_occluders()
+		c.rig.overview(c.board.ring_bounds())
 	c.tray.roll(values, idx)
 	await c.tray.settled
+
+
+
+## After the tray settles: the two moving dice lift and glow (the rest dim), the target
+## tile gets its marker, the camera pulls out to show it, and doubles celebrate.
+func _board_rolled(ev: Dictionary) -> void:
+	var chosen: Array = ev.get("chosen", [])
+	var move := int(ev.get("move", 0))
+	var target := int(ev.get("target", c.flow.run.pos))
+	var steps := posmod(target - c.board.hero_idx, c.board.ring_size) if move > 0 else 0
+	if move > 0 and steps == 0:
+		steps = c.board.ring_size
+	var double := bool(ev.get("double", false))
+	c.tray.set_chosen(chosen)
+	Audio.play_sfx("dice_select")
+	c.rig.overview(c.board.ring_bounds())
+	c.show_move_target(target, steps, double)
+	if double:
+		await _wait(0.15)
+		await _doubles(ev)
+	else:
+		await _wait(0.25)
+
+
+func _doubles(ev: Dictionary) -> void:
+	var chosen: Array = ev.get("chosen", [])
+	Audio.play_sfx("chest")
+	for i in chosen:
+		var r := c.tray.get_die_screen_rect(int(i))
+		if r.size != Vector2.ZERO:
+			Fx.confetti(c.overlay, r.get_center(), 18)
+	var mid := Vector2.ZERO
+	for i in chosen:
+		mid += c.tray.die_top_screen(int(i))
+	mid /= maxf(chosen.size(), 1)
+	c.overlay.popup(mid - Vector2(0, 20), "DOUBLES!", UiPalette.GOLD_BRIGHT, "star", 54)
+	var added := int(ev.get("treasury_added", 0))
+	if added > 0:
+		var to := c.ui.board_hud.top.treasury.get_global_rect().get_center()
+		Fx.fly_coins(c.overlay, mid, to, clampi(added / 2, 4, 10), 0.55 / c.speed)
+		await _wait(0.55)
+		c.ui.board_hud.top.treasury.set_value(int(ev.get("treasury", c.flow.run.treasury)), true)
+		c.overlay.popup(to + Vector2(0, 74), "+%d" % added, UiPalette.GOLD_BRIGHT, "chest", 28)
+		Audio.play_sfx("coin")
+	await _wait(0.35)
+
+
+func _passive_triggered(ev: Dictionary) -> void:
+	var pid := String(ev.get("id", ""))
+	if not Passives.DEFS.has(pid):
+		return
+	var v := int(ev.get("value", 0))
+	var text := String(Passives.DEFS[pid].name)
+	match pid:
+		"piggy_bank", "treasure_sense", "gold_tooth":
+			text = "+%d gold" % v if v > 0 else text
+		"collector":
+			text = "+%d max HP" % v
+		"fast_feet":
+			text = "Fast Feet! +%d" % v
+		"double_trouble":
+			text = "+1 banked reroll"
+		"blacksmith":
+			text = "Forge again!"
+		"bloodthirst", "full_house_party":
+			text = "+%d HP" % v if v > 0 else text
+		"thorns":
+			text = "Thorns %d" % v if v > 0 else text
+		"iron_skin":
+			text = "+%d Block" % v if v > 0 else text
+		"snake_eyes", "straight_shooter", "midas_fist":
+			text = "+%d DMG" % v if v > 0 else text
+		"boxcars", "steady_hand":
+			text = "+%d pips" % v if v > 0 else text
+		"second_wind", "phoenix":
+			text = "Saved at 1 HP!"
+	c.ui.flash_passive(pid)
+	# pops rise from above the hero (they stack if several fire together)
+	c.overlay.passive_pop(c.hero_screen(2.6), pid, text)
+
+	Audio.play_sfx("buff")
+	if pid in ["second_wind", "phoenix"]:
+		Fx.flash(c, Color(1.0, 0.7, 0.3, 0.45), 0.5)
+		Fx.level_up(c.world_parent(), c.hero_pos())
+		await _wait(0.9)
+	elif pid == "fast_feet":
+		await _wait(0.6)
+	else:
+		await _wait(0.25)
 
 
 func _hero_moved(ev: Dictionary) -> void:
@@ -205,27 +338,38 @@ func _hero_moved(ev: Dictionary) -> void:
 	if path.is_empty():
 		return
 	c.board.clear_targets()
+	c.tray.clear_chosen()
 	if bool(ev.get("teleport", false)):
 		c.rig.follow(c.board.hero)
 		await c.board.teleport_hero(int(path[0]))
 	else:
 		c.rig.follow(c.board.hero)
 		await c.board.hop_hero(path, 0.3 / c.speed)
+	c.clear_view()
 	await _wait(0.15)
+
 
 
 func _board_mutated(ev: Dictionary) -> void:
 	var changes: Array = ev.get("changes", [])
 	var n := 0
+	var mini := -1
 	for ch: Dictionary in changes:
 		var idx := int(ch.idx)
 		var cur: Dictionary = c.board.tiles[idx]
 		var same := String(cur.type) == String(ch.type) and Array(cur.enemies) == Array(ch.enemies)
 		if same:
 			continue
+		if String(ch.type) == "miniboss":
+			mini = idx
+			continue
 		c.board.set_tile(idx, ch, true)
 		n += 1
 		await _wait(0.07)
+	if mini >= 0:
+		for ch: Dictionary in changes:
+			if int(ch.idx) == mini:
+				await _miniboss_appears(mini, ch)
 	if n >= 3:
 		var foes := 0
 		var chests := 0
@@ -242,7 +386,34 @@ func _board_mutated(ev: Dictionary) -> void:
 		await _wait(0.3)
 
 
+## Lap 7: the camera swoops to the new mini-boss tile, it bursts up with a warning, then
+## the view returns.
+func _miniboss_appears(idx: int, ch: Dictionary) -> void:
+	var p := c.board.tile_global_position(idx)
+	var pts := PackedVector3Array([p + Vector3(-3.2, 0, -2.4), p + Vector3(3.2, 0, 3.6), p + Vector3.UP * 3.0])
+	c.rig.frame_points(pts, 0.0, 44.0)
+	await _wait(0.55)
+	c.overlay.vignette(0.5, 0.3)
+	Audio.play_sfx("trap")
+	c.board.set_tile(idx, ch, true)
+	Fx.shockwave(c.board, c.board.tile_position(idx) + Vector3.UP * 0.05, Color(1.0, 0.35, 0.2), 2.6, 0.6)
+	Fx.burst(c.board, c.board.tile_position(idx) + Vector3.UP * 0.3, {"amount": 30, "lifetime": 0.9,
+		"speed": Vector2(1.5, 4.0), "size": 0.3, "color": Color(1.0, 0.45, 0.25), "tex": "spark", "spread": 70.0})
+	c.rig.shake(0.55, 0.5)
+	var ids: Array = ch.get("enemies", [])
+	var nm := String(EnemyDefs.def(String(ids[0])).name) if not ids.is_empty() else "A mini-boss"
+	await _wait(0.25)
+	Audio.play_sfx("fanfare")
+	c.overlay.announce("MINI-BOSS!", "%s appears on the board" % nm, Color("ff8a4a"), 1.2, 0.6)
+	c.overlay.toast("Optional fight: beat it for a boss-tier passive", "skull", Color("ffb070"), 0.7)
+
+	await _wait(1.6)
+	c.overlay.vignette(0.0, 0.4)
+	c.rig.home(c.board.hero)
+
+
 func _tile_triggered(ev: Dictionary) -> void:
+
 	var idx := int(ev.idx)
 	var type := String(ev.get("tile_type", ""))
 	c.board.pulse_tile(idx)
@@ -261,7 +432,7 @@ func _tile_triggered(ev: Dictionary) -> void:
 		"portal":
 			Audio.play_sfx("portal")
 			Fx.portal_swirl(c.board, c.board.tile_position(idx) + Vector3.UP * 0.7, 0.8, true)
-		"enemy", "elite":
+		"enemy", "elite", "miniboss":
 			Audio.play_sfx("swing")
 	await _wait(0.3)
 
@@ -281,7 +452,8 @@ func _show_portal(offer: Dictionary) -> void:
 	var tiles: Array = offer.get("tiles", [])
 	var steps: Array = []
 	for t in tiles:
-		steps.append(posmod(int(t) - c.board.hero_idx, BoardView.RING))
+		steps.append(posmod(int(t) - c.board.hero_idx, c.board.ring_size))
+
 	c.board.show_targets(tiles, steps)
 	c.rig.overview(c.board.ring_bounds())
 

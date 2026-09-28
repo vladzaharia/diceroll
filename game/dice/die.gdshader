@@ -1,8 +1,9 @@
 shader_type spatial;
 render_mode blend_mix, depth_draw_opaque, cull_back, diffuse_burley, specular_schlick_ggx;
 
-// Procedural die surface: resin body, engraved pips, gold rim on edited faces,
-// rune tint + emissive bevel rim, Wild star faces, mark/lock/highlight states.
+// Procedural die surface: resin body, engraved pips (numerals for 7-9, an empty inset for
+// a blank 0 face), gold rim on edited faces, rune tint + emissive bevel rim, Wild star
+// faces, a small per-kind corner mark, mark/lock/highlight/dim states.
 // Face slot comes from CUSTOM0.w and the face's right axis from CUSTOM0.xyz (see DieMesh).
 
 uniform vec3 body_color : source_color = vec3(0.95, 0.92, 0.84);
@@ -25,6 +26,12 @@ uniform float hl = 0.0;
 uniform vec3 lock_tint : source_color = vec3(0.42, 0.22, 0.62);
 uniform float locked = 0.0;
 uniform float time_offset = 0.0;
+// Kind corner mark: 0 none, 1 low (down chevron), 2 high (up chevron), 3 even (diamond),
+// 4 odd (ring), 5 loaded (weight), 6 twin (double bar), 7 gambler (spark), 8 giant (crown).
+uniform int kind_mark = 0;
+uniform vec3 kind_color : source_color = vec3(1.0, 0.75, 0.3);
+// 0..1: darken (dice not moving this turn).
+uniform float dim = 0.0;
 
 varying float v_slot;
 varying vec3 v_u;
@@ -94,6 +101,49 @@ float sd_round_box(vec2 p, vec2 b, float r) {
 	return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
 }
 
+float sd_seg(vec2 p, vec2 a, vec2 b) {
+	vec2 pa = p - a, ba = b - a;
+	float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+	return length(pa - ba * h);
+}
+
+// Chunky rounded numeral 7, 8 or 9 (y up, glyph ~1.0 tall). Returns a signed distance.
+float sd_numeral(vec2 q, int n) {
+	float w = 0.105;
+	if (n == 7) {
+		float a = sd_seg(q, vec2(-0.3, 0.44), vec2(0.3, 0.44));
+		float b = sd_seg(q, vec2(0.3, 0.44), vec2(-0.06, -0.46));
+		return min(a, b) - w;
+	}
+	if (n == 8) {
+		float t = abs(length((q - vec2(0.0, 0.25)) * vec2(1.08, 1.0)) - 0.19);
+		float b = abs(length((q - vec2(0.0, -0.2)) * vec2(0.96, 1.0)) - 0.25);
+		return min(t, b) - w * 0.92;
+	}
+	// 9: a loop with a tail
+	float ring = abs(length((q - vec2(0.0, 0.17)) * vec2(0.96, 1.0)) - 0.24);
+	float tail = sd_seg(q, vec2(0.235, 0.14), vec2(0.07, -0.46));
+	return min(ring, tail) - w;
+}
+
+// Small kind mark centred at the origin (y up), radius ~1.
+float sd_kind(vec2 q, int k) {
+	if (k == 1 || k == 2) {
+		vec2 r = (k == 1) ? vec2(q.x, -q.y) : q;
+		return min(sd_seg(r, vec2(-0.75, -0.35), vec2(0.0, 0.4)), sd_seg(r, vec2(0.0, 0.4), vec2(0.75, -0.35))) - 0.28;
+	}
+	if (k == 3) return (abs(q.x) + abs(q.y)) * 0.7071 - 0.62;
+	if (k == 4) return abs(length(q) - 0.62) - 0.26;
+	if (k == 5) return sd_round_box(q - vec2(0.0, -0.12), vec2(0.72, 0.56), 0.3);
+	if (k == 6) return min(sd_seg(q, vec2(-0.38, -0.7), vec2(-0.38, 0.7)), sd_seg(q, vec2(0.38, -0.7), vec2(0.38, 0.7))) - 0.24;
+	if (k == 7) return sd_star5(vec2(q.x, q.y), 0.95, 0.42);
+	// 8 giant: crown
+	float base = sd_round_box(q - vec2(0.0, -0.45), vec2(0.8, 0.22), 0.08);
+	float spikes = min(min(sd_seg(q, vec2(-0.65, -0.3), vec2(-0.8, 0.65)), sd_seg(q, vec2(0.0, -0.3), vec2(0.0, 0.8))),
+		sd_seg(q, vec2(0.65, -0.3), vec2(0.8, 0.65))) - 0.22;
+	return min(base, spikes);
+}
+
 void fragment() {
 	int slot = clamp(int(v_slot + 0.5), 0, 5);
 	int val = int(face_vals[slot] + 0.5);
@@ -138,12 +188,49 @@ void fragment() {
 		pip_off = rp.xy;
 		float pa = fwidth(rp.z) * 0.9;
 		pip_mask = 1.0 - smoothstep(pip_r - pa, pip_r + pa, rp.z);
+	} else if (val >= 7) {
+		// numeral, engraved like a pip (y up in glyph space)
+		vec2 q = vec2(p.x, -p.y) * 1.02;
+		float d = sd_numeral(q, clamp(val, 7, 9));
+		float aa = fwidth(d) * 0.9;
+		pip_mask = 1.0 - smoothstep(-aa, aa, d);
+		pip_r = 0.1;
+		float dx = sd_numeral(q + vec2(0.012, 0.0), clamp(val, 7, 9)) - d;
+		float dy = sd_numeral(q + vec2(0.0, 0.012), clamp(val, 7, 9)) - d;
+		pip_off = -normalize(vec2(dx, -dy) + 1e-5) * clamp(1.0 + d / 0.1, 0.0, 1.0) * pip_r;
+	} else if (val <= 0) {
+		// blank face: an empty engraved inset with a faint cross
+		float rd = sd_round_box(p, vec2(0.46), 0.16);
+		float aa = fwidth(rd) * 0.9;
+		float line = 1.0 - smoothstep(0.03 - aa, 0.03 + aa, abs(rd));
+		float cross_d = min(sd_seg(p, vec2(-0.2, -0.2), vec2(0.2, 0.2)), sd_seg(p, vec2(-0.2, 0.2), vec2(0.2, -0.2))) - 0.04;
+		float ca = fwidth(cross_d) * 0.9;
+		float cr = 1.0 - smoothstep(-ca, ca, cross_d);
+		float inset = 1.0 - smoothstep(-aa, aa, rd);
+		albedo = mix(albedo, albedo * 0.86, inset);
+		pip_mask = max(line * 0.8, cr * 0.45);
+		pip_r = 0.03;
 	} else {
 		vec3 np = nearest_pip(p, clamp(val, 1, 6));
 		pip_r = (val == 1) ? 0.2 : 0.145;
 		pip_off = np.xy;
 		float pa = fwidth(np.z) * 0.9;
 		pip_mask = 1.0 - smoothstep(pip_r - pa, pip_r + pa, np.z);
+	}
+	// --- kind mark: two opposite corners (symmetric under the resting half-turn) ------
+	if (kind_mark > 0 && wild < 0.5) {
+		float km = 0.0;
+		for (int c = 0; c < 2; c++) {
+			vec2 at = (c == 0) ? vec2(-0.63, -0.63) : vec2(0.63, 0.63);
+			vec2 q = (p - at) / 0.1;
+			q.y = -q.y;
+			float d = sd_kind(q, kind_mark) * 0.1;
+			float ka = fwidth(d) * 0.9;
+			km = max(km, 1.0 - smoothstep(-ka, ka, d));
+		}
+		albedo = mix(albedo, kind_color, km * 0.95);
+		emission += kind_color * km * 0.12;
+		rough = mix(rough, 0.3, km);
 	}
 	// Engraved dimple: the inside of the pip tilts toward its centre.
 	float inside = clamp(1.0 - length(pip_off) / max(pip_r, 1e-3), 0.0, 1.0);
@@ -189,6 +276,8 @@ void fragment() {
 	float not_pip = 1.0 - pip_mask;
 	emission += glow_color * glow * (0.06 + 0.9 * fres) * not_pip;
 	emission += hl_color * hl * (0.05 + 0.8 * fres) * not_pip;
+	albedo = mix(albedo, vec3(dot(albedo, vec3(0.3, 0.59, 0.11))), dim * 0.5) * (1.0 - dim * 0.6);
+	emission *= 1.0 - dim * 0.8;
 
 	// Normal perturbation in view space using the face axes.
 	vec3 tu = normalize(v_u);
