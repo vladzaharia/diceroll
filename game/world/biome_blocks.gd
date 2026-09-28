@@ -67,9 +67,10 @@ const LOOKS := {
 
 ## Terrain palette per biome: flat paving (weighted), raised tops, raised fill, accents.
 const TERRAIN := {
-	"glade": {"floor": [["grass", 12], ["dirt_with_grass", 1], ["gravel_with_grass", 1]],
-		"top": ["grass", "grass", "dirt_with_grass"], "fill": "dirt", "tint": Color(0.72, 0.8, 0.66)},
-	"frost": {"floor": [["snow", 9], ["gravel_with_snow", 1], ["grass_with_snow", 1]],
+	"glade": {"floor": [["grass", 1]], "path": "dirt", "floor_shader": "meadow",
+		"top": ["grass", "grass", "dirt_with_grass"], "fill": "dirt", "tint": Color(0.86, 0.92, 0.8),
+		"raise_tint": Color(0.86, 0.9, 0.72)},
+	"frost": {"floor": [["snow", 1]], "floor_shader": "snow",
 		"top": ["snow", "dirt_with_snow", "snow"], "fill": "stone", "tint": Color(0.8, 0.86, 0.97),
 		"raise_tint": Color(0.92, 0.95, 1.0)},
 	"magma": {"floor": [["stone_dark", 1]], "top": ["stone_dark"], "fill": "stone_dark",
@@ -175,6 +176,22 @@ static func ground(x: float, z: float) -> float:
 	return float(_heights.get(Vector2i(i, j), 0)) * CELL
 
 
+## True for a cell under a ring tile (patches stay off the ring so tiles read on one colour).
+static func _ring_cell(cx: float, cz: float) -> bool:
+	var m := maxf(absf(cx), absf(cz))
+	return m > _extent - CELL - 0.2 and m < _extent + 0.2
+
+
+## Glade: a worn dirt path from the front edge of the island up to the set piece, with a
+## one-cell jog so it does not read as a ruler line.
+static func _path_cell(cx: float, cz: float) -> bool:
+	var inner := _extent - CELL
+	var jog := CELL * 0.5 if cz > _extent + 0.2 else -CELL * 0.5
+	if absf(cx - jog) > CELL * 0.6:
+		return false
+	return cz > 2.6 * _s and not (cz > inner and cz < _extent + 0.2)
+
+
 ## True for a cell of the Magma lava channel: the column just outside the ring on both
 ## sides (running off the island's front edge) and the row behind the ring.
 static func _is_channel(cx: float, cz: float) -> bool:
@@ -210,6 +227,12 @@ static func _terrain(d: Node3D) -> void:
 	floor_node.name = "Floor"
 	d.add_child(floor_node)
 	var basis := Basis().scaled(Vector3.ONE * (CELL * 0.5))
+	# low-frequency meadow / snowfield patches: per-cell tint and patch blocks
+	var nz := FastNoiseLite.new()
+	nz.seed = Biome.seed_of(_id) * 31
+	nz.frequency = 0.09
+	var patch_cols: Array = pal.get("patch_tints", [])
+	var cols: Dictionary = {}     # block name -> Array[Color]
 	for i in range(-n, n + 1):
 		for j in range(-n, n + 1):
 			var cx := (float(i) + _off) * CELL
@@ -238,8 +261,19 @@ static func _terrain(d: Node3D) -> void:
 				chan_node.add_child(lp)
 			_heights[Vector2i(i, j)] = up
 			var name := _pick(pal.floor) if up == 0 else String(pal.fill)
+			var nv := nz.get_noise_2d(cx, cz)
+			if up == 0 and pal.has("patch") and nv > float(pal.get("patch_at", 0.3)) and not _ring_cell(cx, cz):
+				name = String(pal.patch)
+			if up == 0 and pal.has("path") and _path_cell(cx, cz):
+				name = String(pal.path)
 			if not flat.has(name):
 				flat[name] = []
+				cols[name] = []
+			var tint := Color(1, 1, 1)
+			if patch_cols.size() >= 2:
+				var k := clampf(nz.get_noise_2d(cx * 1.7 + 40.0, cz * 1.7) * 0.9 + 0.5, 0.0, 1.0)
+				tint = (patch_cols[0] as Color).lerp(patch_cols[1], k)
+			cols[name].append(tint)
 			flat[name].append(Transform3D(basis.rotated(Vector3.UP, PI * 0.5 * _rng.randi_range(0, 3)),
 				Vector3(cx, -CELL * 0.5 - (0.55 if chan else 0.0), cz)))
 			if up > 0:
@@ -269,18 +303,51 @@ static func _terrain(d: Node3D) -> void:
 			box.size = Vector3(2, 2, 2)
 			mm.mesh = box
 		var xs: Array = flat[name]
+		mm.use_colors = not patch_cols.is_empty()
 		mm.instance_count = xs.size()
 		for k in xs.size():
 			mm.set_instance_transform(k, xs[k])
+			if mm.use_colors:
+				mm.set_instance_color(k, cols[name][k])
 		var mmi := MultiMeshInstance3D.new()
 		mmi.name = String(name)
 		mmi.multimesh = mm
-		mmi.material_override = shader_mat if shader_mat else _floor_material(bm[1], pal.tint)
+		var fmat: Material = shader_mat
+		if pal.has("floor_shader"):
+			fmat = ground_material(String(pal.floor_shader) + ("_path" if String(name) == String(pal.get("path", "")) else ""))
+			var box := BoxMesh.new()
+			box.size = Vector3(2, 2, 2)
+			mm.mesh = box
+		mmi.material_override = fmat if fmat else _floor_material(bm[1], pal.tint, mm.use_colors)
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		floor_node.add_child(mmi)
 
 
 static var _basalt: ShaderMaterial
+static var _ground_mats: Dictionary = {}
+
+## Ground looks (terrain_top.gdshader parameters).
+const GROUNDS := {
+	"meadow": {"top_a": Color(0.33, 0.6, 0.22), "top_b": Color(0.56, 0.72, 0.26), "speck_color": Color(0.22, 0.46, 0.16),
+		"side_color": Color(0.5, 0.35, 0.22), "patch_scale": 0.12, "speck_amount": 0.22, "speck_scale": 1.6},
+	"meadow_path": {"top_a": Color(0.6, 0.45, 0.3), "top_b": Color(0.66, 0.52, 0.34), "speck_color": Color(0.5, 0.48, 0.44),
+		"side_color": Color(0.5, 0.35, 0.22), "patch_scale": 0.5, "speck_amount": 0.5, "speck_scale": 5.0, "lip": 0.0},
+	"snow": {"top_a": Color(0.82, 0.88, 0.97), "top_b": Color(0.95, 0.97, 1.0), "speck_color": Color(0.7, 0.8, 0.95),
+		"side_color": Color(0.42, 0.46, 0.56), "patch_scale": 0.1, "speck_amount": 0.3, "glint": 1.2, "roughness": 0.7,
+		"lip": 0.3},
+}
+
+
+## Shared ground material by look id (see GROUNDS).
+static func ground_material(id: String) -> ShaderMaterial:
+	if not _ground_mats.has(id):
+		var m := ShaderMaterial.new()
+		m.shader = preload("res://game/world/shaders/terrain_top.gdshader")
+		var g: Dictionary = GROUNDS.get(id, GROUNDS["meadow"])
+		for k in g:
+			m.set_shader_parameter(k, g[k])
+		_ground_mats[id] = m
+	return _ground_mats[id]
 static var _channel_mat: ShaderMaterial
 
 
@@ -308,13 +375,14 @@ static func channel_material() -> ShaderMaterial:
 static var _floor_mats: Dictionary = {}
 
 
-static func _floor_material(base: Material, mul: Color) -> Material:
+static func _floor_material(base: Material, mul: Color, vcol := false) -> Material:
 	if mul.a <= 0.0 or not base is BaseMaterial3D:
 		return base
-	var key := "%d|%s" % [base.get_instance_id(), mul.to_html()]
+	var key := "%d|%s|%s" % [base.get_instance_id(), mul.to_html(), vcol]
 	if not _floor_mats.has(key):
 		var m := (base as BaseMaterial3D).duplicate() as BaseMaterial3D
 		m.albedo_color = mul
+		m.vertex_color_use_as_albedo = vcol
 		_floor_mats[key] = m
 	return _floor_mats[key]
 
@@ -474,6 +542,24 @@ static func round_tree(parent: Node3D, pos: Vector3, k: float, leaf: Color, seed
 		n.add_child(mi)
 	n.scale = Vector3.ONE * k
 	return n
+
+
+## Pale pink blossom puffs scattered over a round tree's canopy.
+static func blossoms(tree: Node3D, count: int, seed := 1) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(1.0, 0.8, 0.86)
+	m.roughness = 0.8
+	for i in count:
+		var mi := MeshInstance3D.new()
+		mi.mesh = _sphere(0.12, 5, 3)
+		mi.material_override = m
+		var a := rng.randf() * TAU
+		var h := rng.randf_range(1.5, 2.9)
+		var r := rng.randf_range(0.55, 1.0) * (1.2 - absf(h - 2.0) * 0.4)
+		mi.position = Vector3(cos(a) * r, h, sin(a) * r)
+		tree.add_child(mi)
 
 
 ## A low mound of leaves.
@@ -1001,7 +1087,10 @@ static func _glade(root: Node3D, d: Node3D, c: Node3D) -> void:
 		_tag(rock(d, spot(p), 0.4, Color(0.64, 0.63, 0.6), int(p.x + 70)))
 	scatter_tufts(d, Color(0.3, 0.52, 0.2), int(170 * _s * _s))
 	scatter_flowers(d, [Color(1.0, 0.97, 0.92), Color(1.0, 0.6, 0.72), Color(1.0, 0.85, 0.32), Color(0.72, 0.62, 1.0)],
-		int(90 * _s * _s))
+		int(150 * _s * _s))
+	for p in [Vector3(-3.4, 0, 3.4), Vector3(3.6, 0, -3.2), Vector3(3.2, 0, 3.6), Vector3(-3.6, 0, -3.0),
+			Vector3(-6.0, 0, 9.2), Vector3(6.4, 0, 9.4)]:
+		_tag(flower_patch(d, spot(p), 0.9, 14))
 	_tag(butterflies(d))
 	# set piece: the old oak on a mossy mound, a ring of standing stones and a campfire
 	var mound := Node3D.new()
@@ -1010,7 +1099,9 @@ static func _glade(root: Node3D, d: Node3D, c: Node3D) -> void:
 	for p in [Vector3(-0.55, 0, -0.55), Vector3(0.55, 0, -0.55), Vector3(-0.55, 0, 0.55), Vector3(0.55, 0, 0.55)]:
 		block(mound, "grass", p + Vector3(0, -0.28, 0), 1.1, 90.0 * (int(p.x > 0) + 2 * int(p.z > 0)))
 	block(mound, "dirt_with_grass", Vector3(0.0, 0.05, -0.2), 1.0, 0.0)
-	round_tree(c, Vector3(0.0, 0.55, -0.25), 1.35, Color(0.3, 0.6, 0.22), 77)
+	var oak := round_tree(c, Vector3(0.0, 0.55, -0.25), 1.45, Color(0.44, 0.72, 0.3), 77)
+	oak.name = "Oak"
+	blossoms(oak, 26, 78)
 	for i in 7:
 		var a := TAU * float(i) / 7.0 + 0.25
 		var p := Vector3(cos(a) * 2.15, 0, sin(a) * 2.15)
