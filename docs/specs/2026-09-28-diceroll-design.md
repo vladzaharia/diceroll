@@ -196,3 +196,5 @@ Meta currencies, gear, pets, online features, more than 4 classes, Ranger class,
   - Combos work over any values: sets use equal non-zero values, and straights use consecutive non-zero values.
 - **Board:** a 9×9 ring of **32 tiles**, with corners at 0/8/16/24, replaces the 24-tile ring. Size is a parameter in the rules and the board view.
 - **Camera:** the camera zooms in and out with the flow: overview when dice are rolled (all landing targets visible), follow while the hero moves, combat framing for fights, then back.
+- **Upgrade pillars, no equipment:** the dice are the equipment. Roguelike growth comes from three things: (a) **dice abilities** (runes), (b) **pip changes** (forge, face upgrades, die kinds), and (c) **passive abilities** ("relics", about 16 dice-centric passives). Passives come from elites, bosses, the shop and shrine events.
+- **Board size:** 9×9 perimeter = 32 tiles (between the 8×8 = 28 and 10×10 = 36 options). It's a parameter, so it's cheap to change.
