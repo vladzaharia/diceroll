@@ -160,8 +160,13 @@ func _one(ev: Dictionary) -> void:
 		"enemy_intent":
 			c.stage.set_enemy(int(ev.enemy_idx), {"intent": ev.intent})
 		"enemy_died":
-			Audio.play_sfx("death")
 			await c.stage.enemy_die(int(ev.enemy_idx))
+			var left := 0
+			for d: Dictionary in c.stage.data:
+				if int(d.get("hp", 0)) > 0:
+					left += 1
+			if left > 0:
+				c.stage.reframe()
 		"summon":
 			c.stage.add_enemy(ev.enemy)
 			c.stage.reframe()

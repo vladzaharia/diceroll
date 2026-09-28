@@ -43,7 +43,6 @@ var aborting := false
 
 var _tray_layer: CanvasLayer
 var _title_t := 0.0
-var _last_phase := -1
 
 
 func _init() -> void:
@@ -144,7 +143,6 @@ func start(f: GameFlow) -> void:
 	mode = "run"
 	busy = false
 	in_combat = false
-	_last_phase = -1
 	get_tree().paused = false
 	stage.clear()
 	stage.speed = speed
@@ -294,8 +292,6 @@ func _enter_idle() -> void:
 	ui.board_hud.busy = false
 	ui.combat_hud.busy = false
 	var ph := flow.phase
-	if ph != _last_phase:
-		_last_phase = ph
 	if tray.dice.size() != flow.run.dice.size():
 		tray.set_dice(flow.run.dice)
 	ui.sync(flow)
