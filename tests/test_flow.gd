@@ -693,7 +693,7 @@ func test_elite_guarantees_passive_choice() -> void:
 	assert_eq(f.offer.options.size(), 3)
 
 func test_debug_open_scenarios() -> void:
-	var expected := {"shop": P.SHOP, "draft": P.DRAFT, "rune_choice": P.DRAFT, "rune_assign": P.DRAFT,
+	var expected := {"shop": P.SHOP, "draft": P.DRAFT, "rune_choice": P.DRAFT, "rune_assign": P.DRAFT, "passive": P.DRAFT,
 		"forge": P.FORGE, "event": P.EVENT, "portal": P.PORTAL, "combat": P.COMBAT, "boss": P.COMBAT}
 	for kind in expected:
 		var f := _flow()

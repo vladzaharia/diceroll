@@ -1004,8 +1004,9 @@ func portal_pick(tile_idx: int) -> Array[Dictionary]:
 
 ## Jumps straight into a modal or fight for screenshot scenarios. Not recorded in `commands`,
 ## so a flow touched by this cannot be replayed from its log. kind: shop | draft | rune_choice |
-## rune_assign | forge | event | portal | combat | boss. arg: event id, rune id, or comma
-## separated enemy ids for combat.
+## rune_assign | passive | forge | event | portal | combat | boss. arg: event id, rune id, or comma
+## separated enemy ids for combat, or the passive source ("elite" | "miniboss" | "boss" = an
+## elite's boss-tier roll).
 func debug_open(kind: String, arg := "") -> Array[Dictionary]:
 	var ev: Array[Dictionary] = []
 	combat = null
@@ -1018,6 +1019,7 @@ func debug_open(kind: String, arg := "") -> Array[Dictionary]:
 		"shop": _open_shop(ev)
 		"draft": _open_draft(ev)
 		"rune_choice": _open_rune_choice("chest", ev)
+		"passive": _open_passive_choice(arg if arg != "" else "elite", ev, "boss" if arg == "boss" else "")
 		"rune_assign": _set_offer({"kind": "rune_assign", "rune": arg if arg != "" else "blade"}, Phase.DRAFT, ev)
 		"forge": _set_offer({"kind": "forge", "ops": ["raise", "mirror"], "source": "tile"}, Phase.FORGE, ev)
 		"event": _open_event(ev, arg if EventDefs.DATA.has(arg) else "")
