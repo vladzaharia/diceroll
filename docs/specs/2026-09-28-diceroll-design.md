@@ -206,3 +206,9 @@ Meta currencies, gear, pets, online features, more than 4 classes, Ranger class,
   - The lap-7 mini-boss comes from the tier-2 biome's candidates, and the lap-15 final boss from the tier-3 biome's candidates. There are at least 4 final bosses, each with a unique 2-phase mechanic.
   - The route is shown at run start and on the summary.
   - New biome visuals use KayKit BlockBits terrain (snow, ice, lava, grass, sand) and RPGTools props.
+- **Speed and AUTO:** a HUD speed pill cycles 1×/2×/4× (persisted; 4× also condenses repeated beats). An **AUTO** toggle plays decisions with a short visible delay and shows a one-line reason ("Rerolling 2 dice to chase Full House"). Its policy is configurable in Auto settings:
+  - Scope toggles: board, combat, drafts, shop, forge, events, portal.
+  - Stop conditions: HP below X%, before the mini-boss or boss, when a boss-tier passive is offered, at shops.
+  - Focus: balanced, damage, defense or economy.
+  - Tapping any game control turns AUTO off.
+  - Combat choices use expected value, computed with a private RNG that never touches the run's RNG.
