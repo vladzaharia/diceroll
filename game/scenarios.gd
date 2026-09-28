@@ -24,6 +24,9 @@ extends RefCounted
 ##  play_auto     full run driven by Bot through the real presentation; periodic shots
 ##                <shot>_NN.png (--shots=N --every=S), final shot <shot>_final.png, quits at
 ##                game end or --timeout. Run it with a large --wait (e.g. --wait=5000).
+##                --ui-auto=1 drives it through the real AUTO toggle (AutoPilot + Bot.decide)
+##                instead (--auto-rules=all|default, --stop=boss,miniboss,passive,shop).
+##  ui_speed_auto / ui_auto_settings / game_auto   see game/auto/auto_scenarios.gd
 ##
 ## Common args: --class=knight|barbarian|mage|rogue --seed=N --act=N --speed=N
 
@@ -35,10 +38,12 @@ const DEMO_PASSIVES := ["pair_master", "iron_skin", "pathfinder", "rune_echo", "
 
 
 static func names() -> PackedStringArray:
-	return PackedStringArray(NAMES)
+	return PackedStringArray(NAMES + AutoScenarios.NAMES)
 
 
 static func build(name: String) -> Node:
+	if AutoScenarios.NAMES.has(name):
+		return AutoScenarios.build(name)
 	if not NAMES.has(name):
 		return null
 	var d := _Driver.new()
@@ -286,6 +291,12 @@ class _Driver extends Node:
 
 	func _auto() -> void:
 		var f := _flow()
+		if String(args.get("ui-auto", "0")) == "1":
+			var code: int = await AutoScenarios.run_ui_auto(self, c, f, args, _shot_base)
+			await _pause(2.5)
+			await _save("%s_final.png" % _shot_base)
+			await _quit(code)
+			return
 		var shots := int(args.get("shots", "25"))
 		var every := float(args.get("every", "8"))
 		var timeout := float(args.get("timeout", "1500"))

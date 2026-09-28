@@ -500,6 +500,21 @@ P["midas_fist"] = (union([rrect(3.6, 5.4, 3.6, 5.6, 1.8), rrect(7.2, 4.6, 3.6, 5
                    + fill("M3.4 11.6c2.8-.4 6-.2 8.6.8a1.9 1.9 0 0 1-.6 3.7c-2.6-.3-5.4-.1-8 .6z")
                    + coin(18.2, 16.8, 4.4))
 
+
+# ---------------------------------------------------------------- AUTO (looping arrow + play)
+def auto_icon():
+    a0, a1, r = -58, 222, 8.0
+    path, (x1, y1) = arc(12, 12, r, a0, a1)
+    t = math.radians(a1)
+    tx, ty = -math.sin(t), math.cos(t)          # clockwise tangent at the arc end
+    nx, ny = math.cos(t), math.sin(t)           # outward normal
+    tip = (x1 + tx * 3.4, y1 + ty * 3.4)
+    head = poly([tip, (x1 + nx * 3.2 - tx * 0.6, y1 + ny * 3.2 - ty * 0.6), (x1 - nx * 3.2 - tx * 0.6, y1 - ny * 3.2 - ty * 0.6)])
+    return lines([path], 2.5, [head]) + fill("M10 8.4v7.2l5.8-3.6z")
+
+
+ICONS["auto"] = auto_icon()
+
 for pid, body in P.items():
     ICONS["passive_" + pid] = body
 
