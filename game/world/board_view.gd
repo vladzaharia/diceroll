@@ -293,14 +293,15 @@ func _bounce(n: Node3D, depth: float) -> void:
 # --- landing targets ------------------------------------------------------------------------
 
 ## Glowing ghost markers on each target tile, labelled with the die value(s) that land there.
-func show_targets(targets: Array[int], values: Array[int]) -> void:
+## Accepts typed or untyped arrays of ints.
+func show_targets(targets: Array, values: Array) -> void:
 	clear_targets()
 	var by_tile := {}
 	for k in targets.size():
-		var idx := posmod(targets[k], RING)
+		var idx := posmod(int(targets[k]), RING)
 		if not by_tile.has(idx):
 			by_tile[idx] = []
-		by_tile[idx].append(values[k] if k < values.size() else 0)
+		by_tile[idx].append(int(values[k]) if k < values.size() else 0)
 	var n := 0
 	for idx in by_tile:
 		var vals: Array = by_tile[idx]
@@ -455,14 +456,14 @@ func place_hero(idx: int) -> void:
 
 
 ## Hops the hero tile by tile along `path` (tile indices, excluding the current one).
-func hop_hero(path: Array[int], step_time := 0.28) -> void:
+func hop_hero(path: Array, step_time := 0.28) -> void:
 	if path.is_empty():
 		return
 	clear_targets()
 	_restore_dressing(hero_idx)
 	_show_hero_ring(false)
 	for k in path.size():
-		var to_idx := posmod(path[k], RING)
+		var to_idx := posmod(int(path[k]), RING)
 		var from := hero.position
 		var to := tile_position(to_idx)
 		var dir := to - from
