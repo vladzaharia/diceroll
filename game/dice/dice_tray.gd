@@ -264,6 +264,23 @@ func clear_highlight() -> void:
 		d.hl_on = false
 
 
+## Board move: lifts and glows the moving dice and dims the rest. Empty clears it.
+func set_chosen(indices: Array) -> void:
+	for i in dice.size():
+		dice[i].chosen = indices.has(i)
+		dice[i].dimmed = not indices.is_empty() and not indices.has(i)
+
+
+func clear_chosen() -> void:
+	set_chosen([])
+
+
+## Screen (global canvas) point centred above die `idx` (for popups).
+func die_top_screen(idx: int) -> Vector2:
+	var r := get_die_screen_rect(idx)
+	return Vector2(r.get_center().x, r.position.y) if r.size != Vector2.ZERO else global_position + Vector2(size.x * 0.5, 0)
+
+
 func set_interactive(on: bool) -> void:
 	interactive = on
 

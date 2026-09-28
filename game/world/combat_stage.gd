@@ -142,7 +142,8 @@ func enemy_position(i: int) -> Vector3:
 func enemy_heights() -> Array:
 	var out := []
 	for i in enemies.size():
-		out.append(_hud_height(String(data[i].get("id", ""))) + (1.1 if bool(data[i].get("boss", false)) else 0.7))
+		var tall := bool(data[i].get("boss", false)) or bool(data[i].get("miniboss", false))
+		out.append(_hud_height(String(data[i].get("id", ""))) + (1.1 if tall else 0.7))
 	return out
 
 
@@ -178,9 +179,10 @@ func _add(d: Dictionary, i: int, n: int, rise_delay := -1.0) -> void:
 	var dd := d.duplicate(true)
 	dd["boss"] = bool(d.get("boss", EnemyLooks.is_boss(id)))
 	data.append(dd)
+	dd["miniboss"] = bool(d.get("miniboss", EnemyLooks.is_miniboss(id)))
 	var hud := UnitHud.new()
 	add_child(hud)
-	hud.scale = Vector3.ONE * (1.2 if dd.boss else 1.0)
+	hud.scale = Vector3.ONE * (1.2 if dd.boss else (1.1 if dd.miniboss else 1.0))
 	hud.global_position = pos + Vector3.UP * _hud_height(id)
 	hud.set_data(dd, false)
 	huds.append(hud)
@@ -220,7 +222,8 @@ func _rise(ch: Character, id: String, hud: UnitHud, delay: float) -> void:
 		hud.visible = true
 		hud.scale = Vector3.ONE * 0.01
 		var ht := hud.create_tween().set_speed_scale(speed)
-		ht.tween_property(hud, "scale", Vector3.ONE * (1.2 if EnemyLooks.is_boss(id) else 1.0), 0.25) \
+		ht.tween_property(hud, "scale", Vector3.ONE * (1.2 if EnemyLooks.is_boss(id) else (1.1 if EnemyLooks.is_miniboss(id) else 1.0)), 0.25) \
+
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT))
 	Audio.play_sfx("trap", 0.1)
 

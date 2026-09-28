@@ -2,7 +2,7 @@ class_name TileStyle
 extends RefCounted
 ## Tile colours and the small 3D prop that identifies each tile type.
 
-const TYPES := ["start", "forge", "treasury", "portal", "enemy", "elite", "chest", "event", "campfire",
+const TYPES := ["start", "forge", "treasury", "portal", "enemy", "elite", "miniboss", "chest", "event", "campfire",
 	"trap", "empty"]
 
 ## Inset top colour per type (sRGB).
@@ -13,6 +13,7 @@ const COLORS := {
 	"portal": Color(0.62, 0.4, 0.98),
 	"enemy": Color(0.9, 0.26, 0.24),
 	"elite": Color(0.66, 0.1, 0.22),
+	"miniboss": Color(0.58, 0.1, 0.4),
 	"chest": Color(0.28, 0.6, 0.98),
 	"event": Color(0.24, 0.8, 0.78),
 	"campfire": Color(0.46, 0.82, 0.3),

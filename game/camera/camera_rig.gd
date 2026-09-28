@@ -38,6 +38,8 @@ var mode := Mode.OVERVIEW
 
 var _bounds := AABB(Vector3(-7.4, 0, -7.4), Vector3(14.8, 1.8, 14.8))
 var _follow_target: Node3D
+## Follow framing radius multiplier (1 = close hop-by-hop follow, >1 = "home" framing).
+var _follow_wide := 1.0
 var _points: PackedVector3Array = PackedVector3Array()
 var _yaw := 0.0
 var _pitch := 52.0
@@ -89,8 +91,23 @@ func overview(bounds := AABB(), instant := false) -> void:
 ## Tracks a node (the hero) with a closer framing.
 func follow(target: Node3D, instant := false) -> void:
 	_follow_target = target
+	_follow_wide = 1.0
 	mode = Mode.FOLLOW
 	_begin(instant)
+
+
+## Resting board framing: centred on the hero, wider than follow() so a good part of the
+## ring around them is visible (between turns).
+func home(target: Node3D, instant := false) -> void:
+	_follow_target = target
+	_follow_wide = 1.75
+	mode = Mode.FOLLOW
+	_begin(instant)
+
+
+## Yaw (radians) of the current framing (e.g. the fight's yaw right after combat()).
+func combat_yaw() -> float:
+	return _yaw
 
 
 ## Side 3/4 framing of the hero and enemies (world positions of their feet). The camera
@@ -163,6 +180,8 @@ func _process(dt: float) -> void:
 	_t += dt
 	if mode == Mode.FOLLOW and _follow_target and is_instance_valid(_follow_target):
 		_recompute()
+	elif mode == Mode.FOLLOW and _follow_target != null:
+		_follow_target = null
 	var k := 1.0 - exp(-dt * 3.0 / maxf(_smooth, 0.01))
 	var pos := _current.origin.lerp(_desired.origin, k)
 	var q := Quaternion(_current.basis.orthonormalized()).slerp(Quaternion(_desired.basis.orthonormalized()), k)
@@ -216,8 +235,10 @@ func _recompute() -> void:
 		Mode.FOLLOW:
 			_yaw = 0.0
 			_pitch = 50.0 if portrait else 44.0
-			var c := _follow_target.global_position if _follow_target else Vector3.ZERO
-			var r := 3.6 if portrait else 3.4
+			var c := _follow_target.global_position if _follow_target and is_instance_valid(_follow_target) else Vector3.ZERO
+			var r := (3.6 if portrait else 3.4) * _follow_wide
+			if _follow_wide > 1.0:
+				_pitch = 54.0 if portrait else 48.0
 			for x in [-1.0, 1.0]:
 				for z in [-1.0, 1.0]:
 					pts.append(c + Vector3(x * r, 0.0, z * r * 0.8))

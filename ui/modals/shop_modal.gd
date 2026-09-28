@@ -79,7 +79,12 @@ func refresh(flow: GameFlow) -> void:
 		var c := OptionCard.make(String(it.label), String(it.desc))
 		if id == "rune" and it.has("rune"):
 			c.set_rune(String(it.rune))
+		elif id == "die":
+			c.set_die(String(it.get("kind", "standard")))
+		elif id == "passive" and it.has("passive"):
+			c.set_passive(String(it.passive))
 		else:
+
 			c.set_icon(ICONS.get(id, "star"))
 			c.set_tag("", UiPalette.GOLD)
 		c.set_price(int(it.price), run.gold >= int(it.price))
@@ -129,7 +134,8 @@ func begin_pick(i: int) -> void:
 		var chip := DieChip.make(die, d)
 		if String(it.id) == "face_raise":
 			chip.faces[die.lowest_face()].selected = true
-			if die.faces[die.lowest_face()] >= 6:
+			if not die.can_raise(die.lowest_face()):
+
 				chip.disabled = true
 				chip.modulate.a = 0.45
 		chip.pressed.connect(_pick_die.bind(d))

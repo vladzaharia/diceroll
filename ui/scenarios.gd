@@ -234,13 +234,16 @@ class UiBackdrop:
 		slab.material_override = _mat(Color("3a3448"))
 		add_child(slab)
 		var tiles: Array = flow.run.board.tiles if flow else []
-		for i in 24:
-			var p := _grid(i)
+		var n := tiles.size() if tiles.size() > 0 else Balance.BOARD_SIZE
+		var q := n / 4
+		for i in n:
+			var p := _grid(i, q) * 6.0 / q
 			var t := MeshInstance3D.new()
 			var bm := BoxMesh.new()
 			bm.size = Vector3(0.92, 0.3, 0.92)
 			t.mesh = bm
 			t.position = Vector3(p.x - 3.0, 0.0, p.y - 3.0) * 1.05
+			t.scale = Vector3.ONE * 6.0 / q
 			var type := String(tiles[i].type) if i < tiles.size() else "empty"
 			t.material_override = _mat(TILE_COL.get(type, Color.GRAY))
 			add_child(t)
@@ -259,7 +262,7 @@ class UiBackdrop:
 		add_child(lamp)
 		if flow:
 			var hero := Character.create(flow.run.class_id)
-			var hp := _grid(flow.run.pos)
+			var hp := _grid(flow.run.pos, flow.run.board.size() / 4) * 6.0 / (flow.run.board.size() / 4)
 			hero.position = Vector3(hp.x - 3.0, 0.15, hp.y - 3.0) * 1.05
 			hero.scale = Vector3.ONE * 0.55
 			add_child(hero)
@@ -286,15 +289,15 @@ class UiBackdrop:
 			UiTheme.full_rect(r)
 			layer.add_child(r)
 
-	func _grid(i: int) -> Vector2:
-		# 7x7 perimeter, clockwise from bottom-left corner
-		if i <= 6:
-			return Vector2(i, 6)
-		if i <= 12:
-			return Vector2(6, 6 - (i - 6))
-		if i <= 18:
-			return Vector2(6 - (i - 12), 0)
-		return Vector2(0, i - 18)
+	func _grid(i: int, q: int) -> Vector2:
+		# (q+1)x(q+1) perimeter, clockwise from the bottom-left corner
+		if i <= q:
+			return Vector2(i, q)
+		if i <= 2 * q:
+			return Vector2(q, q - (i - q))
+		if i <= 3 * q:
+			return Vector2(q - (i - 2 * q), 0)
+		return Vector2(0, i - 3 * q)
 
 	func _mat(c: Color) -> StandardMaterial3D:
 		var m := StandardMaterial3D.new()

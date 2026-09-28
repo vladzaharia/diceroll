@@ -404,7 +404,54 @@ static func flash(any: Node, color := Color(1.0, 0.95, 0.8, 0.55), duration := 0
 	ScreenFlash.get_for(any).flash(color, duration)
 
 
+## 2D confetti burst at a canvas point under `parent` (doubles, celebrations).
+static func confetti(parent: Control, at: Vector2, count := 16) -> void:
+	var cols := [Color("ffdc7a"), Color("ff7a7f"), Color("7ad0ff"), Color("9cf08a"), Color("d49aff"), Color("fff3d6")]
+	for i in count:
+		var r := ColorRect.new()
+		r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		r.color = cols[i % cols.size()]
+		var sz := randf_range(7.0, 13.0)
+		r.size = Vector2(sz, sz * randf_range(0.45, 0.8))
+		r.pivot_offset = r.size * 0.5
+		r.position = at - r.size * 0.5
+		r.rotation = randf() * TAU
+		parent.add_child(r)
+		var a := randf_range(-PI * 0.95, -PI * 0.05)
+		var v := randf_range(90.0, 210.0)
+		var peak := at + Vector2(cos(a), sin(a)) * v
+		var land := peak + Vector2(randf_range(-30.0, 30.0), randf_range(70.0, 140.0))
+		var t := r.create_tween()
+		t.tween_property(r, "position", peak - r.size * 0.5, 0.28).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		t.parallel().tween_property(r, "rotation", r.rotation + randf_range(-6.0, 6.0), 0.9)
+		t.tween_property(r, "position", land - r.size * 0.5, 0.6).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		t.parallel().tween_property(r, "modulate:a", 0.0, 0.6).set_delay(0.15)
+		t.tween_callback(r.queue_free)
+
+
+## 2D coins flying along an arc from `from` to `to` (canvas points) under `parent`.
+static func fly_coins(parent: Control, from: Vector2, to: Vector2, count := 6, time := 0.55) -> void:
+	for i in count:
+		var c := UiIcons.rect("coin", 30)
+		c.position = from - Vector2(15, 15) + Vector2(randf_range(-24.0, 24.0), randf_range(-10.0, 10.0))
+		c.size = Vector2(30, 30)
+		c.pivot_offset = Vector2(15, 15)
+		parent.add_child(c)
+		var start := c.position
+		var end := to - Vector2(15, 15)
+		var ctrl := (start + end) * 0.5 + Vector2(randf_range(-80.0, 80.0), -120.0)
+		var t := c.create_tween()
+		t.tween_interval(0.04 * i)
+		t.tween_method(func(u: float) -> void:
+			var a := start.lerp(ctrl, u)
+			var b := ctrl.lerp(end, u)
+			c.position = a.lerp(b, u)
+			c.scale = Vector2.ONE * lerpf(1.1, 0.7, u), 0.0, 1.0, time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+		t.tween_callback(c.queue_free)
+
+
 ## Brief global slow-down for impact (restores the previous time scale).
+
 static func hit_stop(any: Node, duration := 0.07, scale := 0.05) -> void:
 	var prev := Engine.time_scale
 	if prev < 0.2:

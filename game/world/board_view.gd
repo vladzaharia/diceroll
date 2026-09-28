@@ -1,22 +1,24 @@
 class_name BoardView
 extends Node3D
-## The 24-tile ring board on its floating-island biome, the hero and enemy previews.
+## The ring board on its floating-island biome, the hero and enemy previews. Any ring size
+## 4(n-1) works (24 = 7x7, 28 = 8x8 default, 32 = 9x9); the size comes from the tile list.
 ##
 ##   var board := BoardView.new()
 ##   add_child(board)
-##   board.build(1, tiles)            # tiles: 24 x {type, enemies:Array[String], elite:bool}
+##   board.build(1, tiles)            # tiles: N x {type, enemies:Array[String], elite:bool}
 ##   board.show_targets([4, 7], [4, 7])
 ##   await board.hop_hero([1, 2, 3, 4])
 ##
-## Ring layout: perimeter of a 7x7 grid, tile 0 (Start) at the front-left corner, running
-## clockwise seen from above: up the left edge (6 = Forge), right along the back (12 =
-## Treasury), down the right edge (18 = Portal), back along the front.
+## Ring layout: perimeter of an n x n grid, tile 0 (Start) at the front-left corner, running
+## clockwise seen from above: up the left edge (corner q = Forge), right along the back (2q =
+## Treasury), down the right edge (3q = Portal), back along the front. q = ring_size / 4.
 
 signal hero_landed(idx: int)
 ## Emitted when set_hero_class() replaces the hero node (re-target cameras on it).
 signal hero_changed(hero: Character)
 
-const RING := 24
+## Ring size used when build() gets no tiles.
+const DEFAULT_RING := Balance.BOARD_SIZE
 const PITCH := 2.1                 ## tile centre spacing (world units)
 const TILE_TOP := 0.5              ## y of a tile's top surface
 const HERO_SCALE := 0.72
@@ -25,6 +27,9 @@ const TILE_MESH := "res://assets/kaykit/boardgame/tile_blue.gltf"
 const TILE_SHADER := preload("res://game/world/shaders/atlas_tint.gdshader")
 
 var act := 1
+## Number of ring tiles (4(n-1)) and the grid side n; set by build().
+var ring_size := DEFAULT_RING
+var side := DEFAULT_RING / 4 + 1
 var tiles: Array = []
 var hero: Character
 var hero_class := "knight"
@@ -57,9 +62,11 @@ func build(p_act: int, p_tiles: Array) -> void:
 	_props.clear()
 	_figures.clear()
 	tiles = []
-	for i in RING:
+	ring_size = p_tiles.size() if p_tiles.size() >= 16 and p_tiles.size() % 4 == 0 else DEFAULT_RING
+	side = ring_size / 4 + 1
+	for i in ring_size:
 		tiles.append(_norm(p_tiles[i] if i < p_tiles.size() else {}))
-	biome = Biome.build(act)
+	biome = Biome.build(act, ring_extent())
 	add_child(biome)
 	_tiles_root = Node3D.new()
 	_tiles_root.name = "Tiles"
@@ -67,27 +74,40 @@ func build(p_act: int, p_tiles: Array) -> void:
 	_targets_root = Node3D.new()
 	_targets_root.name = "Targets"
 	add_child(_targets_root)
-	for i in RING:
+	for i in ring_size:
 		_build_tile(i)
 	_spawn_hero()
 
 
 # --- geometry ---------------------------------------------------------------------------
 
-## Grid cell (x, z in -3..3) of a ring index.
-static func grid_of(idx: int) -> Vector2i:
-	var i := posmod(idx, RING)
-	if i <= 6:
-		return Vector2i(-3, 3 - i)
-	if i <= 12:
-		return Vector2i(-3 + (i - 6), -3)
-	if i <= 18:
-		return Vector2i(3, -3 + (i - 12))
-	return Vector2i(3 - (i - 18), 3)
+## Grid cell of a ring index, centred on the board: x, z in -h..h with h = (side - 1) / 2
+## (half-integers on even sides).
+func grid_of(idx: int) -> Vector2:
+	var q := ring_size / 4
+	var h := q * 0.5
+	var i := posmod(idx, ring_size)
+	if i <= q:
+		return Vector2(-h, h - i)
+	if i <= 2 * q:
+		return Vector2(-h + (i - q), -h)
+	if i <= 3 * q:
+		return Vector2(h, -h + (i - 2 * q))
+	return Vector2(h - (i - 3 * q), h)
 
 
-static func is_corner(idx: int) -> bool:
-	return posmod(idx, 6) == 0
+func is_corner(idx: int) -> bool:
+	return posmod(idx, ring_size / 4) == 0
+
+
+## Half-extent of the ring's outer tile edge (world units, BoardView-local).
+func ring_extent() -> float:
+	return (ring_size / 4) * 0.5 * PITCH + PITCH * 0.5
+
+
+## Wraps a tile index onto the ring.
+func wrap_idx(idx: int) -> int:
+	return posmod(idx, ring_size)
 
 
 ## Top-surface centre of a tile in BoardView-local space.
@@ -110,7 +130,8 @@ func tile_forward(idx: int) -> Vector3:
 func tile_inward(idx: int) -> Vector3:
 	var p := tile_position(idx)
 	var g := grid_of(idx)
-	var v := Vector3(-signf(g.x) if absi(g.x) == 3 else 0.0, 0.0, -signf(g.y) if absi(g.y) == 3 else 0.0)
+	var h := (ring_size / 4) * 0.5
+	var v := Vector3(-signf(g.x) if absf(absf(g.x) - h) < 0.01 else 0.0, 0.0, -signf(g.y) if absf(absf(g.y) - h) < 0.01 else 0.0)
 	if p.length() < 0.01:
 		return Vector3.FORWARD
 	return v.normalized()
@@ -118,7 +139,7 @@ func tile_inward(idx: int) -> Vector3:
 
 ## World-space AABB of the ring including standing figures (camera overview framing).
 func ring_bounds() -> AABB:
-	var h := 3.0 * PITCH + PITCH * 0.5
+	var h := ring_extent()
 	var a := AABB(Vector3(-h, 0.0, -h), Vector3(h * 2.0, 1.8, h * 2.0))
 	return global_transform * a
 
@@ -200,6 +221,8 @@ func _dress_tile(i: int, animate: bool) -> void:
 	holder.add_child(TileStyle.make_prop(type))
 	var figs: Array[Character] = []
 	var ids: Array = t.enemies
+	if type == "miniboss" and not ids.is_empty():
+		figs.append(_dress_miniboss(holder, String(ids[0])))
 	if (type == "enemy" or type == "elite") and ids.is_empty():
 		ids = ["skeleton_minion"]
 	if type == "enemy" or type == "elite":
@@ -233,9 +256,56 @@ func _dress_tile(i: int, animate: bool) -> void:
 		tw.tween_property(holder, "scale", Vector3.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
+## Mini-boss tile: a larger preview figure between two skull posts with red flames, a
+## hovering skull emblem and a slow red ground glow. Returns the figure.
+func _dress_miniboss(holder: Node3D, id: String) -> Character:
+	var ch := EnemyLooks.create(id)
+	ch.scale = Vector3.ONE * PREVIEW_SCALE * 1.5 * EnemyLooks.scale_of(id) / 1.3
+	ch.position = Vector3(0, 0, 0.02)
+	ch.rotation.y = deg_to_rad(12.0)
+	holder.add_child(ch)
+	for sx in [-1.0, 1.0]:
+		var post := Props.put(holder, Props.HAL + "post_skull.gltf", Vector3(sx * 0.62, 0, -0.52), sx * -18.0, 0.55)
+		post.name = "SkullPost"
+		Biome.flame(holder, Vector3(sx * 0.62, 0.98, -0.5), Color(1.0, 0.3, 0.15), 0.2, 6)
+	var glow := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(1.9, 1.9)
+	glow.mesh = pm
+	var gm := Props.glow_material(Color(1.0, 0.25, 0.18), true, 1.4)
+	gm.albedo_texture = Props.particle_texture("ring")
+	glow.material_override = gm
+	glow.position.y = 0.03
+	glow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	holder.add_child(glow)
+	var gt := glow.create_tween().set_loops()
+	gt.tween_property(glow, "scale", Vector3.ONE * 1.12, 0.8).set_trans(Tween.TRANS_SINE)
+	gt.tween_property(glow, "scale", Vector3.ONE * 0.94, 0.8).set_trans(Tween.TRANS_SINE)
+	var emblem := Node3D.new()
+	emblem.name = "Emblem"
+	emblem.position = Vector3(0, 1.75, 0)
+	holder.add_child(emblem)
+	var skull := Props.put(emblem, Props.HAL + "skull.gltf", Vector3.ZERO, 0.0, 0.62)
+	Props.tint(skull, Color(1.0, 0.86, 0.7), 0.35, Color(0.6, 0.12, 0.05))
+	var l := OmniLight3D.new()
+	l.light_color = Color(1.0, 0.35, 0.2)
+	l.light_energy = 1.6
+	l.omni_range = 2.6
+	l.position = Vector3(0, 0.1, 0.4)
+	emblem.add_child(l)
+	var bob := emblem.create_tween().set_loops()
+	bob.tween_property(emblem, "position:y", 1.9, 1.0).set_trans(Tween.TRANS_SINE)
+	bob.tween_property(emblem, "position:y", 1.72, 1.0).set_trans(Tween.TRANS_SINE)
+	var spin := skull.create_tween().set_loops()
+	spin.tween_property(skull, "rotation:y", deg_to_rad(35.0), 1.4).set_trans(Tween.TRANS_SINE)
+	spin.tween_property(skull, "rotation:y", deg_to_rad(-35.0), 1.4).set_trans(Tween.TRANS_SINE)
+	Fx.elite_sparkle(holder, Vector3(0, 0.1, 0), 0.7, 1.3)
+	return ch
+
+
 ## Swaps tile idx to a new {type, enemies, elite} with a pop.
 func set_tile(idx: int, tile: Dictionary, animate := true) -> void:
-	idx = posmod(idx, RING)
+	idx = posmod(idx, ring_size)
 	tiles[idx] = _norm(tile)
 	var old: Node3D = _props[idx]
 	if old:
@@ -263,18 +333,18 @@ func set_tile(idx: int, tile: Dictionary, animate := true) -> void:
 
 ## Enemy preview figures standing on a tile (e.g. to hide them when a fight starts there).
 func tile_figures(idx: int) -> Array:
-	return _figures[posmod(idx, RING)]
+	return _figures[posmod(idx, ring_size)]
 
 
 func set_tile_dressing_visible(idx: int, on: bool) -> void:
-	var n: Node3D = _props[posmod(idx, RING)]
+	var n: Node3D = _props[posmod(idx, ring_size)]
 	if n:
 		n.visible = on
 
 
 ## Short glow + bounce on a tile (landing feedback).
 func pulse_tile(idx: int, color := Color(0, 0, 0, 0)) -> void:
-	idx = posmod(idx, RING)
+	idx = posmod(idx, ring_size)
 	var col := color if color.a > 0.0 else TileStyle.color(tiles[idx].type)
 	var mat := _top_mats[idx]
 	var tw := create_tween()
@@ -298,7 +368,7 @@ func show_targets(targets: Array, values: Array) -> void:
 	clear_targets()
 	var by_tile := {}
 	for k in targets.size():
-		var idx := posmod(int(targets[k]), RING)
+		var idx := posmod(int(targets[k]), ring_size)
 		if not by_tile.has(idx):
 			by_tile[idx] = []
 		by_tile[idx].append(int(values[k]) if k < values.size() else 0)
@@ -310,6 +380,58 @@ func show_targets(targets: Array, values: Array) -> void:
 		n += 1
 
 
+## The single landing marker of an automatic board move: a tall beam and a big badge
+## with the step count on `target`, plus a dotted trail over the tiles on the way.
+## `double` makes it gold-sparkly. Steps 0 marks the hero's own tile.
+func show_move_target(target: int, steps: int, double := false) -> void:
+	clear_targets()
+	target = wrap_idx(target)
+	var col := Color(1.0, 0.8, 0.3) if double else Color(1.0, 0.9, 0.55)
+	var m := _make_marker(target, [steps], 0, 1.8, col)
+	_targets_root.add_child(m)
+	# a bouncing chevron between the badge and the tile
+	var arrow := MeshInstance3D.new()
+	var pm := PrismMesh.new()
+	pm.size = Vector3(0.62, 0.5, 0.16)
+	arrow.mesh = pm
+	var am := StandardMaterial3D.new()
+	am.albedo_color = col
+	am.emission_enabled = true
+	am.emission = col
+	am.emission_energy_multiplier = 1.4
+	am.billboard_mode = BaseMaterial3D.BILLBOARD_FIXED_Y
+	arrow.material_override = am
+	arrow.rotation.z = PI
+	arrow.position.y = 1.45
+	arrow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	m.add_child(arrow)
+	var at := arrow.create_tween().set_loops()
+	at.tween_property(arrow, "position:y", 1.15, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	at.tween_property(arrow, "position:y", 1.55, 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	if double:
+		Fx.elite_sparkle(m, Vector3(0, 0.2, 0), 0.8, 1.6)
+	for k in range(1, steps):
+		var idx := wrap_idx(hero_idx + k)
+		if idx == target:
+			break
+		var dot := MeshInstance3D.new()
+		var q := PlaneMesh.new()
+		q.size = Vector2(0.4, 0.4)
+		dot.mesh = q
+		var dm := Props.glow_material(Color(1.0, 0.9, 0.55), false, 1.0)
+		dm.albedo_texture = Props.particle_texture("hard")
+		dot.material_override = dm
+		dot.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		dot.position = tile_position(idx) + Vector3.UP * 0.14
+
+		dot.scale = Vector3.ONE * 0.01
+		_targets_root.add_child(dot)
+		var dt := dot.create_tween()
+		dt.tween_interval(0.035 * k)
+		dt.tween_property(dot, "scale", Vector3.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		dt.tween_property(dot, "scale", Vector3.ONE * 0.7, 0.5).set_trans(Tween.TRANS_SINE)
+
+
 func clear_targets() -> void:
 	if _targets_root == null:
 		return
@@ -317,17 +439,16 @@ func clear_targets() -> void:
 		c.queue_free()
 
 
-func _make_marker(idx: int, vals: Array, order: int) -> Node3D:
+func _make_marker(idx: int, vals: Array, order: int, big := 1.0, col := Color(1.0, 0.86, 0.45)) -> Node3D:
 	var root := Node3D.new()
 	root.name = "Target%02d" % idx
 	root.position = tile_position(idx)
-	var col := Color(1.0, 0.86, 0.45)
 	# pulsing ground ring
 	var ring := MeshInstance3D.new()
 	var pm := PlaneMesh.new()
 	pm.size = Vector2(1.9, 1.9)
 	ring.mesh = pm
-	var rm := Props.glow_material(col, true, 1.6)
+	var rm := Props.glow_material(col, true, 1.6 + (big - 1.0) * 2.5)
 	rm.albedo_texture = Props.particle_texture("ring")
 	ring.material_override = rm
 	ring.position.y = 0.03
@@ -341,24 +462,27 @@ func _make_marker(idx: int, vals: Array, order: int) -> Node3D:
 	var cm := CylinderMesh.new()
 	cm.top_radius = 0.62
 	cm.bottom_radius = 0.72
-	cm.height = 2.4
+	cm.height = 2.4 * big
 	cm.cap_top = false
 	cm.cap_bottom = false
 	beam.mesh = cm
 	var bm := ShaderMaterial.new()
 	bm.shader = preload("res://game/fx/shaders/beam.gdshader")
 	bm.set_shader_parameter("color", col)
-	bm.set_shader_parameter("alpha", 0.45)
+	bm.set_shader_parameter("alpha", 0.45 + 0.2 * (big - 1.0))
 	beam.material_override = bm
-	beam.position.y = 1.2
+	beam.position.y = 1.2 * big
 	beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	root.add_child(beam)
 	# die-face badge with the value(s)
 	var badge := Node3D.new()
-	badge.position.y = 1.45
-	badge.scale = Vector3.ONE * 1.9
+	badge.position.y = 1.45 * big
+	badge.scale = Vector3.ONE * 1.9 * big
 	root.add_child(badge)
-	var w := 0.62 + 0.36 * float(vals.size() - 1)
+	var chars := 0
+	for v in vals:
+		chars += str(v).length()
+	var w := 0.62 + 0.36 * float(vals.size() - 1) + 0.24 * float(chars - vals.size())
 	var face := MeshInstance3D.new()
 	var q := QuadMesh.new()
 	q.size = Vector2(w, 0.62)
@@ -400,14 +524,77 @@ func _make_marker(idx: int, vals: Array, order: int) -> Node3D:
 	lbl.position.y = -0.01
 	badge.add_child(lbl)
 	var bt := badge.create_tween().set_loops()
-	bt.tween_property(badge, "position:y", 1.55, 0.7).set_trans(Tween.TRANS_SINE)
-	bt.tween_property(badge, "position:y", 1.38, 0.7).set_trans(Tween.TRANS_SINE)
+	bt.tween_property(badge, "position:y", 1.55 * big, 0.7).set_trans(Tween.TRANS_SINE)
+	bt.tween_property(badge, "position:y", 1.38 * big, 0.7).set_trans(Tween.TRANS_SINE)
 	# pop in, staggered
 	root.scale = Vector3.ONE * 0.01
 	var pt := root.create_tween()
 	pt.tween_interval(0.06 * order)
 	pt.tween_property(root, "scale", Vector3.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	return root
+
+
+# --- biome change waves -----------------------------------------------------------------------
+
+## Ring distance of tile i from `from` (either way round).
+func _ring_dist(i: int, from: int) -> int:
+	var d := posmod(i - from, ring_size)
+	return mini(d, ring_size - d)
+
+
+## The board sinks away tile by tile, outward from `from` (the hero keeps standing).
+func sink_wave(from: int, duration := 0.9) -> void:
+	clear_targets()
+	var half := ring_size / 2
+	for i in ring_size:
+		if i == hero_idx:
+			continue
+		var n := _tile_nodes[i]
+		var delay := duration * 0.7 * float(_ring_dist(i, from)) / float(half)
+		var t := n.create_tween()
+		t.tween_interval(delay)
+		t.tween_property(n, "position:y", 0.12, 0.08)
+		t.tween_property(n, "position:y", -2.2, duration * 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+		t.parallel().tween_property(n, "scale", Vector3.ONE * 0.6, duration * 0.3)
+	var hp: Node3D = _props[hero_idx]
+	if hp:
+		var ht := hp.create_tween()
+		ht.tween_interval(duration * 0.4)
+		ht.tween_property(hp, "scale", Vector3.ONE * 0.01, 0.2)
+	await get_tree().create_timer(duration + 0.1).timeout
+
+
+## Hides every tile but the hero's (use before rise_wave()).
+func hide_tiles() -> void:
+	for i in ring_size:
+		if i == hero_idx:
+			continue
+		_tile_nodes[i].position.y = -2.2
+		_tile_nodes[i].scale = Vector3.ONE * 0.6
+		_tile_nodes[i].visible = false
+
+
+## The new board rises tile by tile, outward from `from`, each landing with a puff.
+func rise_wave(from: int, duration := 1.1) -> void:
+	var half := ring_size / 2
+	for i in ring_size:
+		var n := _tile_nodes[i]
+		if i == hero_idx:
+			pulse_tile(i)
+			continue
+		var delay := duration * 0.75 * float(_ring_dist(i, from)) / float(half)
+		var col := TileStyle.color(String(tiles[i].type))
+		var pos := tile_position(i)
+		var t := n.create_tween()
+		t.tween_interval(delay)
+		t.tween_callback(func() -> void: n.visible = true)
+		t.tween_property(n, "position:y", 0.18, duration * 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		t.parallel().tween_property(n, "scale", Vector3.ONE, duration * 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		t.tween_property(n, "position:y", 0.0, 0.18).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+		t.tween_callback(func() -> void:
+			Fx.burst(self, pos + Vector3.UP * 0.15, {"amount": 10, "lifetime": 0.45, "speed": Vector2(0.8, 2.0),
+				"size": 0.2, "color": col.lightened(0.35), "tex": "spark"}))
+	await get_tree().create_timer(duration + 0.45).timeout
 
 
 # --- hero -----------------------------------------------------------------------------------
@@ -449,7 +636,7 @@ func set_hero_class(id: String) -> void:
 
 ## Puts the hero on a tile instantly, turned toward the camera.
 func place_hero(idx: int) -> void:
-	hero_idx = posmod(idx, RING)
+	hero_idx = posmod(idx, ring_size)
 	hero.position = tile_position(hero_idx)
 	hero.rotation.y = _rest_yaw(hero_idx)
 	_shift_dressing_for_hero()
@@ -463,7 +650,7 @@ func hop_hero(path: Array, step_time := 0.28) -> void:
 	_restore_dressing(hero_idx)
 	_show_hero_ring(false)
 	for k in path.size():
-		var to_idx := posmod(int(path[k]), RING)
+		var to_idx := posmod(int(path[k]), ring_size)
 		var from := hero.position
 		var to := tile_position(to_idx)
 		var dir := to - from
@@ -500,7 +687,7 @@ func hop_hero(path: Array, step_time := 0.28) -> void:
 
 ## Teleports the hero to a tile through a portal swirl.
 func teleport_hero(idx: int) -> void:
-	idx = posmod(idx, RING)
+	idx = posmod(idx, ring_size)
 	Audio.play_sfx("portal")
 	_restore_dressing(hero_idx)
 	Fx.portal_swirl(self, hero.position + Vector3.UP * 0.7, 0.8, true)
@@ -562,7 +749,7 @@ func _shift_dressing_for_hero() -> void:
 	if n == null:
 		return
 	var type := String(tiles[hero_idx].type)
-	if type == "enemy" or type == "elite":
+	if type == "enemy" or type == "elite" or type == "miniboss":
 		return
 	var t := n.create_tween()
 	t.tween_property(n, "position", Vector3(0.0, TILE_TOP, -0.35), 0.25).set_trans(Tween.TRANS_SINE)
@@ -570,7 +757,7 @@ func _shift_dressing_for_hero() -> void:
 
 
 func _restore_dressing(idx: int) -> void:
-	var n: Node3D = _props[posmod(idx, RING)]
+	var n: Node3D = _props[posmod(idx, ring_size)]
 	if n == null:
 		return
 	var t := n.create_tween()
@@ -605,16 +792,18 @@ func hide_occluders(cam_xform: Transform3D, fov_deg: float, aspect: float, focus
 	hi += Vector2(0.12, 0.25)
 	var candidates: Array[Node3D] = []
 	var fx: Array[Node3D] = []
-	for holder_name in ["Dressing", "SetPiece"]:
+	for holder_name in ["Dressing", "SetPiece", "InnerCorners"]:
 		var holder := biome.get_node_or_null(holder_name)
 		if holder:
 			for c in holder.get_children():
+				if c.name == "Floor":
+					continue
 				if c is Light3D or c is GPUParticles3D:
 					fx.append(c)
 				elif c is Node3D:
 					candidates.append(c)
 	var sunk: Array[AABB] = []
-	for i in RING:
+	for i in ring_size:
 		if _props[i] and i != hero_idx:
 			candidates.append(_props[i])
 	for n in candidates:
@@ -654,7 +843,7 @@ func hide_occluders(cam_xform: Transform3D, fov_deg: float, aspect: float, focus
 ## Sinks tile dressing (props + enemy previews) within `radius` of a world point, except the
 ## hero's tile. Undo with restore_occluders().
 func clear_area(center: Vector3, radius: float) -> void:
-	for i in RING:
+	for i in ring_size:
 		var n: Node3D = _props[i]
 		if n == null or i == hero_idx or _hidden.has(n) or not n.visible:
 			continue

@@ -37,12 +37,13 @@ func _build(die: Die) -> void:
 	var head := UiTheme.hbox(8)
 	col.add_child(head)
 	head.add_child(RuneBadge.make(die.rune, 36))
-	var name := "Die %d" % (die_idx + 1)
-	var sub := "Plain" if die.rune == "" else String(Runes.DEFS[die.rune].name)
+	var kname := String(DiceKinds.def(die.kind).name)
+	var name := "%s %d" % [kname if die.kind != "standard" else "Die", die_idx + 1]
+	var sub := "No rune" if die.rune == "" else String(Runes.DEFS[die.rune].name)
 	var names := UiTheme.vbox(-6)
 	names.alignment = BoxContainer.ALIGNMENT_CENTER
 	head.add_child(names)
-	names.add_child(UiTheme.label(name, 22, UiPalette.TEXT, true, 0))
+	names.add_child(UiTheme.label(name, 22, UiPalette.kind_color(die.kind).lightened(0.35) if die.kind != "standard" else UiPalette.TEXT, true, 0))
 	names.add_child(UiTheme.label(sub, 18, UiPalette.rune_color(die.rune) if die.rune != "" else UiPalette.TEXT_MUTED, false, 0, false, 600))
 	var grid := GridContainer.new()
 	grid.columns = 6 if _compact else 3
@@ -54,6 +55,8 @@ func _build(die: Die) -> void:
 	for i in 6:
 		var f := DieFace.make(die.faces[i], die.rune, die.edited[i] == 1, 40)
 		f.star = false
+		f.kind = die.kind
+
 		grid.add_child(f)
 		faces.append(f)
 	mouse_entered.connect(func() -> void:

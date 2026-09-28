@@ -29,7 +29,8 @@ static func build(name: String) -> Node:
 	return root
 
 
-## 24 tiles in the contract shape for an act (deterministic).
+## 28 tiles (8x8 ring, corners 0/7/14/21) in the contract shape for an act (deterministic).
+## Act 2 also shows the mini-boss tile.
 static func mock_tiles(act: int) -> Array:
 	var pools := {
 		1: [["skeleton_minion"], ["skeleton_warrior"], ["skeleton_archer", "skeleton_minion"], ["bandit"],
@@ -38,9 +39,11 @@ static func mock_tiles(act: int) -> Array:
 		3: [["brute", "cultist"], ["skeleton_warrior", "skeleton_warrior"], ["cultist", "cultist", "bandit"],
 			["brute"], ["skeleton_archer", "skeleton_warrior"]],
 	}
-	var layout := ["start", "empty", "chest", "enemy", "event", "campfire", "forge", "enemy", "trap", "chest",
-		"enemy", "event", "treasury", "empty", "enemy", "campfire", "elite", "trap", "portal", "event", "enemy",
-		"chest", "empty", "enemy"]
+	var layout := ["start", "empty", "chest", "enemy", "event", "campfire", "enemy", "forge", "enemy", "trap",
+		"chest", "empty", "enemy", "event", "treasury", "empty", "enemy", "campfire", "elite", "chest", "trap",
+		"portal", "event", "enemy", "chest", "empty", "enemy", "event"]
+	if act == 2:
+		layout[11] = "miniboss"
 	var pool: Array = pools[clampi(act, 1, 3)]
 	var out := []
 	var e := 0
@@ -52,6 +55,8 @@ static func mock_tiles(act: int) -> Array:
 			e += 1
 		elif type == "elite":
 			t.enemies = [["skeleton_warrior"], ["brute"], ["cultist"]][clampi(act, 1, 3) - 1]
+		elif type == "miniboss":
+			t.enemies = ["mini_pumpkin_knight"]
 		out.append(t)
 	return out
 
@@ -142,14 +147,14 @@ class _Driver extends Node3D:
 				await get_tree().create_timer(maxf(wait - 0.2, 0.3)).timeout
 				board.set_tile(1, {"type": "enemy", "enemies": ["skeleton_warrior"]})
 				board.set_tile(2, {"type": "empty"})
-				board.set_tile(13, {"type": "elite", "enemies": ["brute"]})
-				board.set_tile(22, {"type": "chest"})
+				board.set_tile(15, {"type": "elite", "enemies": ["brute"]})
+				board.set_tile(25, {"type": "chest"})
 				board.pulse_tile(0)
 			"board_portal":
-				board.place_hero(18)
+				board.place_hero(21)
 				rig.follow(board.hero, true)
 				await get_tree().create_timer(maxf(wait - 0.4, 0.3)).timeout
-				await board.teleport_hero(22)
+				await board.teleport_hero(25)
 				board.set_hero_class("rogue")
 			"combat_act1", "combat_act2", "combat_act3", "boss_act1", "boss_act2", "boss_act3":
 				await _combat(act, wait)

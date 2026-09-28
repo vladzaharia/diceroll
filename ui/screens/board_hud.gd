@@ -1,21 +1,25 @@
 class_name BoardHud
 extends Control
-## Board-phase HUD. Top: HudTop (HP, XP/level, gold, treasury, act/lap, pause).
-## Bottom (just above the dice tray): ROLL in BOARD_READY; "Pick a die to move" + Reroll (n)
-## in BOARD_ROLLED. Hidden bottom bar in every other phase.
+## Board-phase HUD. Top: HudTop (HP, XP/level, gold, treasury, lap, passives, pause).
+## Bottom (just above the dice tray): ROLL in BOARD_READY. In BOARD_ROLLED the move is
+## automatic: a move pill shows the two moving dice and their sum ("5 + 5 = 10", DOUBLES!)
+## over a big GO button and Reroll (n). Hidden bottom bar in every other phase.
 ##
 ## Signals carry intent only; the integration layer calls GameFlow.
 
 signal roll_pressed
 signal reroll_pressed
+signal go_pressed
 signal pause_pressed
 
 var top: HudTop
 var roll_btn: GameButton
+var go_btn: GameButton
 var reroll_btn: GameButton
-var hint: PanelContainer
-var _hint_label: Label
+var move_pill: PanelContainer
+var _move_row: HBoxContainer
 var _bar: HBoxContainer
+var _col: VBoxContainer
 var _toast_holder: Control
 var _phase := -1
 ## True while the game plays events back: the bottom bar is hidden (input locked).
@@ -30,9 +34,19 @@ func _init() -> void:
 	top.pause_pressed.connect(func() -> void: pause_pressed.emit())
 	add_child(top)
 
+	_col = UiTheme.vbox(14)
+	add_child(_col)
+	move_pill = PanelContainer.new()
+	move_pill.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.panel_box("pill"), 22, 8))
+	move_pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	move_pill.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_col.add_child(move_pill)
+	_move_row = UiTheme.hbox(10)
+	_move_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	move_pill.add_child(_move_row)
 	_bar = UiTheme.hbox(16)
 	_bar.alignment = BoxContainer.ALIGNMENT_CENTER
-	add_child(_bar)
+	_col.add_child(_bar)
 
 	roll_btn = GameButton.make("ROLL", "dice", GameButton.Kind.PRIMARY, 54)
 	roll_btn.icon_tint = UiPalette.DIE_BODY
@@ -42,23 +56,20 @@ func _init() -> void:
 	roll_btn.pressed.connect(func() -> void: roll_pressed.emit())
 	_bar.add_child(roll_btn)
 
-	hint = PanelContainer.new()
-	hint.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.panel_box("pill"), 26, 14))
-	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hint.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	var hr := UiTheme.hbox(12)
-	hint.add_child(hr)
-	hr.add_child(UiIcons.rect("dice", 40))
-	_hint_label = UiTheme.label("Pick a die to move", 30, UiPalette.TEXT, true, 0, true)
-	hr.add_child(_hint_label)
-	_bar.add_child(hint)
-
 	reroll_btn = GameButton.make("REROLL", "reroll", GameButton.Kind.SECONDARY, 30)
 	reroll_btn.icon_tint = UiPalette.GOLD_BRIGHT
-	reroll_btn.min_height = 96
+	reroll_btn.min_height = 110
 	reroll_btn.pad_x = 26
 	reroll_btn.pressed.connect(func() -> void: reroll_pressed.emit())
 	_bar.add_child(reroll_btn)
+
+	go_btn = GameButton.make("GO", "arrow_right", GameButton.Kind.PRIMARY, 58)
+	go_btn.icon_tint = UiPalette.TEXT_DARK
+	go_btn.min_height = 120
+	go_btn.pad_x = 70
+	go_btn.sfx_id = "step"
+	go_btn.pressed.connect(func() -> void: go_pressed.emit())
+	_bar.add_child(go_btn)
 
 	_toast_holder = Control.new()
 	_toast_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -75,11 +86,25 @@ func _layout() -> void:
 		return
 	var safe := UiTheme.safe_margins(self)
 	var w := minf(UiTheme.MODAL_MAX_W, size.x - safe.left - safe.right)
-	_bar.reset_size()
-	var h := _bar.get_combined_minimum_size().y
+	_col.reset_size()
+	var h := _col.get_combined_minimum_size().y
+	var slot := UiTheme.side_slot(size)
+	if slot.size.x > 0.0:
+		# landscape: beside the tray, bottom-aligned, so the board keeps the height
+		_col.size = Vector2(slot.size.x, h)
+		_col.position = Vector2(slot.position.x, slot.end.y - h)
+		return
 	var bottom := size.y - UiTheme.tray_height(size) - 20.0
-	_bar.size = Vector2(w, h)
-	_bar.position = Vector2((size.x - w) * 0.5, bottom - h)
+	_col.size = Vector2(w, h)
+	_col.position = Vector2((size.x - w) * 0.5, bottom - h)
+
+
+## Top edge of the bottom controls in portrait (the board must stay above it); the tray
+## top in landscape, where the controls sit beside the tray.
+func content_top(view: Vector2) -> float:
+	if UiTheme.side_slot(view).size.x > 0.0:
+		return view.y - UiTheme.tray_height(view) - 20.0
+	return view.y - UiTheme.tray_height(view) - 20.0 - 214.0
 
 
 func refresh(flow: GameFlow) -> void:
@@ -89,39 +114,67 @@ func refresh(flow: GameFlow) -> void:
 	_phase = ph
 	var ready := ph == GameFlow.Phase.BOARD_READY
 	var rolled := ph == GameFlow.Phase.BOARD_ROLLED
-	_bar.visible = (ready or rolled) and not busy
+	_col.visible = (ready or rolled) and not busy
 	roll_btn.visible = ready
-	hint.visible = rolled
+	go_btn.visible = rolled
 	reroll_btn.visible = rolled
+	move_pill.visible = rolled
 	reroll_btn.sub_text = "%d left" % flow.board_rerolls_left
 	reroll_btn.set_enabled(flow.board_rerolls_left > 0)
+	if rolled:
+		_fill_move(flow)
 	_layout()
-	if changed and _bar.visible and is_inside_tree():
-		_bar.modulate.a = 0.0
+	if _col.visible and is_inside_tree() and (changed or rolled):
+		_col.modulate.a = 0.0
 		var t := create_tween()
-		t.tween_property(_bar, "modulate:a", 1.0, 0.18)
+		t.tween_property(_col, "modulate:a", 1.0, 0.18)
 		if ready:
 			UiTheme.pop(roll_btn, 1.08, 0.3)
 		else:
-			UiTheme.pop(hint, 1.08, 0.3)
+			UiTheme.pop(go_btn, 1.1, 0.3)
+			UiTheme.pop(move_pill, 1.12, 0.3)
+
+
+## "[5] + [5] = 10  DOUBLES!" for the current board roll (the two auto-picked dice).
+func _fill_move(flow: GameFlow) -> void:
+	UiTheme.clear(_move_row)
+	var ch := flow.board_choice
+	for k in ch.size():
+		var i := int(ch[k])
+		if k > 0:
+			_move_row.add_child(UiTheme.label("+", 34, UiPalette.TEXT_DIM, true, 4))
+		var die: Die = flow.run.dice[i] if i < flow.run.dice.size() else null
+		var f := DieFace.make(flow.board_roll[i] if i < flow.board_roll.size() else 0, die.rune if die else "", false, 56)
+		f.kind = die.kind if die else "standard"
+		_move_row.add_child(f)
+	_move_row.add_child(UiTheme.label("=", 34, UiPalette.TEXT_DIM, true, 4))
+	var steps := flow.board_move
+	_move_row.add_child(UiTheme.label(str(steps), 50, UiPalette.GOLD_BRIGHT, true, 8))
+	if flow.board_move == 0:
+		_move_row.add_child(UiTheme.label("STAY", 26, UiPalette.TEXT_DIM, true, 4))
+	elif flow.is_board_double():
+		var tag := PanelContainer.new()
+		tag.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(UiPalette.GOLD, 0.2), 12, 2, UiPalette.GOLD_BRIGHT), 10, 2))
+		tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		tag.add_child(UiTheme.label("DOUBLES!", 22, UiPalette.GOLD_BRIGHT, true, 4))
+		_move_row.add_child(tag)
+	elif flow.run.lap >= Balance.TOTAL_LAPS and flow.run.board.crosses_start(flow.run.pos, flow.board_move):
+		_move_row.add_child(UiTheme.label("BOSS!", 26, UiPalette.HP_BRIGHT, true, 4))
 
 
 ## Locks (hides) the bottom bar while events play; the next refresh() restores it.
 func set_busy(on: bool) -> void:
 	busy = on
 	if on:
-		_bar.visible = false
+		_col.visible = false
 
 
 func on_event(ev: Dictionary, flow: GameFlow) -> void:
 	top.on_event(ev, flow)
 	match String(ev.get("type", "")):
-		"board_rolled":
-			if int(ev.get("treasury_added", 0)) > 0:
-				toast("Doubles! +%d to the Treasury" % int(ev.treasury_added), "chest", UiPalette.GOLD_BRIGHT)
-		"lap_completed":
-			toast("Lap complete  +%d HP" % int(ev.get("healed", 0)), "flag", UiPalette.HEAL)
 		"trap":
+
 			toast("Trap dodged!" if bool(ev.dodged) else "Trap! -%d HP" % int(ev.damage), "skull",
 				UiPalette.HEAL if bool(ev.dodged) else UiPalette.HP_BRIGHT)
 

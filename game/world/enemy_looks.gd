@@ -24,6 +24,18 @@ const DEFS := {
 		"gear": {}, "clips": {}},
 	"brute": {"model": "mannequin_large", "tint": Color(0.46, 0.56, 0.32), "strength": 0.95, "scale": 1.05,
 		"gear": {}, "clips": {}},
+	# Mini-bosses: clearly stronger than elites (bigger, armoured, lit), smaller than the Lich.
+	"mini_pumpkin_knight": {"model": "knight", "tint": Color(0.22, 0.16, 0.14), "strength": 0.55, "scale": 1.3,
+		"emission": Color(0.1, 0.03, 0.0), "gear": {"handslot.r": ADV + "sword_2handed_color.gltf",
+		"handslot.l": ADV + "shield_spikes_color.gltf"}, "clips": {"attack": "Melee_2H_Attack_Chop"},
+		"pumpkin": true, "aura": Color(1.0, 0.5, 0.12), "miniboss": true},
+	"mini_bone_champion": {"model": "barbarian", "tint": Color(0.93, 0.9, 0.8), "strength": 0.85, "scale": 1.3,
+		"skeleton_head": true, "gear": {"handslot.r": ADV + "axe_2handed.gltf"},
+		"clips": {"attack": "Melee_2H_Attack_Chop"}, "aura": Color(0.75, 0.85, 1.0), "miniboss": true},
+	"mini_grave_mage": {"model": "mage", "tint": Color(0.16, 0.36, 0.26), "strength": 0.7, "scale": 1.3,
+		"emission": Color(0.02, 0.12, 0.06), "gear": {"handslot.r": ADV + "staff.gltf", "handslot.l": ADV + "spellbook_open.gltf"},
+		"clips": {"attack": "Ranged_Magic_Spellcasting"}, "skeleton_head": true, "aura": Color(0.35, 1.0, 0.55),
+		"miniboss": true},
 	"boss_bone_warden": {"model": "knight", "tint": Color(0.93, 0.89, 0.78), "strength": 0.8, "scale": 1.6,
 		"gear": {}, "clips": {}, "boss": true},
 	"boss_hollow_king": {"model": "barbarian", "tint": Color(0.45, 0.3, 0.22), "strength": 0.3, "scale": 1.6,
@@ -40,6 +52,10 @@ static func def(id: String) -> Dictionary:
 
 static func is_boss(id: String) -> bool:
 	return bool(def(id).get("boss", false))
+
+
+static func is_miniboss(id: String) -> bool:
+	return bool(def(id).get("miniboss", false))
 
 
 ## Scale multiplier relative to a normal unit (bosses 1.6).
@@ -75,8 +91,12 @@ static func create(id: String) -> Character:
 	ch.set_tint(d.tint, float(d.strength), d.get("emission", Color.BLACK))
 	if bool(d.get("skeleton", false)):
 		_skull_head(ch)
+	if bool(d.get("skeleton_head", false)):
+		_skull_head(ch, true)
 	if bool(d.get("pumpkin", false)):
 		_pumpkin_head(ch)
+	if d.has("aura"):
+		_aura(ch, d.aura)
 	if bool(d.get("glow", false)):
 		var l := OmniLight3D.new()
 		l.light_color = Color(0.7, 0.4, 1.0)
@@ -88,11 +108,30 @@ static func create(id: String) -> Character:
 	return ch
 
 
-static func _skull_head(ch: Character) -> void:
+static func _skull_head(ch: Character, replace := false) -> void:
+	if replace:
+		for m in ch.model.find_children("*", "MeshInstance3D", true, false):
+			var n := String(m.name).to_lower()
+			if n.contains("head") or n.contains("hat") or n.contains("hood"):
+				(m as MeshInstance3D).visible = false
 	var p := ch.attach("head", "res://assets/kaykit/halloween/skull.gltf")
 	if p:
-		p.scale = Vector3.ONE * 1.12
-		p.position = Vector3(0, 0.02, 0.06)
+		p.scale = Vector3.ONE * (1.25 if replace else 1.12)
+		p.position = Vector3(0, 0.08 if replace else 0.02, 0.06)
+
+
+## Mini-boss aura: a coloured rim light and slow rising motes around the figure.
+static func _aura(ch: Character, color: Color) -> void:
+	var l := OmniLight3D.new()
+	l.light_color = color
+	l.light_energy = 1.6
+	l.omni_range = 3.2
+	l.position = Vector3(0.0, 1.6, -0.9)
+	ch.add_child(l)
+	var motes := Fx.elite_sparkle(ch, Vector3(0, 0.1, 0), 0.75, 2.2)
+	(motes.process_material as ParticleProcessMaterial).color = color.lightened(0.2)
+
+
 
 
 static func _pumpkin_head(ch: Character) -> void:

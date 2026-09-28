@@ -55,6 +55,23 @@ const EPIC := Color("c070ff")
 const LEGENDARY := Color("ffb02e")
 
 const RARITY := {"common": COMMON, "rare": RARE, "epic": EPIC}
+const UNCOMMON := Color("6fd08c")
+const BOSS := Color("ffb43d")
+## Passive rarity -> frame colour (boss tier is the premium gold).
+const PASSIVE_RARITY := {"common": COMMON, "uncommon": UNCOMMON, "rare": RARE, "boss": BOSS}
+
+## Die kind -> [corner mark id (die.gdshader kind_mark), accent colour]. Standard has none.
+const KIND := {
+	"standard": [0, Color("c9b99a")],
+	"low": [1, Color("5aa7ff")],
+	"high": [2, Color("ff7a45")],
+	"even": [3, Color("39c9b4")],
+	"odd": [4, Color("c07aff")],
+	"loaded": [5, Color("e0a82e")],
+	"twin": [6, Color("ff6fae")],
+	"gambler": [7, Color("3fcf6a")],
+	"giant": [8, Color("ffb020")],
+}
 
 ## Die body colours.
 const DIE_BODY := Color("f7efe0")
@@ -81,6 +98,18 @@ static func rune_color(rune: String) -> Color:
 
 static func rarity_color(rarity: String) -> Color:
 	return RARITY.get(rarity, COMMON)
+
+
+static func passive_color(rarity: String) -> Color:
+	return PASSIVE_RARITY.get(rarity, COMMON)
+
+
+static func kind_color(kind: String) -> Color:
+	return KIND.get(kind, KIND["standard"])[1]
+
+
+static func kind_mark(kind: String) -> int:
+	return int(KIND.get(kind, KIND["standard"])[0])
 
 
 ## Readable text colour on top of `bg`.
