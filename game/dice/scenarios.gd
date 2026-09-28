@@ -4,6 +4,7 @@ extends RefCounted
 ##               unmarked dice are thrown at 0.4 s, then the marked ones, looping.
 ##               Use --wait=0.5 --frames=6 to capture mid-roll frames.
 ##  dice_tray_3  3 plain dice settled on 4 4 2 with the pair highlighted as a combo group.
+##  dice_tray_gallery  two trays showing all 12 rune looks, with edited (gold-rim) faces up.
 
 const MOCK_6 := [
 	{"faces": [1, 2, 3, 4, 6, 6], "rune": "", "edited": [0, 0, 0, 0, 1, 0]},
@@ -16,7 +17,7 @@ const MOCK_6 := [
 
 
 static func names() -> PackedStringArray:
-	return PackedStringArray(["dice_tray", "dice_tray_3"])
+	return PackedStringArray(["dice_tray", "dice_tray_3", "dice_tray_gallery"])
 
 
 static func build(name: String) -> Node:
@@ -68,6 +69,24 @@ class _Host:
 				tray.set_dice([plain, plain, plain])
 				tray.set_values([4, 4, 2])
 				tray.highlight_group([0, 1], Color(1.0, 0.8, 0.3))
+			"dice_tray_gallery":
+				_gallery()
+
+	func _gallery() -> void:
+		var runes := ["", "blade", "guard", "venom", "ember", "vampire", "lucky", "frost", "thunder", "echo", "heavy", "gilded"]
+		var trays: Array[DiceTray] = [tray, DiceTray.new()]
+		add_child(trays[1])
+		trays[1].position = tray.position - Vector2(0, tray.size.y + 20)
+		trays[1].size = tray.size
+		for t in 2:
+			var pool: Array = []
+			for k in 6:
+				var r: String = runes[t * 6 + k]
+				pool.append({"faces": [1, 2, 3, 4, 5, 6], "rune": r, "edited": [1 if k % 2 == 0 else 0, 0, 0, 0, 0, 0]})
+			trays[t].set_dice(pool)
+			trays[t].set_values([1, 2, 3, 4, 5, 6] if t == 0 else [6, 5, 4, 3, 2, 1])
+		var w := trays[0].dice[0]
+		w.set_data({"faces": [1, 2, 3, 4, 5, 6], "rune": "wild", "edited": [0, 0, 0, 0, 0, 0]})
 
 	func _place() -> void:
 		var vs := size if size.x > 0.0 else get_viewport_rect().size

@@ -22,7 +22,7 @@ void fragment() {
 	float fib = texture(noise_b, w * vec2(4.0, 3.7) + n1).r;
 	vec3 c = felt * (0.8 + 0.35 * n1) * (0.9 + 0.18 * n2) * (0.94 + 0.12 * fib);
 	float r = length((w - center) / vec2(1.0, 0.8)) / falloff;
-	c *= mix(1.08, 0.72, smoothstep(0.2, 1.1, r));
+	c *= mix(1.25, 0.7, smoothstep(0.0, 1.1, r));
 	float fres = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 2.5);
 	ALBEDO = c;
 	EMISSION = sheen * fres * 0.08;

@@ -15,7 +15,7 @@ signal die_pressed(idx: int)
 
 const FRAME_PX := 13.0
 const CORNER_PX := 26.0
-const MIN_SPACING := 1.42
+const MIN_SPACING := 1.38
 const MAX_SPACING := 1.9
 const PITCH_DEG := 60.0
 const FOV := 24.0
@@ -48,6 +48,8 @@ var _jitter: Array[Vector3] = []
 var _last_land_ms := 0
 var _land_count := 0
 var _oversample := 1.0
+var _half_w := 4.0
+var _air := 1.0
 
 
 func _init() -> void:
@@ -89,21 +91,21 @@ func _build_world() -> void:
 	var sky := Sky.new()
 	var sm := ProceduralSkyMaterial.new()
 	sm.sky_top_color = Color(0.32, 0.36, 0.5)
-	sm.sky_horizon_color = Color(0.85, 0.7, 0.5)
+	sm.sky_horizon_color = Color(0.5, 0.42, 0.33)
 	sm.ground_bottom_color = Color(0.08, 0.07, 0.06)
-	sm.ground_horizon_color = Color(0.45, 0.35, 0.25)
+	sm.ground_horizon_color = Color(0.25, 0.2, 0.15)
 	sm.sun_angle_max = 20.0
 	sky.sky_material = sm
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.ambient_light_energy = 0.55
+	env.ambient_light_energy = 0.7
 	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.tonemap_exposure = 1.0
 	env.glow_enabled = true
-	env.glow_intensity = 0.55
+	env.glow_intensity = 0.45
 	env.glow_bloom = 0.03
-	env.glow_hdr_threshold = 1.0
+	env.glow_hdr_threshold = 1.4
 	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SCREEN
 	env.ssao_enabled = true
 	env.ssao_radius = 0.6
@@ -122,7 +124,7 @@ func _build_world() -> void:
 	key.directional_shadow_max_distance = 40.0
 	key.shadow_bias = 0.03
 	_viewport.add_child(key)
-	key.transform = Transform3D(Basis.looking_at(Vector3(0.55, -1.0, 0.5).normalized(), Vector3.UP), Vector3.ZERO)
+	key.transform = Transform3D(Basis.looking_at(Vector3(0.5, -1.0, -0.4).normalized(), Vector3.UP), Vector3.ZERO)
 	var fill := DirectionalLight3D.new()
 	fill.light_color = Color(0.62, 0.72, 1.0)
 	fill.light_energy = 0.3
@@ -132,7 +134,7 @@ func _build_world() -> void:
 	back.light_color = Color(1.0, 0.85, 0.65)
 	back.light_energy = 0.45
 	_viewport.add_child(back)
-	back.transform = Transform3D(Basis.looking_at(Vector3(0.1, -0.5, 1.0).normalized(), Vector3.UP), Vector3.ZERO)
+	back.transform = Transform3D(Basis.looking_at(Vector3(-0.3, -0.6, 0.8).normalized(), Vector3.UP), Vector3.ZERO)
 
 	var pm := PlaneMesh.new()
 	pm.size = Vector2(80, 80)
@@ -218,18 +220,22 @@ func roll(values: Array[int], indices: Array[int]) -> void:
 		return
 	_rolling = true
 	_land_count = 0
-	var throw_x := _rng.randf_range(0.6, 1.1) * (1.0 if _rng.randf() < 0.5 else -1.0)
-	var throw := Vector3(throw_x, 0.0, _rng.randf_range(-0.9, -0.5))
+	var throw_x := _rng.randf_range(0.25, 0.55) * (1.0 if _rng.randf() < 0.5 else -1.0)
+	var throw := Vector3(throw_x, 0.0, _rng.randf_range(-0.8, -0.45) * _air)
 	var order := todo.duplicate()
 	order.shuffle()
 	for j in todo.size():
 		var i := todo[j]
 		var d := dice[i]
 		_jitter[i] = Vector3(_rng.randf_range(-0.1, 0.1) * _spacing / MIN_SPACING, 0.0, _rng.randf_range(-0.14, 0.14))
-		var drift := throw + Vector3(_rng.randf_range(-0.15, 0.15), 0.0, _rng.randf_range(-0.15, 0.15))
+		var drift := throw + Vector3(_rng.randf_range(-0.1, 0.1), 0.0, _rng.randf_range(-0.15, 0.15))
+		# Keep the arc inside the visible felt for dice at the ends of the row.
+		var mid_x := (d.position.x + _slot_pos(i).x) * 0.5
+		drift.x -= mid_x * 0.12  # converge slightly toward the middle
+		drift.x = clampf(mid_x + drift.x, -_half_w + 1.45, _half_w - 1.45) - mid_x
 		var delay := 0.055 * float(order.find(i)) + _rng.randf_range(0.0, 0.03)
 		var dur := roll_duration * _rng.randf_range(0.9, 1.12)
-		var apex := _rng.randf_range(1.05, 1.35)
+		var apex := _rng.randf_range(1.05, 1.35) * _air
 		d.start_roll(vals[j], _slot_pos(i), _rng, delay, dur, drift, apex)
 	_play("dice_roll", 0.0)
 
@@ -425,14 +431,17 @@ func _layout() -> void:
 	var n := dice.size()
 	var aspect := _view.size.x / _view.size.y
 	var tan_v := tan(deg_to_rad(FOV * 0.5))
-	var need_w := (float(maxi(n, 4)) * MIN_SPACING) * 0.5 + 0.45
-	var need_h := 1.45
+	var need_w := (float(maxi(n, 4)) * MIN_SPACING) * 0.5 + 0.3
+	var need_h := 1.6
 	var dist := maxf(need_w / (tan_v * aspect), need_h / tan_v)
 	var pitch := deg_to_rad(PITCH_DEG)
-	var target := Vector3(0.0, 0.55, -0.3)
+	var target := Vector3(0.0, 0.55, -0.12)
 	_camera.position = target + Vector3(0.0, sin(pitch), cos(pitch)) * dist
 	_camera.rotation = Vector3(-pitch, 0.0, 0.0)
 	var vis_w := dist * tan_v * aspect * 2.0
+	_half_w = vis_w * 0.5
+	# Short (landscape) trays get lower arcs so dice stay inside the frame.
+	_air = clampf((dist * tan_v - 0.9) / 1.0, 0.5, 1.0)
 	_spacing = clampf((vis_w - 1.1) / maxf(float(n), 1.0), MIN_SPACING, MAX_SPACING)
 	_slots.clear()
 	for i in n:

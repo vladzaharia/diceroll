@@ -63,7 +63,16 @@ func _run() -> void:
 			if got != want or flat < 0.9999 or square < 0.99:
 				fails += 1
 				printerr("FAIL roll %d die %d: want %d got %d flat %.5f square %.4f" % [r, i, want, got, flat, square])
-	print("dice tray check: %d rolls, %d failures" % [ROLLS, fails])
+	# Picking: the centre of each die's screen rect must hit that die.
+	var pick_fails := 0
+	for i in tray.dice.size():
+		var r := tray.get_die_screen_rect(i)
+		var got := tray._pick(r.get_center() - tray.global_position)
+		if r.size.x < 10.0 or got != i:
+			pick_fails += 1
+			printerr("FAIL pick die %d: rect %s picked %d" % [i, r, got])
+	fails += pick_fails
+	print("dice tray check: %d rolls + %d picks, %d failures" % [ROLLS, tray.dice.size(), fails])
 	tray.queue_free()
 	await process_frame
 	await process_frame

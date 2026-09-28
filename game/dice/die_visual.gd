@@ -13,12 +13,12 @@ signal landed(strength: float)
 ## Rune look: body, bevel/edge, pips, rim (emissive), metallic, roughness, clearcoat.
 const RUNE_LOOKS := {
 	"": [Color(0.96, 0.93, 0.85), Color(0.9, 0.82, 0.68), Color(0.08, 0.065, 0.06), Color(0, 0, 0), 0.0, 0.32, 0.65],
-	"blade": [Color(0.8, 0.17, 0.14), Color(0.55, 0.08, 0.07), Color(0.99, 0.95, 0.88), Color(1.0, 0.35, 0.25), 0.0, 0.3, 0.6],
-	"guard": [Color(0.22, 0.45, 0.85), Color(0.12, 0.26, 0.6), Color(0.99, 0.96, 0.9), Color(0.45, 0.72, 1.0), 0.0, 0.3, 0.6],
+	"blade": [Color(0.74, 0.12, 0.11), Color(0.55, 0.08, 0.07), Color(0.99, 0.95, 0.88), Color(1.0, 0.35, 0.25), 0.0, 0.3, 0.6],
+	"guard": [Color(0.17, 0.38, 0.8), Color(0.12, 0.26, 0.6), Color(0.99, 0.96, 0.9), Color(0.45, 0.72, 1.0), 0.0, 0.3, 0.6],
 	"venom": [Color(0.28, 0.66, 0.3), Color(0.14, 0.4, 0.16), Color(0.98, 0.97, 0.88), Color(0.45, 1.0, 0.35), 0.0, 0.32, 0.6],
-	"ember": [Color(0.97, 0.52, 0.15), Color(0.75, 0.26, 0.05), Color(0.2, 0.07, 0.02), Color(1.0, 0.55, 0.12), 0.0, 0.3, 0.6],
+	"ember": [Color(0.94, 0.45, 0.1), Color(0.75, 0.26, 0.05), Color(0.2, 0.07, 0.02), Color(1.0, 0.55, 0.12), 0.0, 0.3, 0.6],
 	"vampire": [Color(0.5, 0.05, 0.12), Color(0.28, 0.02, 0.06), Color(0.99, 0.93, 0.88), Color(1.0, 0.12, 0.25), 0.0, 0.26, 0.7],
-	"lucky": [Color(0.97, 0.84, 0.36), Color(0.8, 0.6, 0.18), Color(0.1, 0.22, 0.08), Color(1.0, 0.86, 0.35), 0.0, 0.3, 0.6],
+	"lucky": [Color(0.86, 0.9, 0.55), Color(0.55, 0.66, 0.25), Color(0.04, 0.36, 0.14), Color(0.6, 1.0, 0.45), 0.35, 0.28, 0.6],
 	"frost": [Color(0.78, 0.93, 0.99), Color(0.52, 0.77, 0.92), Color(0.06, 0.2, 0.42), Color(0.6, 0.93, 1.0), 0.0, 0.18, 0.85],
 	"thunder": [Color(0.99, 0.88, 0.25), Color(0.85, 0.62, 0.08), Color(0.13, 0.1, 0.28), Color(1.0, 0.98, 0.45), 0.0, 0.3, 0.6],
 	"echo": [Color(0.48, 0.3, 0.76), Color(0.28, 0.15, 0.5), Color(0.99, 0.96, 0.92), Color(0.78, 0.55, 1.0), 0.0, 0.28, 0.65],
@@ -156,18 +156,18 @@ func _apply_look() -> void:
 
 func _build_chains() -> void:
 	var link_mat := StandardMaterial3D.new()
-	link_mat.albedo_color = Color(0.3, 0.27, 0.34)
+	link_mat.albedo_color = Color(0.55, 0.5, 0.62)
 	link_mat.metallic = 0.9
 	link_mat.roughness = 0.35
 	link_mat.emission_enabled = true
 	link_mat.emission = LOCK_TINT
-	link_mat.emission_energy_multiplier = 0.35
+	link_mat.emission_energy_multiplier = 0.7
 	var torus := TorusMesh.new()
-	torus.inner_radius = 0.045
-	torus.outer_radius = 0.085
+	torus.inner_radius = 0.055
+	torus.outer_radius = 0.1
 	torus.rings = 12
 	torus.ring_segments = 6
-	var half := 0.6
+	var half := 0.62
 	var per_side := 5
 	for side in 4:
 		for k in per_side:

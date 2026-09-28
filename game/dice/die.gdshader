@@ -151,7 +151,7 @@ void fragment() {
 	bump.xy += tilt;
 	vec3 pip_shade = pip_col * (0.75 + 0.5 * inside);
 	albedo = mix(albedo, pip_shade, pip_mask);
-	rough = mix(rough, 0.45, pip_mask);
+	rough = mix(rough, 0.6, pip_mask);
 	metal = mix(metal, 0.0, pip_mask);
 
 	// --- gold rim on edited faces ----------------------------------------------
@@ -194,11 +194,9 @@ void fragment() {
 	ALBEDO = albedo;
 	ROUGHNESS = rough;
 	METALLIC = metal;
-	SPECULAR = 0.55;
+	SPECULAR = mix(0.55, 0.15, pip_mask);
 	CLEARCOAT = clearcoat * (1.0 - pip_mask);
 	CLEARCOAT_ROUGHNESS = 0.12;
 	BACKLIGHT = body_color * 0.18;
-	RIM = 0.15;
-	RIM_TINT = 0.6;
 	EMISSION = emission;
 }
