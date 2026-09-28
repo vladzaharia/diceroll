@@ -5,7 +5,7 @@ extends Node3D
 ##
 ##   var board := BoardView.new()
 ##   add_child(board)
-##   board.build(1, tiles)            # tiles: N x {type, enemies:Array[String], elite:bool}
+##   board.build("glade", tiles)      # biome id; tiles: N x {type, enemies:Array[String], elite:bool}
 ##   board.show_targets([4, 7], [4, 7])
 ##   await board.hop_hero([1, 2, 3, 4])
 ##
@@ -26,7 +26,8 @@ const PREVIEW_SCALE := 0.44
 const TILE_MESH := "res://assets/kaykit/boardgame/tile_blue.gltf"
 const TILE_SHADER := preload("res://game/world/shaders/atlas_tint.gdshader")
 
-var act := 1
+## Biome id being shown (see Biome.IDS).
+var biome_id := "crypt"
 ## Number of ring tiles (4(n-1)) and the grid side n; set by build().
 var ring_size := DEFAULT_RING
 var side := DEFAULT_RING / 4 + 1
@@ -53,10 +54,11 @@ func _init() -> void:
 	name = "BoardView"
 
 
-## Builds (or rebuilds) the biome, the ring and the hero. `tiles` uses the core contract
-## shape; missing entries default to empty tiles.
-func build(p_act: int, p_tiles: Array) -> void:
-	act = clampi(p_act, 1, 3)
+## Builds (or rebuilds) the biome, the ring and the hero. `p_biome` is a biome id (an int is
+## read as a legacy act number). `tiles` uses the core contract shape; missing entries
+## default to empty tiles.
+func build(p_biome: Variant, p_tiles: Array) -> void:
+	biome_id = Biome.id_of(p_biome)
 	for c in get_children():
 		c.queue_free()
 	_tile_nodes.clear()
@@ -71,7 +73,7 @@ func build(p_act: int, p_tiles: Array) -> void:
 	side = ring_size / 4 + 1
 	for i in ring_size:
 		tiles.append(_norm(p_tiles[i] if i < p_tiles.size() else {}))
-	biome = Biome.build(act, ring_extent())
+	biome = Biome.build(biome_id, ring_extent())
 	add_child(biome)
 	_tiles_root = Node3D.new()
 	_tiles_root.name = "Tiles"
@@ -180,7 +182,7 @@ func _build_tile(i: int) -> void:
 	base.name = "Base"
 	var bw := 2.02 if corner else 1.94
 	base.scale = Vector3(bw, 1.9 if corner else 1.75, bw)
-	var bmat := _tile_material(Color(0.8, 0.62, 0.34) if corner else TileStyle.BASE[act], base)
+	var bmat := _tile_material(Color(0.8, 0.62, 0.34) if corner else TileStyle.base_color(biome_id), base)
 	bmat.set_shader_parameter("roughness", 0.95)
 	root.add_child(base)
 	var top := Props.inst(TILE_MESH)

@@ -3,8 +3,12 @@ extends RefCounted
 ## Builds everything around the board for an act: sky/fog/post, lights, the floating
 ## island, edge dressing, the centre set piece and ambient particles.
 ##
-##   var world := Biome.build(1, board.ring_extent())    # 1 crypt, 2 hollow, 3 throne
+##   var world := Biome.build("frost", board.ring_extent())
 ##   add_child(world)
+##
+## Biomes are picked by id (BiomeDefs ids: crypt, hollow, throne, glade, frost, magma). An int
+## is still accepted and read as a legacy act number (1 crypt, 2 hollow, 3 throne). The three
+## BlockBits biomes (glade, frost, magma) are dressed in BiomeBlocks.
 ##
 ## Layout contract (world units): the dressing is authored for a 7x7 ring whose outer tile
 ## edge is at |x|,|z| = BASE_EXTENT (7.35). build() scales the layout to the real ring
@@ -13,7 +17,9 @@ extends RefCounted
 ## centre set piece scales up a little. The set piece stays within r ~2.4 * s, so the moat
 ## between it and the ring (combat staging) is free.
 
+## Legacy act number -> biome id (old saves, act-only callers).
 const NAMES := {1: "crypt", 2: "hollow", 3: "throne"}
+const IDS := ["glade", "crypt", "hollow", "frost", "throne", "magma"]
 const ISLAND_HALF := 11.0
 ## Outer ring edge the dressing layout was authored for (7x7 ring, PITCH 2.1).
 const BASE_EXTENT := 7.35
@@ -21,9 +27,9 @@ const BASE_EXTENT := 7.35
 ## Layout scale for the biome being built (see build()).
 static var _s := 1.0
 
-## Per-act look. Colours are sRGB.
+## Per-biome look. Colours are sRGB.
 const LOOKS := {
-	1: {
+	"crypt": {
 		"sky_top": Color(0.09, 0.1, 0.22), "sky_horizon": Color(0.42, 0.27, 0.3),
 		"sky_bottom": Color(0.07, 0.05, 0.1), "sky_glow": Color(1.0, 0.62, 0.35),
 		"glow_strength": 0.35, "stars": 0.35,
@@ -37,7 +43,7 @@ const LOOKS := {
 		"particles": "dust", "light": Color(1.0, 0.6, 0.28),
 		"cloud_deep": Color(0.2, 0.13, 0.22), "cloud_light": Color(0.5, 0.34, 0.42), "cloud_rim": Color(1.0, 0.6, 0.4),
 	},
-	2: {
+	"hollow": {
 		"sky_top": Color(0.2, 0.15, 0.36), "sky_horizon": Color(0.98, 0.5, 0.26),
 		"sky_bottom": Color(0.16, 0.08, 0.12), "sky_glow": Color(1.0, 0.72, 0.36),
 		"glow_strength": 0.9, "stars": 0.0,
@@ -51,7 +57,7 @@ const LOOKS := {
 		"particles": "fireflies", "light": Color(1.0, 0.55, 0.2),
 		"cloud_deep": Color(0.26, 0.12, 0.24), "cloud_light": Color(0.82, 0.46, 0.44), "cloud_rim": Color(1.0, 0.8, 0.5),
 	},
-	3: {
+	"throne": {
 		"sky_top": Color(0.04, 0.04, 0.12), "sky_horizon": Color(0.12, 0.3, 0.38),
 		"sky_bottom": Color(0.03, 0.03, 0.07), "sky_glow": Color(0.55, 0.35, 1.0),
 		"glow_strength": 0.5, "stars": 1.0,
@@ -68,45 +74,67 @@ const LOOKS := {
 }
 
 
-static func look(act: int) -> Dictionary:
-	return LOOKS[clampi(act, 1, 3)]
+## Biome id for an id or a legacy act number (unknown ids fall back to the crypt).
+static func id_of(b: Variant) -> String:
+	if b is int or b is float:
+		return String(NAMES[clampi(int(b), 1, 3)])
+	var s := String(b)
+	return s if LOOKS.has(s) or BiomeBlocks.LOOKS.has(s) else "crypt"
 
 
-static func build(act: int, extent := BASE_EXTENT) -> Node3D:
-	act = clampi(act, 1, 3)
+static func look(b: Variant) -> Dictionary:
+	var id := id_of(b)
+	return LOOKS[id] if LOOKS.has(id) else BiomeBlocks.LOOKS[id]
+
+
+## Stable per-biome number (mesh seeds).
+static func seed_of(id: String) -> int:
+	return IDS.find(id) + 1
+
+
+static func build(b: Variant, extent := BASE_EXTENT) -> Node3D:
+	var id := id_of(b)
 	_s = maxf(extent / BASE_EXTENT, 0.6)
 	var root := Node3D.new()
-	root.name = "Biome_" + String(NAMES[act])
-	var lk := look(act)
-	root.add_child(make_environment(act))
+	root.name = "Biome_" + id
+	var lk := look(id)
+	root.add_child(make_environment(id))
 	_add_lights(root, lk)
 	var island := MeshInstance3D.new()
 	island.name = "Island"
-	island.mesh = island_mesh(ISLAND_HALF * _s, 13.0 * sqrt(_s), lk.island_top, lk.island_side, lk.island_bottom, act * 17)
+	var sd := seed_of(id)
+	island.mesh = island_mesh(ISLAND_HALF * _s, 13.0 * sqrt(_s), lk.island_top, lk.island_side, lk.island_bottom, sd * 17)
 	root.add_child(island)
-	_add_floating_rocks(root, lk, act)
-	root.add_child(_cloud_sea(lk))
+	_add_floating_rocks(root, lk, sd)
+	root.add_child(_lava_sea() if String(lk.get("sea", "clouds")) == "lava" else _cloud_sea(lk))
 	var dressing := Node3D.new()
 	dressing.name = "Dressing"
 	root.add_child(dressing)
 	var centre := Node3D.new()
 	centre.name = "SetPiece"
 	root.add_child(centre)
-	match act:
-		1:
+	match id:
+		"crypt":
 			_crypt(dressing, centre)
-		2:
+		"hollow":
 			_hollow(dressing, centre)
-		3:
+		"throne":
 			_throne(dressing, centre)
+		_:
+			BiomeBlocks.dress(id, root, dressing, centre)
 	_spread(dressing)
 	centre.scale = Vector3.ONE * minf(1.0 + (_s - 1.0) * 1.4, 1.45)
 	if _s > 1.05:
-		_inner_corners(root, act, centre.scale.x)
+		_inner_corners(root, id, centre.scale.x)
 	var amb := ambient_particles(String(lk.particles))
 	amb.scale = Vector3(_s, 1.0, _s)
 	root.add_child(amb)
 	return root
+
+
+## Current layout scale (dressing spreads by it; see build()).
+static func layout_scale() -> float:
+	return _s
 
 
 ## Spreads authored dressing out to the real ring size: positions scale by _s in x/z and
@@ -117,7 +145,7 @@ static func _spread(d: Node3D) -> void:
 		return
 	for c in d.get_children():
 		var n := c as Node3D
-		if n == null or n.name == "Floor":
+		if n == null or n.name == "Floor" or n.has_meta("prescaled"):
 			continue
 		n.position.x *= _s
 		n.position.z *= _s
@@ -130,8 +158,8 @@ static func _spread(d: Node3D) -> void:
 
 # --- environment -------------------------------------------------------------------
 
-static func make_environment(act: int) -> WorldEnvironment:
-	var lk := look(act)
+static func make_environment(b: Variant) -> WorldEnvironment:
+	var lk := look(b)
 	var sky_mat := ShaderMaterial.new()
 	sky_mat.shader = preload("res://game/world/shaders/sky.gdshader")
 	sky_mat.set_shader_parameter("top_color", lk.sky_top)
@@ -154,7 +182,7 @@ static func make_environment(act: int) -> WorldEnvironment:
 	env.tonemap_exposure = lk.exposure
 	env.glow_enabled = true
 	env.glow_normalized = true
-	env.glow_intensity = 0.7
+	env.glow_intensity = float(lk.get("glow", 0.7))
 	env.glow_strength = 1.0
 	env.glow_bloom = 0.04
 	env.glow_hdr_threshold = 0.9
@@ -289,14 +317,36 @@ static func _cloud_sea(lk: Dictionary) -> MeshInstance3D:
 	return mi
 
 
-static func _add_floating_rocks(root: Node3D, lk: Dictionary, act: int) -> void:
+## The glowing lava ocean under the Magma island (replaces the cloud sea).
+static func _lava_sea() -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.name = "LavaSea"
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(400, 400)
+	mi.mesh = pm
+	var m := BiomeBlocks.lava_material(0.16, 1.2, 0.36)
+	m.set_shader_parameter("speed", 0.03)
+	mi.material_override = m
+	mi.position.y = -12.0
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var l := OmniLight3D.new()
+	l.light_color = Color(1.0, 0.4, 0.12)
+	l.light_energy = 3.0
+	l.omni_range = 16.0
+	l.omni_attenuation = 1.2
+	l.position = Vector3(0, 2.5, 0)
+	mi.add_child(l)
+	return mi
+
+
+static func _add_floating_rocks(root: Node3D, lk: Dictionary, sd: int) -> void:
 	var spots := [Vector3(-15.5, -3.5, -9.0), Vector3(15.0, -5.0, -12.0), Vector3(-13.0, -7.0, 9.0),
 		Vector3(16.5, -2.0, 4.0), Vector3(-6.0, -4.0, -17.0), Vector3(8.0, -6.5, -18.0)]
 	for i in spots.size():
 		spots[i] = Vector3(spots[i].x * _s, spots[i].y, spots[i].z * _s)
 		var mi := MeshInstance3D.new()
 		var h := 0.9 + 0.35 * float(i % 3)
-		mi.mesh = island_mesh(h, h * 2.2, lk.island_top, lk.island_side, lk.island_bottom, act * 31 + i)
+		mi.mesh = island_mesh(h, h * 2.2, lk.island_top, lk.island_side, lk.island_bottom, sd * 31 + i)
 		mi.position = spots[i]
 		mi.rotation.y = float(i) * 1.3
 		mi.set_meta("bob", i)
@@ -423,6 +473,48 @@ static func ambient_particles(kind: String) -> GPUParticles3D:
 			col = Color(1.0, 0.8, 0.3, 1.0)
 			size = 0.13
 			tex = "hard"
+		"pollen":
+			p.amount = 70
+			p.lifetime = 9.0
+			pm.initial_velocity_min = 0.05
+			pm.initial_velocity_max = 0.2
+			pm.gravity = Vector3(0.04, 0.02, 0.0)
+			pm.turbulence_enabled = true
+			pm.turbulence_noise_strength = 0.7
+			pm.turbulence_noise_scale = 2.5
+			col = Color(1.0, 0.95, 0.65, 0.8)
+			size = 0.08
+		"snow":
+			p.amount = 260
+			p.lifetime = 9.0
+			p.position = Vector3(0, 7.0, 0)
+			pm.emission_box_extents = Vector3(13.0, 1.0, 13.0)
+			pm.direction = Vector3.DOWN
+			pm.spread = 20.0
+			pm.initial_velocity_min = 0.6
+			pm.initial_velocity_max = 1.0
+			pm.gravity = Vector3(0.12, -0.25, 0.05)
+			pm.turbulence_enabled = true
+			pm.turbulence_noise_strength = 0.35
+			pm.turbulence_noise_scale = 3.0
+			col = Color(1.0, 1.0, 1.0, 0.95)
+			size = 0.11
+			tex = "hard"
+		"embers":
+			p.amount = 110
+			p.lifetime = 6.0
+			p.position = Vector3(0, 0.5, 0)
+			pm.direction = Vector3.UP
+			pm.spread = 25.0
+			pm.initial_velocity_min = 0.4
+			pm.initial_velocity_max = 1.1
+			pm.gravity = Vector3(0.05, 0.25, 0.0)
+			pm.turbulence_enabled = true
+			pm.turbulence_noise_strength = 0.9
+			pm.turbulence_noise_scale = 2.2
+			col = Color(1.0, 0.55, 0.15, 1.0)
+			size = 0.1
+			tex = "hard"
 		"wisps":
 			p.amount = 70
 			p.lifetime = 8.0
@@ -437,6 +529,9 @@ static func ambient_particles(kind: String) -> GPUParticles3D:
 	var grad := Gradient.new()
 	grad.offsets = PackedFloat32Array([0.0, 0.2, 0.75, 1.0])
 	grad.colors = PackedColorArray([Color(col, 0.0), col, col, Color(col, 0.0)])
+	if kind == "embers":
+		grad.colors = PackedColorArray([Color(1.0, 0.9, 0.5, 0.0), Color(1.0, 0.75, 0.3, 1.0),
+			Color(1.0, 0.35, 0.08, 0.9), Color(0.6, 0.1, 0.05, 0.0)])
 	if kind == "wisps":
 		grad.colors = PackedColorArray([Color(0.6, 0.4, 1.0, 0.0), Color(0.6, 0.45, 1.0, 0.9),
 			Color(0.4, 1.0, 0.9, 0.8), Color(0.4, 1.0, 0.9, 0.0)])
@@ -447,7 +542,7 @@ static func ambient_particles(kind: String) -> GPUParticles3D:
 	pm.scale_max = 1.3
 	p.process_material = pm
 	p.preprocess = 8.0
-	p.visibility_aabb = AABB(Vector3(-14, -4, -14), Vector3(28, 10, 28))
+	p.visibility_aabb = AABB(Vector3(-14, -9, -14), Vector3(28, 18, 28))
 	var q := QuadMesh.new()
 	q.size = Vector2(size, size)
 	q.material = Props.particle_material(tex)
@@ -611,7 +706,7 @@ static func _throne(d: Node3D, c: Node3D) -> void:
 
 ## Larger rings leave a wider moat: low, lit props on its four inner corners keep it
 ## dressed (they sit off the combat lanes and are sunk by the occluder pass if needed).
-static func _inner_corners(root: Node3D, act: int, k: float) -> void:
+static func _inner_corners(root: Node3D, id: String, k: float) -> void:
 	var holder := Node3D.new()
 	holder.name = "InnerCorners"
 	root.add_child(holder)
@@ -622,22 +717,24 @@ static func _inner_corners(root: Node3D, act: int, k: float) -> void:
 		for sz in [-1.0, 1.0]:
 			var p := Vector3(sx * r, 0.0, sz * r)
 			var yaw := rad_to_deg(atan2(-sx, -sz))
-			match act:
-				1:
+			match id:
+				"crypt":
 					Props.put(holder, D + "pillar.gltf", p, yaw, 0.32)
 					Props.put(holder, D + "candle_triple.gltf", p + Vector3(0, 1.28, 0), yaw, 0.7)
 					flame(holder, p + Vector3(0, 1.9, 0), Color(1.0, 0.6, 0.25), 0.18, 5)
 					Props.put(holder, D + "barrel_small.gltf", p + Vector3(-sx * 0.75, 0, sz * 0.15), yaw, 0.55)
-				2:
+				"hollow":
 					Props.put(holder, H + "pumpkin_orange_jackolantern.gltf", p, yaw, 0.62)
 					Props.put(holder, H + "gravemarker_A.gltf", p + Vector3(-sx * 0.2, 0, -sz * 0.75), yaw + 10.0, 0.7)
 					Props.put(holder, H + "pumpkin_yellow_small.gltf", p + Vector3(-sx * 0.7, 0, sz * 0.1), yaw, 0.7)
 					flicker_light(holder, p + Vector3(0, 0.7, 0), Color(1.0, 0.5, 0.15), 1.2, 3.2)
-				_:
+				"throne":
 					Props.put(holder, H + "skull_candle.gltf", p, yaw, 0.85)
 					Props.put(holder, H + "bone_B.gltf", p + Vector3(-sx * 0.6, 0, sz * 0.2), yaw + 40.0, 0.7)
 					flame(holder, p + Vector3(0, 1.15, 0), Color(0.62, 0.4, 1.0), 0.18, 5)
 					flicker_light(holder, p + Vector3(0, 1.3, 0), Color(0.65, 0.4, 1.0), 1.2, 3.2)
+				_:
+					BiomeBlocks.inner_corner(id, holder, p, yaw, sx, sz)
 
 
 static func _spin_bob(n: Node3D, y: float) -> void:

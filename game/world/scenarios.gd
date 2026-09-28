@@ -12,7 +12,8 @@ extends RefCounted
 ##  combat_sequence full beat loop (attack, hit, death, enemy attack, hero hit, summon, end)
 ## Optional args: --hero=<class>, --tile=<idx>.
 
-const NAMES := ["board_act1", "board_act2", "board_act3", "board_follow", "board_mutate", "board_portal", "combat_act1",
+const NAMES := ["board_glade", "board_crypt", "board_hollow", "board_frost", "board_throne", "board_magma",
+	"board_act1", "board_act2", "board_act3", "board_follow", "board_mutate", "board_portal", "combat_act1",
 	"combat_act2", "combat_act3", "boss_act1", "boss_act2", "boss_act3", "fx_gallery", "enemy_gallery", "combat_sequence"]
 
 
@@ -27,6 +28,24 @@ static func build(name: String) -> Node:
 	root.name = "WorldScenario"
 	root.scenario = name
 	return root
+
+
+## Tier (1..3) of a biome id.
+static func tier_of(id: String) -> int:
+	return int(BiomeDefs.DEFS[id].tier) if BiomeDefs.DEFS.has(id) else 1
+
+
+## A real generated board for a biome (deterministic): the tier's third lap, with the
+## route's mini-boss standing on tile 11 for tier-2 biomes.
+static func biome_tiles(id: String, seed := 5) -> Array:
+	var tier := tier_of(id)
+	var lap := int(Balance.BIOME_LAPS[tier - 1]) + 2
+	var b := Board.generate(Rng.new(seed), tier, Balance.BOARD_SIZE, lap, id)
+	var tiles: Array = b.to_dict().tiles
+	if tier == 2:
+		var mb: Array = BiomeDefs.miniboss_candidates(["crypt", id, "throne"])
+		tiles[11] = {"type": "miniboss", "enemies": [mb[0]], "elite": false}
+	return tiles
 
 
 ## 28 tiles (8x8 ring, corners 0/7/14/21) in the contract shape for an act (deterministic).
@@ -120,15 +139,23 @@ class _Driver extends Node3D:
 			act = 2
 		elif scenario.ends_with("3"):
 			act = 3
+		var biome_id := String(Biome.NAMES[act])
+		for id in Biome.IDS:
+			if scenario.ends_with("_" + id):
+				biome_id = id
+				act = BoardScenarios.tier_of(id)
+		biome_id = String(args.get("biome", biome_id))
 		board = BoardView.new()
 		add_child(board)
 		board.hero_class = String(args.get("hero", ["knight", "barbarian", "mage"][act - 1]))
 		board.hero_idx = int(args.get("tile", "0"))
-		board.build(act, BoardScenarios.mock_tiles(act))
+		var tiles: Array = BoardScenarios.mock_tiles(act) if scenario.ends_with(str(act)) and not args.has("biome") \
+			else BoardScenarios.biome_tiles(biome_id)
+		board.build(biome_id, tiles)
 		rig = CameraRig.new()
 		add_child(rig)
 		match scenario:
-			"board_act1", "board_act2", "board_act3":
+			"board_act1", "board_act2", "board_act3", "board_glade", "board_crypt", "board_hollow", "board_frost", "board_throne", "board_magma":
 				board.place_hero(int(args.get("tile", "0")))
 				rig.overview(board.ring_bounds(), true)
 				var from := board.hero_idx
