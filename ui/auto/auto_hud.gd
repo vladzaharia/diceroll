@@ -185,9 +185,9 @@ func show_stop(reason: String) -> void:
 
 ## Pulsing ring around a control (followed as it moves) or a canvas rect, for `dur` seconds.
 func highlight(target: Variant, dur := 0.6, color: Color = ACCENT) -> void:
-	if target == null:
+	if typeof(target) == TYPE_OBJECT and not is_instance_valid(target):
 		return
-	if target is Control and not is_instance_valid(target):
+	if not (target is Rect2 or target is Control):
 		return
 	_marks.append({"target": target, "t": 0.0, "dur": maxf(dur, 0.12), "color": color})
 	if target is Control:
@@ -202,15 +202,16 @@ func clear_highlights() -> void:
 
 func _mark_rect(m: Dictionary) -> Rect2:
 	var tg: Variant = m.target
-	if tg is Control:
-		var c := tg as Control
-		if not is_instance_valid(c) or not c.is_visible_in_tree():
-			return Rect2()
-		var r := c.get_global_rect()
-		return Rect2(r.position - global_position, r.size)
 	if tg is Rect2:
 		return Rect2((tg as Rect2).position - global_position, (tg as Rect2).size)
-	return Rect2()
+	# a highlighted card / chip can be freed (modal rebuilt) while its ring still fades
+	if typeof(tg) != TYPE_OBJECT or not is_instance_valid(tg):
+		return Rect2()
+	var c := tg as Control
+	if c == null or not c.is_visible_in_tree():
+		return Rect2()
+	var r := c.get_global_rect()
+	return Rect2(r.position - global_position, r.size)
 
 
 # --- per frame ------------------------------------------------------------------------------
