@@ -276,7 +276,6 @@ func start_roll(value: int, end_pos: Vector3, rng: RandomNumberGenerator, delay:
 	_h0 = pivot.position.y - DieMesh.support_down(body.basis)
 	_q0 = body.basis.get_rotation_quaternion()
 	var tb := target_basis(pick_slot(value, rng), rng, body.basis)
-	# Pre-rotate the target by the tumble we'll unwind, so the unwinding lands exactly on it.
 	_q1 = tb.get_rotation_quaternion()
 	if _q0.dot(_q1) < 0.0:
 		_q1 = -_q1

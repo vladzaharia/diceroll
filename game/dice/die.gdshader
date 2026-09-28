@@ -175,8 +175,12 @@ void fragment() {
 			rc = hsv2rgb(vec3(fract(0.3 * (p.x + p.y) + 0.12 * v_slot + 0.15 * TIME), 0.8, 1.0));
 		}
 		float band = smoothstep(f + 0.05, 1.0, boxd);
-		emission += rc * band * rim_strength;
-		albedo = mix(albedo, rc, band * 0.35);
+		float ld = 1.0 - boxd;
+		float la = fwidth(boxd) * 0.9;
+		float line = 1.0 - smoothstep(0.045 - la, 0.045 + la, ld);
+		emission += rc * band * rim_strength * 0.35;
+		emission += rc * 1.1 * line * rim_strength;
+		albedo = mix(albedo, rc, band * 0.3 + line * 0.5);
 	}
 
 	// --- lock / mark / highlight ------------------------------------------------
