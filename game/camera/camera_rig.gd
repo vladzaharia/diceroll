@@ -24,6 +24,10 @@ enum Mode { OVERVIEW, FOLLOW, COMBAT, POINTS }
 @export var smooth_time := 0.55
 ## Follow mode keeps following at this (faster) rate once settled.
 @export var follow_smooth_time := 0.3
+## Degrees the combat camera swings from a pure side view toward the hero's back
+## (portrait needs a more over-the-shoulder view to fit the enemy row across the screen).
+@export var combat_swing_portrait := 60.0
+@export var combat_swing_landscape := 38.0
 
 var camera: Camera3D
 var mode := Mode.OVERVIEW
@@ -85,16 +89,22 @@ func follow(target: Node3D, instant := false) -> void:
 	_begin(instant)
 
 
-## Side 3/4 framing of the hero and enemies (world positions of their feet).
-func combat(hero_pos: Vector3, enemy_positions: Array, instant := false) -> void:
+## Side 3/4 framing of the hero and enemies (world positions of their feet). The camera
+## looks across the fight from the hero's side: hero lower-left, enemies to the right.
+## `enemy_heights` (optional, per enemy) is how far above the feet the framing must reach
+## (e.g. the top of a boss's HUD); default 2.4.
+func combat(hero_pos: Vector3, enemy_positions: Array, instant := false, enemy_heights: Array = []) -> void:
 	var pts := PackedVector3Array()
-	var heights := [1.6]
-	pts.append(hero_pos)
-	pts.append(hero_pos + Vector3.UP * 1.7)
-	for e in enemy_positions:
-		var p: Vector3 = e
-		pts.append(p)
-		pts.append(p + Vector3.UP * 2.3)
+	var feet: Array[Vector3] = [hero_pos]
+	var heights: Array[float] = [1.9]
+	for i in enemy_positions.size():
+		feet.append(enemy_positions[i])
+		heights.append(float(enemy_heights[i]) if i < enemy_heights.size() else 2.4)
+	for k in feet.size():
+		var p: Vector3 = feet[k]
+		for c in [Vector3(-0.9, 0, -0.9), Vector3(0.9, 0, -0.9), Vector3(-0.9, 0, 0.9), Vector3(0.9, 0, 0.9)]:
+			pts.append(p + c)
+		pts.append(p + Vector3.UP * heights[k])
 	_points = pts
 	var centre := Vector3.ZERO
 	for e in enemy_positions:
@@ -105,15 +115,11 @@ func combat(hero_pos: Vector3, enemy_positions: Array, instant := false) -> void
 	if axis.length() < 0.01:
 		axis = Vector3.FORWARD
 	axis = axis.normalized()
-	# Look across the fight: hero on the left, enemies on the right, camera swung 30 degrees
-	# behind the hero for a 3/4 view.
-	var right := axis
-	var back := right.cross(Vector3.UP)  # camera's +Z (toward the viewer)
-	back = back.rotated(Vector3.UP, deg_to_rad(-30.0))
+	var back := axis.cross(Vector3.UP)  # camera +Z for a pure side view (enemies to the right)
+	back = back.rotated(Vector3.UP, deg_to_rad(-(combat_swing_portrait if is_portrait() else combat_swing_landscape)))
 	_yaw = atan2(back.x, back.z)
 	mode = Mode.COMBAT
 	_follow_target = null
-	heights.clear()
 	_begin(instant)
 
 
@@ -213,7 +219,7 @@ func _recompute() -> void:
 					pts.append(c + Vector3(x * r, 0.0, z * r * 0.8))
 					pts.append(c + Vector3(x * r, 1.6, z * r * 0.8))
 		Mode.COMBAT:
-			_pitch = 24.0 if portrait else 20.0
+			_pitch = 36.0 if portrait else 30.0
 			pts = _points
 		Mode.POINTS:
 			pts = _points
@@ -221,7 +227,7 @@ func _recompute() -> void:
 		return
 	var rect := safe_rect()
 	if mode == Mode.COMBAT and portrait:
-		rect = Rect2(0.06, 0.12, 0.88, 0.5)
+		rect = Rect2(0.07, 0.1, 0.86, 0.56)
 	elif mode == Mode.COMBAT:
 		rect = Rect2(0.18, 0.08, 0.64, 0.62)
 	_desired = solve_framing(pts, _yaw, deg_to_rad(_pitch), rect, _viewport_size(), camera.fov)

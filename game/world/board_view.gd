@@ -36,6 +36,7 @@ var _top_mats: Array[ShaderMaterial] = []
 var _props: Array = []          # per tile: Node3D or null (prop + figures)
 var _figures: Array = []        # per tile: Array[Character]
 var _hero_turn_tween: Tween
+var _hidden: Array[Node3D] = []
 
 
 func _init() -> void:
@@ -125,7 +126,8 @@ func combat_anchor(idx: int) -> Dictionary:
 	var inward := tile_inward(idx)
 	var side := inward.cross(Vector3.UP).normalized()
 	return {"hero": tile_global_position(idx), "facing": global_basis * inward,
-		"side": global_basis * side, "ground_y": to_global(Vector3.ZERO).y + 0.05}
+		"side": global_basis * side, "ground_y": to_global(Vector3.ZERO).y + 0.05,
+		"distance": 3.3 if is_corner(idx) else 2.7}
 
 
 # --- tiles ------------------------------------------------------------------------------
@@ -531,3 +533,90 @@ func _restore_dressing(idx: int) -> void:
 	var t := n.create_tween()
 	t.tween_property(n, "position", Vector3(0.0, TILE_TOP, 0.0), 0.25).set_trans(Tween.TRANS_SINE)
 	t.parallel().tween_property(n, "scale", Vector3.ONE, 0.25)
+
+
+# --- occlusion ------------------------------------------------------------------------------
+
+## Sinks dressing / tile props that would sit between a camera at `cam_xform` and the
+## `focus` points (e.g. the combat line-up). Undo with restore_occluders().
+func hide_occluders(cam_xform: Transform3D, fov_deg: float, aspect: float, focus: Array) -> void:
+	if focus.is_empty():
+		return
+	var inv := cam_xform.affine_inverse()
+	var ty := tan(deg_to_rad(fov_deg) * 0.5)
+	var tx := ty * aspect
+	var lo := Vector2(INF, INF)
+	var hi := Vector2(-INF, -INF)
+	var near := INF
+	for p: Vector3 in focus:
+		for h: float in [0.0, 1.8]:
+			var v := inv * (p + Vector3.UP * h)
+			var d := -v.z
+			if d <= 0.1:
+				continue
+			var s := Vector2(v.x / (d * tx), v.y / (d * ty))
+			lo = lo.min(s)
+			hi = hi.max(s)
+			near = minf(near, d)
+	lo -= Vector2(0.12, 0.12)
+	hi += Vector2(0.12, 0.25)
+	var candidates: Array[Node3D] = []
+	for holder_name in ["Dressing", "SetPiece"]:
+		var holder := biome.get_node_or_null(holder_name)
+		if holder:
+			for c in holder.get_children():
+				if c is Node3D and not (c is Light3D) and not (c is GPUParticles3D):
+					candidates.append(c)
+	for i in RING:
+		if _props[i] and i != hero_idx:
+			candidates.append(_props[i])
+	for n in candidates:
+		var box := Props.world_aabb(n)
+		if box.size == Vector3.ZERO:
+			continue
+		var slo := Vector2(INF, INF)
+		var shi := Vector2(-INF, -INF)
+		var dmax := -INF
+		for k in 8:
+			var v := inv * box.get_endpoint(k)
+			var d := maxf(-v.z, 0.1)
+			dmax = maxf(dmax, -v.z)
+			var sp := Vector2(v.x / (d * tx), v.y / (d * ty))
+			slo = slo.min(sp)
+			shi = shi.max(sp)
+		var hit := dmax < near - 0.2 and slo.x < hi.x and shi.x > lo.x and slo.y < hi.y and shi.y > lo.y
+		if hit:
+			_sink(n)
+
+
+## Sinks tile dressing (props + enemy previews) within `radius` of a world point, except the
+## hero's tile. Undo with restore_occluders().
+func clear_area(center: Vector3, radius: float) -> void:
+	for i in RING:
+		var n: Node3D = _props[i]
+		if n == null or i == hero_idx or _hidden.has(n) or not n.visible:
+			continue
+		var p := tile_global_position(i)
+		if Vector2(p.x - center.x, p.z - center.z).length() > radius:
+			continue
+		_sink(n)
+
+
+func _sink(n: Node3D) -> void:
+	_hidden.append(n)
+	n.set_meta("occl_scale", n.scale)
+	var t := n.create_tween()
+	t.tween_property(n, "scale", Vector3(n.scale.x, 0.01, n.scale.z), 0.25).set_trans(Tween.TRANS_BACK) \
+		.set_ease(Tween.EASE_IN)
+	t.tween_callback(func() -> void: n.visible = false)
+
+
+func restore_occluders() -> void:
+	for n in _hidden:
+		if not is_instance_valid(n):
+			continue
+		n.visible = true
+		var t := n.create_tween()
+		t.tween_property(n, "scale", n.get_meta("occl_scale", Vector3.ONE), 0.3).set_trans(Tween.TRANS_BACK) \
+			.set_ease(Tween.EASE_OUT)
+	_hidden.clear()

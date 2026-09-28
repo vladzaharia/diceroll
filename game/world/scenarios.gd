@@ -163,11 +163,19 @@ class _Driver extends Node3D:
 		rig.overview(board.ring_bounds(), true)
 		var start := Time.get_ticks_msec()
 		stage.begin(board.hero, anchor, list)
-		rig.combat(board.hero.global_position, stage.enemy_positions(), true)
+		rig.combat(board.hero.global_position, stage.enemy_positions(), true, stage.enemy_heights())
+		var focus: Array = stage.enemy_positions()
+		focus.append(board.hero.global_position)
+		var centre := Vector3.ZERO
+		for f: Vector3 in focus:
+			centre += f
+		board.clear_area(centre / focus.size(), 4.2)
+		var vs := get_viewport().get_visible_rect().size
+		board.hide_occluders(rig.desired_transform(), rig.camera.fov, vs.x / vs.y, focus)
 		await stage.began
 		var elapsed := (Time.get_ticks_msec() - start) / 1000.0
-		var hit_at := maxf(wait - 0.45, elapsed + 0.1)
-		await get_tree().create_timer(maxf(hit_at - elapsed - 0.55, 0.05)).timeout
+		var hit_at := maxf(wait - 0.3, elapsed + 0.1)
+		await get_tree().create_timer(maxf(hit_at - elapsed - 0.6, 0.05)).timeout
 		var tgt := 1 if list.size() > 2 else 0
 		stage.set_target(tgt)
 		await stage.hero_attack(tgt)

@@ -15,7 +15,7 @@ extends Node3D
 
 signal began
 
-const UNIT_SCALE := 0.6
+const UNIT_SCALE := 0.7
 const SPACING := 1.55
 const DISTANCE := 2.7
 
@@ -30,6 +30,7 @@ var target := 0
 
 var _target_ring: MeshInstance3D
 var _ground_y := 0.0
+var _distance := DISTANCE
 
 
 func _init() -> void:
@@ -45,6 +46,7 @@ func begin(p_hero: Character, anchor: Dictionary, enemy_list: Array) -> void:
 	facing = (anchor.get("facing", Vector3.FORWARD) as Vector3).normalized()
 	side = (anchor.get("side", facing.cross(Vector3.UP)) as Vector3).normalized()
 	_ground_y = float(anchor.get("ground_y", hero_home.y - 0.45))
+	_distance = float(anchor.get("distance", DISTANCE))
 	_face(hero, hero.global_position + facing, 0.3)
 	var n := enemy_list.size()
 	for i in n:
@@ -71,6 +73,14 @@ func enemy_position(i: int) -> Vector3:
 	return _slot(i, enemies.size()) if i < enemies.size() else hero_home + facing * DISTANCE
 
 
+## Height above each enemy's feet that framing should include (top of its HUD).
+func enemy_heights() -> Array:
+	var out := []
+	for i in enemies.size():
+		out.append(_hud_height(String(data[i].get("id", ""))) + (1.1 if bool(data[i].get("boss", false)) else 0.7))
+	return out
+
+
 func enemy_positions() -> Array[Vector3]:
 	var out: Array[Vector3] = []
 	for i in enemies.size():
@@ -79,10 +89,9 @@ func enemy_positions() -> Array[Vector3]:
 
 
 func _slot(i: int, n: int) -> Vector3:
-	var off := (float(i) - float(n - 1) * 0.5) * SPACING
-	var base := hero_home + facing * DISTANCE + side * off
-	# stagger the row slightly so it reads as a group, not a wall
-	base += facing * (0.25 if i % 2 == 1 else 0.0)
+	var c := float(i) - float(n - 1) * 0.5
+	var along := _distance + (0.35 if n > 1 else 0.3) + absf(c) * -0.3
+	var base := hero_home + facing * along + side * c * SPACING
 	return Vector3(base.x, _ground_y + _floor_offset(), base.z)
 
 
@@ -225,12 +234,13 @@ func enemy_hit(i: int, amount: int, crit := false, blocked := 0) -> void:
 	var ch := enemies[i]
 	var id := String(data[i].get("id", ""))
 	var top := ch.global_position + Vector3.UP * (1.3 * UNIT_SCALE / 0.6 * EnemyLooks.scale_of(id))
+	var num_pos := top + _toward_camera(ch.global_position) * 0.6
 	if blocked > 0:
 		Fx.block_flash(self, ch.global_position + Vector3.UP * 0.8 * EnemyLooks.scale_of(id), 0.8 * EnemyLooks.scale_of(id))
 		Audio.play_sfx("block")
 	if amount > 0:
 		Fx.hit_sparks(self, top, Fx.CRIT_COLOR if crit else Color(1.0, 0.85, 0.6), 26 if crit else 16)
-		Fx.damage_number(self, top + Vector3.UP * 0.7, amount, crit)
+		Fx.damage_number(self, num_pos, amount, crit)
 		Audio.play_sfx("crit" if crit else "hit")
 		_flash_white(ch, id)
 		var dir := (ch.global_position - hero.global_position)
@@ -244,7 +254,7 @@ func enemy_hit(i: int, amount: int, crit := false, blocked := 0) -> void:
 		if crit:
 			Fx.hit_stop(self, 0.08)
 	elif blocked > 0:
-		Fx.popup_text(self, top + Vector3.UP * 0.7, "BLOCK", Fx.BLOCK_COLOR, 0.8)
+		Fx.popup_text(self, num_pos, "BLOCK", Fx.BLOCK_COLOR, 0.8)
 	var d := data[i]
 	d["block"] = maxi(int(d.get("block", 0)) - blocked, 0)
 	d["hp"] = maxi(int(d.get("hp", 0)) - amount, 0)
@@ -309,6 +319,15 @@ func hero_attack(target_i: int, style := "") -> void:
 			var col := Color(0.5, 0.75, 1.0) if style == "magic" else Color(1.0, 0.9, 0.7)
 			await Fx.projectile(self, hero.global_position + Vector3.UP * 1.0 + facing * 0.4,
 				ch.global_position + Vector3.UP * 0.9, col, 0.3)
+
+
+func _toward_camera(from: Vector3) -> Vector3:
+	var cam := get_viewport().get_camera_3d()
+	if cam == null:
+		return Vector3.ZERO
+	var v := cam.global_position - from
+	v.y = 0.0
+	return v.normalized()
 
 
 func _return_hero(delay: float) -> void:

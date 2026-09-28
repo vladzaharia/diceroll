@@ -158,3 +158,23 @@ static func quad(size: float) -> QuadMesh:
 	var q := QuadMesh.new()
 	q.size = Vector2(size, size)
 	return q
+
+
+## World-space AABB of every visual instance below `n` (empty AABB if none).
+static func world_aabb(n: Node3D) -> AABB:
+	var out := AABB()
+	var first := true
+	var list: Array = n.find_children("*", "VisualInstance3D", true, false)
+	if n is VisualInstance3D:
+		list.append(n)
+	for v in list:
+		if v is GPUParticles3D or v is Light3D or v is Label3D:
+			continue
+		var vi := v as VisualInstance3D
+		var a := vi.global_transform * vi.get_aabb()
+		if first:
+			out = a
+			first = false
+		else:
+			out = out.merge(a)
+	return out
