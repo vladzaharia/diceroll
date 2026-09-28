@@ -87,6 +87,10 @@ var current: String = ""
 var _rig: String
 var _attack_clip: String
 var _token: int = 0
+## Optional shader replacing tint.gdshader for this character's tinted surfaces (ghosts), and
+## extra uniforms set on every tinted surface (crack glow, ghost alpha...).
+var tint_shader: Shader = null
+var tint_params: Dictionary = {}
 var _orig_materials: Dictionary = {}  # MeshInstance3D -> Array[Material]
 var _attachments: Dictionary = {}     # slot -> Array[Node3D]
 
@@ -206,7 +210,12 @@ func set_tint(color: Color, strength: float, emission := Color.BLACK) -> void:
 			if strength <= 0.0 and emission == Color.BLACK:
 				mi.set_surface_override_material(s, null)
 				continue
-			mi.set_surface_override_material(s, _tinted(originals[s], color, strength, emission))
+			var m := _tinted(originals[s], color, strength, emission)
+			if tint_shader:
+				m.shader = tint_shader
+			for k in tint_params:
+				m.set_shader_parameter(k, tint_params[k])
+			mi.set_surface_override_material(s, m)
 
 
 ## Attaches a scene to a bone slot ("handslot.r", "handslot.l", "head", or any bone).
