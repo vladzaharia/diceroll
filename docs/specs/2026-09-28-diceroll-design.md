@@ -239,3 +239,4 @@ Principles: no premium currency, no paid or random rolls for power. Every upgrad
 - **Short Road mode:** 10 laps, 2 biomes, pays about 60% Crowns.
 - **Pets** fire automatically from charge meters.
 - **Adopted from the review:** gear caps and traits; the Workshop holds unlock packs plus a pool toggle; potions heal 30%, belt max 3, one per turn, 4 potion types; one tile per equipped minigame; loss-scaled Crowns with a leftover-gold cap; catch-up bonus; Ascension as 10 global rule levels.
+- **Luck and bot realism (Vlad):** the game keeps a real element of luck; even expert play should lose sometimes (expert-bot ceiling about 75–80% on a fresh profile). Balance targets reference a **realistic** bot (the smart policy with human-like imperfection), which is also AUTO's default. Degenerate combos (Wild/Heavy stacking) get mechanic nerfs. There are no broad difficulty hikes aimed at the expert bot.
