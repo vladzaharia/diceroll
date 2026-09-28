@@ -1,35 +1,99 @@
 class_name Board
 extends RefCounted
-## 24-tile ring (perimeter of a 7x7 grid). Tile 0 is Start; corners 6/12/18 are Forge,
-## Treasury and Portal. Each tile: {type, enemies:Array[String], elite:bool}.
+## Ring board: the perimeter of an n x n grid, ring size 4(n-1). Supported sizes: 24 (7x7)
+## and 32 (9x9); any 4(n-1) with n >= 5 works with proportionally scaled tile counts.
+## Tile 0 is Start; the other corners (n-1, 2(n-1), 3(n-1)) are Forge, Treasury and Portal.
+## Each tile: {type, enemies:Array[String], elite:bool}. Presentation lays the ring out with
+## side()/size()/corners(); tile i walks clockwise from Start.
 
-const SIZE := 24
-const CORNERS := {0: "start", 6: "forge", 12: "treasury", 18: "portal"}
-const LAYOUT := {"enemy": 6, "chest": 3, "event": 3, "campfire": 2, "trap": 2, "empty": 4}
-const EVENT_TARGET := 3
+const CORNER_TYPES := ["start", "forge", "treasury", "portal"]
+## Edge tile counts per ring size. Mutation spawns MUTATE per lap and tops events back up to
+## LAYOUTS[size].event.
+const LAYOUTS := {
+	24: {"enemy": 6, "chest": 3, "event": 3, "campfire": 2, "trap": 2, "empty": 4},
+	32: {"enemy": 8, "chest": 4, "event": 4, "campfire": 3, "trap": 3, "empty": 6},
+}
+const MUTATE := {
+	24: ["enemy", "enemy", "elite"],
+	32: ["enemy", "enemy", "enemy", "elite"],
+}
 
 var tiles: Array[Dictionary] = []
 
 static func make_tile(type: String, enemies: Array = [], elite: bool = false) -> Dictionary:
 	return {"type": type, "enemies": enemies.duplicate(), "elite": elite}
 
-static func is_corner(idx: int) -> bool:
-	return CORNERS.has(idx)
+# ---------------------------------------------------------------- geometry
 
-static func generate(rng: Rng, act: int) -> Board:
+## Grid side length n for a ring of `ring_size` tiles.
+static func side_for(ring_size: int) -> int:
+	return ring_size / 4 + 1
+
+## {tile index: corner type} for a ring of `ring_size` tiles.
+static func corners_for(ring_size: int) -> Dictionary:
+	var q := ring_size / 4
+	return {0: "start", q: "forge", 2 * q: "treasury", 3 * q: "portal"}
+
+func size() -> int:
+	return tiles.size()
+
+func side() -> int:
+	return side_for(size())
+
+func corners() -> Dictionary:
+	return corners_for(size())
+
+func is_corner(idx: int) -> bool:
+	return size() >= 4 and idx % (size() / 4) == 0
+
+## Portal reach: a third of the ring (8 on 24, 10 on 32).
+func portal_range() -> int:
+	return size() / 3
+
+## Edge tile counts for a ring size (table for 24/32, proportional otherwise).
+static func layout_for(ring_size: int) -> Dictionary:
+	if LAYOUTS.has(ring_size):
+		return LAYOUTS[ring_size]
+	var base: Dictionary = LAYOUTS[24]
+	var edge := ring_size - 4
+	var out := {}
+	var used := 0
+	for type in base:
+		if type == "empty":
+			continue
+		out[type] = int(round(float(base[type]) * edge / 20.0))
+		used += int(out[type])
+	out["empty"] = maxi(0, edge - used)
+	return out
+
+static func mutate_spawns_for(ring_size: int) -> Array:
+	if MUTATE.has(ring_size):
+		return MUTATE[ring_size]
+	var out: Array = []
+	for i in maxi(1, int(round(2.0 * (ring_size - 4) / 20.0))):
+		out.append("enemy")
+	out.append("elite")
+	return out
+
+# ---------------------------------------------------------------- generation
+
+static func generate(rng: Rng, act: int, ring_size: int = Balance.BOARD_SIZE) -> Board:
+	assert(ring_size % 4 == 0 and ring_size >= 16, "ring size must be 4(n-1)")
 	var b := Board.new()
 	var bag: Array[String] = []
-	for type in LAYOUT:
-		for i in LAYOUT[type]:
+	var layout := layout_for(ring_size)
+	for type in layout:
+		for i in layout[type]:
 			bag.append(type)
 	if act >= 2:
 		bag.erase("enemy")
 		bag.append("elite")
-	# shuffle until tiles 1 and 2 are not fights (swap-fix keeps it deterministic and fast)
+	# shuffle, then swap fights out of tiles 1 and 2 (deterministic and fast)
 	rng.shuffle(bag)
+	var corner_map := corners_for(ring_size)
 	var edge: Array[int] = []
-	for i in SIZE:
-		if not is_corner(i):
+	for i in ring_size:
+		if not corner_map.has(i):
 			edge.append(i)
 	# edge[0], edge[1] are tiles 1 and 2
 	for slot in [0, 1]:
@@ -40,10 +104,9 @@ static func generate(rng: Rng, act: int) -> Board:
 					bag[slot] = bag[j]
 					bag[j] = t
 					break
-	b.tiles.resize(SIZE)
-	for i in SIZE:
-		if is_corner(i):
-			b.tiles[i] = make_tile(CORNERS[i])
+	b.tiles.resize(ring_size)
+	for i in corner_map:
+		b.tiles[i] = make_tile(corner_map[i])
 	for k in edge.size():
 		var type := bag[k]
 		b.tiles[edge[k]] = _spawn(rng, type, act, 1)
@@ -74,23 +137,23 @@ static func roll_enemies(rng: Rng, act: int, lap: int, elite: bool) -> Array[Str
 		out.append(String(rng.pick(pool)))
 	return out
 
-## Tile index after moving `steps` from `pos`.
-static func landing(pos: int, steps: int) -> int:
-	return (pos + steps) % SIZE
+## Tile index after moving `steps` from `pos` (0 steps = stay).
+func landing(pos: int, steps: int) -> int:
+	return (pos + steps) % size()
 
-## Tiles visited in order, excluding the starting tile.
-static func path(pos: int, steps: int) -> Array[int]:
+## Tiles visited in order, excluding the starting tile (empty for 0 steps).
+func path(pos: int, steps: int) -> Array[int]:
 	var out: Array[int] = []
 	for i in range(1, steps + 1):
-		out.append((pos + i) % SIZE)
+		out.append((pos + i) % size())
 	return out
 
 ## True if moving passes or lands on Start.
-static func crosses_start(pos: int, steps: int) -> bool:
-	return pos + steps >= SIZE
+func crosses_start(pos: int, steps: int) -> bool:
+	return steps > 0 and pos + steps >= size()
 
-static func portal_targets(pos: int) -> Array[int]:
-	return path(pos, Balance.PORTAL_RANGE)
+func portal_targets(pos: int) -> Array[int]:
+	return path(pos, portal_range())
 
 func clear_enemies(idx: int) -> void:
 	tiles[idx]["enemies"] = []
@@ -99,8 +162,8 @@ func clear_enemies(idx: int) -> void:
 ## First `n` tiles of `type` strictly ahead of `pos` (not wrapping past Start twice).
 func next_of_type(pos: int, type: String, n: int) -> Array[int]:
 	var out: Array[int] = []
-	for i in range(1, SIZE):
-		var idx := (pos + i) % SIZE
+	for i in range(1, size()):
+		var idx := (pos + i) % size()
 		if tiles[idx].type == type and not is_corner(idx):
 			out.append(idx)
 			if out.size() >= n:
@@ -114,25 +177,27 @@ func set_tile(idx: int, type: String, rng: Rng, act: int, lap: int) -> Dictionar
 func change(idx: int) -> Dictionary:
 	return {"idx": idx, "type": tiles[idx].type, "enemies": tiles[idx].enemies.duplicate(), "elite": tiles[idx].elite}
 
-## Lap mutation: cleared fight tiles become Empty, +2 Enemy and +1 Elite on random Empty
-## tiles, then events are topped back up to 3. `protect` tiles are never changed.
+## Lap mutation: cleared fight tiles become Empty, then mutate_spawns_for(size) (24: +2 Enemy
+## +1 Elite; 32: +3 Enemy +1 Elite) go on random Empty tiles, then events are topped back up
+## to the layout's event count. `protect` tiles are never changed.
 func mutate(rng: Rng, act: int, lap: int, protect: Array = []) -> Array[Dictionary]:
 	var changes: Array[Dictionary] = []
-	for i in SIZE:
+	for i in size():
 		if _is_fight(tiles[i].type) and tiles[i].get("cleared", false):
 			tiles[i] = make_tile("empty")
 			changes.append(change(i))
 	var empties: Array[int] = []
-	for i in SIZE:
+	for i in size():
 		if tiles[i].type == "empty" and not protect.has(i):
 			empties.append(i)
 	rng.shuffle(empties)
-	var spawns: Array[String] = ["enemy", "enemy", "elite"]
+	var spawns: Array[String] = []
+	spawns.assign(mutate_spawns_for(size()))
 	var events := 0
 	for t in tiles:
 		if t.type == "event":
 			events += 1
-	for k in range(events, EVENT_TARGET):
+	for k in range(events, int(layout_for(size()).event)):
 		spawns.append("event")
 	for type in spawns:
 		if empties.is_empty():
@@ -153,7 +218,7 @@ func to_dict() -> Dictionary:
 		if tile.get("cleared", false):
 			d["cleared"] = true
 		t.append(d)
-	return {"tiles": t}
+	return {"tiles": t, "size": size(), "side": side()}
 
 static func from_dict(d: Dictionary) -> Board:
 	var b := Board.new()

@@ -20,12 +20,14 @@ var act: int = 1
 var lap: int = 1
 var pos: int = 0
 var board: Board
+## Ring size of every board in this run (24 or 32).
+var board_size: int = Balance.BOARD_SIZE
 var treasury: int = Balance.TREASURY_START
 var stats: Dictionary = {}
 ## Extra: whether the +1 combat reroll shop item was bought this act.
 var shop_reroll_bought: bool = false
 
-static func create(p_class_id: String, p_seed: int) -> RunState:
+static func create(p_class_id: String, p_seed: int, p_board_size: int = Balance.BOARD_SIZE) -> RunState:
 	var r := RunState.new()
 	var def: Dictionary = HeroDefs.DATA[p_class_id]
 	r.class_id = p_class_id
@@ -37,12 +39,16 @@ static func create(p_class_id: String, p_seed: int) -> RunState:
 	r.board_rerolls = int(def.board_rerolls)
 	for rune_id in def.runes:
 		r.dice.append(Die.make(String(rune_id)))
-	r.board = Board.generate(r.rng, 1)
+	r.board_size = p_board_size
+	r.board = Board.generate(r.rng, 1, r.board_size)
 	r.stats = {
 		"board_turns": 0, "combat_turns": 0, "fights_won": 0, "damage_dealt": 0, "damage_taken": 0,
 		"gold_earned": 0, "best_combo": "", "best_mult": 0.0, "max_act": 1, "commands": 0,
 	}
 	return r
+
+func laps_per_act() -> int:
+	return Balance.laps_per_act(board_size)
 
 ## Heals up to max; returns the amount actually healed.
 func heal(amount: int) -> int:
@@ -68,7 +74,7 @@ func to_dict() -> Dictionary:
 		"class_id": class_id, "seed": str(seed), "rng": rng.to_dict(), "hp": hp, "max_hp": max_hp,
 		"atk": atk, "block": block, "gold": gold, "xp": xp, "level": level, "dice": dd,
 		"combat_rerolls": combat_rerolls, "board_rerolls": board_rerolls, "banked_rerolls": banked_rerolls,
-		"act": act, "lap": lap, "pos": pos, "board": board.to_dict(), "treasury": treasury,
+		"act": act, "lap": lap, "pos": pos, "board": board.to_dict(), "board_size": board_size, "treasury": treasury,
 		"stats": stats.duplicate(true), "shop_reroll_bought": shop_reroll_bought,
 	}
 
@@ -84,6 +90,7 @@ static func from_dict(d: Dictionary) -> RunState:
 	for dd in d.dice:
 		r.dice.append(Die.from_dict(dd))
 	r.board = Board.from_dict(d.board)
+	r.board_size = int(d.get("board_size", r.board.size()))
 	r.stats = {}
 	var st: Dictionary = d.get("stats", {})
 	for k in st:

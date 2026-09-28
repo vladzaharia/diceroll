@@ -23,11 +23,12 @@ var commands: Array = []
 
 # ================================================================ construction
 
-static func new_run(class_id: String, seed: int) -> GameFlow:
+## board_size: ring size, 24 (default) or 32.
+static func new_run(class_id: String, seed: int, board_size: int = Balance.BOARD_SIZE) -> GameFlow:
 	var f := GameFlow.new()
 	if not HeroDefs.DATA.has(class_id):
 		class_id = "knight"
-	f.run = RunState.create(class_id, seed)
+	f.run = RunState.create(class_id, seed, board_size)
 	f.phase = Phase.BOARD_READY
 	return f
 
@@ -65,10 +66,11 @@ func _do_board_roll() -> Array[Dictionary]:
 		board_roll.append(run.dice[i].value(run.dice[i].roll(run.rng)))
 		idx.append(i)
 	ev.append({"type": "dice_rolled", "values": board_roll.duplicate(), "indices": idx, "context": "board"})
-	# Doubles feed the Treasury bank: +value*2 per value rolled at least twice.
+	# Doubles feed the Treasury bank: +value*2 per value rolled at least twice (blanks never count).
 	var counts := {}
 	for v in board_roll:
-		counts[v] = int(counts.get(v, 0)) + 1
+		if v > 0:
+			counts[v] = int(counts.get(v, 0)) + 1
 	var added := 0
 	for v in counts:
 		if counts[v] >= 2:
@@ -81,10 +83,10 @@ func _do_board_roll() -> Array[Dictionary]:
 func landing_preview() -> Array[int]:
 	var out: Array[int] = []
 	for v in board_roll:
-		if run.lap >= Balance.LAPS_PER_ACT and Board.crosses_start(run.pos, v):
+		if run.lap >= run.laps_per_act() and run.board.crosses_start(run.pos, v):
 			out.append(0)
 		else:
-			out.append(Board.landing(run.pos, v))
+			out.append(run.board.landing(run.pos, v))
 	return out
 
 func choose_move(die_idx: int) -> Array[Dictionary]:
@@ -106,9 +108,13 @@ func choose_move(die_idx: int) -> Array[Dictionary]:
 ## Moves the hero `steps` tiles forward (or teleports), handling lap completion.
 func _move(steps: int, teleport: bool) -> Array[Dictionary]:
 	var ev: Array[Dictionary] = []
-	var crossing := Board.crosses_start(run.pos, steps)
-	var p := Board.path(run.pos, steps)
-	if crossing and run.lap >= Balance.LAPS_PER_ACT:
+	if steps <= 0:
+		# A blank face (0) keeps the hero in place; the current tile does not trigger again.
+		ev.append({"type": "hero_stayed", "pos": run.pos})
+		return ev
+	var crossing := run.board.crosses_start(run.pos, steps)
+	var p := run.board.path(run.pos, steps)
+	if crossing and run.lap >= run.laps_per_act():
 		# stop on Start: act boss
 		var cut: Array[int] = []
 		for t in p:
@@ -122,7 +128,7 @@ func _move(steps: int, teleport: bool) -> Array[Dictionary]:
 	if crossing:
 		var healed := run.heal(run.pct_of_max(Balance.LAP_HEAL_PCT))
 		var completed := run.lap
-		if run.lap >= Balance.LAPS_PER_ACT:
+		if run.lap >= run.laps_per_act():
 			ev.append({"type": "lap_completed", "lap": completed, "healed": healed, "hp": run.hp, "boss": true})
 			ev.append({"type": "hp_changed", "amount": healed, "total": run.hp, "source": "lap", "max_hp": run.max_hp})
 			pending.push_front({"kind": "boss"})
@@ -228,9 +234,9 @@ func _trigger_tile(idx: int, ev: Array[Dictionary]) -> void:
 ## Portal destinations from the hero's tile. On the last lap they stop at Start (the boss).
 func _portal_tiles(from: int) -> Array:
 	var out: Array = []
-	for t in Board.portal_targets(from):
+	for t in run.board.portal_targets(from):
 		out.append(t)
-		if t == 0 and run.lap >= Balance.LAPS_PER_ACT:
+		if t == 0 and run.lap >= run.laps_per_act():
 			break
 	return out
 
@@ -343,7 +349,7 @@ func _next_act(ev: Array[Dictionary]) -> void:
 	run.pos = 0
 	run.treasury = Balance.TREASURY_START
 	run.shop_reroll_bought = false
-	run.board = Board.generate(run.rng, run.act)
+	run.board = Board.generate(run.rng, run.act, run.board_size)
 	run.stats.max_act = maxi(int(run.stats.get("max_act", 1)), run.act)
 	ev.append({"type": "act_started", "act": run.act, "biome": EnemyDefs.ACT_BIOME[run.act - 1], "board": run.board.to_dict(), "treasury": run.treasury})
 	var h := run.heal(run.pct_of_max(Balance.ACT_START_HEAL_PCT))
@@ -352,13 +358,15 @@ func _next_act(ev: Array[Dictionary]) -> void:
 
 # ================================================================ draft & runes
 
+## Level-up draft: 3 options. While the pool is below MAX_DICE a New Die (random kind) is
+## always one of them, so growing the pool is the early priority.
 func _open_draft(ev: Array[Dictionary]) -> void:
 	var ids: Array = ["rune", "max_hp", "face_raise"]
-	if run.dice.size() < Balance.MAX_DICE:
-		ids.append("new_die")
 	if run.combat_rerolls < Balance.MAX_COMBAT_REROLLS:
 		ids.append("combat_reroll")
 	run.rng.shuffle(ids)
+	if run.dice.size() < Balance.MAX_DICE:
+		ids.insert(run.rng.randi_range(0, 2), "new_die")
 	var options: Array = []
 	for k in 3:
 		options.append(_draft_option(String(ids[k])))
@@ -367,7 +375,8 @@ func _open_draft(ev: Array[Dictionary]) -> void:
 func _draft_option(id: String) -> Dictionary:
 	match id:
 		"new_die":
-			return {"id": id, "label": "New Die", "desc": "Add a plain die to your pool."}
+			var kind := DiceKinds.random_kind(run.rng)
+			return {"id": id, "label": DiceKinds.label(kind), "desc": String(DiceKinds.DEFS[kind].desc), "kind": kind}
 		"rune":
 			return Runes.option(Runes.random_rune(run.rng))
 		"max_hp":
@@ -409,11 +418,24 @@ func pick_draft(i: int) -> Array[Dictionary]:
 	_advance(ev)
 	return ev
 
-func _add_die(ev: Array[Dictionary]) -> void:
+func _add_die(ev: Array[Dictionary], kind := "standard") -> void:
 	if run.dice.size() >= Balance.MAX_DICE:
 		return
-	run.dice.append(Die.new())
-	ev.append({"type": "die_added", "die_idx": run.dice.size() - 1, "die": run.dice.back().to_dict()})
+	run.dice.append(Die.make("", kind))
+	ev.append({"type": "die_added", "die_idx": run.dice.size() - 1, "kind": kind, "die": run.dice.back().to_dict()})
+
+## Replaces die `idx` with a fresh die of `kind`, keeping its rune (Dicesmith on a full pool).
+func _reforge_die(ev: Array[Dictionary], idx: int, kind: String) -> void:
+	run.dice[idx] = Die.make(run.dice[idx].rune, kind)
+	ev.append({"type": "die_changed", "die_idx": idx, "kind": kind, "die": run.dice[idx].to_dict()})
+
+## Index of the die with the lowest face sum (first on ties).
+func _weakest_die() -> int:
+	var best := 0
+	for i in run.dice.size():
+		if run.dice[i].face_sum() < run.dice[best].face_sum():
+			best = i
+	return best
 
 func rune_assign(die_idx: int) -> Array[Dictionary]:
 	if phase != Phase.DRAFT or offer.get("kind", "") != "rune_assign":
@@ -435,10 +457,13 @@ func rune_assign(die_idx: int) -> Array[Dictionary]:
 func _open_shop(ev: Array[Dictionary]) -> void:
 	_set_offer({"kind": "shop", "items": _shop_stock()}, Phase.SHOP, ev)
 
+## 3-4 items. While the pool is below MAX_DICE the first item is always a die (random kind);
+## at most 2 dice per stock (distinct kinds), runes repeat (distinct), anything else once.
 func _shop_stock() -> Array:
 	var weights := {}
+	var pool_open := run.dice.size() < Balance.MAX_DICE
 	for id in ShopDefs.ITEMS:
-		if id == "die" and run.dice.size() >= Balance.MAX_DICE:
+		if id == "die" and not pool_open:
 			continue
 		if id == "combat_reroll" and (run.shop_reroll_bought or run.combat_rerolls >= Balance.MAX_COMBAT_REROLLS):
 			continue
@@ -446,13 +471,19 @@ func _shop_stock() -> Array:
 	var n := run.rng.randi_range(Balance.SHOP_MIN_ITEMS, Balance.SHOP_MAX_ITEMS)
 	var items: Array = []
 	var used := {}
-	for k in n:
+	var dice := 0
+	if pool_open:
+		items.append(_shop_item("die", used))
+		dice = 1
+	while items.size() < n and not weights.is_empty():
 		var id := String(run.rng.weighted(weights))
-		if id != "rune":
-			weights.erase(id) # at most one of each non-rune item
+		if id == "die":
+			dice += 1
+			if dice >= Balance.SHOP_MAX_DICE_ITEMS:
+				weights.erase(id)
+		elif id != "rune":
+			weights.erase(id) # at most one of each other non-rune item
 		items.append(_shop_item(id, used))
-		if weights.is_empty():
-			break
 	return items
 
 func _shop_item(id: String, used: Dictionary) -> Dictionary:
@@ -497,7 +528,7 @@ func shop_buy(i: int, die_idx := -1) -> Array[Dictionary]:
 			if run.dice.size() >= Balance.MAX_DICE:
 				return [_e("dice pool is full")]
 		"face_raise":
-			if run.dice[die_idx].faces[run.dice[die_idx].lowest_face()] >= 6:
+			if not run.dice[die_idx].can_raise(run.dice[die_idx].lowest_face()):
 				return [_e("die is maxed")]
 		"combat_reroll":
 			if run.combat_rerolls >= Balance.MAX_COMBAT_REROLLS or run.shop_reroll_bought:
@@ -560,8 +591,8 @@ func forge_apply(die_idx: int, face_idx: int, op: String, src_face := -1) -> Arr
 		if die_idx < 0 or die_idx >= run.dice.size() or face_idx < 0 or face_idx > 5:
 			return [_e("bad die or face")]
 		var d := run.dice[die_idx]
-		if op == "raise" and d.faces[face_idx] >= 6:
-			return [_e("face is already 6")]
+		if op == "raise" and not d.can_raise(face_idx):
+			return [_e("face is already at its cap (%d)" % d.raise_cap())]
 		if op == "mirror" and (src_face < 0 or src_face > 5 or src_face == face_idx or d.faces[src_face] == d.faces[face_idx]):
 			return [_e("bad mirror source")]
 	_record(["forge_apply", die_idx, face_idx, op, src_face])
@@ -690,7 +721,8 @@ func portal_pick(tile_idx: int) -> Array[Dictionary]:
 	_record(["portal_pick", tile_idx])
 	var ev: Array[Dictionary] = []
 	_close_offer(ev)
-	var steps := (tile_idx - run.pos + Board.SIZE) % Board.SIZE
+	var n := run.board.size()
+	var steps := (tile_idx - run.pos + n) % n
 	ev.append_array(_move(steps, true))
 	_advance(ev)
 	return ev
@@ -749,8 +781,8 @@ func apply(cmd: Array) -> Array[Dictionary]:
 	return [_e("unknown command " + str(cmd[0]))]
 
 ## Replays a whole command log from a fresh run.
-static func replay(class_id: String, seed: int, log_: Array) -> GameFlow:
-	var f := GameFlow.new_run(class_id, seed)
+static func replay(class_id: String, seed: int, log_: Array, board_size: int = Balance.BOARD_SIZE) -> GameFlow:
+	var f := GameFlow.new_run(class_id, seed, board_size)
 	for cmd in log_:
 		f.apply(cmd)
 	return f

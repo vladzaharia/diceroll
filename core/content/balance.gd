@@ -2,11 +2,14 @@ class_name Balance
 extends RefCounted
 ## Tunable numbers. See docs/plans/balance.md for the sim results behind them.
 
+## Default ring size (24 = 7x7 perimeter, 32 = 9x9). GameFlow.new_run takes a size override.
 const BOARD_SIZE := 24
+## Laps per act on the default board. Use laps_per_act(size) for other ring sizes.
 const LAPS_PER_ACT := 3
+const LAPS_BY_SIZE := {24: 3, 32: 3}
 const ACTS := 3
-const MAX_DICE := 6
-const START_DICE := 3
+const MAX_DICE := 5
+const START_DICE := 2
 
 # Tiles
 const LAP_HEAL_PCT := 0.15
@@ -15,7 +18,6 @@ const TRAP_DAMAGE_PCT := 0.12
 const TRAP_DODGE_MIN := 4
 const TREASURY_START := 10
 const TREASURY_PAIR_MULT := 2
-const PORTAL_RANGE := 8
 const CHEST_GOLD_MIN := 12
 const CHEST_GOLD_MAX := 24
 const CHEST_RUNE_CHANCE := 0.5
@@ -42,7 +44,8 @@ const XP_THRESHOLDS := [10, 25, 45, 70, 100]
 const XP_STEP_AFTER := 30
 
 # Shop
-const SHOP_DIE_PRICE := 40
+## Dice prices live in DiceKinds.DEFS[kind].price.
+const SHOP_MAX_DICE_ITEMS := 2
 const SHOP_POTION_PRICE := 20
 const SHOP_POTION_PCT := 0.35
 const SHOP_FACE_RAISE_PRICE := 25
@@ -64,6 +67,9 @@ static func xp_for_level(level: int) -> int:
 	if level - 1 < XP_THRESHOLDS.size():
 		return XP_THRESHOLDS[level - 1]
 	return XP_THRESHOLDS.back() + XP_STEP_AFTER * (level - XP_THRESHOLDS.size())
+
+static func laps_per_act(ring_size: int) -> int:
+	return int(LAPS_BY_SIZE.get(ring_size, LAPS_PER_ACT))
 
 static func enemy_scale(act: int, lap: int) -> float:
 	return 1.0 + ENEMY_ACT_STEP * (act - 1) + ENEMY_LAP_STEP * (lap - 1)

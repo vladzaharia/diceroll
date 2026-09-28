@@ -792,3 +792,195 @@ func test_portal_lap3_stops_at_start() -> void:
 	var ev := f.portal_pick(0)
 	assert_eq(f.phase, P.COMBAT)
 	assert_eq(f.combat.boss, true)
+
+# ================================================================ pool, die kinds, board size
+
+func test_start_with_two_dice_max_five() -> void:
+	assert_eq(Balance.MAX_DICE, 5)
+	var want := {"knight": ["guard", ""], "barbarian": ["heavy", ""], "mage": ["ember", "echo"], "rogue": ["venom", "lucky"]}
+	for id in HeroDefs.IDS:
+		var g := GameFlow.new_run(id, 1)
+		assert_eq(g.run.dice.size(), 2, id + " starts with 2 dice")
+		assert_eq([g.run.dice[0].rune, g.run.dice[1].rune], want[id])
+	assert_eq(GameFlow.new_run("barbarian", 1).run.atk, 2)
+
+func test_zero_roll_stays_put() -> void:
+	var f := _flow()
+	_blank(f)
+	f.run.pos = 5
+	_put(f, 5, Board.make_tile("chest"))
+	_force_roll(f, 0)
+	assert_eq(f.landing_preview()[0], 5)
+	var ev := f.choose_move(0)
+	assert_eq(f.run.pos, 5)
+	assert_true(not _types(ev).has("hero_moved"), "no hop for a blank")
+	assert_true(_types(ev).has("hero_stayed"))
+	assert_true(not _types(ev).has("tile_triggered"), "staying does not retrigger the tile")
+	assert_eq(f.run.board.tiles[5].type, "chest")
+	assert_eq(f.phase, P.BOARD_READY)
+
+func test_treasury_ignores_blank_doubles_and_counts_high_values() -> void:
+	var f := _flow()
+	f.run.dice = [Die.make("", "gambler"), Die.make("", "gambler")] as Array[Die]
+	for d in f.run.dice:
+		d.faces = PackedInt32Array([0, 0, 0, 0, 0, 0])
+	var before := f.run.treasury
+	var ev := f.roll_board()
+	assert_eq(_first(ev, "board_rolled").treasury_added, 0, "0-0 is not a double")
+	assert_eq(f.run.treasury, before)
+	var g := _flow()
+	g.run.dice = [Die.make("", "giant"), Die.make("", "giant")] as Array[Die]
+	for d in g.run.dice:
+		d.faces = PackedInt32Array([9, 9, 9, 9, 9, 9])
+	ev = g.roll_board()
+	assert_eq(_first(ev, "board_rolled").treasury_added, 18)
+	assert_eq(_first(ev, "board_rolled").values, [9, 9])
+
+func test_draft_new_die_has_kind() -> void:
+	var f := _flow()
+	_draft_with(f, {"id": "new_die", "label": "Giant Die", "desc": "", "kind": "giant"})
+	var ev := f.pick_draft(0)
+	assert_eq(f.run.dice.back().kind, "giant")
+	assert_eq(f.run.dice.back().faces, PackedInt32Array([4, 5, 6, 7, 8, 9]))
+	var da := _first(ev, "die_added")
+	assert_eq(da.kind, "giant")
+	assert_eq(da.die.kind, "giant")
+
+func test_draft_offers_new_die_while_pool_small() -> void:
+	for s in 20:
+		var f := _flow("knight", s)
+		var ev: Array[Dictionary] = []
+		f._open_draft(ev)
+		var found := false
+		for o in f.offer.options:
+			if o.id == "new_die":
+				found = true
+				assert_true(DiceKinds.DEFS.has(o.kind), "draft die has a kind")
+				assert_eq(o.label, DiceKinds.label(o.kind))
+		assert_true(found, "pool < 5 always offers a new die (seed %d)" % s)
+
+func test_shop_sells_die_kinds() -> void:
+	var f := _flow()
+	var seen_die := 0
+	for s in 20:
+		f.run.rng = Rng.new(s)
+		var items := f._shop_stock()
+		var dice := 0
+		for it in items:
+			if it.id == "die":
+				dice += 1
+				assert_true(DiceKinds.DEFS.has(it.kind))
+				assert_eq(it.label, DiceKinds.label(it.kind))
+				assert_eq(it.price, int(DiceKinds.DEFS[it.kind].price))
+		assert_true(dice >= 1, "a small pool always sees a die in the shop")
+		seen_die += dice
+	f.run.gold = 999
+	var item := _item("die", 45, false)
+	item.kind = "gambler"
+	_shop_with(f, [item])
+	var ev := f.shop_buy(0)
+	assert_eq(f.run.dice.back().kind, "gambler")
+	assert_eq(_first(ev, "die_added").kind, "gambler")
+
+func test_shop_no_die_when_pool_full() -> void:
+	var f := _flow()
+	while f.run.dice.size() < Balance.MAX_DICE:
+		f.run.dice.append(Die.new())
+	for s in 20:
+		f.run.rng = Rng.new(s)
+		for it in f._shop_stock():
+			assert_true(it.id != "die", "no die when full")
+
+func test_forge_giant_raises_past_six() -> void:
+	var f := _flow()
+	f.run.dice[0] = Die.make("", "giant")
+	f.phase = P.FORGE
+	f.offer = {"kind": "forge", "ops": ["raise", "mirror"], "source": "tile"}
+	var ev := f.forge_apply(0, 2, "raise")
+	assert_eq(f.run.dice[0].faces[2], 7)
+	assert_eq(_first(ev, "face_changed").value, 7)
+	f.phase = P.FORGE
+	f.offer = {"kind": "forge", "ops": ["raise"], "source": "draft"}
+	assert_eq(f.forge_apply(0, 5, "raise")[0].type, "error", "9 is the giant cap")
+	f.run.dice[1] = Die.make("", "high")
+	assert_eq(f.forge_apply(1, 5, "raise")[0].type, "error", "6 is the normal cap")
+
+func test_shop_face_raise_on_giant() -> void:
+	var f := _flow()
+	f.run.gold = 99
+	f.run.dice[0] = Die.make("", "giant")
+	f.run.dice[0].faces = PackedInt32Array([9, 9, 9, 9, 9, 6])
+	_shop_with(f, [_item("face_raise", 25, true)])
+	f.shop_buy(0, 0)
+	assert_eq(f.run.dice[0].faces[5], 7)
+
+func test_event_dicesmith() -> void:
+	var f := _flow()
+	_event(f, "dicesmith")
+	var c0: Dictionary = f.offer.choices[0]
+	assert_true(DiceKinds.DEFS.has(c0.kind))
+	var n := f.run.dice.size()
+	var ev := f.event_choose(0)
+	assert_eq(f.run.dice.size(), n + 1)
+	assert_eq(f.run.dice.back().kind, c0.kind)
+	assert_true(_types(ev).has("die_added"))
+	# full pool: the choice reforges the weakest die, keeping its rune
+	while f.run.dice.size() < Balance.MAX_DICE:
+		f.run.dice.append(Die.make("", "low"))
+	f.run.dice[0] = Die.make("guard", "low")
+	for i in range(1, f.run.dice.size()):
+		f.run.dice[i] = Die.make("", "high")
+	_event(f, "dicesmith")
+	var c: Dictionary = f.offer.choices[0]
+	ev = f.event_choose(0)
+	assert_eq(f.run.dice.size(), Balance.MAX_DICE)
+	var dc := _first(ev, "die_changed")
+	assert_eq(dc.die_idx, 0)
+	assert_eq(f.run.dice[0].kind, c.kind)
+	assert_eq(f.run.dice[0].rune, "guard", "rune kept")
+
+func test_board_32_run() -> void:
+	var f := GameFlow.new_run("knight", 3, 32)
+	assert_eq(f.run.board.size(), 32)
+	assert_eq(f.run.board_size, 32)
+	f.run.max_hp = 70
+	f.run.hp = 70
+	for i in 32:
+		if not f.run.board.is_corner(i):
+			f.run.board.tiles[i] = Board.make_tile("empty")
+	f.run.pos = 30
+	_force_roll(f, 4)
+	assert_eq(f.landing_preview()[0], 2)
+	var ev := f.choose_move(0)
+	assert_eq(_first(ev, "hero_moved").path, [31, 0, 1, 2])
+	assert_eq(f.run.lap, 2)
+	f.shop_leave()
+	# portal on 24 reaches 10 tiles
+	f.run.pos = 20
+	_force_roll(f, 4)
+	f.choose_move(0)
+	assert_eq(f.phase, P.PORTAL)
+	assert_eq(f.offer.tiles.size(), 10)
+	assert_eq(f.offer.tiles[0], 25)
+	f.portal_pick(31)
+	assert_eq(f.run.pos, 31)
+	var parsed: Dictionary = JSON.parse_string(JSON.stringify(f.to_dict()))
+	var g := GameFlow.from_dict(parsed)
+	assert_eq(g.run.board_size, 32)
+	assert_eq(JSON.stringify(g.to_dict()), JSON.stringify(f.to_dict()))
+
+func test_board_32_next_act_keeps_size() -> void:
+	var f := GameFlow.new_run("knight", 5, 32)
+	var ev: Array[Dictionary] = []
+	f._next_act(ev)
+	assert_eq(f.run.board.size(), 32)
+	assert_eq(_first(ev, "act_started").board.tiles.size(), 32)
+
+func test_board_32_replay() -> void:
+	var f := GameFlow.new_run("rogue", 77, 32)
+	for k in 400:
+		if f.is_over():
+			break
+		f.apply(Bot.next_command(f))
+	var r := GameFlow.replay("rogue", 77, f.commands, 32)
+	assert_eq(JSON.stringify(r.to_dict()), JSON.stringify(f.to_dict()))
