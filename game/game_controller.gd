@@ -38,6 +38,8 @@ var busy := false
 ## "title" | "class" | "run"
 var mode := "title"
 var in_combat := false
+## Set when the player leaves mid-playback; the EventPlayer stops at the next event.
+var aborting := false
 
 var _tray_layer: CanvasLayer
 var _title_t := 0.0
@@ -160,7 +162,33 @@ func start(f: GameFlow) -> void:
 	Audio.play_music("act%d" % f.run.act)
 	overlay.set_black(true)
 	overlay.fade_in(0.5)
+	if f.phase == GameFlow.Phase.COMBAT and f.combat != null:
+		await _restore_combat()
 	_enter_idle()
+
+
+## Re-stages a fight in progress (a run loaded mid-combat): living enemies rise again,
+## the dice show their current values, marks and curses.
+func _restore_combat() -> void:
+	busy = true
+	var c := flow.combat
+	var tile := c.tile if c.tile >= 0 else flow.run.pos
+	in_combat = true
+	board.hero.anim_player.speed_scale = speed
+	ui.sync(flow)
+	ui.combat_hud.set_busy(true)
+	await stage.begin_on_board(board, tile, c.enemies, rig)
+	for i in c.enemies.size():
+		if not c.alive(i):
+			stage.enemies[i].visible = false
+			stage.huds[i].visible = false
+	stage.reframe()
+	stage.set_target(c.target)
+	tray.set_values(c.dice_values)
+	for i in tray.dice.size():
+		tray.set_marked(i, i < c.marked.size() and c.marked[i])
+		tray.set_locked(i, i < c.locked.size() and c.locked[i])
+	busy = false
 
 
 func _on_menu(action: String, arg: Variant) -> void:
@@ -172,7 +200,7 @@ func _on_menu(action: String, arg: Variant) -> void:
 		"class_chosen":
 			new_run(String(arg))
 		"back_to_title":
-			show_title()
+			leave_to_title()
 		"pause":
 			get_tree().paused = true
 		"resume":
@@ -180,9 +208,19 @@ func _on_menu(action: String, arg: Variant) -> void:
 		"abandon":
 			get_tree().paused = false
 			delete_save()
-			show_title()
+			leave_to_title()
 		"speed":
 			set_speed(float(arg))
+
+
+## Returns to the title. If events are still playing, playback stops at the next event
+## boundary (so no beat resumes on a cleared stage) and the title follows.
+func leave_to_title() -> void:
+	if busy:
+		aborting = true
+		overlay.fade_out(0.2)
+		return
+	show_title()
 
 
 func set_speed(s: float) -> void:
@@ -236,6 +274,10 @@ func play_events(evs: Array) -> void:
 	if not is_inside_tree():
 		return
 	busy = false
+	if aborting:
+		aborting = false
+		show_title()
+		return
 	_enter_idle()
 
 

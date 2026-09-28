@@ -9,6 +9,7 @@ extends RefCounted
 ##  game_shop / game_draft / game_forge / game_event / game_portal   modals and picks
 ##  game_boss     act boss fight (--act=1..3)
 ##  game_victory / game_defeat   summary screens
+##  game_continue runs --steps=N bot commands, JSON round-trips the run and presents it
 ##  game_manual   drives the UI like a player (ROLL -> tap die -> fight -> ATTACK -> draft),
 ##                saving a shot per step: <shot>_step_NN.png
 ##  play_auto     full run driven by Bot through the real presentation; periodic shots
@@ -18,7 +19,7 @@ extends RefCounted
 ## Common args: --class=knight|barbarian|mage|rogue --seed=N --act=N --speed=N
 
 const NAMES := ["game_title", "game_board", "game_rolled", "game_combat", "game_combo", "game_shop", "game_draft",
-	"game_forge", "game_event", "game_portal", "game_boss", "game_victory", "game_defeat", "game_manual", "play_auto"]
+	"game_forge", "game_event", "game_portal", "game_boss", "game_victory", "game_defeat", "game_manual", "game_continue", "play_auto"]
 
 
 static func names() -> PackedStringArray:
@@ -55,6 +56,8 @@ class _Driver extends Node:
 				await _auto()
 			"game_manual":
 				await _manual()
+			"game_continue":
+				_continue()
 			_:
 				await _state()
 
@@ -113,16 +116,25 @@ class _Driver extends Node:
 			"game_portal":
 				await c.play_events(f.debug_open("portal"))
 			"game_boss":
-				var bev := f.debug_open("boss")
-				print("DBG boss events ", bev.size(), " ", GameFlow.phase_name(f.phase))
-				await c.play_events(bev)
-				print("DBG boss played")
+				await c.play_events(f.debug_open("boss"))
 			"game_victory", "game_defeat":
 				f.run.stats.merge({"fights_won": 21, "damage_dealt": 2140, "damage_taken": 388, "gold_earned": 512,
 					"best_combo": "Full House", "best_mult": 4.0, "board_turns": 47, "max_act": 3 if scenario == "game_victory" else 2}, true)
 				var ev: Array[Dictionary] = []
 				f._finish(scenario == "game_victory", ev)
 				await c.play_events(ev)
+
+	## Plays --steps bot commands without presentation, round-trips the run through JSON (as
+	## the save does) and presents the loaded copy: checks Continue for mid-run phases.
+	func _continue() -> void:
+		var f := _flow()
+		for k in int(args.get("steps", "60")):
+			if f.is_over():
+				break
+			f.apply(Bot.next_command(f))
+		var loaded := GameFlow.from_dict(JSON.parse_string(JSON.stringify(f.to_dict())))
+		print("CONTINUE phase=%s act=%d lap=%d pos=%d" % [GameFlow.phase_name(loaded.phase), loaded.run.act, loaded.run.lap, loaded.run.pos])
+		c.start(loaded)
 
 	# --- manual-style drive through the UI signals ------------------------------------------
 

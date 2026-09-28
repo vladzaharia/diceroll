@@ -20,7 +20,7 @@ func _init(controller: GameController) -> void:
 
 func play(events: Array) -> void:
 	for ev: Dictionary in events:
-		if not is_instance_valid(c) or not c.is_inside_tree():
+		if not is_instance_valid(c) or not c.is_inside_tree() or c.aborting:
 			return
 		c.ui.on_event(ev, c.flow)
 		await _one(ev)
@@ -293,6 +293,8 @@ func _rune_fired(ev: Dictionary) -> void:
 	var i := int(ev.die_idx)
 	var col := UiPalette.rune_color(rune)
 	var v := int(ev.get("value", 0))
+	if v <= 0 and String(ev.get("effect", "")) in ["heal", "block", "gold", "bonus_damage", "poison"]:
+		return
 	var text := String(Runes.DEFS[rune].name) if Runes.DEFS.has(rune) else rune
 	match String(ev.get("effect", "")):
 		"bonus_damage": text = "+%d DMG" % v

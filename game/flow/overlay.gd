@@ -107,7 +107,7 @@ func announce(title: String, subtitle := "", color: Color = UiPalette.GOLD_BRIGH
 
 ## Pill message above the bottom HUD that rises and fades. `y_ratio` is the screen height
 ## fraction it appears at.
-func toast(text: String, icon := "", color: Color = UiPalette.TEXT, y_ratio := 0.42) -> void:
+func toast(text: String, icon := "", color: Color = UiPalette.TEXT, y_ratio := 0.47) -> void:
 	if modal_check.is_valid() and bool(modal_check.call()):
 		return
 	var p := PanelContainer.new()
