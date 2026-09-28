@@ -694,7 +694,7 @@ func _draft_option(id: String) -> Dictionary:
 
 func _open_rune_choice(source: String, ev: Array[Dictionary], n := 3) -> void:
 	var options: Array = []
-	for id in Runes.random_runes_in(run.rng, n, run.pool("runes")):
+	for id in Runes.random_runes_in(run.rng, n, _rune_pool()):
 		options.append(Runes.option(id))
 	_set_offer({"kind": "draft", "options": options, "source": source}, Phase.DRAFT, ev)
 
@@ -1216,7 +1216,19 @@ func portal_pick(tile_idx: int) -> Array[Dictionary]:
 ## Random rune / die kind / passive exclusions honouring the run's unlocked pools (meta layer).
 ## Legacy runs (no meta) draw from everything, exactly as before.
 func _rand_rune(rarity := "") -> String:
-	return Runes.random_rune_in(run.rng, run.pool("runes"), rarity)
+	return Runes.random_rune_in(run.rng, _rune_pool(), rarity)
+
+## The rune drop pool: the run's unlocked runes (all in legacy runs), minus Wild once the pool
+## already holds Balance.WILD_MAX_DICE Wild dice (a second one would do nothing).
+func _rune_pool() -> Array:
+	var p := run.pool("runes")
+	if run.dice_with_rune("wild").size() >= Balance.WILD_MAX_DICE:
+		var out: Array = []
+		for id in (p if not p.is_empty() else Runes.IDS):
+			if id != "wild":
+				out.append(id)
+		p = out
+	return p
 
 func _rand_kind() -> String:
 	return DiceKinds.random_kind_in(run.rng, run.pool("kinds"))

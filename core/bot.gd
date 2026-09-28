@@ -352,6 +352,49 @@ const BOARD_SAMPLES := 96
 ## Worth of a whole run in PV points (death penalties).
 const RUN_VALUE := 30.0
 
+## Realistic skill (AutoRules.skill == "realistic"): bounded rationality from a private Rng.
+##   REAL_MC_SAMPLES   Monte-Carlo samples per keep-set (expert: MC_SAMPLES)
+##   look-ahead        one reroll deep (expert: all remaining rerolls)
+##   REAL_NEAR         keep-sets within this share of the best EV are candidates, picked by
+##                     softmax with temperature REAL_TEMP x best EV
+##   REAL_GUT          chance of a "gut feel" keep: hold the best pair/set, reroll the rest
+##   REAL_TARGET_SLIP  chance of staying on the current target when the model would switch
+##                     (never when the model's pick dies to this attack)
+##   REAL_TASTE        draft/shop values get x(1 +- REAL_TASTE) noise; REAL_SHINY chance to
+##                     prefer a rare/epic/boss option by +REAL_SHINY_BONUS
+## Never: breaking a made Four of a Kind or better, or skipping a lethal-avoiding choice the
+## model is sure about (those paths are unchanged).
+const REAL_MC_SAMPLES := 24
+const REAL_NEAR := 0.9
+const REAL_TEMP := 0.04
+const REAL_GUT := 0.12
+const REAL_TARGET_SLIP := 0.15
+const REAL_TASTE := 0.15
+const REAL_SHINY := 0.25
+const REAL_SHINY_BONUS := 0.2
+
+static func _real(rules: AutoRules) -> bool:
+	return rules != null and rules.skill == "realistic"
+
+## Private Rng for realistic noise: a hash of the run seed, the command count and a salt.
+static func _noise_rng(f: GameFlow, salt: int) -> Rng:
+	return Rng.new(hash([f.run.seed, f.commands.size(), int(f.run.stats.get("combat_turns", 0)), salt]))
+
+## Softmax pick over `vals` restricted to those within REAL_NEAR of the best.
+static func _soft_pick(vals: Array, rng: Rng) -> int:
+	var best := 0
+	for i in vals.size():
+		if float(vals[i]) > float(vals[best]):
+			best = i
+	var top := float(vals[best])
+	var t := maxf(0.05, absf(top) * REAL_TEMP)
+	var ws := {}
+	for i in vals.size():
+		var v := float(vals[i])
+		if v >= top - absf(top) * (1.0 - REAL_NEAR) - 0.001:
+			ws[i] = exp((v - top) / t)
+	return int(rng.weighted(ws))
+
 static var _combo_cache := {}
 static var _fixed_cache := {}
 static var _plan_cache := {}
@@ -380,6 +423,10 @@ static func decide(f: GameFlow, rules: AutoRules = null) -> Dictionary:
 		rules = AutoRules.new()
 	if f.is_over():
 		return _stop("The run is over.")
+	# Meta layer (potions, minigames, minigame rewards): see core/bot_meta.gd.
+	var meta_d := BotMeta.decide(f, rules)
+	if not meta_d.is_empty():
+		return meta_d
 	var low := rules.stop_hp_below > 0.0 and hp_ratio(f) < rules.stop_hp_below
 	var low_msg := "HP is below %d%%." % int(round(rules.stop_hp_below * 100.0))
 	match f.phase:
@@ -673,8 +720,8 @@ class CombatModel:
 			dw.append(ws)
 			var rc := int(Bot.RUNE_CODE.get(String(dice[i][1]), 0))
 			rune[i] = rc
-			if rc == Bot.R_WILD:
-				wild_mask |= 1 << i
+			if rc == Bot.R_WILD and wild_mask == 0:
+				wild_mask |= 1 << i  # only the first Wild die acts as Wild (Balance.WILD_MAX_DICE)
 
 	func set_passives(ps: Array, gold: int, first_turn: bool) -> void:
 		pair_master = ps.has("pair_master")
@@ -755,13 +802,15 @@ class CombatModel:
 		var gold := 0.0
 		var lucky := 0
 		var frost := false
+		var heavy_left := Balance.HEAVY_MAX
 		for i in n:
 			var p := eff[i]
 			var rc := rune[i]
 			var ing := ((gm >> i) & 1) == 1
 			var rerolled := ((rer >> i) & 1) == 1
 			var t := times_group if (ing and rc != 0) else 1.0
-			if rc == Bot.R_HEAVY:
+			if rc == Bot.R_HEAVY and ing and heavy_left > 0:
+				heavy_left -= 1
 				sum += p * (1.0 + t)
 			else:
 				sum += p
@@ -1023,10 +1072,15 @@ static func _outcomes(cm: CombatModel, cur: PackedInt32Array, mask: int, samples
 ## expected best outcome over the remaining rerolls: V1 = E[S], Vr = E[max(S, V(r-1))] (reroll
 ## the same dice again if the result is worse than trying again). Returns
 ## {mask, value, now, chase:String, chance:float}.
-static func _plan_rerolls(cm: CombatModel, cur: PackedInt32Array, rer_prev: int, free_mask: int, rerolls: int, seed: int) -> Dictionary:
+static func _plan_rerolls(cm: CombatModel, cur: PackedInt32Array, rer_prev: int, free_mask: int, rerolls: int, seed: int, real := false) -> Dictionary:
 	var ns := MC_SAMPLES_6 if cm.n >= 6 else MC_SAMPLES
+	if real:
+		ns = REAL_MC_SAMPLES
+	var cand_masks: Array = [0]
+	var cand_vals: Array = []
 	var samples := _samples(seed, ns)
 	var now := cm.score(cur, rer_prev)
+	cand_vals.append(now)
 	var best_v := now
 	var best_mask := 0
 	var v := cur.duplicate()
@@ -1079,14 +1133,20 @@ static func _plan_rerolls(cm: CombatModel, cur: PackedInt32Array, rer_prev: int,
 				ev += x * w
 		for i in idx:
 			v[i] = cur[i]
-		for r in range(1, rerolls):
+		for r in range(1, 1 if real else rerolls):
 			var nv := 0.0
 			for k in sc.size():
 				nv += maxf(sc[k], ev) * ws[k]
 			ev = nv
+		cand_masks.append(mask)
+		cand_vals.append(ev)
 		if ev > best_v + 0.05:
 			best_v = ev
 			best_mask = mask
+	if real and cand_masks.size() > 1:
+		var pick := _soft_pick(cand_vals, Rng.new(seed ^ 0x5eed))
+		best_mask = int(cand_masks[pick])
+		best_v = float(cand_vals[pick])
 	var plan := {"mask": best_mask, "value": best_v, "now": now, "chase": "", "chance": 0.0}
 	if best_mask != 0:
 		# the combo worth chasing: max mult x P(reaching at least that mult)
@@ -1126,7 +1186,7 @@ static func _combat_key(f: GameFlow, rules: AutoRules) -> int:
 		dd.append([d.faces, d.rune])
 	return hash([f.run.seed, int(f.run.stats.get("combat_turns", 0)), c.turn, c.rerolls_left, c.dice_values,
 		c.locked, c.rerolled, en, dd, f.run.hp, f.run.max_hp, f.run.block, f.run.gold, f.run.passives,
-		f.run.banked_rerolls, rules.focus])
+		f.run.banked_rerolls, rules.focus, rules.skill])
 
 static func _enemy_name(f: GameFlow, i: int) -> String:
 	return String(f.combat.enemies[i].name) if i >= 0 and i < f.combat.enemies.size() else "?"
@@ -1146,11 +1206,24 @@ static func _combat_plan(f: GameFlow, rules: AutoRules) -> Dictionary:
 			rer_prev |= 1 << i
 		# a Wild die already counts as its best value, and a one-value die can't change: never
 		# worth a reroll (this also halves the search)
-		if not c.locked[i] and cm.rune[i] != R_WILD and (cm.dv[i].size() > 1 or cm.rune[i] == R_THUNDER):
+		if not c.locked[i] and ((cm.wild_mask >> i) & 1) == 0 and (cm.dv[i].size() > 1 or cm.rune[i] == R_THUNDER):
 			free_mask |= 1 << i
 	var plan := {"mask": 0, "chase": "", "chance": 0.0}
+	var real := _real(rules)
+	var cur_cb := _combo(cur, cm.wild_mask)
 	if c.rerolls_left > 0 and free_mask != 0:
-		plan = _plan_rerolls(cm, cur, rer_prev, free_mask, c.rerolls_left, key)
+		plan = _plan_rerolls(cm, cur, rer_prev, free_mask, c.rerolls_left, key, real)
+		if real:
+			var nrng := Rng.new(key ^ 0x6a7)
+			var grp: int = cur_cb[1]
+			if nrng.chance(REAL_GUT) and grp != 0 and float(cur_cb[0]) >= 1.5 and float(cur_cb[0]) < 5.0:
+				# gut feel: keep the pair/set, reroll everything else that can move
+				var gut := free_mask & ~grp
+				if gut != 0:
+					plan = {"mask": gut, "chase": "", "chance": 0.0, "gut": true}
+			if float(cur_cb[0]) >= 5.0:
+				# never break a made Four of a Kind or better
+				plan = {"mask": 0, "chase": "", "chance": 0.0}
 	var out := {"mask": int(plan.mask), "target": -1}
 	if int(plan.mask) != 0:
 		var k := 0
@@ -1158,7 +1231,9 @@ static func _combat_plan(f: GameFlow, rules: AutoRules) -> Dictionary:
 			if (int(plan.mask) >> i) & 1:
 				k += 1
 		var what := "Rerolling %d %s" % [k, "die" if k == 1 else "dice"]
-		if String(plan.chase) != "":
+		if bool(plan.get("gut", false)):
+			out.reason = "%s: keeping the %s, gut feel" % [what, String(Combo.TABLE[cur_cb[4]].name)]
+		elif String(plan.chase) != "":
 			out.reason = "%s to chase %s (%d%%)" % [what, plan.chase, int(round(float(plan.chance) * 100.0))]
 		else:
 			out.reason = "%s for more damage" % what
@@ -1166,6 +1241,9 @@ static func _combat_plan(f: GameFlow, rules: AutoRules) -> Dictionary:
 		cm.use_memo = false
 		cm.score(cur, rer_prev)
 		out.target = cm.last_target
+		if real and cm.last_target >= 0 and cm.last_target != c.target and c.alive(c.target) \
+				and cm.last_dmg < float(c.enemies[cm.last_target].hp) and Rng.new(key ^ 0x7a9).chance(REAL_TARGET_SLIP):
+			out.target = c.target
 		var cb := _combo(cur, cm.wild_mask)
 		var name := String(Combo.TABLE[cb[4]].name)
 		var t := _enemy_name(f, cm.last_target)
@@ -1481,12 +1559,28 @@ static func _rune_why(f: GameFlow, r: String, i: int) -> String:
 
 # ------------------------------------------------------------------------------ drafts
 
+## Realistic taste: value x(1 +- REAL_TASTE), and sometimes a bonus for shiny rarities.
+static func _taste(f: GameFlow, rules: AutoRules, o: Dictionary, v: float, salt: int) -> float:
+	if not _real(rules) or v == -INF:
+		return v
+	var rng := _noise_rng(f, salt)
+	v *= 1.0 + (rng.randf() * 2.0 - 1.0) * REAL_TASTE
+	var rar := String(o.get("rarity", ""))
+	if rar == "" and o.has("rune"):
+		rar = Runes.rarity(String(o.rune))
+	if rar == "" and o.has("kind") and DiceKinds.DEFS.has(String(o.kind)):
+		rar = String(DiceKinds.DEFS[String(o.kind)].rarity)
+	if rar in ["rare", "epic", "boss"] and rng.chance(REAL_SHINY):
+		v += absf(v) * REAL_SHINY_BONUS
+	return v
+
 static func _decide_draft(f: GameFlow, rules: AutoRules) -> Dictionary:
 	var best := 0
 	var best_v := -INF
 	var why := ""
 	for i in f.offer.options.size():
 		var ov := _option_value(f, rules, f.offer.options[i])
+		ov[0] = _taste(f, rules, f.offer.options[i], float(ov[0]), 100 + i)
 		if float(ov[0]) > best_v:
 			best_v = float(ov[0])
 			best = i
@@ -1525,7 +1619,7 @@ static func _decide_shop(f: GameFlow, rules: AutoRules) -> Dictionary:
 		if String(it.id) == "combat_reroll" and (run.shop_reroll_bought or run.combat_rerolls >= Balance.MAX_COMBAT_REROLLS):
 			continue
 		var ov := _option_value(f, rules, it)
-		var v := float(ov[0])
+		var v := _taste(f, rules, it, float(ov[0]), 200 + i)
 		var price := float(it.price)
 		if String(it.id) != "die" and run.gold - price < reserve:
 			continue

@@ -13,6 +13,10 @@ extends RefCounted
 ## `fight_miniboss`: "auto" (fight when it looks winnable), "always", "never" (avoid the tile).
 
 const FOCUSES := ["balanced", "damage", "defense", "economy"]
+## "realistic": the smart policy with bounded rationality (noisy near-best choices, shallower
+## combat search, occasional gut-feel keeps and simpler draft/shop taste), the balance
+## reference and the default. "expert": the full smart policy.
+const SKILLS := ["realistic", "expert"]
 const MINIBOSS_MODES := ["auto", "always", "never"]
 
 # scope
@@ -32,18 +36,20 @@ var stop_on_shop: bool = true
 # priorities
 var focus: String = "balanced"
 var fight_miniboss: String = "auto"
+var skill: String = "realistic"
 
 const _BOOLS := ["board", "combat", "drafts", "shop", "forge", "events", "portal",
 	"stop_before_miniboss", "stop_before_boss", "stop_on_boss_passive", "stop_on_shop"]
 
 ## Every scope on and no stop conditions: AUTO plays the whole run (balance sim).
-static func all_on(p_focus := "balanced") -> AutoRules:
+static func all_on(p_focus := "balanced", p_skill := "realistic") -> AutoRules:
 	var r := AutoRules.new()
 	r.shop = true
 	r.stop_before_boss = false
 	r.stop_on_boss_passive = false
 	r.stop_on_shop = false
 	r.focus = p_focus if FOCUSES.has(p_focus) else "balanced"
+	r.skill = p_skill if SKILLS.has(p_skill) else "realistic"
 	return r
 
 func to_dict() -> Dictionary:
@@ -53,6 +59,7 @@ func to_dict() -> Dictionary:
 	d["stop_hp_below"] = stop_hp_below
 	d["focus"] = focus
 	d["fight_miniboss"] = fight_miniboss
+	d["skill"] = skill
 	return d
 
 ## Missing keys keep their defaults; invalid values fall back to them.
@@ -69,4 +76,6 @@ static func from_dict(d: Dictionary) -> AutoRules:
 	r.focus = f if FOCUSES.has(f) else "balanced"
 	var m := String(d.get("fight_miniboss", "auto"))
 	r.fight_miniboss = m if MINIBOSS_MODES.has(m) else "auto"
+	var sk := String(d.get("skill", "realistic"))
+	r.skill = sk if SKILLS.has(sk) else "realistic"
 	return r

@@ -4,7 +4,9 @@ extends SceneTree
 ## Usage: godot --headless --path . -s tools/sim.gd -- --runs=300 --class=all --seed=1
 ##        [--board=24|28|32] [--route=glade,frost,magma] [--boss=boss_lich] [--verbose]
 ##        [--profile=none|fresh|mid|max] [--asc=N] [--mode=standard|short] [--mg=par|play]
-##        [--pet=<id>|none] [--policy=greedy|smart] [--focus=balanced|damage|defense|economy]
+##        [--pet=<id>|none] [--policy=greedy|realistic|expert] [--focus=balanced|damage|defense|economy]
+## --policy: greedy = the naive Bot.next_command floor; realistic = Bot.decide with
+## AutoRules.skill "realistic" (the balance reference); expert (alias smart) = full smart AUTO.
 ##        [--campaign=N [--campaigns=M]]
 ## Without --route each run draws its own route (one biome per tier) and bosses from its seed.
 ## --profile runs with a canonical meta profile (core/meta/presets.gd; default none = legacy
@@ -71,8 +73,8 @@ func _init() -> void:
 			pet_override = arg.substr(6)
 		elif arg.begins_with("--policy="):
 			policy = arg.substr(9)
-			if not (policy in ["greedy", "smart"]):
-				print("bad --policy (greedy|smart): ", policy)
+			if not (policy in ["greedy", "smart", "expert", "realistic"]):
+				print("bad --policy (greedy|realistic|expert; smart = expert): ", policy)
 				quit(2)
 				return
 		elif arg.begins_with("--focus="):
@@ -87,7 +89,7 @@ func _init() -> void:
 			campaigns = arg.substr(12).to_int()
 		elif arg == "--verbose":
 			verbose = true
-	rules = AutoRules.all_on(focus)
+	rules = AutoRules.all_on(focus, "realistic" if policy == "realistic" else "expert")
 	if campaign > 0:
 		_campaign(campaign, campaigns, seed0, board, String(opts.get("mode", "standard")))
 		quit(0 if total_errors == 0 else 1)
@@ -186,9 +188,9 @@ func _init() -> void:
 	_table("route / final boss", by_combo)
 	_table("mini-boss", by_mini, false)
 	print("")
-	print("policy=%s%s board=%d laps=%d mode=%s profile=%s asc=%d mg=%s opts=%s" % [policy, (" focus=" + focus) if policy == "smart" else "",
+	print("policy=%s%s board=%d laps=%d mode=%s profile=%s asc=%d mg=%s opts=%s" % [policy, (" focus=" + focus) if policy != "greedy" else "",
 		board, Balance.TOTAL_LAPS, String(opts.get("mode", "standard")), profile_name, asc, BotMeta.minigame_mode, str(opts.keys())])
-	if policy == "smart":
+	if policy != "greedy":
 		print("decide(): %d calls, avg %.2f ms, max %.1f ms, unexpected stops %d" % [decide_calls, decide_us / 1000.0 / maxi(1, decide_calls), decide_max_us / 1000.0, stops])
 	print("overall win%%=%.1f runs/class=%d seed=%d errors=%d capped=%d time=%.1fs" % [100.0 * all_wins / maxi(1, all_runs), runs, seed0, total_errors, total_stuck, (Time.get_ticks_msec() - t0) / 1000.0])
 	quit(0 if total_errors == 0 and total_stuck == 0 else 1)
@@ -226,7 +228,7 @@ func _play(c: String, s: int, board: int, opts: Dictionary, verbose := false) ->
 
 ## The policy's next command.
 func _next(f: GameFlow) -> Array:
-	if policy != "smart":
+	if policy == "greedy":
 		return Bot.next_command(f)
 	var t1 := Time.get_ticks_usec()
 	var d := Bot.decide(f, rules)

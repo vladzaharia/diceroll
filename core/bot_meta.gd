@@ -275,3 +275,35 @@ static func _spend_rank(it: Dictionary) -> float:
 		var order := ["classes", "packs", "pets", "minigames", "biomes", "potions", "gear", "minibosses", "bosses"]
 		return 10000.0 + order.find(String(it.kind)) * 10.0 + int(c.sigils)
 	return float(c.get("crowns", 0))
+
+# ------------------------------------------------------------------ AUTO (Bot.decide)
+
+## The meta part of Bot.decide(): {} when there is nothing meta to do, else a decide() result
+## {cmd, reason, stop, stop_reason}. Minigames always use AUTO's par result.
+static func decide(f: GameFlow, rules: AutoRules) -> Dictionary:
+	var cmd := next_command(f)
+	if cmd.is_empty():
+		if f.phase == GameFlow.Phase.MINIGAME:
+			return _res(["minigame_finish"], "Finishing the minigame")
+		return {}
+	match String(cmd[0]):
+		"minigame_auto":
+			return _res(cmd, "Minigame: taking the par result")
+		"minigame_finish":
+			return _res(cmd, "Minigame: cashing in")
+		"minigame_action":
+			return _res(cmd, "Minigame: playing")
+		"pick_draft":
+			if not rules.drafts:
+				return {"cmd": [], "reason": "", "stop": true, "stop_reason": "AUTO drafts are off."}
+			return _res(cmd, "Minigame reward: " + String(f.offer.options[int(cmd[1])].label))
+		"use_potion":
+			return _res(cmd, "Drinking a %s" % PotionDefs.name_of(f.run.belt[int(cmd[1])]))
+		"shop_buy":
+			if not rules.shop:
+				return {}
+			return _res(cmd, "Buying a potion for the belt")
+	return _res(cmd, "")
+
+static func _res(cmd: Array, reason: String) -> Dictionary:
+	return {"cmd": cmd, "reason": reason, "stop": false, "stop_reason": ""}

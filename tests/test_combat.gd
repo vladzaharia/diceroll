@@ -88,10 +88,29 @@ func test_hero_atk_is_flat() -> void:
 	assert_eq(_first(ev, "combo").total, 16)
 
 func test_heavy_doubles_pips() -> void:
+	_setup(["heavy", "", ""])
+	_dice([2, 2, 5])
+	var ev := c.attack(run)
+	assert_eq(_first(ev, "combo").total, 16, "(4+2+5)*1.5: Heavy in the scoring pair")
+
+func test_heavy_only_in_group() -> void:
 	_setup(["", "", "heavy"])
 	_dice([2, 2, 5])
 	var ev := c.attack(run)
-	assert_eq(_first(ev, "combo").total, 21, "(2+2+10)*1.5")
+	assert_eq(_first(ev, "combo").total, 13, "(2+2+5)*1.5: Heavy outside the group does nothing")
+	assert_true(_first(ev, "rune_fired").is_empty(), "no Heavy event outside the group")
+
+func test_heavy_caps_at_two_dice() -> void:
+	_setup(["heavy", "heavy", "heavy"])
+	_dice([3, 3, 3])
+	var ev := c.attack(run)
+	assert_eq(_first(ev, "combo").total, 37, "(6+6+3)*2.5: only HEAVY_MAX=2 Heavy dice double")
+
+func test_only_one_wild_die_counts() -> void:
+	_setup(["wild", "wild", ""])
+	_dice([1, 1, 5])
+	var cb := c.current_combo(run)
+	assert_eq(String(cb.id), "pair", "one Wild pairs with the 5; the second Wild is a plain 1")
 
 func test_blade_only_in_group() -> void:
 	_setup(["blade", "", ""])

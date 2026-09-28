@@ -43,6 +43,11 @@ const MAX_SUMMONED_ALIVE := 3
 const BURN_SCALE := 0.5
 ## Damage a Thorns enemy (Briar Beast) reflects when hit by your attack (never lethal).
 const ENEMY_THORNS := 3
+## Anti-stacking (2026-09-28 balance pass): only this many Wild dice act as Wild (the first
+## ones in pool order; offers skip Wild once you have one), and Heavy doubles pips only for
+## dice in the scoring group, at most HEAVY_MAX of them per attack.
+const WILD_MAX_DICE := 1
+const HEAVY_MAX := 2
 
 # Biome twists (core/content/biomes.gd)
 const GLADE_CAMPFIRE_HEAL_PCT := 0.45

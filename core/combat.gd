@@ -274,8 +274,13 @@ func set_target(i: int) -> Array[Dictionary]:
 ## Best combo for the current dice (Wild aware), without resolving anything.
 func current_combo(run: RunState) -> Dictionary:
 	var wild: Array[bool] = []
+	var left := Balance.WILD_MAX_DICE
 	for d in run.dice:
-		wild.append(d.rune == "wild")
+		# anti-stacking: only the first WILD_MAX_DICE Wild dice act as Wild
+		var w := d.rune == "wild" and left > 0
+		if w:
+			left -= 1
+		wild.append(w)
 	return Combo.evaluate(dice_values, wild)
 
 func _fix_target() -> void:
@@ -328,6 +333,8 @@ func attack(run: RunState) -> Array[Dictionary]:
 	var sum := 0
 	var bonus := 0
 	var flat := 0
+	var heavy_left := Balance.HEAVY_MAX
+	var wild_left := Balance.WILD_MAX_DICE
 	var steady := 0
 	var boxcars := 0
 	var snakes := 0
@@ -335,7 +342,9 @@ func attack(run: RunState) -> Array[Dictionary]:
 		var pips := int(eff[i])
 		var rune := run.dice[i].rune
 		var in_group := group.has(i)
-		if rune == "heavy":
+		if rune == "heavy" and in_group and heavy_left > 0:
+			# anti-stacking: Heavy doubles only inside the scoring group, at most HEAVY_MAX dice
+			heavy_left -= 1
 			sum += pips * (1 + times[i])
 			for k in times[i]:
 				ev.append(_rune(i, rune, "double_pips", pips))
@@ -349,7 +358,8 @@ func attack(run: RunState) -> Array[Dictionary]:
 			mult += 0.5 * times[i]
 			for k in times[i]:
 				ev.append(_rune(i, rune, "mult", 0))
-		if rune == "wild":
+		if rune == "wild" and wild_left > 0:
+			wild_left -= 1
 			ev.append(_rune(i, rune, "wild", pips))
 		if run.has_passive("steady_hand") and not rerolled[i]:
 			steady += 1
