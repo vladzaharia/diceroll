@@ -64,6 +64,11 @@ func play(combo_name: String, mult: float, total := 0) -> void:
 	var name_col: Color = [UiPalette.TEXT, UiPalette.GOLD_BRIGHT, Color("ffe066")][tier]
 	var outline_col: Color = [UiPalette.OUTLINE, Color("5a2a08"), Color("7a1020")][tier]
 	var fs := int(78 * scale_k)
+	# fit the name inside the screen width
+	var tw := UiTheme.display_font().get_string_size(combo_name.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + fs * 0.4
+	var avail := maxf(200.0, size.x - 64.0)
+	if tw > avail:
+		fs = int(fs * avail / tw)
 	_name.text = combo_name.to_upper()
 	_name.label_settings = _ls(fs, name_col, outline_col, int(fs * 0.2))
 	_mult.text = "×" + CombatHud._fmt(mult)
@@ -96,8 +101,7 @@ func play(combo_name: String, mult: float, total := 0) -> void:
 	if hold:
 		return
 	_tween.chain().tween_interval(0.75 + 0.2 * tier)
-	_tween.chain().set_parallel(true)
-	_tween.tween_property(_col, "modulate:a", 0.0, 0.25)
+	_tween.chain().tween_property(_col, "modulate:a", 0.0, 0.25)
 	_tween.tween_property(_col, "position:y", _col.position.y - 60.0, 0.25)
 	_tween.tween_property(_rays, "modulate:a", 0.0, 0.25)
 	_tween.chain().tween_callback(func() -> void:

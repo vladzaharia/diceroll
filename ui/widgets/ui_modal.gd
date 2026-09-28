@@ -86,9 +86,12 @@ func open() -> void:
 	await get_tree().process_frame
 	_layout()
 	_frame.pivot_offset = _frame.size * 0.5
+	var target := _frame.position
+	_frame.position.y += 70.0
 	var t := create_tween().set_parallel(true)
 	t.tween_property(scrim, "modulate:a", 1.0, 0.18)
 	t.tween_property(_frame, "modulate:a", 1.0, 0.14)
+	t.tween_property(_frame, "position", target, 0.3).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	t.tween_property(_frame, "scale", Vector2.ONE, 0.32).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	UiTheme.sfx("open")
 	opened.emit()

@@ -56,7 +56,7 @@ static func build(name: String) -> Node:
 				h.show_sheet.call_deferred(true)
 			if name == "ui_combo_banner":
 				var b := ComboBanner.new()
-				b.hold = true
+				b.hold = _arg("hold", "1") == "1"
 				ui.add_child(b)
 				var mult := float(_arg("mult", "3.5"))
 				b.play.call_deferred(String(_arg("combo", "Full House")), mult, int(_arg("total", "64")))
@@ -133,7 +133,10 @@ static func _modal(ui: Control, m: UiModal, flow: GameFlow) -> void:
 	h.refresh(flow)
 	ui.add_child(m)
 	m.call("refresh", flow)
-	m.show_now()
+	if _arg("anim", "0") == "1":
+		m.open.call_deferred()
+	else:
+		m.show_now()
 
 
 ## A mid-run flow: act 2 lap 2, some gold/xp, a 5-die pool with runes and an edited face.

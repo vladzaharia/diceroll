@@ -85,7 +85,7 @@ func _draw() -> void:
 	var gl := UiTheme.box(Color(1, 1, 1, 0.22), r)
 	draw_style_box(gl, Rect2(top.position + Vector2(s * 0.08, s * 0.05), Vector2(s * 0.84, s * 0.3)))
 	# wild: rainbow rim
-	if rune == "wild":
+	if rune == "wild" and s >= 56.0:
 		var n := 24
 		for i in n:
 			var a0 := TAU * i / n
