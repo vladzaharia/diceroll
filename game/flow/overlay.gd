@@ -16,6 +16,8 @@ var _ann_title: Label
 var _ann_sub: Label
 var _ann_tween: Tween
 var _toast_count := 0
+## Returns true while a modal is open; toasts are skipped then (the modal shows the change).
+var modal_check: Callable
 
 
 func _init() -> void:
@@ -106,6 +108,8 @@ func announce(title: String, subtitle := "", color: Color = UiPalette.GOLD_BRIGH
 ## Pill message above the bottom HUD that rises and fades. `y_ratio` is the screen height
 ## fraction it appears at.
 func toast(text: String, icon := "", color: Color = UiPalette.TEXT, y_ratio := 0.42) -> void:
+	if modal_check.is_valid() and bool(modal_check.call()):
+		return
 	var p := PanelContainer.new()
 	p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.panel_box("pill"), 24, 12))
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE

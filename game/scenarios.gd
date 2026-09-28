@@ -113,7 +113,10 @@ class _Driver extends Node:
 			"game_portal":
 				await c.play_events(f.debug_open("portal"))
 			"game_boss":
-				await c.play_events(f.debug_open("boss"))
+				var bev := f.debug_open("boss")
+				print("DBG boss events ", bev.size(), " ", GameFlow.phase_name(f.phase))
+				await c.play_events(bev)
+				print("DBG boss played")
 			"game_victory", "game_defeat":
 				f.run.stats.merge({"fights_won": 21, "damage_dealt": 2140, "damage_taken": 388, "gold_earned": 512,
 					"best_combo": "Full House", "best_mult": 4.0, "board_turns": 47, "max_act": 3 if scenario == "game_victory" else 2}, true)

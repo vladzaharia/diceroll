@@ -84,6 +84,7 @@ func _ready() -> void:
 	add_child(ov_layer)
 	overlay = GameOverlay.new()
 	ov_layer.add_child(overlay)
+	overlay.modal_check = any_modal_open
 
 	player = EventPlayer.new(self)
 	set_speed(SettingsPanel.game_speed())
@@ -273,11 +274,19 @@ func _enter_idle() -> void:
 			pass
 	tray.set_interactive(ph == GameFlow.Phase.BOARD_ROLLED or ph == GameFlow.Phase.COMBAT)
 	if flow.is_over():
+		tray.visible = false
 		delete_save()
 		run_over.emit(flow.phase == GameFlow.Phase.VICTORY)
 	elif ph != GameFlow.Phase.COMBAT:
 		save()
 	idle.emit(ph)
+
+
+func any_modal_open() -> bool:
+	for m: UiModal in [ui.draft, ui.rune_assign, ui.shop, ui.forge, ui.event, ui.summary]:
+		if m.visible and m.is_open():
+			return true
+	return false
 
 
 func close_modals() -> void:
@@ -338,6 +347,11 @@ func begin_combat(ev: Dictionary) -> void:
 
 
 func end_combat(ev: Dictionary) -> void:
+	# swap to the board HUD (bottom bar stays hidden while the rest of the batch plays)
+	ui.combat_hud.visible = false
+	ui.board_hud.set_busy(true)
+	ui.board_hud.visible = true
+	ui.board_hud.refresh(flow)
 	tray.clear_highlight()
 	for i in tray.dice.size():
 		tray.set_marked(i, false)
@@ -354,7 +368,7 @@ func end_combat(ev: Dictionary) -> void:
 		UiPalette.GOLD_BRIGHT, 0.9)
 	await wait(1.3)
 	board.hero.anim_player.speed_scale = 1.0
-	stage.end_on_board(false)
+	stage.end_on_board(true)
 	in_combat = false
 	await wait(0.2)
 
@@ -518,7 +532,7 @@ func _update_combat_rect() -> void:
 		var top := 0.12
 		rig.combat_rect_portrait = Rect2(0.05, top, 0.9, maxf(bottom - top, 0.3))
 	else:
-		var top := 0.16
+		var top := 0.12
 		rig.combat_rect_landscape = Rect2(0.2, top, 0.6, maxf(bottom - top, 0.3))
 		# board overview: keep the ring above the ROLL bar (it sits right above the tray)
 		var bar_top := (vs.y - UiTheme.tray_height(vs) - 20.0 - 124.0) / vs.y

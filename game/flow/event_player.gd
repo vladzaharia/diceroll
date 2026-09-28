@@ -101,6 +101,8 @@ func _one(ev: Dictionary) -> void:
 			Audio.play_sfx("dice_select")
 			await _wait(0.3)
 		"rune_assigned":
+			if c.flow.phase != GameFlow.Phase.SHOP:
+				c.close_modals()
 			c.tray.set_dice(c.flow.run.dice)
 			var rn := String(ev.rune)
 			c.overlay.toast("%s rune bound to die %d" % [String(Runes.DEFS[rn].name), int(ev.die_idx) + 1],
@@ -110,6 +112,8 @@ func _one(ev: Dictionary) -> void:
 			await _wait(0.45)
 			c.tray.clear_highlight()
 		"face_changed":
+			if c.flow.phase != GameFlow.Phase.SHOP and c.flow.phase != GameFlow.Phase.COMBAT:
+				c.close_modals()
 			c.tray.set_dice(c.flow.run.dice)
 		"item_bought":
 			Audio.play_sfx("coin")
