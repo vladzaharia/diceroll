@@ -234,8 +234,14 @@ func _dice_rolled(ev: Dictionary) -> void:
 	if c.tray.dice.size() != c.flow.run.dice.size():
 		c.tray.set_dice(c.flow.run.dice)
 	c.tray.clear_highlight()
+	if String(ev.get("context", "")) == "board":
+		# the camera pulls out while the dice tumble, so the landing tile is in view
+		c.tray.clear_chosen()
+		c.board.clear_targets()
+		c.rig.overview(c.board.ring_bounds())
 	c.tray.roll(values, idx)
 	await c.tray.settled
+
 
 
 ## After the tray settles: the two moving dice lift and glow (the rest dim), the target
@@ -424,7 +430,7 @@ func _tile_triggered(ev: Dictionary) -> void:
 		"portal":
 			Audio.play_sfx("portal")
 			Fx.portal_swirl(c.board, c.board.tile_position(idx) + Vector3.UP * 0.7, 0.8, true)
-		"enemy", "elite":
+		"enemy", "elite", "miniboss":
 			Audio.play_sfx("swing")
 	await _wait(0.3)
 

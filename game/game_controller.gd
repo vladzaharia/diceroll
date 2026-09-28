@@ -146,7 +146,11 @@ func start(f: GameFlow) -> void:
 	get_tree().paused = false
 	stage.clear()
 	stage.speed = speed
+	tray.modulate.a = 1.0
+	ui.combat_hud.modulate.a = 1.0
+	overlay.vignette(0.0, 0.01)
 	board.hero_class = f.run.class_id
+
 	board.hero_idx = f.run.pos
 	board.build(f.run.act, f.run.board.to_dict().tiles)
 	if f.phase == GameFlow.Phase.BOARD_READY:

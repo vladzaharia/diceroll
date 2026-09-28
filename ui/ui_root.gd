@@ -146,7 +146,7 @@ func inspect_die(flow: GameFlow, idx: int) -> void:
 
 
 ## A passive was gained: pops it into both HUD passive bars.
-func add_passive(flow: GameFlow, id: String) -> void:
+func add_passive(_flow: GameFlow, id: String) -> void:
 	board_hud.top.add_passive(id)
 	combat_hud.top.add_passive(id)
 
