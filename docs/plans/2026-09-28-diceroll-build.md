@@ -10,7 +10,7 @@
 
 ## Commands
 
-- Tests: `godot --headless --path . -s tests/run_tests.gd` (optional `-- --filter=combo`)
+- Tests: `./tests/run.sh` (wraps the runner; fails on SCRIPT ERROR). Contract additions from WP-A2 are listed in docs/plans/balance.md and core/game_flow.gd.
 - Import after adding assets: `godot --headless --path . --import`
 - Screenshot: `godot --path . --resolution 720x1280 -- --scenario=<name> --shot=<abs.png> --wait=2.0`
   (a real window with a renderer is required, so do NOT pass `--headless`. It quits by itself after the shot.)
