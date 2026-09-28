@@ -27,6 +27,10 @@ const PASSIVE_SCORE := {
 }
 
 static func next_command(f: GameFlow) -> Array:
+	# Meta layer (potions, minigames, minigame rewards): see core/bot_meta.gd.
+	var meta_cmd := BotMeta.next_command(f)
+	if not meta_cmd.is_empty():
+		return meta_cmd
 	match f.phase:
 		GameFlow.Phase.BOARD_READY:
 			return ["roll_board"]
@@ -107,6 +111,8 @@ static func tile_score(f: GameFlow, idx: int, crossing: bool) -> float:
 			s = 2.0
 		"start":
 			s = 3.0
+		"minigame":
+			s = 3.5
 	if crossing and f.run.lap < Balance.TOTAL_LAPS:
 		s += 3.0
 	return s

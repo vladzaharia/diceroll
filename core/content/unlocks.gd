@@ -1,0 +1,220 @@
+class_name UnlockDefs
+extends RefCounted
+## Meta-layer tables (review §4–§6 plus the user decisions of 2026-09-28): what a fresh profile
+## owns, the Workshop unlock packs, milestone unlocks, Sigil prices, Crowns upgrades and the
+## Ascension ladder. Everything is deterministic: a milestone either happened or it didn't, and
+## every price is fixed.
+
+# ------------------------------------------------------------------ lockable content
+
+## Unlock kinds. Every kind can be earned by a milestone; SIGIL_PRICE kinds can also be bought
+## early with Sigils. "features" only come from milestones (they make a Crowns upgrade
+## purchasable).
+const KINDS := ["classes", "biomes", "bosses", "minibosses", "pets", "minigames", "packs", "gear", "potions", "features"]
+
+const SIGIL_PRICE := {
+	"classes": 4, "biomes": 3, "bosses": 2, "minibosses": 2, "pets": 3, "minigames": 3, "packs": 3, "gear": 2, "potions": 2,
+}
+
+## A fresh profile. Classes: Knight only (all four when the profile's lock_classes flag is off).
+## Route: Glade -> Hollow -> Throne with the Pumpkin Knight and the Lich. No pet on run 1.
+const STARTER := {
+	"classes": ["knight"],
+	"biomes": ["glade", "hollow", "throne"],
+	"bosses": ["boss_lich"],
+	"minibosses": ["mini_pumpkin_knight"],
+	"pets": [],
+	"minigames": ["scratch_off", "claw_machine"],
+	"packs": ["starter"],
+	"gear": [],
+	"potions": ["healing"],
+	"features": [],
+}
+
+## Workshop unlock packs (horizontal content for the drop pools). Class starting runes work on
+## the class die even while their rune is locked; packs only add things to drops.
+const PACKS := {
+	"starter": {"name": "Starter", "runes": ["blade", "guard", "venom", "heavy", "vampire", "gilded"],
+		"kinds": ["standard", "low", "high", "loaded"],
+		"passives": ["pair_master", "gold_tooth", "steady_hand", "treasure_sense", "haggler", "scholar", "second_wind",
+			"full_house_party", "pathfinder", "piggy_bank", "blacksmith", "bloodthirst",
+			"extra_hand", "crowd_pleaser", "phoenix"]},
+	"gamblers_kit": {"name": "Gambler's Kit", "runes": ["lucky"], "kinds": ["gambler"],
+		"passives": ["double_trouble", "encore", "midas_fist"]},
+	"cold_steel": {"name": "Cold Steel", "runes": ["frost"], "kinds": ["twin"], "passives": ["iron_skin", "thorns"]},
+	"pyromancy": {"name": "Pyromancy", "runes": ["ember"], "kinds": [], "passives": ["boxcars", "opening_salvo", "glass_cannon"]},
+	"storm": {"name": "Storm", "runes": ["thunder"], "kinds": [], "passives": ["loaded_hands", "collector", "fast_feet"]},
+	"numerology": {"name": "Numerology", "runes": [], "kinds": ["odd", "even"], "passives": ["straight_shooter", "snake_eyes"]},
+	"resonance": {"name": "Resonance", "runes": ["echo"], "kinds": [], "passives": ["rune_echo", "resonance"]},
+	"colossus": {"name": "Colossus", "runes": ["wild"], "kinds": ["giant"], "passives": ["triple_threat", "rune_bloom"]},
+}
+const PACK_IDS := ["starter", "gamblers_kit", "cold_steel", "pyromancy", "storm", "numerology", "resonance", "colossus"]
+
+## Passives that only make sense for gold; meta runs keep them out of elite/mini-boss rewards
+## (they still appear in shops and shrines).
+const ECONOMY_PASSIVES := ["gold_tooth", "piggy_bank", "treasure_sense", "haggler"]
+
+## Pool toggle: at most this share of each unlocked pool (runes, kinds, passives) may be
+## switched off in the Workshop.
+const POOL_TOGGLE_MAX := 0.25
+
+## All ids of an unlock kind.
+static func all_ids(kind: String) -> Array:
+	match kind:
+		"classes": return HeroDefs.IDS.duplicate()
+		"biomes":
+			var b: Array = []
+			for tier in BiomeDefs.TIERS:
+				b.append_array(tier)
+			return b
+		"bosses": return ["boss_lich", "boss_bone_warden", "boss_cinder_king", "boss_magma_golem"]
+		"minibosses": return ["mini_pumpkin_knight", "mini_grave_mage", "mini_frost_warden", "mini_bone_champion", "mini_briar_beast", "mini_cinder_brute"]
+		"pets": return PetDefs.IDS.duplicate()
+		"minigames": return MinigameDefs.IDS.duplicate()
+		"packs": return PACK_IDS.duplicate()
+		"gear": return GearDefs.SLOTS.duplicate()
+		"potions": return PotionDefs.IDS.duplicate()
+		"features": return ["potion_belt", "loadout_slot"]
+		"runes": return Runes.IDS.duplicate()
+		"kinds": return DiceKinds.IDS.duplicate()
+		"passives": return Passives.IDS.duplicate()
+	return []
+
+## Drop pool ("runes" | "kinds" | "passives") granted by a list of owned packs, in content order.
+static func pool_from_packs(packs: Array, kind: String) -> Array:
+	var have := {}
+	for p in packs:
+		if PACKS.has(p):
+			for id in PACKS[p].get(kind, []):
+				have[id] = true
+	var out: Array = []
+	for id in all_ids(kind):
+		if have.has(id):
+			out.append(id)
+	return out
+
+## Sigil price to unlock `id` of `kind` early; {} when it can't be bought.
+static func sigil_cost(kind: String, id: String) -> Dictionary:
+	if not SIGIL_PRICE.has(kind) or not all_ids(kind).has(id):
+		return {}
+	return {"sigils": int(SIGIL_PRICE[kind])}
+
+# ------------------------------------------------------------------ milestones
+
+## Milestones, checked after every banked run against Profile.records (counters are cumulative
+## over all runs; best_* are records). A milestone fires once and grants its unlocks for free.
+## cond: {stat, min} or {any: [cond, ...]}. Stats: runs, laps, fights, minigames, rerolls, kept,
+## poison_kills, cashouts, block, straights, minibosses_reached, minibosses_killed,
+## bosses_reached, wins, act2_runs, act3_runs, frost_visits, throne_wins, mage_wins,
+## full_runes, best_lap.
+## `run` is the design target (median run number for the sim's greedy bot, fresh profile).
+const MILESTONES := [
+	{"id": "first_steps", "run": 1, "desc": "Finish your first run.", "cond": {"stat": "runs", "min": 1},
+		"unlocks": [["gear", "helm"]]},
+	{"id": "lap_five", "run": 1, "desc": "Reach lap 5.", "cond": {"stat": "best_lap", "min": 5},
+		"unlocks": [["pets", "pumpkin_sprite"]]},
+	{"id": "wanderer", "run": 2, "desc": "Complete 20 laps in total.", "cond": {"stat": "laps", "min": 20},
+		"unlocks": [["gear", "blade"], ["biomes", "crypt"]]},
+	{"id": "brawler", "run": 3, "desc": "Win 55 fights in total.", "cond": {"stat": "fights", "min": 55},
+		"unlocks": [["classes", "barbarian"]]},
+	{"id": "gate_crasher", "run": 4, "desc": "Reach the mini-boss 3 times.", "cond": {"stat": "minibosses_reached", "min": 3},
+		"unlocks": [["packs", "gamblers_kit"], ["gear", "boots"]]},
+	{"id": "arcade_regular", "run": 5, "desc": "Play 14 minigames.", "cond": {"stat": "minigames", "min": 14},
+		"unlocks": [["minigames", "fossil_hunter"]]},
+	{"id": "deep_delver", "run": 6, "desc": "Reach the third biome in 5 runs.", "cond": {"stat": "act3_runs", "min": 5},
+		"unlocks": [["biomes", "frost"], ["potions", "stoneskin"]]},
+	{"id": "boss_seen", "run": 6, "desc": "Reach the final boss 4 times.", "cond": {"stat": "bosses_reached", "min": 4},
+		"unlocks": [["pets", "skull_buddy"], ["gear", "charm"], ["features", "potion_belt"]]},
+	{"id": "frostbitten", "run": 8, "desc": "Visit Frostpeak.", "cond": {"stat": "frost_visits", "min": 1},
+		"unlocks": [["packs", "cold_steel"]]},
+	{"id": "champion", "run": 8, "desc": "Defeat 6 mini-bosses.", "cond": {"stat": "minibosses_killed", "min": 6},
+		"unlocks": [["classes", "mage"], ["minibosses", "mini_grave_mage"]]},
+	{"id": "straight_talk", "run": 9, "desc": "Score 30 Straights.", "cond": {"stat": "straights", "min": 30},
+		"unlocks": [["packs", "numerology"]]},
+	{"id": "arcade_fan", "run": 10, "desc": "Play 40 minigames.", "cond": {"stat": "minigames", "min": 40},
+		"unlocks": [["minigames", "bubble_breaker"], ["features", "loadout_slot"]]},
+	{"id": "plague", "run": 10, "desc": "Kill 25 enemies with Poison.", "cond": {"stat": "poison_kills", "min": 25},
+		"unlocks": [["pets", "lantern_ghost"]]},
+	{"id": "victor", "run": 11, "desc": "Win a run.", "cond": {"stat": "wins", "min": 1},
+		"unlocks": [["packs", "colossus"], ["biomes", "magma"], ["bosses", "boss_cinder_king"], ["bosses", "boss_magma_golem"]]},
+	{"id": "tinkerer", "run": 12, "desc": "Use 900 combat rerolls.", "cond": {"stat": "rerolls", "min": 900},
+		"unlocks": [["packs", "storm"], ["potions", "reroll_tonic"]]},
+	{"id": "veteran", "run": 14, "desc": "Win 2 runs, or play 14.", "cond": {"any": [{"stat": "wins", "min": 2}, {"stat": "runs", "min": 14}]},
+		"unlocks": [["classes", "rogue"]]},
+	{"id": "patience", "run": 15, "desc": "Keep 1,200 dice unrerolled.", "cond": {"stat": "kept", "min": 1200},
+		"unlocks": [["pets", "crystal_wisp"]]},
+	{"id": "throne_breaker", "run": 16, "desc": "Win at the Bone Throne twice.", "cond": {"stat": "throne_wins", "min": 2},
+		"unlocks": [["bosses", "boss_bone_warden"], ["minibosses", "mini_bone_champion"]]},
+	{"id": "stonewall", "run": 17, "desc": "Gain 2,500 Block.", "cond": {"stat": "block", "min": 2500},
+		"unlocks": [["pets", "guard_die"], ["potions", "cleanse"]]},
+	{"id": "banker", "run": 18, "desc": "Cash out the Treasury 30 times.", "cond": {"stat": "cashouts", "min": 30},
+		"unlocks": [["pets", "coin_mimic"]]},
+	{"id": "warden_slayer", "run": 19, "desc": "Defeat 16 mini-bosses.", "cond": {"stat": "minibosses_killed", "min": 16},
+		"unlocks": [["minibosses", "mini_frost_warden"], ["minibosses", "mini_briar_beast"], ["minibosses", "mini_cinder_brute"]]},
+	{"id": "archmage", "run": 20, "desc": "Win with the Mage.", "cond": {"stat": "mage_wins", "min": 1},
+		"unlocks": [["packs", "pyromancy"]]},
+	{"id": "rune_lord", "run": 22, "desc": "Start 3 fights with 5 dice that all carry runes.", "cond": {"stat": "full_runes", "min": 3},
+		"unlocks": [["packs", "resonance"]]},
+]
+
+static func milestone(id: String) -> Dictionary:
+	for m in MILESTONES:
+		if m.id == id:
+			return m
+	return {}
+
+# ------------------------------------------------------------------ Crowns upgrades
+
+## Bought with Camp.buy_upgrade(track, id). `requires` names a feature unlock (milestone).
+const UPGRADES := {
+	"workshop": {
+		"whetstone": {"name": "Whetstone", "desc": "Start every run with 1 Face Raise.", "cost": {"crowns": 80}},
+		"starter_kit": {"name": "Starter Kit", "desc": "Choose the kind of your second starting die (unlocked commons).", "cost": {"crowns": 40}},
+	},
+	"armory": {
+		"potion_belt": {"name": "Third Potion Slot", "desc": "The potion belt holds 3.", "cost": {"crowns": 120}, "requires": "potion_belt"},
+	},
+	"arcade": {
+		"loadout_slot": {"name": "Third Minigame Slot", "desc": "Equip 3 minigames per run.", "cost": {"crowns": 150}, "requires": "loadout_slot"},
+	},
+}
+
+static func upgrade_def(track: String, id: String) -> Dictionary:
+	return (UPGRADES.get(track, {}) as Dictionary).get(id, {})
+
+# ------------------------------------------------------------------ ascension
+
+const MAX_ASCENSION := 10
+
+## Global ladder; level n includes every rule of levels 1..n. One system per level.
+const ASCENSION := [
+	{"level": 1, "key": "extra_elite", "desc": "Lap mutations spawn +1 Elite."},
+	{"level": 2, "key": "lap_heal", "desc": "Lap heal 10% -> 6%."},
+	{"level": 3, "key": "shop_tax", "desc": "Shops cost +20%; restocks cost 15."},
+	{"level": 4, "key": "miniboss_trait", "desc": "The mini-boss gains a trait; skipping it gives the final boss +10% HP."},
+	{"level": 5, "key": "potions", "desc": "Start with 0 potions; potions heal 25%."},
+	{"level": 6, "key": "enemy_stats", "desc": "Enemies have +12% HP and attack."},
+	{"level": 7, "key": "biome_curse", "desc": "Each new biome curses one die face to 1 until you visit a Forge."},
+	{"level": 8, "key": "hazards", "desc": "Traps, ice and lava hurt x1.5; +1 hazard tile per board."},
+	{"level": 9, "key": "boss_phase", "desc": "The final boss starts with its phase-2 traits and +15% HP."},
+	{"level": 10, "key": "double_boss", "desc": "Double final: then face the route's other final boss at 60% HP."},
+]
+
+const ASC_LAP_HEAL := 0.06
+const ASC_SHOP_TAX := 1.2
+const ASC_RESTOCK := 15
+const ASC_SKIP_MINIBOSS_BOSS_HP := 1.10
+const ASC_POTION_HEAL := 0.25
+const ASC_ENEMY_STATS := 1.12
+const ASC_HAZARD_MULT := 1.5
+const ASC_BOSS_HP := 1.15
+const ASC_SECOND_BOSS_HP := 0.6
+## A4 mini-boss trait by the route's mini-boss biome.
+const ASC_MINIBOSS_TRAIT := {"hollow": "thorns", "frost": "armor", "throne": "thorns", "magma": "armor", "glade": "armor", "crypt": "thorns"}
+
+## The rule keys active at ascension n.
+static func ascension_keys(n: int) -> Array:
+	var out: Array = []
+	for k in clampi(n, 0, MAX_ASCENSION):
+		out.append(String(ASCENSION[k].key))
+	return out

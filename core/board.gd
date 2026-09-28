@@ -5,8 +5,8 @@ extends RefCounted
 ## Tile 0 is Start; the other corners (n-1, 2(n-1), 3(n-1)) are Forge, Treasury and Portal.
 ## Each tile: {type, enemies:Array[String], elite:bool}. Types: start forge treasury portal enemy
 ## elite miniboss chest event campfire trap empty, plus biome tiles ice (Frostpeak traps) and
-## lava (Magma Depths). Presentation lays the ring out with side()/size()/corners(); tile i walks
-## clockwise from Start. `biome` ("" = none) sets the tile mix and the enemy roster.
+## lava (Magma Depths), and meta-layer minigame tiles ({type:"minigame", game:<minigame id>}).
+## Presentation lays the ring out with side()/size()/corners(); tile i walks clockwise from Start. `biome` ("" = none) sets the tile mix and the enemy roster.
 
 const CORNER_TYPES := ["start", "forge", "treasury", "portal"]
 ## Edge tile counts per ring size. Mutation spawns MUTATE per lap and tops events back up to
@@ -222,12 +222,15 @@ func set_tile(idx: int, type: String, rng: Rng, act: int, lap: int) -> Dictionar
 	return change(idx)
 
 func change(idx: int) -> Dictionary:
-	return {"idx": idx, "type": tiles[idx].type, "enemies": tiles[idx].enemies.duplicate(), "elite": tiles[idx].elite}
+	var c := {"idx": idx, "type": tiles[idx].type, "enemies": tiles[idx].enemies.duplicate(), "elite": tiles[idx].elite}
+	if tiles[idx].has("game"):
+		c["game"] = String(tiles[idx].game)
+	return c
 
 ## Lap mutation: cleared fight tiles become Empty, then mutate_spawns_for(size) (24: +2 Enemy
 ## +1 Elite; 32: +3 Enemy +1 Elite) go on random Empty tiles, then events are topped back up
 ## to the layout's event count. `protect` tiles are never changed.
-func mutate(rng: Rng, act: int, lap: int, protect: Array = []) -> Array[Dictionary]:
+func mutate(rng: Rng, act: int, lap: int, protect: Array = [], extra: Array = []) -> Array[Dictionary]:
 	var changes: Array[Dictionary] = []
 	for i in size():
 		if _is_fight(tiles[i].type) and tiles[i].get("cleared", false):
@@ -240,6 +243,8 @@ func mutate(rng: Rng, act: int, lap: int, protect: Array = []) -> Array[Dictiona
 	rng.shuffle(empties)
 	var spawns: Array[String] = []
 	spawns.assign(mutate_spawns_for(size(), biome))
+	for x in extra:
+		spawns.append(String(x))
 	var events := 0
 	for t in tiles:
 		if t.type == "event":
@@ -257,6 +262,36 @@ func mutate(rng: Rng, act: int, lap: int, protect: Array = []) -> Array[Dictiona
 				changes.remove_at(c)
 		changes.append(change(idx))
 	return changes
+
+## One minigame tile ({type:"minigame", game:<id>}) for each id in `games` that has none on the
+## board, on random Empty, non-corner tiles outside `protect` (tiles 1 and 2 stay free).
+## Returns the changes. No Rng use when every game already has a tile.
+func place_minigames(rng: Rng, games: Array, protect: Array = []) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var missing: Array = []
+	for g in games:
+		var found := false
+		for t in tiles:
+			if t.type == "minigame" and String(t.get("game", "")) == String(g):
+				found = true
+				break
+		if not found:
+			missing.append(String(g))
+	if missing.is_empty():
+		return out
+	var empties: Array[int] = []
+	for i in size():
+		if tiles[i].type == "empty" and not is_corner(i) and not protect.has(i) and i > 2:
+			empties.append(i)
+	rng.shuffle(empties)
+	for g in missing:
+		if empties.is_empty():
+			break
+		var idx: int = empties.pop_back()
+		tiles[idx] = make_tile("minigame")
+		tiles[idx]["game"] = String(g)
+		out.append(change(idx))
+	return out
 
 ## Turns one Empty or uncleared Enemy tile into the act's mini-boss tile. The tile is not a
 ## corner, not in `protect`, and more than 3 tiles (either way round) from `hero_pos`.
@@ -292,6 +327,8 @@ func to_dict() -> Dictionary:
 		var d := {"type": tile.type, "enemies": Array(tile.enemies).duplicate(), "elite": bool(tile.elite)}
 		if tile.get("cleared", false):
 			d["cleared"] = true
+		if tile.has("game"):
+			d["game"] = String(tile.game)
 		t.append(d)
 	return {"tiles": t, "size": size(), "side": side(), "biome": biome}
 
@@ -305,5 +342,7 @@ static func from_dict(d: Dictionary) -> Board:
 		var tile := make_tile(String(td.type), enemies, bool(td.get("elite", false)))
 		if td.get("cleared", false):
 			tile["cleared"] = true
+		if td.has("game"):
+			tile["game"] = String(td.game)
 		b.tiles.append(tile)
 	return b

@@ -37,8 +37,29 @@ var miniboss_id: String = "mini_pumpkin_knight"
 var boss_id: String = "boss_lich"
 ## Dice frozen by Frostpeak ice: they lock on turn 1 of the next fight.
 var chill: int = 0
+## Meta-layer run config (MetaRun.build; {} = legacy run without the meta layer).
+var meta: Dictionary = {}
+## Run mode: "standard" (15 laps, 3 biomes) or "short" (Short Road: 10 laps, 2 biomes, see
+## Balance.SHORT_*). A short run's `route` has 2 entries: [tier-1 biome, tier-3 biome].
+var mode: String = "standard"
+## Potion belt: potion type ids carried (PotionDefs), belt size, and the count (== belt.size()).
+var belt: Array[String] = []
+var potion_cap: int = 0
+var potions: int = 0
+## Pet runtime: charge (meter pips, persists across fights), fights (won with the pet),
+## boost (fights left with Bubble Breaker's +1 reroll), last_stand (used), lap_bonus (lap of the
+## last Wisp board perk). All ints.
+var pet_state: Dictionary = {}
+## Board rerolls left in this lap's pool (Boots, Crystal Wisp perk); refilled on every lap.
+var lap_rerolls: int = 0
+## A7 biome curse: faces set to 1 until the next Forge visit: [{die, face, value}].
+var cursed_faces: Array[Dictionary] = []
 
 ## opts (all optional, for scenarios/tests): route:[tier1, tier2, tier3], miniboss:id, boss:id.
+## opts.mode: "standard" (default) | "short".
+## opts.profile (a Profile.to_dict() snapshot) or opts.meta (a MetaRun.build() config) turns on
+## the meta layer: gear, workshop, pet, potions, loadout minigame tiles, unlock pools, locked
+## biomes/bosses, ascension.
 ## The route and bosses are always drawn from the run Rng first, so forcing them does not shift
 ## the rest of the random stream. Invalid overrides are ignored.
 static func create(p_class_id: String, p_seed: int, p_board_size: int = Balance.BOARD_SIZE, opts: Dictionary = {}) -> RunState:
@@ -54,24 +75,168 @@ static func create(p_class_id: String, p_seed: int, p_board_size: int = Balance.
 	for rune_id in def.runes:
 		r.dice.append(Die.make(String(rune_id)))
 	r.board_size = p_board_size
-	r.route = BiomeDefs.pick_route(r.rng)
+	r.mode = "short" if String(opts.get("mode", "standard")) == "short" else "standard"
+	if opts.has("meta"):
+		r.meta = MetaRun.normalize(opts.meta)
+	elif opts.has("profile"):
+		r.meta = MetaRun.build(opts.profile, p_class_id)
+	if r.meta.is_empty():
+		r.route = BiomeDefs.pick_route(r.rng)
+	else:
+		# One pick per tier among unlocked biomes (the same Rng draws as pick_route).
+		for tier in BiomeDefs.TIERS:
+			var ok: Array = []
+			for b in tier:
+				if (r.meta.biomes as Array).has(b):
+					ok.append(b)
+			r.route.append(String(r.rng.pick(ok if not ok.is_empty() else tier)))
 	var forced: Array = opts.get("route", [])
 	if BiomeDefs.valid_route(forced):
 		r.route.assign(forced.map(func(x): return String(x)))
-	r.miniboss_id = String(r.rng.pick(BiomeDefs.miniboss_candidates(r.route)))
-	r.boss_id = String(r.rng.pick(BiomeDefs.boss_candidates(r.route)))
+	if r.mode == "short":
+		r.route = [r.route[0], r.route[2]] as Array[String]
+	r.miniboss_id = String(r.rng.pick(_allowed(BiomeDefs.DEFS[r.route[1]].minibosses, r.meta.get("minibosses", []))))
+	r.boss_id = String(r.rng.pick(_allowed(BiomeDefs.DEFS[r.route.back()].bosses, r.meta.get("bosses", []))))
 	var fm := String(opts.get("miniboss", ""))
 	if EnemyDefs.MINIBOSSES.has(fm):
 		r.miniboss_id = fm
 	var fb := String(opts.get("boss", ""))
 	if EnemyDefs.BOSSES.has(fb):
 		r.boss_id = fb
-	r.board = Board.generate(r.rng, 1, r.board_size, 1, r.route[0])
+	MetaRun.apply_start(r)
+	r.board = Board.generate(r.rng, 1, r.board_size, r.eff_lap(1), r.route[0])
+	r.after_board_generated([])
 	r.stats = {
 		"board_turns": 0, "combat_turns": 0, "fights_won": 0, "damage_dealt": 0, "damage_taken": 0,
 		"gold_earned": 0, "best_combo": "", "best_mult": 0.0, "max_act": 1, "commands": 0,
 	}
 	return r
+
+## `cands` filtered to `allowed` (unfiltered when allowed is empty or nothing matches).
+static func _allowed(cands: Array, allowed: Array) -> Array:
+	if allowed.is_empty():
+		return cands
+	var out: Array = []
+	for c in cands:
+		if allowed.has(c):
+			out.append(c)
+	return out if not out.is_empty() else cands
+
+## Meta additions to a freshly generated board: A8 extra hazard tile, then one minigame tile
+## per equipped minigame. No Rng use in legacy runs. Returns the changes.
+func after_board_generated(protect: Array) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if meta.is_empty():
+		return out
+	if has_asc("hazards"):
+		var empties: Array[int] = []
+		for i in board.size():
+			if board.tiles[i].type == "empty" and not board.is_corner(i) and not protect.has(i) and i > 2:
+				empties.append(i)
+		if not empties.is_empty():
+			var idx: int = rng.pick(empties)
+			board.tiles[idx] = Board.make_tile(String(BiomeDefs.DEFS[board.biome].get("trap_tile", "trap")) if BiomeDefs.has(board.biome) else "trap")
+			out.append(board.change(idx))
+	out.append_array(place_minigames(protect))
+	return out
+
+# ------------------------------------------------------------------ mode helpers
+
+func total_laps() -> int:
+	return Balance.SHORT_LAPS if mode == "short" else Balance.TOTAL_LAPS
+
+func biome_laps() -> Array:
+	return Balance.SHORT_BIOME_LAPS if mode == "short" else Balance.BIOME_LAPS
+
+func miniboss_lap() -> int:
+	return Balance.SHORT_MINIBOSS_LAP if mode == "short" else Balance.MINIBOSS_LAP
+
+## Act (biome index, 1-based) for a lap in this run's mode.
+func act_for_lap(l: int) -> int:
+	var a := 1
+	var bl := biome_laps()
+	for k in bl.size():
+		if l >= int(bl[k]):
+			a = k + 1
+	return a
+
+func is_shop_lap(completed_lap: int) -> bool:
+	return completed_lap % Balance.SHOP_EVERY == 0 or biome_laps().has(completed_lap + 1)
+
+## The standard-run lap of equal difficulty (enemy scaling, pools, gold). == lap in standard.
+func eff_lap(l: int = -1) -> int:
+	var x := lap if l < 0 else l
+	if mode != "short":
+		return x
+	return int(Balance.SHORT_EFF_LAPS[clampi(x, 1, Balance.SHORT_LAPS) - 1])
+
+# ------------------------------------------------------------------ meta helpers
+
+## Minigame ids equipped for this run (empty in legacy runs).
+func loadout() -> Array:
+	return meta.get("minigames", [])
+
+## One minigame tile per equipped minigame that has none on the board (on random Empty,
+## non-corner tiles outside `protect`). No Rng use with an empty loadout.
+func place_minigames(protect: Array = []) -> Array[Dictionary]:
+	var lo := loadout()
+	if lo.is_empty():
+		return []
+	return board.place_minigames(rng, lo, protect)
+
+## Unlocked pool for "runes" | "kinds" | "passives" (empty = everything, legacy runs).
+func pool(kind: String) -> Array:
+	return (meta.get("pools", {}) as Dictionary).get(kind, [])
+
+func pet_id() -> String:
+	return String((meta.get("pet", {}) as Dictionary).get("id", ""))
+
+func pet_level() -> int:
+	return int((meta.get("pet", {}) as Dictionary).get("level", 0))
+
+func has_pet(id: String) -> bool:
+	return pet_id() == id
+
+## True when ascension rule `key` (UnlockDefs.ASCENSION) is active.
+func has_asc(key: String) -> bool:
+	return (meta.get("asc_keys", []) as Array).has(key)
+
+## True when gear trait `id` (GearDefs.TRAIT_DEFS) is active.
+func has_trait(id: String) -> bool:
+	return (meta.get("traits", []) as Array).has(id)
+
+func lap_heal_pct() -> float:
+	if meta.is_empty():
+		return Balance.LAP_HEAL_PCT
+	var p := UnlockDefs.ASC_LAP_HEAL if has_asc("lap_heal") else Balance.LAP_HEAL_PCT
+	if has_trait("helm_lap_heal"):
+		p += float(GearDefs.TRAIT_BONUS.helm_lap_heal)
+	return p
+
+func potion_pct() -> float:
+	return UnlockDefs.ASC_POTION_HEAL if has_asc("potions") else Balance.POTION_HEAL_PCT
+
+## Damage multiplier for traps and lava (Boots, A8).
+func hazard_mult() -> float:
+	var m := float(meta.get("hazard_mult", 1.0))
+	if has_asc("hazards"):
+		m *= UnlockDefs.ASC_HAZARD_MULT
+	return m
+
+## Gold from fights, chests and minigames with the Charm bonus (legacy: unchanged).
+func gold_bonus(amount: int) -> int:
+	var p := float(meta.get("gold_pct", 0.0))
+	if p <= 0.0 or amount <= 0:
+		return amount
+	return int(round(amount * (1.0 + p)))
+
+## Lap pool size: Boots +1, Crystal Wisp perk +1.
+func lap_reroll_refill() -> int:
+	return int(meta.get("lap_rerolls", 0)) + (1 if has_pet("crystal_wisp") else 0)
+
+## Syncs the potion count with the belt.
+func sync_potions() -> void:
+	potions = belt.size()
 
 func has_passive(id: String) -> bool:
 	return passives.has(id)
@@ -85,8 +250,10 @@ func max_dice() -> int:
 	return Balance.MAX_DICE + (1 if has_passive("extra_hand") else 0)
 
 ## Called when a hit would drop HP to 0 or below: Phoenix Feather (once per act) then Second
-## Wind (once per run) leave the hero at 1 HP. Returns the passive that saved them, or "".
-func survive_lethal() -> String:
+## Wind (once per run) leave the hero at 1 HP, then the Helm's Last Stand trait (once per run,
+## only if HP before the hit was above 50%: pass it as `hp_before`). Returns the passive or
+## trait that saved them, or "".
+func survive_lethal(hp_before := -1) -> String:
 	if has_passive("phoenix") and int(passive_state.get("phoenix_act", 0)) != act:
 		passive_state["phoenix_act"] = act
 		hp = 1
@@ -95,6 +262,10 @@ func survive_lethal() -> String:
 		passive_state["second_wind_used"] = true
 		hp = 1
 		return "second_wind"
+	if has_trait("helm_last_stand") and int(pet_state.get("last_stand", 0)) == 0 and hp_before * 2 > max_hp:
+		pet_state["last_stand"] = 1
+		hp = 1
+		return "last_stand"
 	return ""
 
 ## Heals up to max; returns the amount actually healed.
@@ -125,6 +296,8 @@ func to_dict() -> Dictionary:
 		"stats": stats.duplicate(true), "shop_reroll_bought": shop_reroll_bought,
 		"passives": Array(passives), "passive_state": passive_state.duplicate(true),
 		"route": Array(route), "miniboss_id": miniboss_id, "boss_id": boss_id, "chill": chill,
+		"meta": meta.duplicate(true), "mode": mode, "belt": Array(belt), "potions": potions, "potion_cap": potion_cap,
+		"pet_state": pet_state.duplicate(true), "lap_rerolls": lap_rerolls, "cursed_faces": cursed_faces.duplicate(true),
 	}
 
 static func from_dict(d: Dictionary) -> RunState:
@@ -148,6 +321,11 @@ static func from_dict(d: Dictionary) -> RunState:
 			r.stats[k] = float(v)
 		elif v is float:
 			r.stats[k] = int(v)
+		elif v is Dictionary:
+			var m := {}
+			for mk in v:
+				m[String(mk)] = int(v[mk])
+			r.stats[k] = m
 		else:
 			r.stats[k] = v
 	r.shop_reroll_bought = bool(d.get("shop_reroll_bought", false))
@@ -160,6 +338,18 @@ static func from_dict(d: Dictionary) -> RunState:
 	r.miniboss_id = String(d.get("miniboss_id", "mini_pumpkin_knight"))
 	r.boss_id = String(d.get("boss_id", EnemyDefs.FINAL_BOSS))
 	r.chill = int(d.get("chill", 0))
+	r.meta = MetaRun.normalize(d.get("meta", {}))
+	r.mode = String(d.get("mode", "standard"))
+	for b in d.get("belt", []):
+		r.belt.append(String(b))
+	r.sync_potions()
+	r.potion_cap = int(d.get("potion_cap", 0))
+	r.lap_rerolls = int(d.get("lap_rerolls", 0))
+	for c in d.get("cursed_faces", []):
+		r.cursed_faces.append({"die": int(c.die), "face": int(c.face), "value": int(c.value)})
+	var pst: Dictionary = d.get("pet_state", {})
+	for k in pst:
+		r.pet_state[k] = int(pst[k])
 	var ps: Dictionary = d.get("passive_state", {})
 	for k in ps:
 		var v: Variant = ps[k]

@@ -54,3 +54,37 @@ static func random_runes(rng: Rng, n: int) -> Array[String]:
 static func option(id: String) -> Dictionary:
 	var d: Dictionary = DEFS[id]
 	return {"id": "rune", "label": "%s Rune" % d.name, "desc": d.desc, "rune": id}
+
+## random_rune() restricted to `allowed` ids (empty = all runes, identical to random_rune).
+## The rarity is rolled among rarities that still have an allowed rune (a filter with no allowed
+## rune of that rarity falls back to any allowed rune).
+static func random_rune_in(rng: Rng, allowed: Array, rarity_filter: String = "") -> String:
+	if allowed.is_empty():
+		return random_rune(rng, rarity_filter)
+	# Each allowed id keeps its unrestricted odds (rarity weight / ids of that rarity), then the
+	# weights are renormalised, so locking content never makes a rarer item more common.
+	var w := {}
+	for id in IDS:
+		if allowed.has(id) and (rarity_filter == "" or String(DEFS[id].rarity) == rarity_filter):
+			var r: String = DEFS[id].rarity
+			w[id] = float(RARITY_WEIGHTS[r]) / float(of_rarity(r).size())
+	if w.is_empty():
+		for id in IDS:
+			if allowed.has(id):
+				w[id] = float(RARITY_WEIGHTS[String(DEFS[id].rarity)]) / float(of_rarity(String(DEFS[id].rarity)).size())
+	if w.is_empty():
+		return random_rune(rng, rarity_filter)
+	return String(rng.weighted(w))
+
+## n distinct runes from `allowed` (empty = all).
+static func random_runes_in(rng: Rng, n: int, allowed: Array) -> Array[String]:
+	if allowed.is_empty():
+		return random_runes(rng, n)
+	var out: Array[String] = []
+	var guard := 0
+	while out.size() < mini(n, allowed.size()) and guard < 100:
+		guard += 1
+		var id := random_rune_in(rng, allowed)
+		if not out.has(id):
+			out.append(id)
+	return out

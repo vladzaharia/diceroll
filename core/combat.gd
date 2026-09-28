@@ -26,6 +26,13 @@ var hero_burn: int = 0             # Burn stacks on the hero: ticks at the end o
 var result: String = ""            # "" | "won" | "lost"
 var gold_reward: int = 0
 var xp_reward: int = 0
+# meta layer (all 0/false in legacy runs)
+var pet_block_carry: int = 0       # Guard Die L5: Block that lands again next turn
+var wisp_free: int = 0             # Crystal Wisp L10: rerolls that don't mark dice as rerolled
+var wisp_used: bool = false        # Crystal Wisp L10 used this fight
+var potion_turn: int = 0           # turn a potion was last drunk (max one per combat turn)
+var stoneskin: int = 0             # Stoneskin Block still to land at the next turn start
+var boost: bool = false            # Bubble Breaker signature: +1 reroll every turn this fight
 
 # ---------------------------------------------------------------- setup
 
@@ -35,9 +42,21 @@ func begin(run: RunState, ids: Array, p_elite: bool, p_boss: bool, p_tile: int, 
 	miniboss = p_miniboss
 	tile = p_tile
 	act = run.act
-	lap = run.lap
+	lap = run.eff_lap()
 	for id in ids:
 		enemies.append(make_enemy(run.rng, String(id), act, lap, elite))
+	if not run.meta.is_empty():
+		for e in enemies:
+			meta_enemy(run, e)
+		if int(run.pet_state.get("boost", 0)) > 0:
+			boost = true
+			run.pet_state["boost"] = int(run.pet_state.boost) - 1
+		var runed := run.dice.size() >= Balance.MAX_DICE
+		for d in run.dice:
+			if d.rune == "":
+				runed = false
+		if runed:
+			run.stats.full_rune_fights = int(run.stats.get("full_rune_fights", 0)) + 1
 	for i in enemies.size():
 		roll_intent(run.rng, i)
 	var ev: Array[Dictionary] = []
@@ -68,6 +87,31 @@ static func make_enemy(rng: Rng, id: String, p_act: int, p_lap: int, p_elite: bo
 		"elite": p_elite, "atk_mult": atk_mult, "step": step, "summoned": summoned,
 		"miniboss": EnemyDefs.is_miniboss(id), "traits": EnemyDefs.traits(id, 1).duplicate(),
 	}
+
+## Meta-layer enemy modifiers (ascension): A6 +12% HP/attack; the final boss gets A9 phase-2
+## traits and +15% HP, A4's +10% HP when the mini-boss was skipped, and 60% HP as A10's second
+## boss (run.stats.boss_stage == 1); A4 gives the mini-boss a trait by biome.
+static func meta_enemy(run: RunState, e: Dictionary) -> void:
+	var hp_m := 1.0
+	if run.has_asc("enemy_stats"):
+		hp_m *= UnlockDefs.ASC_ENEMY_STATS
+		e.atk_mult = float(e.atk_mult) * UnlockDefs.ASC_ENEMY_STATS
+	if bool(e.boss):
+		var stage := int(run.stats.get("boss_stage", 0))
+		if stage == 0 and run.has_asc("boss_phase"):
+			hp_m *= UnlockDefs.ASC_BOSS_HP
+			e.traits = EnemyDefs.traits(String(e.id), 2).duplicate()
+		if stage == 0 and run.has_asc("miniboss_trait") and int(run.stats.get("minibosses_won", 0)) == 0:
+			hp_m *= UnlockDefs.ASC_SKIP_MINIBOSS_BOSS_HP
+		if stage >= 1:
+			hp_m *= UnlockDefs.ASC_SECOND_BOSS_HP
+	if bool(e.get("miniboss", false)) and run.has_asc("miniboss_trait"):
+		var t := String(UnlockDefs.ASC_MINIBOSS_TRAIT.get(run.route[1], "armor"))
+		if not (e.traits as Array).has(t):
+			e.traits.append(t)
+	if hp_m != 1.0:
+		e.hp = maxi(1, int(round(int(e.hp) * hp_m)))
+		e.max_hp = e.hp
 
 static func has_trait(e: Dictionary, t: String) -> bool:
 	return (e.get("traits", []) as Array).has(t)
@@ -136,8 +180,22 @@ func start_turn(run: RunState) -> Array[Dictionary]:
 		pev.append(_passive("loaded_hands", 1))
 	if run.has_passive("iron_skin"):
 		run.block = Balance.PASSIVE_IRON_SKIN
+		run.stats.block_gained = int(run.stats.get("block_gained", 0)) + run.block
 		pev.append(_passive("iron_skin", run.block))
 		pev.append({"type": "block_gained", "target": "hero", "amount": run.block, "total": run.block})
+	if not run.meta.is_empty():
+		var extra := 0
+		if turn == 1 and run.has_trait("helm_bulwark"):
+			extra += int(GearDefs.TRAIT_BONUS.helm_bulwark)
+		if stoneskin > 0:
+			extra += stoneskin
+			stoneskin = 0
+		if extra > 0:
+			run.block += extra
+			run.stats.block_gained = int(run.stats.get("block_gained", 0)) + extra
+			pev.append({"type": "block_gained", "target": "hero", "amount": extra, "total": run.block})
+		if boost:
+			rerolls_left += 1
 	var n := run.dice.size()
 	marked.resize(n)
 	marked.fill(false)
@@ -166,6 +224,7 @@ func start_turn(run: RunState) -> Array[Dictionary]:
 		dice_values[i] = run.dice[i].value(dice_faces[i])
 		all.append(i)
 	ev.append({"type": "dice_rolled", "values": dice_values.duplicate(), "indices": all, "context": "combat", "faces": dice_faces.duplicate(), "rerolls_left": rerolls_left})
+	ev.append_array(PetLogic.on_turn_start(run, self))
 	return ev
 
 func toggle(i: int) -> Array[Dictionary]:
@@ -189,10 +248,15 @@ func reroll(run: RunState) -> Array[Dictionary]:
 		return [_err("no dice marked")]
 	var before_mult := float(current_combo(run).mult)
 	rerolls_left -= 1
+	run.stats.rerolls_used = int(run.stats.get("rerolls_used", 0)) + 1
+	var free := wisp_free > 0
+	if free:
+		wisp_free -= 1
 	for i in idx:
 		dice_faces[i] = run.dice[i].roll(run.rng)
 		dice_values[i] = run.dice[i].value(dice_faces[i])
-		rerolled[i] = true
+		if not free:
+			rerolled[i] = true
 		marked[i] = false
 	var ev: Array[Dictionary] = []
 	if run.has_passive("encore") and float(current_combo(run).mult) > before_mult:
@@ -234,6 +298,10 @@ static func passive_mult(run: RunState, combo_id: String, base: float) -> float:
 
 func attack(run: RunState) -> Array[Dictionary]:
 	var ev: Array[Dictionary] = []
+	ev.append_array(PetLogic.fire_at_attack(run, self))
+	if all_dead():
+		ev.append_array(_win(run))
+		return ev
 	_fix_target()
 	var combo := current_combo(run)
 	var eff: Array = combo.values
@@ -307,6 +375,21 @@ func attack(run: RunState) -> Array[Dictionary]:
 			flat += m
 			ev.append(_passive("midas_fist", m))
 	var factor := 1.0
+	if not run.meta.is_empty():
+		if cid == "pair" and run.has_trait("blade_pair"):
+			flat += int(GearDefs.TRAIT_BONUS.blade_pair)
+			ev.append({"type": "trait_triggered", "id": "blade_pair", "value": int(GearDefs.TRAIT_BONUS.blade_pair)})
+		if cid == "high_roller" and run.has_trait("blade_high"):
+			flat += int(GearDefs.TRAIT_BONUS.blade_high)
+			ev.append({"type": "trait_triggered", "id": "blade_high", "value": int(GearDefs.TRAIT_BONUS.blade_high)})
+		if boss and turn == 1 and run.has_trait("blade_boss_opener") and int(run.stats.get("boss_stage", 0)) == 0:
+			factor *= float(GearDefs.TRAIT_BONUS.blade_boss_opener)
+			ev.append({"type": "trait_triggered", "id": "blade_boss_opener", "value": 0})
+		for i in rerolled.size():
+			if not rerolled[i]:
+				run.stats.kept_dice = int(run.stats.get("kept_dice", 0)) + 1
+		if cid == "straight" or cid == "small_straight":
+			run.stats.straights = int(run.stats.get("straights", 0)) + 1
 	if run.has_passive("glass_cannon"):
 		factor *= Balance.PASSIVE_DAMAGE_MULT
 		ev.append(_passive("glass_cannon", 0))
@@ -320,7 +403,19 @@ func attack(run: RunState) -> Array[Dictionary]:
 		run.stats.best_mult = mult
 		run.stats.best_combo = combo.name
 	var thorny := alive(target) and has_trait(enemies[target], "thorns")
+	var soak := int(enemies[target].hp) + int(enemies[target].block) if alive(target) else 0
+	var tgt0 := target
 	ev.append_array(damage_enemy(target, total, "attack", run))
+	if run.has_trait("blade_overflow") and not alive(tgt0) and total > soak:
+		var spill := int(floor((total - soak) * float(GearDefs.TRAIT_BONUS.blade_overflow)))
+		var nxt := -1
+		for j in enemies.size():
+			if alive(j):
+				nxt = j
+				break
+		if spill > 0 and nxt >= 0:
+			ev.append({"type": "trait_triggered", "id": "blade_overflow", "value": spill})
+			ev.append_array(damage_enemy(nxt, spill, "cleave", run))
 	if thorny and total > 0:
 		# Briar thorns: reflect damage to the hero, never lethal.
 		var th := mini(Balance.ENEMY_THORNS, run.hp - 1)
@@ -379,6 +474,7 @@ func attack(run: RunState) -> Array[Dictionary]:
 						ev.append({"type": "status", "target": target, "status": "frozen", "value": 1})
 				"guard":
 					run.block += pips
+					run.stats.block_gained = int(run.stats.get("block_gained", 0)) + pips
 					ev.append(_rune(i, rune, "block", pips))
 					ev.append({"type": "block_gained", "target": "hero", "amount": pips, "total": run.block})
 				"vampire":
@@ -396,6 +492,7 @@ func attack(run: RunState) -> Array[Dictionary]:
 					if not rerolled[i] and run.banked_rerolls < Balance.MAX_BANKED_REROLLS:
 						run.banked_rerolls += 1
 						ev.append(_rune(i, rune, "bank_reroll", 1))
+	ev.append_array(PetLogic.on_attack_resolved(run, self, cid, eff))
 	if all_dead():
 		ev.append_array(_win(run))
 		return ev
@@ -409,6 +506,8 @@ func damage_enemy(i: int, amount: int, source: String, run: RunState, ignore_blo
 	if not alive(i) or amount <= 0:
 		return ev
 	var e := enemies[i]
+	if (source == "thunder" or source == "ember") and int(e.poison) > 0 and run.has_pet("lantern_ghost") and run.pet_level() >= 10:
+		amount += 1
 	var warded := false
 	if has_trait(e, "ward") and _summons_alive() > 0:
 		# Bone Warden's legion: half damage while any summoned ally stands.
@@ -424,6 +523,8 @@ func damage_enemy(i: int, amount: int, source: String, run: RunState, ignore_blo
 	var lethal := int(e.hp) <= 0
 	ev.append({"type": "damage", "target": i, "amount": dealt, "blocked": blocked, "source": source, "lethal": lethal, "hp": int(e.hp), "max_hp": int(e.max_hp), "block": int(e.block), "warded": warded})
 	if lethal:
+		if source == "poison":
+			run.stats.poison_kills = int(run.stats.get("poison_kills", 0)) + 1
 		e.poison = 0
 		e.frozen = false
 		ev.append({"type": "enemy_died", "enemy_idx": i, "id": e.id})
@@ -467,7 +568,8 @@ func _enemy_phase(run: RunState) -> Array[Dictionary]:
 			var p := int(e.poison)
 			ev.append_array(damage_enemy(i, p, "poison", run, true))
 			if alive(i):
-				e.poison = p - 1
+				var keep := bool(e.boss) and run.has_pet("lantern_ghost") and run.pet_level() >= 5
+				e.poison = p if keep else p - 1
 				ev.append({"type": "status", "target": i, "status": "poison", "value": int(e.poison)})
 			else:
 				if all_dead():
@@ -498,10 +600,11 @@ func _tick_burn(run: RunState) -> Array[Dictionary]:
 	if hero_burn <= 0 or result != "":
 		return ev
 	var dmg := mini(hero_burn, run.hp)
+	var hp_before := run.hp
 	run.hp -= dmg
 	var saved := ""
 	if run.hp <= 0:
-		saved = run.survive_lethal()
+		saved = run.survive_lethal(hp_before)
 		if saved != "":
 			dmg -= 1
 	run.stats.damage_taken = int(run.stats.get("damage_taken", 0)) + dmg
@@ -523,10 +626,11 @@ func _hit_hero(run: RunState, i: int, v: int, out_dealt: Array = []) -> Array[Di
 	var blocked := 0 if pierce else mini(run.block, v)
 	run.block -= blocked
 	var dealt := mini(v - blocked, run.hp)
+	var hp_before := run.hp
 	run.hp -= dealt
 	var saved := ""
 	if run.hp <= 0:
-		saved = run.survive_lethal()
+		saved = run.survive_lethal(hp_before)
 		if saved != "":
 			dealt -= 1
 	run.stats.damage_taken = int(run.stats.get("damage_taken", 0)) + dealt
@@ -603,6 +707,8 @@ func _execute_intent(run: RunState, i: int) -> Array[Dictionary]:
 				if _summoned_alive() >= Balance.MAX_SUMMONED_ALIVE:
 					break
 				var m := make_enemy(run.rng, sid, act, slap, false, true)
+				if not run.meta.is_empty():
+					meta_enemy(run, m)
 				enemies.append(m)
 				var idx := enemies.size() - 1
 				roll_intent(run.rng, idx)
@@ -675,7 +781,8 @@ func to_dict() -> Dictionary:
 		"last_combo": last_combo.duplicate(true), "dice_faces": Array(dice_faces), "rerolled": Array(rerolled),
 		"boss": boss, "elite": elite, "miniboss": miniboss, "tile": tile, "act": act, "lap": lap, "pending_curse": pending_curse,
 		"chaos": chaos.duplicate(true), "result": result, "gold_reward": gold_reward, "xp_reward": xp_reward,
-		"hero_burn": hero_burn,
+		"hero_burn": hero_burn, "pet_block_carry": pet_block_carry, "wisp_free": wisp_free, "wisp_used": wisp_used,
+		"potion_turn": potion_turn, "stoneskin": stoneskin, "boost": boost,
 	}
 
 static func from_dict(d: Dictionary) -> CombatState:
@@ -699,6 +806,12 @@ static func from_dict(d: Dictionary) -> CombatState:
 	c.miniboss = bool(d.get("miniboss", false))
 	c.result = String(d.result)
 	c.hero_burn = int(d.get("hero_burn", 0))
+	c.pet_block_carry = int(d.get("pet_block_carry", 0))
+	c.wisp_free = int(d.get("wisp_free", 0))
+	c.wisp_used = bool(d.get("wisp_used", false))
+	c.potion_turn = int(d.get("potion_turn", 0))
+	c.stoneskin = int(d.get("stoneskin", 0))
+	c.boost = bool(d.get("boost", false))
 	c.last_combo = _norm_combo(d.last_combo)
 	for ch in d.chaos:
 		c.chaos.append({"die": int(ch.die), "face": int(ch.face), "value": int(ch.value)})

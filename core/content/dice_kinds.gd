@@ -60,3 +60,22 @@ static func random_kind(rng: Rng, rarity_filter := "") -> String:
 ## Label for a new die of this kind, e.g. "Giant Die".
 static func label(id: String) -> String:
 	return "%s Die" % def(id).name
+
+## random_kind() restricted to `allowed` kinds (empty = all kinds, identical to random_kind).
+static func random_kind_in(rng: Rng, allowed: Array, rarity_filter := "") -> String:
+	if allowed.is_empty():
+		return random_kind(rng, rarity_filter)
+	# Each allowed id keeps its unrestricted odds (rarity weight / ids of that rarity), then the
+	# weights are renormalised, so locking content never makes a rarer item more common.
+	var w := {}
+	for id in IDS:
+		if allowed.has(id) and (rarity_filter == "" or String(DEFS[id].rarity) == rarity_filter):
+			var r: String = DEFS[id].rarity
+			w[id] = float(RARITY_WEIGHTS[r]) / float(of_rarity(r).size())
+	if w.is_empty():
+		for id in IDS:
+			if allowed.has(id):
+				w[id] = float(RARITY_WEIGHTS[String(DEFS[id].rarity)]) / float(of_rarity(String(DEFS[id].rarity)).size())
+	if w.is_empty():
+		return random_kind(rng, rarity_filter)
+	return String(rng.weighted(w))

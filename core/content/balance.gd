@@ -136,3 +136,28 @@ static func enemy_scale(lap: int) -> float:
 
 static func gold_scale(lap: int) -> float:
 	return 1.0 + GOLD_LAP_STEP * (lap - 1)
+
+# Meta layer (§16 + design review). See also core/content/{economy,pets,gear,potions,unlocks,minigames}.gd.
+## Potion belt: base size, Camp upgrade maximum, potions at run start, heal per potion.
+const POTION_CAP := 2
+const POTION_MAX_CAP := 3
+const POTION_START := 1
+const POTION_HEAL_PCT := 0.30
+## Chance a chest also holds a Healing Draught (only in runs with a potion belt).
+const CHEST_POTION_CHANCE := 0.2
+## One minigame tile per equipped minigame (at most this many), respawned on lap mutation.
+const MINIGAME_TILES_MAX := 3
+
+# Short Road mode (opts.mode = "short"): 10 laps, 2 biomes. Laps 1-5 walk the route's tier-1
+# biome, laps 6-10 its tier-3 biome. The mini-boss (from the tier-3 biome's list) appears when
+# lap 6 starts; the final boss (tier-3 candidates) comes at lap 10. Enemies, pools and gold use
+# the "effective lap" SHORT_EFF_LAPS[lap - 1] (the standard-run lap of equal difficulty).
+const SHORT_LAPS := 10
+const SHORT_BIOME_LAPS := [1, 6]
+const SHORT_MINIBOSS_LAP := 6
+const SHORT_EFF_LAPS := [1, 2, 3, 4, 5, 8, 9, 10, 11, 12]
+
+## Balance targets for the greedy sim bot (A0, standard mode), used by tools/sim.gd reports.
+const TARGET_FRESH := [0.22, 0.30]
+const TARGET_MID := 0.33
+const TARGET_MAX := [0.45, 0.50]
