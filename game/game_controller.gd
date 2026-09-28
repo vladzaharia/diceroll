@@ -313,7 +313,9 @@ func _enter_idle() -> void:
 				tray.set_locked(i, false)
 			if not in_combat:
 				rig.home(board.hero)
+				clear_view()
 		GameFlow.Phase.BOARD_ROLLED:
+			board.restore_occluders()
 			rig.overview(board.ring_bounds())
 		GameFlow.Phase.PORTAL:
 			rig.overview(board.ring_bounds())
@@ -356,6 +358,17 @@ func hero_pos() -> Vector3:
 ## Screen point above the hero (height in world units).
 func hero_screen(height := 2.0) -> Vector2:
 	return rig.camera.unproject_position(hero_pos() + Vector3.UP * height)
+
+
+## Sinks set pieces / dressing that would hide the hero from the camera's current target
+## framing (close follow / home views on the far side of the island). Undone by the next
+## overview (board.restore_occluders()).
+func clear_view() -> void:
+	if in_combat or board.hero == null:
+		return
+	board.restore_occluders()
+	var vs := get_viewport().get_visible_rect().size
+	board.hide_occluders(rig.desired_transform(), rig.camera.fov, vs.x / maxf(vs.y, 1.0), [board.hero.global_position])
 
 
 ## The single landing marker for the current board move (tile + move size).
@@ -480,14 +493,18 @@ func change_biome(ev: Dictionary) -> void:
 	await board.sink_wave(pos, 0.9 / speed)
 	var look := Biome.look(act)
 	Audio.play_sfx("portal")
-	await overlay.dissolve(true, Color(look.sky_top).lerp(Color(look.sky_glow), 0.25), Color(look.sky_glow), 0.7)
+	var vs := get_viewport().get_visible_rect().size
+	var centre := hero_screen(0.8) / Vector2(maxf(vs.x, 1.0), maxf(vs.y, 1.0))
+	await overlay.dissolve(true, Color(look.sky_top).lerp(Color(look.sky_glow), 0.25), Color(look.sky_glow), 0.7, centre)
 	board.hero_idx = pos
 	board.build(act, tiles)
 	board.hide_tiles()
 	rig.overview(board.ring_bounds(), true)
 	Audio.play_music("act%d" % act, 1.2)
 	await wait(0.15)
-	overlay.dissolve(false, Color(look.sky_top), Color(look.sky_glow), 0.9)
+	centre = hero_screen(0.8) / Vector2(maxf(vs.x, 1.0), maxf(vs.y, 1.0))
+	overlay.dissolve(false, Color(look.sky_top), Color(look.sky_glow), 0.9, centre)
+
 	await wait(0.25)
 	board.rise_wave(pos, 1.1 / speed)
 	var name := String(SummaryScreen.ACT_NAMES[clampi(act - 1, 0, 2)])

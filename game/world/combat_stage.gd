@@ -281,7 +281,7 @@ func enemy_attack(i: int) -> void:
 	var ch := enemies[i]
 	var id := String(data[i].get("id", ""))
 	var home := ch.global_position
-	var ranged := id == "skeleton_archer" or id == "cultist" or id == "boss_lich"
+	var ranged := id in ["skeleton_archer", "cultist", "boss_lich", "mini_grave_mage"]
 	var lunge := home + (hero.global_position - home).normalized() * (0.2 if ranged else 0.9)
 	var t := ch.create_tween().set_speed_scale(speed)
 	t.tween_property(ch, "global_position", lunge, 0.18).set_trans(Tween.TRANS_SINE)

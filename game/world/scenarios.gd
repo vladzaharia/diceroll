@@ -162,12 +162,18 @@ class _Driver extends Node3D:
 				await _sequence()
 			"enemy_gallery":
 				var ids := EnemyLooks.DEFS.keys()
+				if String(args.get("only", "")) == "mini":
+					# size ladder: elite brute < mini-bosses < the Lich
+					ids = ["brute", "mini_bone_champion", "mini_pumpkin_knight", "mini_grave_mage", "boss_lich"]
 				var pts := PackedVector3Array()
 				for i in ids.size():
 					var id: String = ids[i]
 					var ch := EnemyLooks.create(id)
 					ch.scale = Vector3.ONE * CombatStage.UNIT_SCALE * EnemyLooks.scale_of(id)
 					var p := Vector3(-5.6 + (i % 5) * 2.8, 0.05, -1.5 + (i / 5) * 4.2)
+					if ids.size() <= 5:
+						p = Vector3(-5.2 + i * 2.6, 0.05, 0.6)
+
 					ch.position = p
 					add_child(ch)
 					var hud := UnitHud.new()

@@ -238,6 +238,7 @@ func _dice_rolled(ev: Dictionary) -> void:
 		# the camera pulls out while the dice tumble, so the landing tile is in view
 		c.tray.clear_chosen()
 		c.board.clear_targets()
+		c.board.restore_occluders()
 		c.rig.overview(c.board.ring_bounds())
 	c.tray.roll(values, idx)
 	await c.tray.settled
@@ -318,10 +319,9 @@ func _passive_triggered(ev: Dictionary) -> void:
 		"second_wind", "phoenix":
 			text = "Saved at 1 HP!"
 	c.ui.flash_passive(pid)
-	var at := c.hero_screen(2.4)
-	if c.in_combat and not pid in ["thorns", "second_wind", "phoenix", "bloodthirst", "iron_skin"]:
-		at = c.tray.global_position + Vector2(c.tray.size.x * 0.5, 0)
-	c.overlay.passive_pop(at, pid, text)
+	# pops rise from above the hero (they stack if several fire together)
+	c.overlay.passive_pop(c.hero_screen(2.6), pid, text)
+
 	Audio.play_sfx("buff")
 	if pid in ["second_wind", "phoenix"]:
 		Fx.flash(c, Color(1.0, 0.7, 0.3, 0.45), 0.5)
@@ -345,7 +345,9 @@ func _hero_moved(ev: Dictionary) -> void:
 	else:
 		c.rig.follow(c.board.hero)
 		await c.board.hop_hero(path, 0.3 / c.speed)
+	c.clear_view()
 	await _wait(0.15)
+
 
 
 func _board_mutated(ev: Dictionary) -> void:

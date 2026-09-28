@@ -239,6 +239,16 @@ func _recompute() -> void:
 			var r := (3.6 if portrait else 3.4) * _follow_wide
 			if _follow_wide > 1.0:
 				_pitch = 54.0 if portrait else 48.0
+				# home view: lean toward the board centre so the ring ahead is in view, not
+				# the empty island edge behind the hero
+				var bc0 := _bounds.get_center()
+				c = c.lerp(Vector3(bc0.x, c.y, bc0.z), 0.38)
+
+			# on the far side of the ring look down more steeply, over the centre set piece
+			var bc := _bounds.get_center()
+			var far := clampf((bc.z - c.z) / maxf(_bounds.size.z * 0.5, 0.1), 0.0, 1.0)
+			_pitch += 12.0 * far
+
 			for x in [-1.0, 1.0]:
 				for z in [-1.0, 1.0]:
 					pts.append(c + Vector3(x * r, 0.0, z * r * 0.8))
