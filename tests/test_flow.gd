@@ -277,7 +277,7 @@ func test_pass_start_lap_and_shop() -> void:
 	assert_eq(_first(ev, "hero_moved").path, [23, 0, 1, 2, 3])
 	var lc := _first(ev, "lap_completed")
 	assert_eq(lc.lap, 3)
-	assert_eq(lc.healed, 11, "15% of 70 = 10.5 -> 11")
+	assert_eq(lc.healed, int(round(70 * Balance.LAP_HEAL_PCT)))
 	assert_eq(f.run.lap, 4)
 	assert_eq(f.run.pos, 3)
 	assert_true(_types(ev).has("board_mutated"))
@@ -674,7 +674,7 @@ func test_elite_guarantees_passive_choice() -> void:
 	_force_roll(f, 3)
 	f.choose_move(0)
 	assert_eq(f.combat.elite, true)
-	assert_eq(f.combat.enemies[0].hp, int(round(38 * Balance.ELITE_HP_MULT)))
+	assert_eq(f.combat.enemies[0].hp, int(round(38 * Balance.ELITE_HP_MULT * Balance.enemy_scale(1))))
 	_win_fight(f)
 	for k in 6:
 		if f.phase == P.DRAFT and f.offer.kind == "passive":
@@ -749,7 +749,8 @@ func test_lap_heal_emits_hp_changed() -> void:
 	for e in ev:
 		if e.type == "hp_changed" and e.source == "lap":
 			hc = e
-	assert_eq(hc, {"type": "hp_changed", "amount": 11, "total": 51, "source": "lap", "max_hp": 70})
+	var heal := int(round(70 * Balance.LAP_HEAL_PCT))
+	assert_eq(hc, {"type": "hp_changed", "amount": heal, "total": 40 + heal, "source": "lap", "max_hp": 70})
 
 func test_treasury_payout_reports_reset() -> void:
 	var f := _flow()

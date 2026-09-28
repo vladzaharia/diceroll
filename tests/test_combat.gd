@@ -48,7 +48,7 @@ func test_begin_emits_start_events() -> void:
 	assert_true(t.has("combat_turn_started"))
 	assert_true(t.has("dice_rolled"))
 	assert_eq(c.enemies.size(), 2)
-	assert_eq(c.enemies[0].hp, 12, "act1 lap1 minion hp")
+	assert_eq(c.enemies[0].hp, int(round(12 * Balance.enemy_scale(1))), "lap1 minion hp")
 	assert_eq(c.turn, 1)
 	assert_eq(c.rerolls_left, 2)
 	assert_eq(c.dice_values.size(), 2)
@@ -64,7 +64,7 @@ func test_enemy_scaling() -> void:
 	c.begin(run, ["skeleton_warrior"], false, false, 3)
 	# warrior base 20 scaled by lap 3
 	assert_eq(c.enemies[0].hp, int(round(20 * Balance.enemy_scale(3))))
-	assert_near(Balance.enemy_scale(1), 1.0)
+	assert_near(Balance.enemy_scale(1), Balance.ENEMY_BASE_SCALE)
 	assert_true(Balance.enemy_scale(15) > Balance.enemy_scale(7), "scales smoothly by lap")
 
 func test_damage_formula_pair() -> void:
@@ -297,7 +297,7 @@ func test_buff_increases_future_attacks() -> void:
 	assert_eq(c.enemies[0].atk_bonus, 2)
 	# bandit cycle next is attack 7 (+2)
 	assert_eq(c.enemies[0].intent.kind, "attack")
-	assert_eq(c.enemies[0].intent.value, 9)
+	assert_eq(c.enemies[0].intent.value, int(round(7 * Balance.enemy_scale(1))) + 2)
 
 func test_enemy_block_intent_and_reset() -> void:
 	_setup(["", "", ""], ["skeleton_warrior"])

@@ -149,7 +149,7 @@ func test_elite_rewards_regular_passive_choice() -> void:
 	for o in f.offer.options:
 		for k in ["id", "label", "desc", "rarity"]:
 			assert_true(o.has(k))
-		assert_true(not Passives.is_boss(o.id), "elite never gives boss passives")
+		assert_eq(Passives.is_boss(o.id), Passives.is_boss(f.offer.options[0].id), "one tier per elite offer")
 	var id: String = f.offer.options[1].id
 	var ev := f.pick_draft(1)
 	assert_true(f.run.passives.has(id))
