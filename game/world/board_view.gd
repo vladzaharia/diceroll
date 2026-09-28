@@ -196,6 +196,9 @@ func _build_tile(i: int) -> void:
 	Props.set_shadows(top, false)
 	if corner:
 		base.position.y = -0.03
+	var glow: Variant = Biome.look(biome_id).get("tile_glow", null)
+	if glow is Color:
+		root.add_child(TileStyle.glow_skirt(glow, bw))
 	_tile_nodes.append(root)
 	_top_mats.append(tmat)
 	_props.append(null)

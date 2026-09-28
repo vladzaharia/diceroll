@@ -324,14 +324,14 @@ static func _lava_sea() -> MeshInstance3D:
 	var pm := PlaneMesh.new()
 	pm.size = Vector2(400, 400)
 	mi.mesh = pm
-	var m := BiomeBlocks.lava_material(0.16, 1.2, 0.36)
-	m.set_shader_parameter("speed", 0.03)
+	var m := ShaderMaterial.new()
+	m.shader = preload("res://game/world/shaders/lava_sea.gdshader")
 	mi.material_override = m
 	mi.position.y = -12.0
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	var l := OmniLight3D.new()
 	l.light_color = Color(1.0, 0.4, 0.12)
-	l.light_energy = 3.0
+	l.light_energy = 2.0
 	l.omni_range = 16.0
 	l.omni_attenuation = 1.2
 	l.position = Vector3(0, 2.5, 0)

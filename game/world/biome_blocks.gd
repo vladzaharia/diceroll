@@ -49,19 +49,19 @@ const LOOKS := {
 		"sea": "clouds", "tile_base": Color(0.52, 0.58, 0.68),
 	},
 	"magma": {
-		"sky_top": Color(0.08, 0.03, 0.05), "sky_horizon": Color(0.55, 0.16, 0.06),
-		"sky_bottom": Color(0.35, 0.08, 0.03), "sky_glow": Color(1.0, 0.42, 0.12),
-		"glow_strength": 0.8, "stars": 0.0,
-		"fog": Color(0.32, 0.1, 0.06), "fog_density": 0.0, "fog_height_density": 0.0,
-		"ambient": Color(0.7, 0.42, 0.38), "ambient_energy": 0.55,
-		"key": Color(1.0, 0.66, 0.45), "key_energy": 1.2, "key_rot": Vector3(-54.0, -140.0, 0.0),
-		"fill": Color(1.0, 0.4, 0.2), "fill_energy": 0.55,
-		"exposure": 1.0, "saturation": 1.15, "contrast": 1.12, "glow": 0.6,
-		"island_top": Color(0.2, 0.17, 0.18), "island_side": Color(0.18, 0.14, 0.15),
-		"island_bottom": Color(0.55, 0.16, 0.05),
+		"sky_top": Color(0.05, 0.04, 0.12), "sky_horizon": Color(0.42, 0.12, 0.12),
+		"sky_bottom": Color(0.2, 0.06, 0.06), "sky_glow": Color(1.0, 0.45, 0.16),
+		"glow_strength": 0.6, "stars": 0.25,
+		"fog": Color(0.16, 0.08, 0.14), "fog_density": 0.0, "fog_height_density": 0.0,
+		"ambient": Color(0.46, 0.44, 0.7), "ambient_energy": 0.55,
+		"key": Color(1.0, 0.86, 0.74), "key_energy": 1.25, "key_rot": Vector3(-54.0, -140.0, 0.0),
+		"fill": Color(0.42, 0.48, 1.0), "fill_energy": 0.6,
+		"exposure": 1.0, "saturation": 1.08, "contrast": 1.1, "glow": 0.35,
+		"island_top": Color(0.12, 0.11, 0.13), "island_side": Color(0.09, 0.08, 0.1),
+		"island_bottom": Color(0.4, 0.12, 0.05),
 		"particles": "embers", "light": Color(1.0, 0.45, 0.15),
 		"cloud_deep": Color(0.2, 0.05, 0.03), "cloud_light": Color(0.5, 0.14, 0.05), "cloud_rim": Color(1.0, 0.5, 0.2),
-		"sea": "lava", "tile_base": Color(0.26, 0.22, 0.24),
+		"sea": "lava", "tile_base": Color(0.6, 0.57, 0.56), "tile_glow": Color(1.0, 0.4, 0.1),
 	},
 }
 
@@ -72,9 +72,8 @@ const TERRAIN := {
 	"frost": {"floor": [["snow", 9], ["gravel_with_snow", 1], ["grass_with_snow", 1]],
 		"top": ["snow", "dirt_with_snow", "snow"], "fill": "stone", "tint": Color(0.8, 0.86, 0.97),
 		"raise_tint": Color(0.92, 0.95, 1.0)},
-	"magma": {"floor": [["gravel", 10], ["stone_dark", 2]],
-		"top": ["stone_dark", "stone_dark", "gravel"], "fill": "stone_dark", "tint": Color(0.3, 0.26, 0.28),
-		"raise_tint": Color(0.42, 0.34, 0.36)},
+	"magma": {"floor": [["stone_dark", 1]], "top": ["stone_dark"], "fill": "stone_dark",
+		"tint": Color(1, 1, 1), "shader": "basalt", "channel": true},
 }
 
 ## Current build state (set by dress()).
@@ -85,6 +84,9 @@ static var _off := 0.5
 static var _heights: Dictionary = {}
 static var _rng := RandomNumberGenerator.new()
 static var _meshes: Dictionary = {}
+static var _chan: Dictionary = {}
+## Lava surface height in the Magma channel (world y).
+const CHANNEL_Y := -0.32
 
 
 # --- entry points (called by Biome.build) ---------------------------------------------------
@@ -124,11 +126,10 @@ static func inner_corner(id: String, holder: Node3D, p: Vector3, yaw: float, sx:
 			v.name = "Vent"
 			v.position = p
 			holder.add_child(v)
-			rock(v, Vector3(0.0, 0, 0), 0.55, Color(0.16, 0.13, 0.14), 3)
-			var pool := lava_pool(v, Vector3(0, 0.3, 0), 0.5)
-			pool.name = "Glow"
-			Biome.flame(v, Vector3(0, 0.4, 0), Color(1.0, 0.45, 0.12), 0.3, 8)
-			Biome.flicker_light(holder, p + Vector3(0, 0.9, 0), Color(1.0, 0.42, 0.12), 1.4, 3.2)
+			spire(v, Vector3.ZERO, 0.62, 3 + int(sx * 2 + sz))
+			crack_decal(v, Vector3(-sx * 0.2, 0.02, sz * 0.3), 1.6, yaw)
+			Biome.flame(v, Vector3(0, 0.15, 0), Color(1.0, 0.45, 0.12), 0.22, 6)
+			Biome.flicker_light(holder, p + Vector3(0, 0.9, 0), Color(1.0, 0.42, 0.12), 0.9, 3.0)
 
 
 # --- terrain ------------------------------------------------------------------------------
@@ -169,7 +170,19 @@ static func _height(cx: float, cz: float) -> int:
 static func ground(x: float, z: float) -> float:
 	var i := int(floor(x / CELL - _off + 0.5))
 	var j := int(floor(z / CELL - _off + 0.5))
+	if _chan.has(Vector2i(i, j)):
+		return CHANNEL_Y
 	return float(_heights.get(Vector2i(i, j), 0)) * CELL
+
+
+## True for a cell of the Magma lava channel: the column just outside the ring on both
+## sides (running off the island's front edge) and the row behind the ring.
+static func _is_channel(cx: float, cz: float) -> bool:
+	var e := _extent + 0.2
+	var ax := absf(cx)
+	if ax > e and ax < e + CELL:
+		return true
+	return cz < -e and cz > -e - CELL and ax < e + CELL
 
 
 static func _pick(list: Array) -> String:
@@ -186,7 +199,10 @@ static func _pick(list: Array) -> String:
 
 static func _terrain(d: Node3D) -> void:
 	_heights.clear()
+	_chan.clear()
 	var pal: Dictionary = TERRAIN[_id]
+	var shader_mat: Material = basalt_material() if String(pal.get("shader", "")) == "basalt" else null
+	var chan_node: Node3D = null
 	var half := Biome.ISLAND_HALF * _s
 	var n := int(ceil(half / CELL)) + 1
 	var flat: Dictionary = {}     # block name -> Array[Transform3D]
@@ -203,12 +219,29 @@ static func _terrain(d: Node3D) -> void:
 			if r > 1.0 - CELL * 0.2 / half:
 				continue
 			var up := _height(cx, cz)
+			var chan := bool(pal.get("channel", false)) and _is_channel(cx, cz)
+			if chan:
+				up = 0
+				_chan[Vector2i(i, j)] = true
+				if chan_node == null:
+					chan_node = Node3D.new()
+					chan_node.name = "LavaChannel"
+					chan_node.set_meta("prescaled", true)
+					d.add_child(chan_node)
+				var lp := MeshInstance3D.new()
+				var pm := PlaneMesh.new()
+				pm.size = Vector2(CELL, CELL)
+				lp.mesh = pm
+				lp.material_override = channel_material()
+				lp.position = Vector3(cx, CHANNEL_Y, cz)
+				lp.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				chan_node.add_child(lp)
 			_heights[Vector2i(i, j)] = up
 			var name := _pick(pal.floor) if up == 0 else String(pal.fill)
 			if not flat.has(name):
 				flat[name] = []
 			flat[name].append(Transform3D(basis.rotated(Vector3.UP, PI * 0.5 * _rng.randi_range(0, 3)),
-				Vector3(cx, -CELL * 0.5, cz)))
+				Vector3(cx, -CELL * 0.5 - (0.55 if chan else 0.0), cz)))
 			if up > 0:
 				var col := Node3D.new()
 				col.name = "Block"
@@ -220,7 +253,7 @@ static func _terrain(d: Node3D) -> void:
 					var mi := MeshInstance3D.new()
 					var bm: Array = block_mesh(bn)
 					mi.mesh = bm[0]
-					mi.material_override = _floor_material(bm[1], pal.get("raise_tint", Color(0, 0, 0, 0)))
+					mi.material_override = shader_mat if shader_mat else _floor_material(bm[1], pal.get("raise_tint", Color(0, 0, 0, 0)))
 					mi.scale = Vector3.ONE * (CELL * 0.5)
 					mi.position = Vector3(0, CELL * (k + 0.5), 0)
 					mi.rotation.y = PI * 0.5 * _rng.randi_range(0, 3)
@@ -230,6 +263,11 @@ static func _terrain(d: Node3D) -> void:
 		mm.transform_format = MultiMesh.TRANSFORM_3D
 		var bm: Array = block_mesh(String(name))
 		mm.mesh = bm[0]
+		if shader_mat:
+			# plain boxes: no bevelled cube edges, so the floor reads as one surface
+			var box := BoxMesh.new()
+			box.size = Vector3(2, 2, 2)
+			mm.mesh = box
 		var xs: Array = flat[name]
 		mm.instance_count = xs.size()
 		for k in xs.size():
@@ -237,9 +275,33 @@ static func _terrain(d: Node3D) -> void:
 		var mmi := MultiMeshInstance3D.new()
 		mmi.name = String(name)
 		mmi.multimesh = mm
-		mmi.material_override = _floor_material(bm[1], pal.tint)
+		mmi.material_override = shader_mat if shader_mat else _floor_material(bm[1], pal.tint)
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		floor_node.add_child(mmi)
+
+
+static var _basalt: ShaderMaterial
+static var _channel_mat: ShaderMaterial
+
+
+## Calm world-space basalt (Magma terrain; see basalt.gdshader).
+static func basalt_material() -> ShaderMaterial:
+	if _basalt == null:
+		_basalt = ShaderMaterial.new()
+		_basalt.shader = preload("res://game/world/shaders/basalt.gdshader")
+	return _basalt
+
+
+## Crust-plate lava for the channel around the Magma ring (bright, fast-ish seams).
+static func channel_material() -> ShaderMaterial:
+	if _channel_mat == null:
+		_channel_mat = ShaderMaterial.new()
+		_channel_mat.shader = preload("res://game/world/shaders/lava_sea.gdshader")
+		_channel_mat.set_shader_parameter("scale", 0.75)
+		_channel_mat.set_shader_parameter("speed", 0.08)
+		_channel_mat.set_shader_parameter("energy", 1.7)
+		_channel_mat.set_shader_parameter("seam", 0.09)
+	return _channel_mat
 
 
 ## The flat paving is darkened a touch (`mul`, alpha 0 = as is) so ring tiles read on it.
@@ -1084,92 +1146,134 @@ static func ice_material() -> StandardMaterial3D:
 static func _magma(root: Node3D, d: Node3D, c: Node3D) -> void:
 	var T := Props.TOOLS
 	var D := Props.DUN
-	var basalt := Color(0.2, 0.17, 0.18)
-	# red uplight from the lava below
+	var basalt := Color(0.3, 0.28, 0.31)
+	var smoke_col := Color(0.3, 0.28, 0.4, 0.5)
+	# warm uplight from the lava below (the key stays neutral, the fill cool)
 	var up := DirectionalLight3D.new()
 	up.name = "LavaUplight"
-	up.light_color = Color(1.0, 0.38, 0.12)
-	up.light_energy = 0.55
-	up.light_specular = 0.3
+	up.light_color = Color(1.0, 0.4, 0.14)
+	up.light_energy = 0.4
+	up.light_specular = 0.2
 	up.rotation_degrees = Vector3(35.0, 20.0, 0.0)
 	root.add_child(up)
-	# back: basalt cliffs with lava falls and smoking vents
-	for x in [-7.6, 0.4, 7.2]:
-		var p := spot(Vector3(x, 0, -10.3))
+	var side_x := (_extent + CELL * 1.5) / _s      # authored x of the raised side columns
+	var back_z := -(_extent + CELL * 1.5) / _s     # authored z of the raised back row
+	# back cliffs: lava falls pouring into the channel, smoke columns and obsidian spires
+	for x in [-6.3, 0.0, 6.3]:
+		var p := spot(Vector3(x, 0, back_z))
 		var fall := Node3D.new()
 		fall.name = "LavaFall"
 		fall.set_meta("prescaled", true)
-		fall.position = p
+		fall.position = Vector3(p.x, p.y, p.z + CELL * 0.5 + 0.05)
 		d.add_child(fall)
-		for k in 3:
-			block(fall, "lava", Vector3(0, -CELL * (k + 0.5) + 0.02, 0.62), CELL * 0.5)
-		lava_pool(fall, Vector3(0, 0.03, 0.9), 0.75)
-		_tag(smoke(d, p + Vector3(0, 0.4, 0.4), 1.2, Color(0.22, 0.17, 0.17, 0.55)))
-		Biome.flame(fall, Vector3(0, 0.25, 0.9), Color(1.0, 0.5, 0.12), 0.35, 8)
-		Biome.flicker_light(fall, Vector3(0, 0.8, 1.4), Color(1.0, 0.42, 0.12), 2.4, 6.0)
-	for x in [-9.8, -4.0, 3.8, 10.0]:
-		_tag(rock(d, spot(Vector3(x, 0, -9.0)), _rng.randf_range(0.7, 1.0), basalt, int(x * 4 + 11)))
-	for x in [-5.8, 5.6]:
-		_tag(crystal_cluster(d, spot(Vector3(x, 0, -9.6)), 0.7, 5, int(x * 3 + 2), false, obsidian_material())).name = "Obsidian"
-	# sides: the forge yard (anvils, grindstone, tools, braziers)
+		var sheet := MeshInstance3D.new()
+		var q := QuadMesh.new()
+		q.size = Vector2(1.0, p.y - CHANNEL_Y)
+		sheet.mesh = q
+		sheet.material_override = fall_material()
+		sheet.position = Vector3(0, (p.y + CHANNEL_Y) * 0.5 - p.y, 0)
+		sheet.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		fall.add_child(sheet)
+		lava_pool(fall, Vector3(0, CHANNEL_Y - p.y + 0.03, 0.5), 0.8)
+		Biome.flame(fall, Vector3(0, CHANNEL_Y - p.y + 0.2, 0.6), Color(1.0, 0.5, 0.12), 0.35, 8)
+		Biome.flicker_light(fall, Vector3(0, CHANNEL_Y - p.y + 1.0, 1.0), Color(1.0, 0.42, 0.12), 1.6, 5.0)
+		_tag(smoke(d, p + Vector3(0, 0.2, -0.6), 1.3, smoke_col))
+	for x in [-9.4, -3.2, 3.2, 9.4]:
+		_tag(spire(d, spot(Vector3(x, 0, back_z)), _rng.randf_range(1.1, 1.5), int(x * 5 + 40)))
+	# side columns: the forge yard up on the basalt shelves
 	for side in [-1.0, 1.0]:
-		put(d, T + "anvil.gltf", Vector3(side * 9.0, 0, -5.4), side * 70.0, 1.3)
-		put(d, T + "hammer.gltf", Vector3(side * 9.3, 0.02, -4.4), side * 20.0, 1.0)
-		put(d, D + "barrel_large.gltf", Vector3(side * 9.6, 0, -2.2), side * 30.0, 0.7)
-		put(d, T + "tongs.gltf", Vector3(side * 9.1, 0.72, -2.1), 40.0, 0.9)
-		var bz := put(d, D + "torch_lit.gltf", Vector3(side * 8.8, 0, 0.9), 0.0, 1.2)
+		_tag(spire(d, spot(Vector3(side * side_x, 0, -5.8)), 1.2, int(side * 7 + 3)))
+		put(d, T + "anvil.gltf", Vector3(side * side_x, 0, -2.4), side * 70.0, 1.4)
+		put(d, T + "hammer.gltf", Vector3(side * side_x + 0.1, 0.02, -1.4), side * 20.0, 1.1)
+		var bz := put(d, D + "torch_lit.gltf", Vector3(side * side_x, 0, 1.2), 0.0, 1.3)
 		bz.name = "Brazier"
-		var bp := bz.position
-		Biome.flame(d, bp + Vector3(0, 0.95, 0), Color(1.0, 0.5, 0.15), 0.4, 10).set_meta("prescaled", true)
-		Biome.flicker_light(d, bp + Vector3(0, 1.4, 0.3), Color(1.0, 0.5, 0.2), 1.8, 5.0).set_meta("prescaled", true)
-		_tag(rock(d, spot(Vector3(side * 9.6, 0, 3.6)), 0.6, basalt, int(side * 7 + 33)))
-		var pool := Node3D.new()
-		pool.name = "LavaPool"
-		pool.position = spot(Vector3(side * 8.8, 0, 6.2))
-		pool.set_meta("prescaled", true)
-		d.add_child(pool)
-		lava_pool(pool, Vector3(0, 0.02, 0), 0.85)
-		for a in 5:
-			var ang := TAU * a / 5.0
-			rock(pool, Vector3(cos(ang) * 0.95, -0.12, sin(ang) * 0.95), 0.3, basalt, a + int(side * 5 + 70))
-		Biome.flame(pool, Vector3(0, 0.1, 0), Color(1.0, 0.45, 0.12), 0.28, 6)
-		Biome.flicker_light(pool, Vector3(0, 0.7, 0), Color(1.0, 0.42, 0.12), 1.2, 3.4)
-	put(d, T + "grindstone.gltf", Vector3(-9.2, 0, -0.4), 80.0, 1.2)
-	put(d, D + "sword_shield_broken.gltf", Vector3(9.2, 0, -0.2), -80.0, 0.8)
-	put(d, T + "pickaxe.gltf", Vector3(-8.9, 0.05, 4.8), 20.0, 1.0)
-	for p in [Vector3(-5.0, 0, 9.8), Vector3(0.2, 0, 10.1), Vector3(5.2, 0, 9.8)]:
-		_tag(rock(d, spot(p), 0.45, basalt, int(p.x * 7 + 99)))
-	for p in [Vector3(-2.6, 0, 10.0), Vector3(2.8, 0, 9.9), Vector3(8.2, 0, 9.9), Vector3(-8.0, 0, 9.9)]:
-		var v := Node3D.new()
-		v.position = spot(p)
-		v.set_meta("prescaled", true)
-		d.add_child(v)
-		lava_pool(v, Vector3(0, 0.02, 0), 0.42)
-	# set piece: the Cinder Forge, a stepped basalt cone with a lava heart, an anvil and a
-	# glowing blade before it
-	var tiers := [[2.0, 0.55], [1.45, 0.5], [0.95, 0.45]]
+		Biome.flame(d, bz.position + Vector3(0, 1.0, 0), Color(1.0, 0.5, 0.15), 0.42, 10).set_meta("prescaled", true)
+		Biome.flicker_light(d, bz.position + Vector3(0, 1.5, 0.3), Color(1.0, 0.5, 0.2), 1.6, 5.0).set_meta("prescaled", true)
+		put(d, D + "barrel_large.gltf", Vector3(side * side_x, 0, 3.8), side * 30.0, 0.75)
+		_tag(rock(d, spot(Vector3(side * side_x, 0, 6.6)), 0.55, basalt, int(side * 7 + 33)))
+	put(d, T + "grindstone.gltf", Vector3(-side_x, 0, 5.2), 80.0, 1.2)
+	put(d, D + "sword_shield_broken.gltf", Vector3(side_x, 0, 5.4), -80.0, 0.85)
+	# front: low basalt boulders and a few thin glowing cracks (the camera side stays open)
+	for p in [Vector3(-5.2, 0, 9.9), Vector3(5.0, 0, 9.8)]:
+		_tag(spire(d, spot(p), 0.45, int(p.x * 7 + 99)))
+	for p in [Vector3(-2.6, 0, 9.4), Vector3(0.6, 0, 10.0), Vector3(2.9, 0, 9.6)]:
+		_tag(crack_decal(d, spot(p) + Vector3(0, 0.02, 0), 1.5, _rng.randf() * 180.0))
+	_tag(smoke(d, spot(Vector3(-side_x, 0, -8.0)) + Vector3(0, 0.5, 0), 0.9, smoke_col))
+	_tag(smoke(d, spot(Vector3(side_x, 0, -7.0)) + Vector3(0, 0.5, 0), 0.9, smoke_col))
+	# set piece: the Cinder Forge. A stepped basalt dais over a ring of lava, a great anvil on
+	# top with a glowing greatsword driven into it, flanked by two obsidian spires.
+	var moat := lava_pool(c, Vector3(0, 0.01, -0.1), 2.05)
+	moat.name = "ForgeMoat"
+	var tiers := [[3.0, 0.4, 0.0], [2.2, 0.4, 20.0], [1.5, 0.35, 45.0]]
 	var y := 0.0
 	for i in tiers.size():
 		var t: Array = tiers[i]
-		var bmi := block(c, "stone_dark", Vector3(0, y + float(t[1]) * 0.5, -0.2), 1.0, 20.0 * i)
-		bmi.scale = Vector3(float(t[0]), float(t[1]), float(t[0])) * 0.5
+		var mi := MeshInstance3D.new()
+		var cy := CylinderMesh.new()
+		cy.top_radius = float(t[0]) * 0.5
+		cy.bottom_radius = float(t[0]) * 0.54
+		cy.height = float(t[1])
+		cy.radial_segments = 8
+		cy.rings = 1
+		mi.mesh = cy
+		mi.material_override = basalt_material()
+		mi.position = Vector3(0, y + float(t[1]) * 0.5, -0.1)
+		mi.rotation.y = deg_to_rad(float(t[2]) + 22.5)
+		c.add_child(mi)
 		y += float(t[1])
-	var core := block(c, "lava", Vector3(0, y + 0.05, -0.2), 0.8, 45.0)
-	core.name = "LavaCore"
-	lava_pool(c, Vector3(0, y + 0.47, -0.2), 0.34)
-	Biome.flame(c, Vector3(0, y + 0.6, -0.2), Color(1.0, 0.5, 0.12), 0.55, 14)
-	var sm := smoke(c, Vector3(0, y + 0.8, -0.2), 1.5, Color(0.2, 0.15, 0.15, 0.5))
+	var anvil := Props.put(c, T + "anvil.gltf", Vector3(0.0, y, -0.1), 90.0, 1.7)
+	anvil.name = "ForgeAnvil"
+	Props.tint(anvil, Color(0.26, 0.25, 0.3), 0.85)
+	var blade := Props.put(c, Props.WPN + "sword_A.gltf", Vector3(0.0, y + 0.55, -0.1), 0.0, 2.3)
+	blade.name = "Greatsword"
+	Props.tint(blade, Color(1.0, 0.45, 0.12), 0.9, Color(0.9, 0.25, 0.02) * 0.9)
+	blade.rotation = Vector3(deg_to_rad(180.0), deg_to_rad(20.0), 0.0)
+	blade.position.y = y + 2.3
+	Biome.flame(c, Vector3(0, y + 0.55, -0.1), Color(1.0, 0.55, 0.15), 0.45, 12)
+	var sm := smoke(c, Vector3(0, y + 2.2, -0.1), 1.1, smoke_col)
 	sm.name = "ForgeSmoke"
-	Biome.flicker_light(c, Vector3(0, y + 1.2, 0.6), Color(1.0, 0.45, 0.15), 3.0, 7.0)
-	Props.put(c, T + "anvil.gltf", Vector3(0.0, 0, 1.75), 0.0, 1.1)
-	var blade := Props.put(c, Props.WPN + "sword_A.gltf", Vector3(0.05, 0.72, 1.75), 0.0, 0.9)
-	Props.tint(blade, Color(1.0, 0.5, 0.2), 0.6, Color(1.0, 0.35, 0.05) * 1.5)
-	blade.rotation = Vector3(0, deg_to_rad(90.0), deg_to_rad(90.0))
-	Props.put(c, T + "hammer.gltf", Vector3(-0.7, 0.02, 1.9), 50.0, 1.2)
-	for p in [Vector3(-1.9, 0, -1.2), Vector3(1.8, 0, -1.4), Vector3(-1.7, 0, 1.2), Vector3(1.9, 0, 1.0)]:
-		var bz := Props.put(c, D + "torch_lit.gltf", p, 0.0, 0.9)
+	Biome.flicker_light(c, Vector3(0, y + 1.5, 0.9), Color(1.0, 0.5, 0.18), 2.4, 6.5)
+	for sx in [-1.0, 1.0]:
+		spire(c, Vector3(sx * 1.85, 0, -0.9), 1.25, int(sx * 3 + 90))
+		var bz := Props.put(c, D + "torch_lit.gltf", Vector3(sx * 1.7, 0, 1.25), 0.0, 0.95)
 		bz.name = "Brazier"
-		Biome.flame(c, p + Vector3(0, 0.72, 0), Color(1.0, 0.5, 0.15), 0.3, 7)
-	var ring := Biome._rune_circle(Color(1.0, 0.42, 0.12), 2.8)
+		Biome.flame(c, Vector3(sx * 1.7, 0.75, 1.25), Color(1.0, 0.5, 0.15), 0.3, 7)
+	var ring := Biome._rune_circle(Color(1.0, 0.42, 0.12), 2.85)
 	ring.position = Vector3(0, 0.04, 0)
+	(ring.material_override as ShaderMaterial).set_shader_parameter("intensity", 0.6)
 	c.add_child(ring)
+
+
+## A tall obsidian spire (a few black glass crystals with an ember sheen).
+static func spire(parent: Node3D, pos: Vector3, k: float, seed := 1) -> Node3D:
+	var n := crystal_cluster(parent, pos, k, 4, seed, false, obsidian_material())
+	n.name = "Obsidian"
+	return n
+
+
+static var _fall_mat: ShaderMaterial
+
+
+## A lava fall sheet (the crust-plate lava, streaming down).
+static func fall_material() -> ShaderMaterial:
+	if _fall_mat == null:
+		_fall_mat = ShaderMaterial.new()
+		_fall_mat.shader = preload("res://game/world/shaders/lava_fall.gdshader")
+	return _fall_mat
+
+
+## Thin glowing cracks on the ground (an additive decal quad).
+static func crack_decal(parent: Node3D, pos: Vector3, size: float, yaw: float) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.name = "Crack"
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(size, size)
+	mi.mesh = pm
+	var m := Props.glow_material(Color(1.0, 0.45, 0.12), true, 2.0)
+	m.albedo_texture = TileStyle.crack_texture()
+	mi.material_override = m
+	mi.position = pos
+	mi.rotation.y = deg_to_rad(yaw)
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(mi)
+	return mi

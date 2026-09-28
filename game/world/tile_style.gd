@@ -113,7 +113,7 @@ static func _ice_slab() -> Node3D:
 	q.size = Vector2(1.1, 1.1)
 	crack.mesh = q
 	var cm := Props.glow_material(Color(0.85, 0.97, 1.0), true, 0.7)
-	cm.albedo_texture = _crack_texture()
+	cm.albedo_texture = crack_texture()
 	crack.material_override = cm
 	crack.position.y = 0.085
 	crack.rotation.y = deg_to_rad(8.0)
@@ -160,10 +160,39 @@ static func _lava_vent() -> Node3D:
 
 
 static var _crack_tex: Texture2D
+static var _skirt_tex: Texture2D
+
+
+## A soft glowing seam on the ground around a tile plinth (Magma: the tiles sit on lava
+## light, so they separate from the dark basalt).
+static func glow_skirt(color: Color, width: float) -> MeshInstance3D:
+	if _skirt_tex == null:
+		var n := 64
+		var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+		for y in n:
+			for x in n:
+				var u := absf((float(x) + 0.5) / n * 2.0 - 1.0)
+				var v := absf((float(y) + 0.5) / n * 2.0 - 1.0)
+				var d := pow(pow(u, 6.0) + pow(v, 6.0), 1.0 / 6.0)
+				var a := clampf(1.0 - absf(d - 0.8) / 0.2, 0.0, 1.0)
+				img.set_pixel(x, y, Color(1, 1, 1, a * a))
+		img.generate_mipmaps()
+		_skirt_tex = ImageTexture.create_from_image(img)
+	var mi := MeshInstance3D.new()
+	mi.name = "GlowSkirt"
+	var pm := PlaneMesh.new()
+	pm.size = Vector2.ONE * width * 1.25
+	mi.mesh = pm
+	var m := Props.glow_material(color, true, 1.6)
+	m.albedo_texture = _skirt_tex
+	mi.material_override = m
+	mi.position.y = 0.015
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return mi
 
 
 ## Thin white crack lines on transparent (ice tile surface).
-static func _crack_texture() -> Texture2D:
+static func crack_texture() -> Texture2D:
 	if _crack_tex:
 		return _crack_tex
 	var size := 128
