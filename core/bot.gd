@@ -94,6 +94,10 @@ static func tile_score(f: GameFlow, idx: int, crossing: bool) -> float:
 			s = (1.0 - r) * 14.0
 		"trap":
 			s = -3.0
+		"ice":
+			s = -1.5
+		"lava":
+			s = -5.0
 		"forge":
 			s = 4.0
 		"treasury":

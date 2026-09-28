@@ -321,7 +321,7 @@ func test_boss_phase_and_summon() -> void:
 	assert_eq(c.enemies[0].hp, 75)
 	assert_true(_types(ev).has("summon"))
 	assert_eq(c.enemies.size(), 2)
-	assert_eq(c.enemies[1].id, "skeleton_minion")
+	assert_eq(c.enemies[1].id, "skeleton_warrior", "the Warden raises warriors")
 	c.dice_values.assign([6, 6, 6])
 	c.target = 0
 	ev = c.attack(run)
@@ -442,5 +442,5 @@ func test_combat_started_carries_intents() -> void:
 	c = CombatState.new()
 	var ev := c.begin(run, ["boss_bone_warden"], false, true, 0)
 	var cs := _first(ev, "combat_started")
-	assert_eq(cs.enemies[0].intent, {"kind": "attack", "value": 10})
+	assert_eq(cs.enemies[0].intent, {"kind": "attack", "value": 20})
 	assert_true(_types(ev).has("enemy_intent"))

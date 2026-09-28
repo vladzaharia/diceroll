@@ -4,8 +4,9 @@ extends RefCounted
 ## and 32 (9x9); any 4(n-1) with n >= 5 works with proportionally scaled tile counts.
 ## Tile 0 is Start; the other corners (n-1, 2(n-1), 3(n-1)) are Forge, Treasury and Portal.
 ## Each tile: {type, enemies:Array[String], elite:bool}. Types: start forge treasury portal enemy
-## elite miniboss chest event campfire trap empty. Presentation lays the ring out with
-## side()/size()/corners(); tile i walks clockwise from Start.
+## elite miniboss chest event campfire trap empty, plus biome tiles ice (Frostpeak traps) and
+## lava (Magma Depths). Presentation lays the ring out with side()/size()/corners(); tile i walks
+## clockwise from Start. `biome` ("" = none) sets the tile mix and the enemy roster.
 
 const CORNER_TYPES := ["start", "forge", "treasury", "portal"]
 ## Edge tile counts per ring size. Mutation spawns MUTATE per lap and tops events back up to
@@ -22,6 +23,8 @@ const MUTATE := {
 }
 
 var tiles: Array[Dictionary] = []
+## Biome id (BiomeDefs) this board was generated for; "" = the legacy mix and band pools.
+var biome: String = ""
 
 static func make_tile(type: String, enemies: Array = [], elite: bool = false) -> Dictionary:
 	return {"type": type, "enemies": enemies.duplicate(), "elite": elite}
@@ -53,8 +56,31 @@ func is_corner(idx: int) -> bool:
 func portal_range() -> int:
 	return size() / 3
 
-## Edge tile counts for a ring size (table for 24/32, proportional otherwise).
-static func layout_for(ring_size: int) -> Dictionary:
+## Edge tile counts for a ring size (table for 24/28/32, proportional otherwise), with the
+## biome's mix deltas applied (Empty absorbs the difference; traps become the biome's trap tile).
+static func layout_for(ring_size: int, p_biome := "") -> Dictionary:
+	var base := _base_layout(ring_size)
+	if not BiomeDefs.has(p_biome):
+		return base
+	var def: Dictionary = BiomeDefs.DEFS[p_biome]
+	var out := {}
+	for type in base:
+		out[type] = int(base[type])
+	var mix: Dictionary = def.get("mix", {})
+	for type in mix:
+		out[type] = maxi(0, int(out.get(type, 0)) + int(mix[type]))
+	var trap_tile := String(def.get("trap_tile", "trap"))
+	if trap_tile != "trap":
+		out[trap_tile] = int(out.get(trap_tile, 0)) + int(out.get("trap", 0))
+		out["trap"] = 0
+	var used := 0
+	for type in out:
+		if type != "empty":
+			used += int(out[type])
+	out["empty"] = maxi(0, ring_size - 4 - used)
+	return out
+
+static func _base_layout(ring_size: int) -> Dictionary:
 	if LAYOUTS.has(ring_size):
 		return LAYOUTS[ring_size]
 	var base: Dictionary = LAYOUTS[24]
@@ -69,27 +95,35 @@ static func layout_for(ring_size: int) -> Dictionary:
 	out["empty"] = maxi(0, edge - used)
 	return out
 
-static func mutate_spawns_for(ring_size: int) -> Array:
-	if MUTATE.has(ring_size):
-		return MUTATE[ring_size]
+static func mutate_spawns_for(ring_size: int, p_biome := "") -> Array:
 	var out: Array = []
-	for i in maxi(1, int(round(2.0 * (ring_size - 4) / 20.0))):
-		out.append("enemy")
-	out.append("elite")
+	if MUTATE.has(ring_size):
+		out = (MUTATE[ring_size] as Array).duplicate()
+	else:
+		for i in maxi(1, int(round(2.0 * (ring_size - 4) / 20.0))):
+			out.append("enemy")
+		out.append("elite")
+	if BiomeDefs.has(p_biome):
+		for k in int(BiomeDefs.DEFS[p_biome].get("mutate_elites", 0)):
+			var e := out.find("enemy")
+			if e >= 0:
+				out[e] = "elite"
 	return out
 
 # ---------------------------------------------------------------- generation
 
 ## act >= 2 swaps one Enemy for an Elite; `lap` sets the enemy band on the new tiles.
-static func generate(rng: Rng, act: int, ring_size: int = Balance.BOARD_SIZE, lap: int = 1) -> Board:
+## `p_biome` ("" = legacy) sets the tile mix and the enemy roster.
+static func generate(rng: Rng, act: int, ring_size: int = Balance.BOARD_SIZE, lap: int = 1, p_biome := "") -> Board:
 	assert(ring_size % 4 == 0 and ring_size >= 16, "ring size must be 4(n-1)")
 	var b := Board.new()
+	b.biome = p_biome if BiomeDefs.has(p_biome) else ""
 	var bag: Array[String] = []
-	var layout := layout_for(ring_size)
+	var layout := layout_for(ring_size, b.biome)
 	for type in layout:
 		for i in layout[type]:
 			bag.append(type)
-	if act >= 2:
+	if act >= 2 and bag.has("enemy"):
 		bag.erase("enemy")
 		bag.append("elite")
 	# shuffle, then swap fights out of tiles 1 and 2 (deterministic and fast)
@@ -113,25 +147,34 @@ static func generate(rng: Rng, act: int, ring_size: int = Balance.BOARD_SIZE, la
 		b.tiles[i] = make_tile(corner_map[i])
 	for k in edge.size():
 		var type := bag[k]
-		b.tiles[edge[k]] = _spawn(rng, type, act, lap)
+		b.tiles[edge[k]] = _spawn(rng, type, act, lap, b.biome)
 	return b
 
 static func _is_fight(type: String) -> bool:
 	return type == "enemy" or type == "elite" or type == "miniboss"
 
-static func _spawn(rng: Rng, type: String, act: int, lap: int) -> Dictionary:
+static func _spawn(rng: Rng, type: String, act: int, lap: int, p_biome := "") -> Dictionary:
 	if type == "enemy":
-		return make_tile("enemy", roll_enemies(rng, act, lap, false))
+		return make_tile("enemy", roll_enemies(rng, act, lap, false, p_biome))
 	if type == "elite":
-		return make_tile("elite", roll_enemies(rng, act, lap, true), true)
+		return make_tile("elite", roll_enemies(rng, act, lap, true, p_biome), true)
 	return make_tile(type)
 
-static func roll_enemies(rng: Rng, act: int, lap: int, elite: bool) -> Array[String]:
+## Regular enemy pool for a lap: the biome's early pool for the first 3 laps of its tier, its
+## late pool after; the legacy band pools without a biome.
+static func enemy_pool(lap: int, p_biome := "") -> Array:
+	if not BiomeDefs.has(p_biome):
+		return EnemyDefs.POOLS[EnemyDefs.band(lap)]
+	var def: Dictionary = BiomeDefs.DEFS[p_biome]
+	var first := int(Balance.BIOME_LAPS[int(def.tier) - 1])
+	return def.pools[0] if lap - first < 3 else def.pools[1]
+
+static func roll_enemies(rng: Rng, act: int, lap: int, elite: bool, p_biome := "") -> Array[String]:
 	var band := EnemyDefs.band(lap)
-	var pool: Array = EnemyDefs.POOLS[band]
+	var pool: Array = enemy_pool(lap, p_biome)
 	var out: Array[String] = []
 	if elite:
-		out.append("brute")
+		out.append(String(BiomeDefs.DEFS[p_biome].elite) if BiomeDefs.has(p_biome) else "brute")
 		if band >= 2:
 			out.append(String(rng.pick(pool)))
 		return out
@@ -175,7 +218,7 @@ func next_of_type(pos: int, type: String, n: int) -> Array[int]:
 	return out
 
 func set_tile(idx: int, type: String, rng: Rng, act: int, lap: int) -> Dictionary:
-	tiles[idx] = _spawn(rng, type, act, lap)
+	tiles[idx] = _spawn(rng, type, act, lap, biome)
 	return change(idx)
 
 func change(idx: int) -> Dictionary:
@@ -196,12 +239,12 @@ func mutate(rng: Rng, act: int, lap: int, protect: Array = []) -> Array[Dictiona
 			empties.append(i)
 	rng.shuffle(empties)
 	var spawns: Array[String] = []
-	spawns.assign(mutate_spawns_for(size()))
+	spawns.assign(mutate_spawns_for(size(), biome))
 	var events := 0
 	for t in tiles:
 		if t.type == "event":
 			events += 1
-	for k in range(events, int(layout_for(size()).event)):
+	for k in range(events, int(layout_for(size(), biome).event)):
 		spawns.append("event")
 	for type in spawns:
 		if empties.is_empty():
@@ -250,10 +293,11 @@ func to_dict() -> Dictionary:
 		if tile.get("cleared", false):
 			d["cleared"] = true
 		t.append(d)
-	return {"tiles": t, "size": size(), "side": side()}
+	return {"tiles": t, "size": size(), "side": side(), "biome": biome}
 
 static func from_dict(d: Dictionary) -> Board:
 	var b := Board.new()
+	b.biome = String(d.get("biome", ""))
 	for td in d.get("tiles", []):
 		var enemies: Array = []
 		for e in td.get("enemies", []):

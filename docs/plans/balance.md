@@ -1,13 +1,18 @@
 # Diceroll balance
 
-Numbers live in `core/content/` (`balance.gd`, `heroes.gd`, `enemies.gd`, `dice_kinds.gd`,
-`passives.gd`, `shop.gd`, `events.gd`) and `core/runes.gd`.
+Numbers live in `core/content/` (`balance.gd`, `heroes.gd`, `enemies.gd`, `biomes.gd`,
+`dice_kinds.gd`, `passives.gd`, `shop.gd`, `events.gd`) and `core/runes.gd`.
 
 Re-run the sim with:
 
 ```
 godot --headless --path . -s tools/sim.gd -- --runs=300 --class=all --seed=1 [--board=24|28|32]
+    [--route=glade,frost,magma] [--boss=boss_lich]
 ```
+
+Without `--route` every run draws its own route and bosses from its seed. The sim prints the
+class table, then win% per route, per final boss, per route + boss (with "reached boss%" and
+"boss win%" = wins / runs that reached the boss) and the mini-boss fight win%.
 
 ## Run structure (Heroll-style, 2026-09-28 revision)
 
@@ -15,50 +20,258 @@ godot --headless --path . -s tools/sim.gd -- --runs=300 --class=all --seed=1 [--
   is **28 tiles** (8x8 perimeter, corners 0/7/14/21: Start, Forge, Treasury, Portal). Ring size
   is a parameter: `GameFlow.new_run(class, seed, board_size)` accepts 24 (7x7), 28 (8x8) and
   32 (9x9). Any 4(n-1) with n >= 5 works, with tile counts scaled from the 24 layout.
-- **Biomes.** Act 1 = laps 1–5 (crypt), act 2 = laps 6–10 (hollow), act 3 = laps 11–15
-  (throne). When lap 6 or lap 11 starts, the board is **regenerated** around the hero. The hero
-  keeps their position, their landing tile is never a fight, and they heal 30%. `act_started`
-  fires at that point.
+- **Biomes (routes).** Act 1 = laps 1–5 (tier 1), act 2 = laps 6–10 (tier 2), act 3 = laps
+  11–15 (tier 3). At run start one biome per tier is drawn: tier 1 `glade`/`crypt`, tier 2
+  `hollow`/`frost`, tier 3 `throne`/`magma` (8 routes; see "Biomes and routes" below). When
+  lap 6 or lap 11 starts, the board is **regenerated** in the route's next biome around the hero.
+  The hero keeps their position, their landing tile is never a fight, and they heal 30%.
+  `act_started` fires at that point.
 - **Shop** after completing laps 3, 6, 9 and 12, and at each biome change (after laps 5 and 10).
-- **Mini-boss.** When lap 7 starts, one `miniboss` tile appears (the Pumpkin Knight in the act 2
-  biome). It lasts until it is beaten, or until lap 11 regenerates the board.
-- **Final boss.** Completing lap 15 stops the hero on Start and starts the Lich. Winning is
-  VICTORY. The act 1 and act 2 bosses are no longer in the run; their content ids are kept.
+- **Mini-boss.** When lap 7 starts, one `miniboss` tile appears with the run's mini-boss
+  (`run.miniboss_id`, drawn at run start from the tier-2 biome's candidates). It lasts until it
+  is beaten, or until lap 11 regenerates the board.
+- **Final boss.** Completing lap 15 stops the hero on Start and starts the run's final boss
+  (`run.boss_id`, drawn at run start from the tier-3 biome's candidates). Winning is VICTORY.
+  The Hollow King is no longer in the run; its content id is kept.
 - **Movement is automatic.** `roll_board()` rolls the whole pool and picks two dice. The move is
   their sum (0..18). The only choice is to reroll or go (`board_reroll()` / `confirm_move()`).
 
-## Final sim (greedy Bot, 300 runs per class, board 28, seed 1)
+## Final sim (greedy Bot, 500 runs per class, board 28, seed 1, random routes)
 
 | class | win% | avg act | avg lap | avg board turns | avg combat turns | avg commands | avg level | avg fights won | deaths |
 |---|---|---|---|---|---|---|---|---|---|
-| knight | 35.0 | 2.89 | 13.9 | 47.1 | 48.7 | 419 | 14.8 | 18.6 | act1:7 act2:20 act3:101 boss:67 |
-| barbarian | 31.3 | 2.86 | 13.7 | 45.6 | 44.0 | 385 | 14.2 | 18.0 | act1:7 act2:26 act3:110 boss:62 mini:1 |
-| mage | 26.0 | 2.83 | 13.5 | 45.2 | 43.5 | 380 | 13.8 | 17.5 | act1:8 act2:31 act3:111 boss:69 mini:3 |
-| rogue | 33.0 | 2.90 | 14.0 | 45.9 | 46.0 | 418 | 14.5 | 18.4 | act1:5 act2:19 act3:108 boss:69 |
+| knight | 37.6 | 2.94 | 14.3 | 48.1 | 49.6 | 416 | 15.0 | 19.1 | act1:5 act2:17 act3:155 boss:134 mini:1 |
+| barbarian | 34.8 | 2.94 | 14.3 | 47.8 | 46.8 | 398 | 14.7 | 18.8 | act1:7 act2:15 act3:151 boss:150 mini:3 |
+| mage | 27.2 | 2.89 | 14.0 | 47.1 | 45.8 | 393 | 14.4 | 18.4 | act1:15 act2:24 act3:148 boss:175 mini:2 |
+| rogue | 35.8 | 2.94 | 14.4 | 48.4 | 48.7 | 423 | 14.9 | 19.2 | act1:4 act2:19 act3:114 boss:180 mini:4 |
 
-Seed 4242 (a check against overfitting to one seed): knight 39.0, barbarian 35.0, mage 29.7,
-rogue 33.3.
+Win% per route, per final boss and per route + final boss, over all classes. "reached boss%"
+is the share of runs that got to the lap-15 fight; "boss win%" is wins / runs that reached it.
 
-Other ring sizes (seed 1, same numbers otherwise):
+| route | win% | runs | reached boss% | boss win% |
+|---|---|---|---|---|
+| crypt,frost,magma | 29.7 | 232 | 68.1 | 43.7 |
+| crypt,frost,throne | 32.1 | 252 | 67.5 | 47.6 |
+| crypt,hollow,magma | 39.2 | 232 | 67.7 | 58.0 |
+| crypt,hollow,throne | 33.6 | 220 | 64.5 | 52.1 |
+| glade,frost,magma | 32.1 | 280 | 67.9 | 47.4 |
+| glade,frost,throne | 36.6 | 292 | 64.7 | 56.6 |
+| glade,hollow,magma | 32.7 | 248 | 62.5 | 52.3 |
+| glade,hollow,throne | 34.4 | 244 | 63.5 | 54.2 |
 
-| board | knight | barbarian | mage | rogue | avg board turns |
-|---|---|---|---|---|---|
-| 24 | 28.7 | 33.7 | 23.0 | 31.7 | ~39.5 |
-| 28 (default) | 35.0 | 31.3 | 26.0 | 33.0 | ~46 |
-| 32 | 30.0 | 34.3 | 29.3 | 28.0 | ~52 |
+| final boss | win% | runs | reached boss% | boss win% |
+|---|---|---|---|---|
+| boss_bone_warden | 29.8 | 496 | 63.1 | 47.3 |
+| boss_cinder_king | 33.5 | 516 | 66.1 | 50.7 |
+| boss_lich | 38.7 | 512 | 67.0 | 57.7 |
+| boss_magma_golem | 33.2 | 476 | 67.0 | 49.5 |
+
+| route / final boss | win% | runs | reached boss% | boss win% |
+|---|---|---|---|---|
+| crypt,frost,magma / boss_cinder_king | 30.7 | 88 | 69.3 | 44.3 |
+| crypt,frost,magma / boss_magma_golem | 29.2 | 144 | 67.4 | 43.3 |
+| crypt,frost,throne / boss_bone_warden | 26.8 | 112 | 64.3 | 41.7 |
+| crypt,frost,throne / boss_lich | 36.4 | 140 | 70.0 | 52.0 |
+| crypt,hollow,magma / boss_cinder_king | 40.4 | 136 | 66.9 | 60.4 |
+| crypt,hollow,magma / boss_magma_golem | 37.5 | 96 | 68.8 | 54.5 |
+| crypt,hollow,throne / boss_bone_warden | 28.4 | 116 | 63.8 | 44.6 |
+| crypt,hollow,throne / boss_lich | 39.4 | 104 | 65.4 | 60.3 |
+| glade,frost,magma / boss_cinder_king | 31.1 | 148 | 67.6 | 46.0 |
+| glade,frost,magma / boss_magma_golem | 33.3 | 132 | 68.2 | 48.9 |
+| glade,frost,throne / boss_bone_warden | 32.9 | 164 | 62.2 | 52.9 |
+| glade,frost,throne / boss_lich | 41.4 | 128 | 68.0 | 60.9 |
+| glade,hollow,magma / boss_cinder_king | 31.2 | 144 | 61.8 | 50.6 |
+| glade,hollow,magma / boss_magma_golem | 34.6 | 104 | 63.5 | 54.5 |
+| glade,hollow,throne / boss_bone_warden | 29.8 | 104 | 62.5 | 47.7 |
+| glade,hollow,throne / boss_lich | 37.9 | 140 | 64.3 | 58.9 |
+
+The bot wins its optional mini-boss fights about 98–100% of the time (it only walks onto the
+skull tile above 60% HP), for every mini-boss.
+
+Seed 4242 (300 runs per class): knight 36.0, barbarian 35.7, mage 28.0, rogue 34.3; bosses:
+Bone Warden 35.4, Cinder King 33.7, Lich 38.2, Magma Golem 27.7.
+
+Other ring sizes (seed 1, 300 runs per class):
+
+| board | knight | barbarian | mage | rogue |
+|---|---|---|---|---|
+| 24 | 39.7 | 31.3 | 24.7 | 25.7 |
+| 28 (default) | 37.6 | 34.8 | 27.2 | 35.8 |
+| 32 | 40.7 | 32.7 | 24.3 | 29.0 |
 
 Every run finished with zero error events and zero command-cap hits. The sim exits 1 on either.
 
 About the numbers:
-- **"avg board turns"** counts every run, deaths included. A run that reaches the Lich takes
-  about 15 × 28 / 8 ≈ 52 board turns on 28 tiles, which is the low end of the 50–70 target. On
-  32 tiles it is about 60. If runs feel too short, the cheapest levers are a 32-tile board or
-  more laps.
+- **"avg board turns"** counts every run, deaths included. A run that reaches the final boss
+  takes about 15 × 28 / 8 ≈ 52 board turns on 28 tiles.
 - **"avg act"** is the biome the run ended in. A victory counts as act 3.
 - **Deaths** are keyed by where they happened: `act1` means a regular fight or trap in laps 1–5,
-  `act2` laps 6–10, `act3` laps 11–15, `mini` the mini-boss and `boss` the Lich. About 2% of
-  runs die in act 1, 7% in act 2, 35% in act 3, 22% at the Lich and under 1% at the mini-boss.
-  Deaths cluster in act 3 but are spread across the run.
+  `act2` laps 6–10, `act3` laps 11–15, `mini` the mini-boss and `boss` the final boss. About a
+  third of all runs die in act 3 and a third at the final boss.
+- Tier-3 boards are balanced so both reach the boss about 65% of the time: Magma's lava and
+  burns cost HP on the way, the Bone Throne's extra elites and bone knights fight harder.
+
+## Biomes and routes (`core/content/biomes.gd`)
+
+Each run draws one biome per tier with the run Rng (`run.route`, serialised), then its mini-boss
+from the tier-2 biome's candidates and its final boss from the tier-3 biome's candidates
+(`run.miniboss_id`, `run.boss_id`, serialised). The draws always happen, so forcing a route
+(`new_run(class, seed, size, {route, miniboss, boss})`) does not shift the rest of the random
+stream. That gives 8 routes × 2 mini-bosses × 2 final bosses = 32 combinations.
+
+| tier (laps) | id | name | tile mix vs base (28 tiles) | twist (`biome_desc`) | mini-boss candidates | final-boss candidates |
+|---|---|---|---|---|---|---|
+| 1 (1–5) | `glade` | Verdant Glade | +1 campfire, +1 chest (3 / 5) | Campfires heal 45% instead of 30%. | (`mini_briar_beast`, unused) | – |
+| 1 (1–5) | `crypt` | The Crypt | +2 trap (4) | A dodged trap (roll 4+) drops 6 gold (× lap gold scale). | (`mini_bone_champion`, unused) | – |
+| 2 (6–10) | `hollow` | The Hollow | +2 event (6; lap top-up also refills to 6) | Finishing an event heals 8% max HP. | `mini_pumpkin_knight`, `mini_grave_mage` | – |
+| 2 (6–10) | `frost` | Frostpeak | traps become **`ice`**, +1 (3 ice, 0 trap) | Ice: roll 4+ dodges; otherwise 1 die (max 2 banked) is locked on turn 1 of the next fight. No damage. | `mini_frost_warden`, `mini_bone_champion` | – |
+| 3 (11–15) | `throne` | Bone Throne | +1 elite −1 enemy (2 elites with the act-3 swap); lap mutation spawns 2 elites + 1 enemy | Elites roll a boss-tier passive 30% of the time (15% elsewhere). | – | `boss_lich`, `boss_bone_warden` |
+| 3 (11–15) | `magma` | Magma Depths | +3 **`lava`** | Lava: 2% max HP per lava tile passed over, 6% when landed on. Never lethal (stops at 1 HP). Persistent. | (`mini_cinder_brute`, unused) | `boss_cinder_king`, `boss_magma_golem` |
+
+- Tile mixes are deltas on the base layout; Empty absorbs the difference (24 and 32 tiles work).
+  `Board.layout_for(size, biome)` returns the counts. A board built without a biome (`biome`
+  "") uses the base layout and the legacy band pools, so old scenarios still work.
+- Enemy pools: the biome's `pools[0]` for the tier's first 3 laps, `pools[1]` for the last 2.
+  Elite tiles lead with the biome's `elite` (plus one pool enemy from band 2 on). Counts per
+  tile still follow `EnemyDefs.COUNTS` by lap band.
+
+| biome | early pool | late pool | elite leader |
+|---|---|---|---|
+| glade | thorn_sprite, wolf_bandit, skeleton_minion | thorn_sprite, wolf_bandit, skeleton_archer, bandit | brute |
+| crypt | skeleton_minion ×2, skeleton_archer | skeleton_minion, skeleton_archer, skeleton_warrior, cultist | brute |
+| hollow | skeleton_archer, cultist, hollow_wisp, bandit | cultist, bandit, hollow_wisp, skeleton_warrior | brute |
+| frost | frost_skeleton, ice_archer, skeleton_warrior | frost_skeleton, ice_archer, skeleton_warrior, bandit | brute |
+| throne | skeleton_warrior, bone_knight, cultist, brute | bone_knight ×2, brute, cultist | bone_knight |
+| magma | ember_imp ×2, skeleton_warrior, bandit | ember_imp, magma_brute, brute, cultist | magma_brute |
+
+## Enemies, mini-bosses and final bosses (`core/content/enemies.gd`)
+
+New intents: `heal` (heals every living enemy by N, scaled like Block), `drain` (attack; the
+enemy heals by the damage that got through), `burn` (adds N Burn stacks to the hero; scales at
+half the attack rate), `chill` (attack, then 1 of your dice is locked next turn), `scorch` (one
+of your non-blank faces becomes 0 for the fight; restored after a win, like Chaos).
+
+Traits (enemy dict field `traits: Array[String]`; bosses change traits per phase):
+`armor` (its Block never expires), `thorns` (your main attack on it reflects 3 damage to you,
+never lethal), `ward` (takes half damage, rounded up, while any summoned ally lives), `pierce`
+(its attacks ignore your Block).
+
+Hero Burn: stacks tick at the **end of every enemy phase**, ignoring Block (damage = stacks,
+then stacks −1). Burn can kill (Phoenix/Second Wind apply). It ends with the fight.
+
+Regular enemies (14; base stats before lap scaling):
+
+| id | name | HP | pattern | biomes |
+|---|---|---|---|---|
+| skeleton_minion | Skeleton Minion | 12 | random: attack 4 / attack 5 | glade, crypt |
+| skeleton_warrior | Skeleton Warrior | 20 | random: attack 6 / block 6 | crypt, hollow, frost, throne, magma |
+| skeleton_archer | Skeleton Archer | 14 | cycle: aim → attack 8 | glade, crypt, hollow |
+| cultist | Cultist | 16 | cycle: curse 1 → attack 5 | crypt, hollow, throne, magma |
+| bandit | Bandit | 18 | cycle: attack 7 → buff 2 | glade, hollow, frost, magma |
+| brute | Brute | 38 | cycle: block 8 → attack 12 | elite leader; throne, magma |
+| **thorn_sprite** | Thorn Sprite | 10 | cycle: heal 4 (all allies) → attack 4 | glade |
+| **wolf_bandit** | Wolf Bandit | 15 | cycle: attack 3 → attack 4 → attack 9 (pounce) | glade |
+| **hollow_wisp** | Hollow Wisp | 12 | cycle: drain 5 → block 4 | hollow |
+| **frost_skeleton** | Frost Skeleton | 18 | cycle: curse 2 → attack 6 → block 5 | frost |
+| **ice_archer** | Ice Archer | 13 | cycle: aim → chill 7 | frost |
+| **bone_knight** | Bone Knight | 34 | cycle: block 6 → attack 10 → buff 2; trait armor | throne (elite leader) |
+| **ember_imp** | Ember Imp | 11 | random: burn 2 / attack 5 | magma |
+| **magma_brute** | Magma Brute | 36 | cycle: burn 2 → block 8 → attack 12 | magma (elite leader) |
+
+Mini-bosses (scaled like regular enemies; 1 of 3 boss-tier passives as the reward):
+
+| id | name | HP | pattern | mechanic | used by |
+|---|---|---|---|---|---|
+| mini_pumpkin_knight | Pumpkin Knight | 105 | curse 1 → attack 9 → attack 11 → buff 2 | escalates: curses, then buffs its attack | hollow |
+| mini_grave_mage | Grave Mage | 100 | summon → attack 10 → chaos → attack 12 | summons minions, Chaos turns a face to 1 | hollow |
+| mini_frost_warden | Frost Warden | 105 | chill 8 → curse 2 → attack 11 → block 8 | locks your dice every other turn | frost |
+| mini_bone_champion | Bone Champion | 110 | attack 9 → block 10 → attack 12; trait armor | Block piles up (armor) | frost |
+| mini_briar_beast | Briar Beast | 110 | attack 8 → heal 10 → attack 10; trait thorns | reflects 3 per hit, regrows | (glade candidate, unused while mini-bosses come from tier 2) |
+| mini_cinder_brute | Cinder Brute | 110 | burn 3 → attack 11 → block 10 | Burn damage over time | (magma candidate, unused) |
+
+Final bosses (unscaled; phase 2 at or below half HP):
+
+| id | name | HP | phase 1 | phase 2 | unique mechanic | biome |
+|---|---|---|---|---|---|---|
+| boss_lich | The Lich | 1650 | attack 22 / curse 1 / block 30 | attack 26 / chaos / attack 22 / curse 1 | Chaos: one of your faces becomes 1 for the fight | throne |
+| boss_bone_warden | Bone Warden | 1150 | attack 20 / block 28 / summon 1 | summon 2 / attack 24 / attack 20 / block 24; trait ward | Bone Legion: summons lap-scaled Skeleton Warriors; half damage while any stands | throne |
+| boss_cinder_king | Cinder King | 1200 | burn 4 / attack 20 / block 24 | scorch / attack 24 / burn 5 / attack 20 | Burns you; Scorch turns one of your faces to 0 (blank) for the fight | magma |
+| boss_magma_golem | Magma Golem | 800 | block 32 / attack 22 / attack 26; trait armor | attack 24 / attack 28 / buff 3; trait pierce | Molten shell: its Block never expires. Phase 2 the shell shatters (all Block lost) and its attacks pierce your Block | magma |
+| boss_hollow_king | Hollow King | 380 | – | – | unused (content kept) | – |
+
+## Presentation ids and look hints
+
+Every new id the presentation layer needs, with a look hint (KayKit meshes + tints; BlockBits
+terrain for new biome visuals).
+
+| kind | id | look hint |
+|---|---|---|
+| biome | glade | Verdant Glade: BlockBits grass, bright greens, flowers and trees, warm daylight, fireflies |
+| biome | crypt | The Crypt: existing Dungeon look (grey stone, torches, banners) |
+| biome | hollow | The Hollow: existing Halloween look (autumn trees, graves, pumpkins, orange dusk) |
+| biome | frost | Frostpeak: BlockBits snow + ice, pale blue fog, cold rim light, snowfall particles |
+| biome | throne | Bone Throne: existing act-3 look (purple/teal night, crypt building, bones) |
+| biome | magma | Magma Depths: BlockBits lava + dark basalt, red-orange glow, rising embers, heat haze |
+| tile | ice | slick pale-blue ice slab with frost sparkle (Frostpeak's trap); on a slip, a snowflake pops onto one die |
+| tile | lava | glowing orange lava block, bubbling, ember particles; flashes red when passed over |
+| enemy | thorn_sprite | small (0.8×) Mannequin_Medium tinted leaf green, vine/leaf particles; green glow on heal |
+| enemy | wolf_bandit | Rogue_Hooded tinted forest brown with a grey fur cloak |
+| enemy | hollow_wisp | Mannequin_Medium, translucent ghostly teal, floating, soft glow |
+| enemy | frost_skeleton | skeleton (Skeletons_* anims) tinted icy blue |
+| enemy | ice_archer | Mannequin_Medium + crossbow, frosted white-blue tint |
+| enemy | bone_knight | Knight tinted bone white with dark purple trim, sword + shield |
+| enemy | ember_imp | small (0.75×) Mannequin tinted charcoal with an orange emissive glow |
+| enemy | magma_brute | Mannequin_Large tinted basalt black with glowing orange cracks |
+| mini-boss | mini_frost_warden | Knight at 1.3×, icy blue tint, frost aura particles |
+| mini-boss | mini_briar_beast | Mannequin_Large tinted moss green with brown thorns |
+| mini-boss | mini_cinder_brute | Mannequin_Large tinted charred black with orange embers |
+| mini-boss | mini_bone_champion | (existing) bone-white knight; its Block persists, so show a stacking stone-plate shield |
+| boss | boss_bone_warden | Knight tinted bone white, Large rig, 1.6×; phase 2: purple ward shimmer while minions stand |
+| boss | boss_cinder_king | Barbarian tinted ember orange/black with a crown, flame particles |
+| boss | boss_magma_golem | Mannequin_Large at 1.8×, grey rock shell over lava glow; phase 2: shell cracks off, glowing orange |
+| intent | heal | green plus |
+| intent | drain | red fang dripping into a heart |
+| intent | burn | flame with the stack count |
+| intent | chill | sword + snowflake (attack, then a die locks) |
+| intent | scorch | flame over a die face |
+| status | burn (hero) | flame badge with stacks on the hero HP bar |
+| status | chill (hero) | snowflake on the die that will lock |
+| status | scorch | the affected face drawn blackened as a blank (0) with embers |
+| trait | armor | stone plating on the enemy's Block badge |
+| trait | thorns | bramble ring around the enemy |
+| trait | ward | shimmering shield dome while minions live |
+| trait | pierce | cracked-shield icon on the enemy's attack intent |
+
+## Contract additions (biomes and routes)
+
+- `GameFlow.new_run(class_id, seed, board_size = 28, opts = {})`: `opts` may carry `route`
+  ([tier1, tier2, tier3] ids), `miniboss` and `boss` ids. Invalid values are ignored.
+  `GameFlow.replay(class_id, seed, log, board_size, opts)` takes the same `opts`.
+- `GameFlow.route_info() -> {route: [{id, name, desc}] ×3, miniboss: {id, name}, boss: {id, name}}`.
+- `RunState.route: Array[String]`, `miniboss_id`, `boss_id`, `chill` (dice to lock on the next
+  fight's turn 1) and `biome()` (current biome id); all serialised. Old saves load with the
+  legacy route (crypt, hollow, throne), the Pumpkin Knight and the Lich.
+- `Board.biome` (serialised in `to_dict().biome`), `Board.generate(rng, act, size, lap, biome)`,
+  `Board.layout_for(size, biome)`, `Board.mutate_spawns_for(size, biome)`,
+  `Board.enemy_pool(lap, biome)`, `Board.roll_enemies(rng, act, lap, elite, biome)`.
+- `debug_open("boss", id)` and `debug_open("miniboss", id)` (default: the run's picks).
+- Events:
+  - `act_started` gains `biome_name`, `biome_desc`; `biome` is the route's id (any of the 6).
+  - `trap` on an ice tile: `{roll, dodged, damage: 0, ice: true, chill}`, plus
+    `status {target: "hero", status: "chill", value, pending: true}` on a slip.
+  - `lava {idx, damage, landed}` + `hp_changed {source: "lava"}` (passing tiles fire after
+    `hero_moved`, in path order).
+  - `status {target: "hero", status: "chill", value}` at combat start when frozen dice lock.
+  - `status {target: "hero", status: "burn", value: stacks}`, `damage {target: "hero", source:
+    "burn"}`; `status {status: "scorch", die_idx, face_idx}` (restored by `face_changed` after a
+    win); `status {status: "curse", chill: true}` from chill attacks.
+  - `enemy_healed {enemy_idx, amount, hp, max_hp, source: "heal"|"drain"}`.
+  - `damage` gains `warded` (enemy targets) and `pierce` (hero target); thorns reflect is
+    `damage {target: "hero", source: "thorns"}`.
+  - `boss_phase` gains `traits`; `block_gained {source: "shatter"}` when the Golem's shell breaks.
+  - `gold_changed {source: "crypt"}`, `hp_changed {source: "hollow"}`.
+  - `game_over.stats` gains `route`, `boss_id`, `miniboss_id`.
+- Enemy dictionaries gain `traits`; `CombatState` gains `hero_burn` (serialised).
 
 ## Numbers changed in this revision
 
@@ -74,8 +287,10 @@ About the numbers:
 | Lap heal | 15% | **10%** | 15 laps of healing |
 | New-act heal | 50% | **30% at a biome change** | Revision |
 | XP thresholds | 10/25/45/70/100, +30 | **6/14/24/36/50, +18** | Fewer fights per lap with automatic movement |
-| The Lich HP | 800 | **1300** | The only boss is the run's climax |
-| Hollow King / Bone Warden | in the run | **not used** (content kept) | Revision |
+| The Lich HP | 800 | **1650** (1300 before routes) | The final boss; biome twists made heroes stronger |
+| Bone Warden | act 1 boss, 200 HP | **Bone Throne final boss, 1150 HP**, warded phase 2 | Boss rotation |
+| Hollow King | in the run | **not used** (content kept) | Revision |
+| Mini-boss / final boss | fixed | **drawn per run** from the route's biomes | Replayability |
 | Hero HP | K64 B60 M56 R55 | **K60 B60 M60 R58** | Class parity |
 | Shop dice | "New Die" 40 | **per kind, 20–65** (see die kinds) | Die kinds |
 
@@ -187,18 +402,18 @@ Damage with passives:
 7. **Portal** targets are the next `size / 3` tiles (8 on 24, 9 on 28, 10 on 32), wrapping past
    Start. On the final lap they stop at Start.
 8. **Final lap.** Completing lap 15 cuts the move short at Start (`landing_preview` shows 0).
-   The hero heals 10% and the Lich fight starts. Any mini-boss tile is removed, with a
+   The hero heals 10% and the run's final boss fight starts. Any mini-boss tile is removed, with a
    `board_mutated` change to empty. There is no shop and no mutation.
 9. **Biome change** (laps 6 and 11):
    - `act` goes up, the board is regenerated and the hero keeps their tile. If the new landing
      tile would be a fight, it becomes Empty.
    - The hero heals 30%, and Rune Bloom fires.
    - The treasury carries over, and the once-per-act reroll item becomes available again.
-   - `act_started {act, biome, lap, board, treasury, pos}` fires between `lap_completed` and the
+   - `act_started {act, biome, biome_name, biome_desc, lap, board, treasury, pos}` fires between `lap_completed` and the
      shop.
 10. **Mini-boss.** It spawns on an Empty or uncleared Enemy tile that is not a corner, not the
     landing tile, and more than 3 tiles (either way round) from the hero. It is scaled like a
-    regular enemy (not an elite): Pumpkin Knight base 105 HP, which is about 2× an elite brute's
+    regular enemy (not an elite): mini-bosses have 105–110 base HP (Pumpkin Knight 105), which is about 2× an elite brute's
     HP at that lap. `combat_started` and `combat_won` carry `miniboss: true`. The reward is gold,
     XP and a choice of 1 of 3 boss-tier passives, which comes after any level-up drafts.
 11. **Treasury, Outbreak/Garden, traps and the Dice Duel** work as before. A trap that would kill

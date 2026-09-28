@@ -613,7 +613,8 @@ func test_miniboss_spawns_when_lap_7_starts() -> void:
 			var d := (idx - f.run.pos + n) % n
 			assert_true(mini(d, n - d) > 3, "not within 3 tiles of the hero")
 			assert_true(not f.run.board.is_corner(idx))
-			assert_eq(Array(f.run.board.tiles[idx].enemies), ["mini_pumpkin_knight"], "act 2 biome mini-boss")
+			assert_eq(Array(f.run.board.tiles[idx].enemies), [f.run.miniboss_id], "the run's mini-boss")
+			assert_true(BiomeDefs.miniboss_candidates(f.run.route).has(f.run.miniboss_id), "drawn from the tier-2 biome")
 			var found := false
 			for e in ev:
 				if e.type == "board_mutated":
@@ -705,7 +706,10 @@ func test_biome_change_regenerates_board() -> void:
 	assert_eq(f.run.pos, 2, "hero keeps their position")
 	var as_ := _first(ev, "act_started")
 	assert_eq(as_.act, 2)
-	assert_eq(as_.biome, "hollow")
+	assert_eq(as_.biome, f.run.route[1])
+	assert_eq(as_.biome_name, BiomeDefs.name_of(f.run.route[1]))
+	assert_eq(as_.biome_desc, BiomeDefs.desc_of(f.run.route[1]))
+	assert_eq(f.run.board.biome, f.run.route[1])
 	assert_eq(as_.lap, 6)
 	assert_eq(as_.board.tiles.size(), 28)
 	assert_eq(_count_type(f, "elite"), 1, "later biomes carry an elite")
@@ -733,4 +737,4 @@ func test_no_mid_run_bosses() -> void:
 			assert_true(e.type != "combat_started" or not e.boss, "no boss before the last lap")
 	var ev := _cross(f, Balance.TOTAL_LAPS)
 	assert_eq(f.phase, P.COMBAT)
-	assert_eq(f.combat.enemies[0].id, "boss_lich")
+	assert_eq(f.combat.enemies[0].id, f.run.boss_id)

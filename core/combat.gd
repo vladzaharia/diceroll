@@ -21,7 +21,8 @@ var tile: int = -1
 var act: int = 1
 var lap: int = 1
 var pending_curse: int = 0         # dice to lock at the start of the next player turn
-var chaos: Array[Dictionary] = []  # [{die, face, value}] original faces to restore after the fight
+var chaos: Array[Dictionary] = []  # [{die, face, value}] original faces to restore after the fight (Chaos, Scorch)
+var hero_burn: int = 0             # Burn stacks on the hero: ticks at the end of each enemy phase
 var result: String = ""            # "" | "won" | "lost"
 var gold_reward: int = 0
 var xp_reward: int = 0
@@ -43,6 +44,11 @@ func begin(run: RunState, ids: Array, p_elite: bool, p_boss: bool, p_tile: int, 
 	ev.append({"type": "combat_started", "enemies": enemies.duplicate(true), "boss": boss, "elite": elite, "miniboss": miniboss, "tile": tile})
 	for i in enemies.size():
 		ev.append({"type": "enemy_intent", "enemy_idx": i, "intent": enemies[i].intent.duplicate()})
+	# Frostpeak ice: dice frozen on the board lock on the first turn of this fight.
+	if run.chill > 0:
+		pending_curse += run.chill
+		ev.append({"type": "status", "target": "hero", "status": "chill", "value": run.chill})
+		run.chill = 0
 	ev.append_array(start_turn(run))
 	return ev
 
@@ -60,8 +66,11 @@ static func make_enemy(rng: Rng, id: String, p_act: int, p_lap: int, p_elite: bo
 		"id": id, "name": String(def.name), "hp": hp, "max_hp": hp, "block": 0, "atk_bonus": 0,
 		"poison": 0, "frozen": false, "intent": {"kind": "aim", "value": 0}, "boss": is_boss, "phase": 1,
 		"elite": p_elite, "atk_mult": atk_mult, "step": step, "summoned": summoned,
-		"miniboss": EnemyDefs.is_miniboss(id),
+		"miniboss": EnemyDefs.is_miniboss(id), "traits": EnemyDefs.traits(id, 1).duplicate(),
 	}
+
+static func has_trait(e: Dictionary, t: String) -> bool:
+	return (e.get("traits", []) as Array).has(t)
 
 func alive(i: int) -> bool:
 	return i >= 0 and i < enemies.size() and int(enemies[i].hp) > 0
@@ -103,10 +112,13 @@ func roll_intent(rng: Rng, i: int) -> void:
 		entry = {"kind": "block", "value": 8}
 	var value := int(entry.value)
 	match String(entry.kind):
-		"attack":
+		"attack", "chill", "drain":
 			value = int(round(value * float(e.atk_mult))) + int(e.atk_bonus)
-		"block":
+		"block", "heal":
 			value = int(round(value * float(e.atk_mult)))
+		"burn":
+			# Burn stacks decay by 1 per tick, so they scale at half the attack rate.
+			value = int(round(value * (1.0 + (float(e.atk_mult) - 1.0) * Balance.BURN_SCALE)))
 	e.intent = {"kind": String(entry.kind), "value": value}
 
 # ---------------------------------------------------------------- player turn
@@ -307,7 +319,15 @@ func attack(run: RunState) -> Array[Dictionary]:
 	if mult > float(run.stats.get("best_mult", 0.0)):
 		run.stats.best_mult = mult
 		run.stats.best_combo = combo.name
+	var thorny := alive(target) and has_trait(enemies[target], "thorns")
 	ev.append_array(damage_enemy(target, total, "attack", run))
+	if thorny and total > 0:
+		# Briar thorns: reflect damage to the hero, never lethal.
+		var th := mini(Balance.ENEMY_THORNS, run.hp - 1)
+		if th > 0:
+			run.hp -= th
+			run.stats.damage_taken = int(run.stats.get("damage_taken", 0)) + th
+			ev.append({"type": "damage", "target": "hero", "amount": th, "blocked": 0, "source": "thorns", "attacker": target, "lethal": false, "hp": run.hp, "max_hp": run.max_hp, "block": run.block})
 	# Ember (SIX): 6 to all
 	for i in run.dice.size():
 		if run.dice[i].rune == "ember" and int(eff[i]) == 6:
@@ -389,6 +409,11 @@ func damage_enemy(i: int, amount: int, source: String, run: RunState, ignore_blo
 	if not alive(i) or amount <= 0:
 		return ev
 	var e := enemies[i]
+	var warded := false
+	if has_trait(e, "ward") and _summons_alive() > 0:
+		# Bone Warden's legion: half damage while any summoned ally stands.
+		amount = int(ceil(amount / 2.0))
+		warded = true
 	var blocked := 0
 	if not ignore_block:
 		blocked = mini(int(e.block), amount)
@@ -397,7 +422,7 @@ func damage_enemy(i: int, amount: int, source: String, run: RunState, ignore_blo
 	e.hp = int(e.hp) - dealt
 	run.stats.damage_dealt = int(run.stats.get("damage_dealt", 0)) + dealt
 	var lethal := int(e.hp) <= 0
-	ev.append({"type": "damage", "target": i, "amount": dealt, "blocked": blocked, "source": source, "lethal": lethal, "hp": int(e.hp), "max_hp": int(e.max_hp), "block": int(e.block)})
+	ev.append({"type": "damage", "target": i, "amount": dealt, "blocked": blocked, "source": source, "lethal": lethal, "hp": int(e.hp), "max_hp": int(e.max_hp), "block": int(e.block), "warded": warded})
 	if lethal:
 		e.poison = 0
 		e.frozen = false
@@ -407,10 +432,25 @@ func damage_enemy(i: int, amount: int, source: String, run: RunState, ignore_blo
 			ev.append(_passive("bloodthirst", Balance.PASSIVE_BLOODTHIRST))
 			ev.append({"type": "hp_changed", "amount": h, "total": run.hp, "source": "bloodthirst", "max_hp": run.max_hp})
 	elif e.boss and int(e.phase) == 1 and int(e.hp) * 2 <= int(e.max_hp):
+		var was_armored := has_trait(e, "armor")
 		e.phase = 2
 		e.step = 0
-		ev.append({"type": "boss_phase", "enemy_idx": i, "phase": 2})
+		e.traits = EnemyDefs.traits(String(e.id), 2).duplicate()
+		ev.append({"type": "boss_phase", "enemy_idx": i, "phase": 2, "traits": e.traits.duplicate()})
+		if was_armored and not has_trait(e, "armor") and int(e.block) > 0:
+			# Magma Golem: the shell shatters and its stored Block is gone.
+			var lost := int(e.block)
+			e.block = 0
+			ev.append({"type": "block_gained", "target": i, "amount": -lost, "total": 0, "source": "shatter"})
 	return ev
+
+## Living summoned allies.
+func _summons_alive() -> int:
+	var n := 0
+	for k in enemies.size():
+		if alive(k) and bool(enemies[k].summoned):
+			n += 1
+	return n
 
 func _enemy_phase(run: RunState) -> Array[Dictionary]:
 	var ev: Array[Dictionary] = []
@@ -420,8 +460,8 @@ func _enemy_phase(run: RunState) -> Array[Dictionary]:
 			continue
 		var e := enemies[i]
 		var old_block := int(e.block)
-		e.block = 0
-		if old_block > 0:
+		if old_block > 0 and not has_trait(e, "armor"):
+			e.block = 0
 			ev.append({"type": "block_gained", "target": i, "amount": -old_block, "total": 0})
 		if int(e.poison) > 0:
 			var p := int(e.poison)
@@ -448,7 +488,66 @@ func _enemy_phase(run: RunState) -> Array[Dictionary]:
 				continue
 		roll_intent(run.rng, i)
 		ev.append({"type": "enemy_intent", "enemy_idx": i, "intent": e.intent.duplicate()})
+	ev.append_array(_tick_burn(run))
 	return ev
+
+## Burn on the hero: at the end of the enemy phase the hero takes damage equal to the stacks
+## (ignoring Block), then the stacks drop by 1.
+func _tick_burn(run: RunState) -> Array[Dictionary]:
+	var ev: Array[Dictionary] = []
+	if hero_burn <= 0 or result != "":
+		return ev
+	var dmg := mini(hero_burn, run.hp)
+	run.hp -= dmg
+	var saved := ""
+	if run.hp <= 0:
+		saved = run.survive_lethal()
+		if saved != "":
+			dmg -= 1
+	run.stats.damage_taken = int(run.stats.get("damage_taken", 0)) + dmg
+	ev.append({"type": "damage", "target": "hero", "amount": dmg, "blocked": 0, "source": "burn", "lethal": run.hp <= 0, "hp": run.hp, "max_hp": run.max_hp, "block": run.block})
+	if saved != "":
+		ev.append(_passive(saved, 1))
+	hero_burn -= 1
+	ev.append({"type": "status", "target": "hero", "status": "burn", "value": hero_burn})
+	if run.hp <= 0:
+		result = "lost"
+	return ev
+
+## Enemy i hits the hero for v (Block absorbs it unless the enemy pierces). Returns the events
+## and the damage dealt through `out_dealt[0]` when given.
+func _hit_hero(run: RunState, i: int, v: int, out_dealt: Array = []) -> Array[Dictionary]:
+	var ev: Array[Dictionary] = []
+	var e := enemies[i]
+	var pierce := has_trait(e, "pierce")
+	var blocked := 0 if pierce else mini(run.block, v)
+	run.block -= blocked
+	var dealt := mini(v - blocked, run.hp)
+	run.hp -= dealt
+	var saved := ""
+	if run.hp <= 0:
+		saved = run.survive_lethal()
+		if saved != "":
+			dealt -= 1
+	run.stats.damage_taken = int(run.stats.get("damage_taken", 0)) + dealt
+	ev.append({"type": "damage", "target": "hero", "amount": dealt, "blocked": blocked, "source": String(e.id), "attacker": i, "lethal": run.hp <= 0, "hp": run.hp, "max_hp": run.max_hp, "block": run.block, "pierce": pierce})
+	if saved != "":
+		ev.append(_passive(saved, 1))
+	if run.hp <= 0:
+		result = "lost"
+	elif dealt > 0 and run.has_passive("thorns"):
+		ev.append(_passive("thorns", Balance.PASSIVE_THORNS))
+		ev.append_array(damage_enemy(i, Balance.PASSIVE_THORNS, "thorns", run))
+	out_dealt.append(dealt)
+	return ev
+
+func _heal_enemy(i: int, amount: int, source: String) -> Array[Dictionary]:
+	var e := enemies[i]
+	var h := mini(amount, int(e.max_hp) - int(e.hp))
+	if h <= 0 or not alive(i):
+		return []
+	e.hp = int(e.hp) + h
+	return [{"type": "enemy_healed", "enemy_idx": i, "amount": h, "hp": int(e.hp), "max_hp": int(e.max_hp), "source": source}]
 
 func _execute_intent(run: RunState, i: int) -> Array[Dictionary]:
 	var ev: Array[Dictionary] = []
@@ -456,24 +555,37 @@ func _execute_intent(run: RunState, i: int) -> Array[Dictionary]:
 	var v := int(e.intent.value)
 	match String(e.intent.kind):
 		"attack":
-			var blocked := mini(run.block, v)
-			run.block -= blocked
-			var dealt := mini(v - blocked, run.hp)
-			run.hp -= dealt
-			var saved := ""
-			if run.hp <= 0:
-				saved = run.survive_lethal()
-				if saved != "":
-					dealt -= 1
-			run.stats.damage_taken = int(run.stats.get("damage_taken", 0)) + dealt
-			ev.append({"type": "damage", "target": "hero", "amount": dealt, "blocked": blocked, "source": String(e.id), "attacker": i, "lethal": run.hp <= 0, "hp": run.hp, "max_hp": run.max_hp, "block": run.block})
-			if saved != "":
-				ev.append(_passive(saved, 1))
-			if run.hp <= 0:
-				result = "lost"
-			elif dealt > 0 and run.has_passive("thorns"):
-				ev.append(_passive("thorns", Balance.PASSIVE_THORNS))
-				ev.append_array(damage_enemy(i, Balance.PASSIVE_THORNS, "thorns", run))
+			ev.append_array(_hit_hero(run, i, v))
+		"chill":
+			ev.append_array(_hit_hero(run, i, v))
+			if result == "":
+				pending_curse += 1
+				ev.append({"type": "status", "target": "hero", "status": "curse", "value": 1, "source": i, "pending": true, "chill": true})
+		"drain":
+			var dealt: Array = []
+			ev.append_array(_hit_hero(run, i, v, dealt))
+			if result == "" and alive(i) and int(dealt[0]) > 0:
+				ev.append_array(_heal_enemy(i, int(dealt[0]), "drain"))
+		"heal":
+			for k in enemies.size():
+				if alive(k):
+					ev.append_array(_heal_enemy(k, v, "heal"))
+		"burn":
+			hero_burn += v
+			ev.append({"type": "status", "target": "hero", "status": "burn", "value": hero_burn, "source": i})
+		"scorch":
+			var opts: Array = []
+			for d in run.dice.size():
+				for f in 6:
+					if run.dice[d].faces[f] > 0:
+						opts.append([d, f])
+			if not opts.is_empty():
+				var pk: Array = run.rng.pick(opts)
+				var sd: int = pk[0]
+				var sf: int = pk[1]
+				chaos.append({"die": sd, "face": sf, "value": run.dice[sd].faces[sf]})
+				run.dice[sd].faces[sf] = 0
+				ev.append({"type": "status", "target": "hero", "status": "scorch", "value": 0, "die_idx": sd, "face_idx": sf, "source": i})
 		"block":
 			e.block = int(e.block) + v
 			ev.append({"type": "block_gained", "target": i, "amount": v, "total": int(e.block)})
@@ -484,10 +596,13 @@ func _execute_intent(run: RunState, i: int) -> Array[Dictionary]:
 			pending_curse += v
 			ev.append({"type": "status", "target": "hero", "status": "curse", "value": v, "source": i, "pending": true})
 		"summon":
+			var sdef := EnemyDefs.def(String(e.id))
+			var sid := String(sdef.get("summon", EnemyDefs.SUMMON_ID))
+			var slap := lap if sdef.has("summon") else 1
 			for k in maxi(1, v):
 				if _summoned_alive() >= Balance.MAX_SUMMONED_ALIVE:
 					break
-				var m := make_enemy(run.rng, EnemyDefs.SUMMON_ID, act, 1, false, true)
+				var m := make_enemy(run.rng, sid, act, slap, false, true)
 				enemies.append(m)
 				var idx := enemies.size() - 1
 				roll_intent(run.rng, idx)
@@ -560,6 +675,7 @@ func to_dict() -> Dictionary:
 		"last_combo": last_combo.duplicate(true), "dice_faces": Array(dice_faces), "rerolled": Array(rerolled),
 		"boss": boss, "elite": elite, "miniboss": miniboss, "tile": tile, "act": act, "lap": lap, "pending_curse": pending_curse,
 		"chaos": chaos.duplicate(true), "result": result, "gold_reward": gold_reward, "xp_reward": xp_reward,
+		"hero_burn": hero_burn,
 	}
 
 static func from_dict(d: Dictionary) -> CombatState:
@@ -582,6 +698,7 @@ static func from_dict(d: Dictionary) -> CombatState:
 	c.elite = bool(d.elite)
 	c.miniboss = bool(d.get("miniboss", false))
 	c.result = String(d.result)
+	c.hero_burn = int(d.get("hero_burn", 0))
 	c.last_combo = _norm_combo(d.last_combo)
 	for ch in d.chaos:
 		c.chaos.append({"die": int(ch.die), "face": int(ch.face), "value": int(ch.value)})
@@ -594,7 +711,14 @@ static func _norm_enemy(ed: Dictionary) -> Dictionary:
 		"intent": {"kind": String(ed.intent.kind), "value": int(ed.intent.value)}, "boss": bool(ed.boss),
 		"phase": int(ed.phase), "elite": bool(ed.elite), "atk_mult": float(ed.atk_mult), "step": int(ed.step),
 		"summoned": bool(ed.summoned), "miniboss": bool(ed.get("miniboss", false)),
+		"traits": _strings(ed.get("traits", [])),
 	}
+
+static func _strings(a: Array) -> Array:
+	var out: Array = []
+	for x in a:
+		out.append(String(x))
+	return out
 
 static func _norm_combo(lc: Dictionary) -> Dictionary:
 	if lc.is_empty():

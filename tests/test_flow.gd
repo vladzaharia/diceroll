@@ -579,7 +579,7 @@ func test_final_lap_completion_starts_boss() -> void:
 	assert_eq(f.run.pos, 0)
 	assert_eq(f.phase, P.COMBAT)
 	assert_eq(f.combat.boss, true)
-	assert_eq(f.combat.enemies[0].id, "boss_lich")
+	assert_eq(f.combat.enemies[0].id, f.run.boss_id)
 	assert_eq(_first(ev, "combat_started").boss, true)
 	assert_eq(_first(ev, "lap_completed").lap, 15)
 
@@ -591,7 +591,7 @@ func test_final_boss_victory() -> void:
 	f.run.pos = 22
 	_force_roll(f, 5)
 	f.choose_move(0)
-	assert_eq(f.combat.enemies[0].id, "boss_lich")
+	assert_eq(f.combat.enemies[0].id, f.run.boss_id)
 	var ev := _win_fight(f)
 	assert_eq(f.phase, P.VICTORY)
 	var go := _first(ev, "game_over")

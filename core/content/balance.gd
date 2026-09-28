@@ -39,6 +39,22 @@ const MAX_COMBAT_REROLLS := 4
 const MAX_BANKED_REROLLS := 2
 const BUFF_AMOUNT := 2
 const MAX_SUMMONED_ALIVE := 3
+## Burn intent stacks scale at this fraction of the attack scaling (stacks decay by 1 per tick).
+const BURN_SCALE := 0.5
+## Damage a Thorns enemy (Briar Beast) reflects when hit by your attack (never lethal).
+const ENEMY_THORNS := 3
+
+# Biome twists (core/content/biomes.gd)
+const GLADE_CAMPFIRE_HEAL_PCT := 0.45
+const CRYPT_DODGE_GOLD := 6
+const HOLLOW_EVENT_HEAL_PCT := 0.08
+## Frostpeak ice tile: fail the dodge roll and this many dice lock on turn 1 of the next fight.
+const ICE_CHILL := 1
+const ICE_CHILL_MAX := 2
+const THRONE_ELITE_BOSS_PASSIVE_CHANCE := 0.30
+## Magma Depths lava tile: % max HP when passed over / landed on. Lava never kills (min 1 HP).
+const LAVA_PASS_PCT := 0.02
+const LAVA_LAND_PCT := 0.06
 
 # Enemy scaling by lap (1..15): mult = ENEMY_BASE_SCALE + ENEMY_LAP_STEP*(lap-1)
 const ENEMY_BASE_SCALE := 1.2

@@ -27,14 +27,28 @@ var commands: Array = []
 
 # ================================================================ construction
 
-## board_size: ring size, 24 (default) or 32.
-static func new_run(class_id: String, seed: int, board_size: int = Balance.BOARD_SIZE) -> GameFlow:
+## board_size: ring size, 24, 28 (default) or 32.
+## opts (optional, scenarios/tests): {route:[tier1, tier2, tier3], miniboss:id, boss:id}.
+## Without them the route (one biome per tier) and bosses are drawn from the seed.
+static func new_run(class_id: String, seed: int, board_size: int = Balance.BOARD_SIZE, opts: Dictionary = {}) -> GameFlow:
 	var f := GameFlow.new()
 	if not HeroDefs.DATA.has(class_id):
 		class_id = "knight"
-	f.run = RunState.create(class_id, seed, board_size)
+	f.run = RunState.create(class_id, seed, board_size, opts)
 	f.phase = Phase.BOARD_READY
 	return f
+
+## The run's route for presentation: {route:[{id, name, desc}], miniboss:{id, name},
+## boss:{id, name}}.
+func route_info() -> Dictionary:
+	var r: Array = []
+	for b in run.route:
+		r.append({"id": b, "name": BiomeDefs.name_of(b), "desc": BiomeDefs.desc_of(b)})
+	return {
+		"route": r,
+		"miniboss": {"id": run.miniboss_id, "name": String(EnemyDefs.def(run.miniboss_id).name)},
+		"boss": {"id": run.boss_id, "name": String(EnemyDefs.def(run.boss_id).name)},
+	}
 
 static func phase_name(p: int) -> String:
 	return Phase.keys()[p]
@@ -220,6 +234,11 @@ func _move(steps: int, teleport: bool) -> Array[Dictionary]:
 	var dest: int = p.back()
 	run.pos = dest
 	ev.append({"type": "hero_moved", "path": ([dest] as Array[int]) if teleport else p, "teleport": teleport})
+	if not teleport:
+		# Magma lava scorches every lava tile passed over (landing is handled by the tile).
+		for k in range(0, p.size() - 1):
+			if String(run.board.tiles[p[k]].type) == "lava":
+				_lava(p[k], false, ev)
 	if crossing:
 		var healed := run.heal(run.pct_of_max(Balance.LAP_HEAL_PCT))
 		var completed := run.lap
@@ -236,7 +255,7 @@ func _move(steps: int, teleport: bool) -> Array[Dictionary]:
 		else:
 			var changes := run.board.mutate(run.rng, run.act, run.lap, [dest])
 			if run.lap == Balance.MINIBOSS_LAP:
-				var mb := run.board.spawn_miniboss(run.rng, EnemyDefs.ACT_MINIBOSS[run.act - 1], dest, [dest])
+				var mb := run.board.spawn_miniboss(run.rng, run.miniboss_id, dest, [dest])
 				if not mb.is_empty():
 					for c in range(changes.size() - 1, -1, -1):
 						if changes[c].idx == mb.idx:
@@ -281,7 +300,7 @@ func _advance(ev: Array[Dictionary]) -> void:
 				var gone := run.board.remove_minibosses()
 				if not gone.is_empty():
 					ev.append({"type": "board_mutated", "changes": gone})
-				_start_combat([EnemyDefs.FINAL_BOSS], false, true, 0, ev)
+				_start_combat([run.boss_id], false, true, 0, ev)
 			"passive_choice":
 				_open_passive_choice(String(step.get("source", "elite")), ev, String(step.get("tier", "")))
 			"bonus_move":
@@ -329,7 +348,8 @@ func _trigger_tile(idx: int, ev: Array[Dictionary]) -> void:
 			_open_event(ev)
 		"campfire":
 			_consume(idx, ev)
-			var h := run.heal(run.pct_of_max(Balance.CAMPFIRE_HEAL_PCT))
+			var pct := Balance.GLADE_CAMPFIRE_HEAL_PCT if run.board.biome == "glade" else Balance.CAMPFIRE_HEAL_PCT
+			var h := run.heal(run.pct_of_max(pct))
 			ev.append({"type": "hp_changed", "amount": h, "total": run.hp, "source": "campfire", "max_hp": run.max_hp})
 		"trap":
 			var roll := run.rng.randi_range(1, 6)
@@ -347,6 +367,20 @@ func _trigger_tile(idx: int, ev: Array[Dictionary]) -> void:
 				ev.append(_passive_ev(saved, 1))
 			if run.hp <= 0:
 				_finish(false, ev)
+			elif dodged and run.board.biome == "crypt":
+				# Crypt twist: a dodged trap drops coins.
+				_gold(ev, int(round(Balance.CRYPT_DODGE_GOLD * Balance.gold_scale(run.lap))), "crypt")
+		"ice":
+			# Frostpeak: slip (fail the dodge roll) and a die freezes for your next fight.
+			var roll := run.rng.randi_range(1, 6)
+			var dodged := roll >= Balance.TRAP_DODGE_MIN
+			if not dodged:
+				run.chill = mini(Balance.ICE_CHILL_MAX, run.chill + Balance.ICE_CHILL)
+			ev.append({"type": "trap", "roll": roll, "dodged": dodged, "damage": 0, "ice": true, "chill": run.chill})
+			if not dodged:
+				ev.append({"type": "status", "target": "hero", "status": "chill", "value": run.chill, "pending": true})
+		"lava":
+			_lava(idx, true, ev)
 		"forge":
 			var uses := 2 if run.has_passive("blacksmith") else 1
 			_set_offer({"kind": "forge", "ops": ["raise", "mirror"], "source": "tile", "uses": uses}, Phase.FORGE, ev)
@@ -368,6 +402,17 @@ func _portal_tiles(from: int) -> Array:
 		if t == 0 and run.lap >= Balance.TOTAL_LAPS:
 			break
 	return out
+
+## Magma lava: LAVA_PASS_PCT of max HP when passed over, LAVA_LAND_PCT when landed on. It
+## never kills (leaves at least 1 HP). Emits lava {idx, damage, landed} + hp_changed.
+func _lava(idx: int, landed: bool, ev: Array[Dictionary]) -> void:
+	var dmg := mini(run.pct_of_max(Balance.LAVA_LAND_PCT if landed else Balance.LAVA_PASS_PCT), run.hp - 1)
+	dmg = maxi(0, dmg)
+	run.hp -= dmg
+	run.stats.damage_taken = int(run.stats.get("damage_taken", 0)) + dmg
+	ev.append({"type": "lava", "idx": idx, "damage": dmg, "landed": landed})
+	if dmg > 0:
+		ev.append({"type": "hp_changed", "amount": -dmg, "total": run.hp, "source": "lava", "max_hp": run.max_hp})
 
 func _consume(idx: int, ev: Array[Dictionary]) -> void:
 	run.board.tiles[idx] = Board.make_tile("empty")
@@ -451,7 +496,8 @@ func _on_combat_won(ev: Array[Dictionary]) -> void:
 	if c.miniboss:
 		front.append({"kind": "passive_choice", "source": "miniboss"})
 	elif c.elite:
-		var tier := "boss" if run.rng.chance(Balance.ELITE_BOSS_PASSIVE_CHANCE) else "regular"
+		var chance := Balance.THRONE_ELITE_BOSS_PASSIVE_CHANCE if run.board.biome == "throne" else Balance.ELITE_BOSS_PASSIVE_CHANCE
+		var tier := "boss" if run.rng.chance(chance) else "regular"
 		front.append({"kind": "passive_choice", "source": "elite", "tier": tier})
 	front.append_array(pending)
 	pending = front
@@ -475,19 +521,24 @@ func _summary() -> Dictionary:
 	s["level"] = run.level
 	s["gold"] = run.gold
 	s["dice"] = run.dice.size()
+	s["route"] = Array(run.route)
+	s["miniboss_id"] = run.miniboss_id
+	s["boss_id"] = run.boss_id
 	return s
 
 ## Biome change (laps 6 and 11): act += 1, the board is regenerated around the hero (who keeps
 ## their position; their landing tile is never a fight), 30% heal, Rune Bloom, reroll item
-## available again. Emits act_started {act, biome, lap, board, treasury}. Any mini-boss is gone.
+## available again. Emits act_started {act, biome, biome_name, biome_desc, lap, board, treasury,
+## pos}; biome is the route's id for the new tier. Any mini-boss is gone.
 func _new_biome(dest: int, ev: Array[Dictionary]) -> void:
 	run.act = Balance.act_for_lap(run.lap)
 	run.shop_reroll_bought = false
-	run.board = Board.generate(run.rng, run.act, run.board_size, run.lap)
+	run.board = Board.generate(run.rng, run.act, run.board_size, run.lap, run.biome())
 	if not run.board.is_corner(dest) and Board._is_fight(String(run.board.tiles[dest].type)):
 		run.board.tiles[dest] = Board.make_tile("empty")
 	run.stats.max_act = maxi(int(run.stats.get("max_act", 1)), run.act)
-	ev.append({"type": "act_started", "act": run.act, "biome": EnemyDefs.ACT_BIOME[run.act - 1], "lap": run.lap,
+	ev.append({"type": "act_started", "act": run.act, "biome": run.biome(), "biome_name": BiomeDefs.name_of(run.biome()),
+		"biome_desc": BiomeDefs.desc_of(run.biome()), "lap": run.lap,
 		"board": run.board.to_dict(), "treasury": run.treasury, "pos": run.pos})
 	var h := run.heal(run.pct_of_max(Balance.BIOME_HEAL_PCT))
 	ev.append({"type": "hp_changed", "amount": h, "total": run.hp, "source": "act_start", "max_hp": run.max_hp})
@@ -981,6 +1032,10 @@ func event_choose(i: int) -> Array[Dictionary]:
 					var f := run.dice[d].lowest_face()
 					if run.dice[d].raise_face(f):
 						ev.append(_face_ev(d, f))
+	if run.board.biome == "hollow" and run.hp > 0:
+		# Hollow twist: restless spirits mend you after every event.
+		var hh := run.heal(run.pct_of_max(Balance.HOLLOW_EVENT_HEAL_PCT))
+		ev.append({"type": "hp_changed", "amount": hh, "total": run.hp, "source": "hollow", "max_hp": run.max_hp})
 	_advance(ev)
 	return ev
 
@@ -1004,9 +1059,9 @@ func portal_pick(tile_idx: int) -> Array[Dictionary]:
 
 ## Jumps straight into a modal or fight for screenshot scenarios. Not recorded in `commands`,
 ## so a flow touched by this cannot be replayed from its log. kind: shop | draft | rune_choice |
-## rune_assign | passive | forge | event | portal | combat | boss. arg: event id, rune id, or comma
-## separated enemy ids for combat, or the passive source ("elite" | "miniboss" | "boss" = an
-## elite's boss-tier roll).
+## rune_assign | passive | forge | event | portal | combat | boss | miniboss. arg: event id, rune
+## id, or comma separated enemy ids for combat, or the passive source ("elite" | "miniboss" |
+## "boss" = an elite's boss-tier roll), or a boss / mini-boss id (default: the run's).
 func debug_open(kind: String, arg := "") -> Array[Dictionary]:
 	var ev: Array[Dictionary] = []
 	combat = null
@@ -1027,7 +1082,8 @@ func debug_open(kind: String, arg := "") -> Array[Dictionary]:
 		"combat":
 			var ids: Array = Array(arg.split(",", false)) if arg != "" else ["skeleton_minion", "skeleton_archer"]
 			_start_combat(ids, false, false, run.pos, ev)
-		"boss": _start_combat([EnemyDefs.FINAL_BOSS], false, true, 0, ev)
+		"boss": _start_combat([arg if EnemyDefs.BOSSES.has(arg) else run.boss_id], false, true, 0, ev)
+		"miniboss": _start_combat([arg if EnemyDefs.MINIBOSSES.has(arg) else run.miniboss_id], false, false, run.pos, ev, true)
 		_: return [_e("unknown debug kind " + kind)]
 	return ev
 
@@ -1058,8 +1114,8 @@ func apply(cmd: Array) -> Array[Dictionary]:
 	return [_e("unknown command " + str(cmd[0]))]
 
 ## Replays a whole command log from a fresh run.
-static func replay(class_id: String, seed: int, log_: Array, board_size: int = Balance.BOARD_SIZE) -> GameFlow:
-	var f := GameFlow.new_run(class_id, seed, board_size)
+static func replay(class_id: String, seed: int, log_: Array, board_size: int = Balance.BOARD_SIZE, opts: Dictionary = {}) -> GameFlow:
+	var f := GameFlow.new_run(class_id, seed, board_size, opts)
 	for cmd in log_:
 		f.apply(cmd)
 	return f

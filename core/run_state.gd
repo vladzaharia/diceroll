@@ -30,8 +30,18 @@ var shop_reroll_bought: bool = false
 var passives: Array[String] = []
 ## Passive bookkeeping: second_wind_used:bool, phoenix_act:int (act the feather was spent in).
 var passive_state: Dictionary = {}
+## Biome per tier (BiomeDefs ids), picked at run start: [tier1, tier2, tier3].
+var route: Array[String] = []
+## Lap-7 mini-boss and lap-15 final boss, picked at run start from the route's candidates.
+var miniboss_id: String = "mini_pumpkin_knight"
+var boss_id: String = "boss_lich"
+## Dice frozen by Frostpeak ice: they lock on turn 1 of the next fight.
+var chill: int = 0
 
-static func create(p_class_id: String, p_seed: int, p_board_size: int = Balance.BOARD_SIZE) -> RunState:
+## opts (all optional, for scenarios/tests): route:[tier1, tier2, tier3], miniboss:id, boss:id.
+## The route and bosses are always drawn from the run Rng first, so forcing them does not shift
+## the rest of the random stream. Invalid overrides are ignored.
+static func create(p_class_id: String, p_seed: int, p_board_size: int = Balance.BOARD_SIZE, opts: Dictionary = {}) -> RunState:
 	var r := RunState.new()
 	var def: Dictionary = HeroDefs.DATA[p_class_id]
 	r.class_id = p_class_id
@@ -44,7 +54,19 @@ static func create(p_class_id: String, p_seed: int, p_board_size: int = Balance.
 	for rune_id in def.runes:
 		r.dice.append(Die.make(String(rune_id)))
 	r.board_size = p_board_size
-	r.board = Board.generate(r.rng, 1, r.board_size)
+	r.route = BiomeDefs.pick_route(r.rng)
+	var forced: Array = opts.get("route", [])
+	if BiomeDefs.valid_route(forced):
+		r.route.assign(forced.map(func(x): return String(x)))
+	r.miniboss_id = String(r.rng.pick(BiomeDefs.miniboss_candidates(r.route)))
+	r.boss_id = String(r.rng.pick(BiomeDefs.boss_candidates(r.route)))
+	var fm := String(opts.get("miniboss", ""))
+	if EnemyDefs.MINIBOSSES.has(fm):
+		r.miniboss_id = fm
+	var fb := String(opts.get("boss", ""))
+	if EnemyDefs.BOSSES.has(fb):
+		r.boss_id = fb
+	r.board = Board.generate(r.rng, 1, r.board_size, 1, r.route[0])
 	r.stats = {
 		"board_turns": 0, "combat_turns": 0, "fights_won": 0, "damage_dealt": 0, "damage_taken": 0,
 		"gold_earned": 0, "best_combo": "", "best_mult": 0.0, "max_act": 1, "commands": 0,
@@ -53,6 +75,10 @@ static func create(p_class_id: String, p_seed: int, p_board_size: int = Balance.
 
 func has_passive(id: String) -> bool:
 	return passives.has(id)
+
+## Current biome id (the route's entry for the current act).
+func biome() -> String:
+	return route[clampi(act - 1, 0, route.size() - 1)]
 
 ## Pool cap: MAX_DICE, +1 with Extra Hand.
 func max_dice() -> int:
@@ -98,6 +124,7 @@ func to_dict() -> Dictionary:
 		"act": act, "lap": lap, "pos": pos, "board": board.to_dict(), "board_size": board_size, "treasury": treasury,
 		"stats": stats.duplicate(true), "shop_reroll_bought": shop_reroll_bought,
 		"passives": Array(passives), "passive_state": passive_state.duplicate(true),
+		"route": Array(route), "miniboss_id": miniboss_id, "boss_id": boss_id, "chill": chill,
 	}
 
 static func from_dict(d: Dictionary) -> RunState:
@@ -126,6 +153,13 @@ static func from_dict(d: Dictionary) -> RunState:
 	r.shop_reroll_bought = bool(d.get("shop_reroll_bought", false))
 	for p in d.get("passives", []):
 		r.passives.append(String(p))
+	# Saves from before biome routes get the legacy route and bosses.
+	r.route.clear()
+	for b in d.get("route", BiomeDefs.DEFAULT_ROUTE):
+		r.route.append(String(b))
+	r.miniboss_id = String(d.get("miniboss_id", "mini_pumpkin_knight"))
+	r.boss_id = String(d.get("boss_id", EnemyDefs.FINAL_BOSS))
+	r.chill = int(d.get("chill", 0))
 	var ps: Dictionary = d.get("passive_state", {})
 	for k in ps:
 		var v: Variant = ps[k]
