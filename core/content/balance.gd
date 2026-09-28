@@ -23,7 +23,7 @@ const MAX_DICE := 5
 const START_DICE := 2
 
 # Tiles
-const LAP_HEAL_PCT := 0.15
+const LAP_HEAL_PCT := 0.10
 const CAMPFIRE_HEAL_PCT := 0.30
 const TRAP_DAMAGE_PCT := 0.12
 const TRAP_DODGE_MIN := 4
@@ -40,8 +40,9 @@ const MAX_BANKED_REROLLS := 2
 const BUFF_AMOUNT := 2
 const MAX_SUMMONED_ALIVE := 3
 
-# Enemy scaling by lap (1..15): mult = 1 + ENEMY_LAP_STEP*(lap-1)
-const ENEMY_LAP_STEP := 0.14
+# Enemy scaling by lap (1..15): mult = ENEMY_BASE_SCALE + ENEMY_LAP_STEP*(lap-1)
+const ENEMY_BASE_SCALE := 1.35
+const ENEMY_LAP_STEP := 0.155
 const ELITE_HP_MULT := 1.3
 const ELITE_ATK_MULT := 1.15
 const ELITE_REWARD_MULT := 1.5
@@ -115,7 +116,7 @@ static func is_shop_lap(completed_lap: int) -> bool:
 	return completed_lap % SHOP_EVERY == 0 or BIOME_LAPS.has(completed_lap + 1)
 
 static func enemy_scale(lap: int) -> float:
-	return 1.0 + ENEMY_LAP_STEP * (lap - 1)
+	return ENEMY_BASE_SCALE + ENEMY_LAP_STEP * (lap - 1)
 
 static func gold_scale(lap: int) -> float:
 	return 1.0 + GOLD_LAP_STEP * (lap - 1)

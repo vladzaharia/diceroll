@@ -30,7 +30,7 @@ const BOSSES := {
 		[{"kind": "attack", "value": 18}, {"kind": "curse", "value": 2}, {"kind": "buff", "value": 3}],
 		[{"kind": "attack", "value": 18}, {"kind": "attack", "value": 20}, {"kind": "curse", "value": 2}, {"kind": "buff", "value": 3}],
 	]},
-	"boss_lich": {"name": "The Lich", "hp": 700, "gold": 0, "xp": 0, "phases": [
+	"boss_lich": {"name": "The Lich", "hp": 1300, "gold": 0, "xp": 0, "phases": [
 		[{"kind": "attack", "value": 22}, {"kind": "curse", "value": 1}, {"kind": "block", "value": 30}],
 		[{"kind": "attack", "value": 26}, {"kind": "chaos", "value": 1}, {"kind": "attack", "value": 22}, {"kind": "curse", "value": 1}],
 	]},
@@ -64,7 +64,7 @@ const POOLS := [
 	["skeleton_warrior", "bandit", "brute", "cultist"],
 ]
 ## [min, max] enemies per tile for each band.
-const COUNTS := [[1, 2], [2, 2], [2, 3], [2, 3], [2, 3]]
+const COUNTS := [[2, 2], [2, 2], [2, 3], [2, 3], [2, 3]]
 
 static func band(lap: int) -> int:
 	return clampi((lap - 1) / 3, 0, POOLS.size() - 1)

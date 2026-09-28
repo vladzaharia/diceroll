@@ -14,6 +14,17 @@ const KIND_SCORE := {
 	"giant": 10, "high": 9, "twin": 7, "gambler": 6, "loaded": 7, "even": 7, "standard": 6, "odd": 5, "low": 4,
 }
 
+## How much the bot wants each passive.
+const PASSIVE_SCORE := {
+	"pair_master": 7, "full_house_party": 4, "straight_shooter": 5, "triple_threat": 7, "snake_eyes": 5,
+	"boxcars": 6, "gold_tooth": 4, "steady_hand": 6, "loaded_hands": 5, "double_trouble": 4, "rune_echo": 6,
+	"collector": 5, "pathfinder": 3, "treasure_sense": 3, "piggy_bank": 3, "haggler": 4, "scholar": 4,
+	"blacksmith": 4, "thorns": 5, "iron_skin": 6, "bloodthirst": 5, "opening_salvo": 6, "second_wind": 7,
+	"glass_cannon": 7,
+	"extra_hand": 10, "crowd_pleaser": 10, "encore": 8, "rune_bloom": 9, "fast_feet": 6, "resonance": 10,
+	"phoenix": 9, "midas_fist": 8,
+}
+
 static func next_command(f: GameFlow) -> Array:
 	match f.phase:
 		GameFlow.Phase.BOARD_READY:
@@ -68,6 +79,13 @@ static func tile_score(f: GameFlow, idx: int, crossing: bool) -> float:
 				s = 6.0
 			else:
 				s = -8.0
+		"miniboss":
+			if t.enemies.is_empty():
+				s = 0.0
+			elif r > 0.6:
+				s = 7.0
+			else:
+				s = -9.0
 		"chest":
 			s = 5.0
 		"event":
@@ -150,6 +168,8 @@ static func _draft_score(f: GameFlow, o: Dictionary) -> float:
 			return 4.0 + (4.0 if hp_ratio(f) < 0.5 else 0.0)
 		"face_raise":
 			return 3.0
+	if Passives.DEFS.has(String(o.id)):
+		return float(PASSIVE_SCORE.get(String(o.id), 4))
 	return 0.0
 
 static func _best_draft(f: GameFlow) -> int:
@@ -189,7 +209,7 @@ static func _shop(f: GameFlow) -> Array:
 			"potion":
 				s = 9.0 if hp_ratio(f) < 0.55 else 0.0
 			"die":
-				s = (8.0 + float(KIND_SCORE.get(String(it.get("kind", "standard")), 6)) / 5.0) if f.run.dice.size() < Balance.MAX_DICE else 0.0
+				s = (8.0 + float(KIND_SCORE.get(String(it.get("kind", "standard")), 6)) / 5.0) if f.run.dice.size() < f.run.max_dice() else 0.0
 			"rune":
 				var rs := float(RUNE_SCORE.get(String(it.rune), 4))
 				var target := _die_for_rune(f, String(it.rune))
@@ -200,6 +220,8 @@ static func _shop(f: GameFlow) -> Array:
 				s = 7.0
 			"face_raise":
 				s = 2.0
+			"passive":
+				s = float(PASSIVE_SCORE.get(String(it.passive), 4)) + 1.0
 		if s > best_s:
 			best_s = s
 			best = i
@@ -254,10 +276,20 @@ static func _event(f: GameFlow) -> int:
 		"idol":
 			return 0 if ch[0].enabled and f.run.hp > 40 else 1
 		"shrine":
+			var best := 0
+			var best_s := -1.0
 			for i in ch.size():
-				if ch[i].get("blessing", "") == "atk":
-					return i
-			return 0
+				var sc := 5.0 if ch[i].get("blessing", "") == "atk" else 3.0
+				if ch[i].has("passive"):
+					sc = float(PASSIVE_SCORE.get(String(ch[i].passive), 4))
+				if sc > best_s:
+					best_s = sc
+					best = i
+			return best
+		"dicesmith":
+			if f.run.dice.size() < f.run.max_dice() or ch[0].kind in ["giant", "high", "twin"]:
+				return 0 if float(KIND_SCORE.get(String(ch[0].kind), 5)) >= float(KIND_SCORE.get(String(ch[1].kind), 5)) else 1
+			return 2
 	for i in ch.size():
 		if ch[i].enabled:
 			return i
