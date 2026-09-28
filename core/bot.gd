@@ -106,20 +106,13 @@ static func tile_score(f: GameFlow, idx: int, crossing: bool) -> float:
 		s += 3.0
 	return s
 
+## The move is automatic; the only choice is reroll-or-go.
 static func _board(f: GameFlow) -> Array:
-	var best := 0
-	var best_s := -INF
-	var targets := f.landing_preview()
-	for i in f.board_roll.size():
-		var crossing := f.run.board.crosses_start(f.run.pos, f.board_roll[i])
-		# a blank (0) stays put and triggers nothing
-		var s := 0.0 if f.board_roll[i] <= 0 else tile_score(f, targets[i], crossing)
-		if s > best_s:
-			best_s = s
-			best = i
-	if best_s < 1.0 and f.board_rerolls_left > 0:
+	var crossing := f.run.board.crosses_start(f.run.pos, f.board_move)
+	var s := 0.0 if f.board_move <= 0 else tile_score(f, f.board_target(), crossing)
+	if s < 1.0 and f.board_rerolls_left > 0:
 		return ["board_reroll"]
-	return ["choose_move", best]
+	return ["confirm_move"]
 
 static func _combat(f: GameFlow) -> Array:
 	var c := f.combat

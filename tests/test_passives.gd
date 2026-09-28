@@ -65,11 +65,12 @@ func _flow(cls := "knight", s := 1) -> GameFlow:
 			f.run.board.tiles[i] = Board.make_tile("empty")
 	return f
 
+## Forces a board roll of `values` (the two moving dice are auto-selected; move = their sum).
 func _force_roll(f: GameFlow, values: Array) -> void:
 	f.phase = P.BOARD_ROLLED
 	var r: Array[int] = []
 	r.assign(values)
-	f.board_roll = r
+	f._select_move(r)
 
 func _win(f: GameFlow) -> Array[Dictionary]:
 	for e in f.combat.enemies:
@@ -138,7 +139,7 @@ func test_boss_roll_excludes_owned_and_falls_back() -> void:
 func test_elite_rewards_regular_passive_choice() -> void:
 	var f := _flow()
 	f.run.board.tiles[3] = Board.make_tile("elite", ["brute"], true)
-	_force_roll(f, [3, 3])
+	_force_roll(f, [3, 0])
 	f.choose_move(0)
 	assert_eq(f.phase, P.COMBAT)
 	_win(f)
@@ -204,7 +205,7 @@ func test_elite_sometimes_offers_boss_tier() -> void:
 		var f := _flow("knight", s)
 		f.run.xp = 0
 		f.run.board.tiles[3] = Board.make_tile("elite", ["brute"], true)
-		_force_roll(f, [3, 1])
+		_force_roll(f, [3, 0])
 		f.choose_move(0)
 		_win(f)
 		_drain_drafts(f)
@@ -453,14 +454,14 @@ func test_double_trouble() -> void:
 func test_fast_feet() -> void:
 	var f := _flow()
 	f.run.passives.append("fast_feet")
-	_force_roll(f, [2, 2])
-	var ev := f.choose_move(0)
-	assert_eq(f.run.pos, 4)
+	_force_roll(f, [1, 1])
+	var ev := f.confirm_move()
+	assert_eq(f.run.pos, 3, "move 2, then hop 1")
 	assert_eq(_all(ev, "hero_moved").size(), 2)
 	assert_eq(f.phase, P.BOARD_READY)
 	_force_roll(f, [0, 0])
-	f.choose_move(0)
-	assert_eq(f.run.pos, 4, "blank doubles do nothing")
+	f.confirm_move()
+	assert_eq(f.run.pos, 3, "blank doubles do nothing")
 
 func test_pathfinder() -> void:
 	var f := _flow()
@@ -474,7 +475,7 @@ func test_treasure_sense() -> void:
 		var f := _flow("knight", s)
 		f.run.passives.append("treasure_sense")
 		f.run.board.tiles[2] = Board.make_tile("chest")
-		_force_roll(f, [2, 2])
+		_force_roll(f, [2, 0])
 		var ev := f.choose_move(0)
 		var g := _first(ev, "gold_changed")
 		if not g.is_empty() and g.source == "chest":
@@ -512,7 +513,7 @@ func test_haggler() -> void:
 func test_blacksmith_two_edits() -> void:
 	var f := _flow()
 	f.run.passives.append("blacksmith")
-	_force_roll(f, [6, 6])
+	_force_roll(f, [6, 0])
 	f.choose_move(0)
 	assert_eq(f.phase, P.FORGE)
 	assert_eq(f.offer.uses, 2)
@@ -634,7 +635,7 @@ func test_miniboss_ids() -> void:
 func test_miniboss_fight_rewards_boss_passive() -> void:
 	var f := _flow()
 	f.run.board.tiles[5] = Board.make_tile("miniboss", ["mini_pumpkin_knight"])
-	_force_roll(f, [5, 1])
+	_force_roll(f, [5, 0])
 	var ev := f.choose_move(0)
 	var cs := _first(ev, "combat_started")
 	assert_eq(cs.miniboss, true)
@@ -697,7 +698,7 @@ func test_biome_change_regenerates_board() -> void:
 	f.run.hp = 50
 	f.run.lap = 5
 	f.run.pos = 26
-	_force_roll(f, [4, 4])
+	_force_roll(f, [4, 0])
 	var ev := f.choose_move(0)
 	assert_eq(f.run.lap, 6)
 	assert_eq(f.run.act, 2)

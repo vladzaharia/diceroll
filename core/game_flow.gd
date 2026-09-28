@@ -13,6 +13,9 @@ var phase: Phase = Phase.BOARD_READY
 var combat: CombatState = null
 var board_roll: Array[int] = []
 var offer: Dictionary = {}
+## The two dice auto-selected to move (indices into board_roll) and their summed move.
+var board_choice: Array[int] = []
+var board_move: int = 0
 # extras
 var board_rerolls_left: int = 0
 ## Queue of steps still to resolve after the current modal/combat closes.
@@ -61,66 +64,131 @@ func board_reroll() -> Array[Dictionary]:
 
 func _do_board_roll() -> Array[Dictionary]:
 	var ev: Array[Dictionary] = []
-	board_roll.clear()
+	var values: Array[int] = []
 	var idx: Array[int] = []
 	for i in run.dice.size():
-		board_roll.append(run.dice[i].value(run.dice[i].roll(run.rng)))
+		values.append(run.dice[i].value(run.dice[i].roll(run.rng)))
 		idx.append(i)
-	ev.append({"type": "dice_rolled", "values": board_roll.duplicate(), "indices": idx, "context": "board"})
-	# Doubles feed the Treasury bank: +value*2 per value rolled at least twice (blanks never count).
-	var counts := {}
-	for v in board_roll:
-		if v > 0:
-			counts[v] = int(counts.get(v, 0)) + 1
+	ev.append({"type": "dice_rolled", "values": values.duplicate(), "indices": idx, "context": "board"})
+	_select_move(values)
+	# Chosen doubles feed the Treasury bank: +value * TREASURY_PAIR_MULT.
 	var added := 0
-	for v in counts:
-		if counts[v] >= 2:
-			added += int(v) * Balance.TREASURY_PAIR_MULT
+	if is_board_double():
+		added = board_roll[board_choice[0]] * Balance.TREASURY_PAIR_MULT
 	run.treasury += added
-	ev.append({"type": "board_rolled", "values": board_roll.duplicate(), "targets": landing_preview(),
+	ev.append({"type": "board_rolled", "values": board_roll.duplicate(), "chosen": board_choice.duplicate(),
+		"move": board_move, "target": board_target(), "targets": landing_preview(), "double": is_board_double(),
 		"treasury_added": added, "treasury": run.treasury, "rerolls_left": board_rerolls_left})
 	return ev
 
-func landing_preview() -> Array[int]:
+## Sets the current board roll and auto-selects the two moving dice (see pick_move_dice).
+func _select_move(values: Array[int]) -> void:
+	board_roll = values.duplicate()
+	board_choice = pick_move_dice(values, run.rng)
+	board_move = 0
+	for i in board_choice:
+		board_move += board_roll[i]
+
+## Movement rule: the pool rolls, then two dice are picked automatically.
+## Blank faces (0) are ignored unless fewer than two dice show a value. The most frequent value
+## wins: if some value shows at least twice, two dice of that value move (ties between values
+## are broken at random). If every value is unique, two random dice move. A 2-die pool moves
+## both. Returns the two dice indices, ascending. The move is their sum.
+static func pick_move_dice(values: Array[int], rng: Rng) -> Array[int]:
+	var n := values.size()
 	var out: Array[int] = []
-	for v in board_roll:
-		if run.lap >= Balance.TOTAL_LAPS and run.board.crosses_start(run.pos, v):
-			out.append(0)
+	if n <= 2:
+		for i in n:
+			out.append(i)
+		return out
+	var live: Array[int] = []
+	var blanks: Array[int] = []
+	for i in n:
+		if values[i] > 0:
+			live.append(i)
 		else:
-			out.append(run.board.landing(run.pos, v))
+			blanks.append(i)
+	if live.size() < 2:
+		out.append_array(live)
+		while out.size() < 2:
+			var b: int = rng.pick(blanks)
+			blanks.erase(b)
+			out.append(b)
+		out.sort()
+		return out
+	var by_val := {}
+	for i in live:
+		if not by_val.has(values[i]):
+			by_val[values[i]] = [] as Array[int]
+		(by_val[values[i]] as Array[int]).append(i)
+	var best := 0
+	for v in by_val:
+		best = maxi(best, (by_val[v] as Array[int]).size())
+	if best >= 2:
+		var tied: Array = []
+		for v in by_val:
+			if (by_val[v] as Array[int]).size() == best:
+				tied.append(v)
+		tied.sort()
+		var pick_v: int = tied[0] if tied.size() == 1 else int(rng.pick(tied))
+		var group: Array[int] = by_val[pick_v]
+		out.append(group[0])
+		out.append(group[1])
+		return out
+	var pool := live.duplicate()
+	var a: int = rng.pick(pool)
+	pool.erase(a)
+	var b2: int = rng.pick(pool)
+	out.append(a)
+	out.append(b2)
+	out.sort()
 	return out
 
-func choose_move(die_idx: int) -> Array[Dictionary]:
+## True when the two chosen dice show the same non-blank value.
+func is_board_double() -> bool:
+	return board_choice.size() == 2 and board_roll[board_choice[0]] > 0 \
+		and board_roll[board_choice[0]] == board_roll[board_choice[1]]
+
+## Landing tile of the current move (Start on the final lap if the move crosses it).
+func board_target() -> int:
+	if run.lap >= Balance.TOTAL_LAPS and run.board.crosses_start(run.pos, board_move):
+		return 0
+	return run.board.landing(run.pos, board_move)
+
+## [target] for the current board roll (kept as an array for the old contract).
+func landing_preview() -> Array[int]:
+	if board_roll.is_empty():
+		return []
+	return [board_target()] as Array[int]
+
+## Executes the auto-selected move for the current board roll.
+func confirm_move() -> Array[Dictionary]:
 	if phase != Phase.BOARD_ROLLED:
-		return _err("choose_move")
-	if die_idx < 0 or die_idx >= board_roll.size():
-		return [_e("bad die index")]
-	_record(["choose_move", die_idx])
+		return _err("confirm_move")
+	_record(["confirm_move"])
 	var ev: Array[Dictionary] = []
-	var steps := board_roll[die_idx]
-	if run.dice[die_idx].rune == "gilded":
-		_gold(ev, steps, "gilded")
-		ev.insert(0, {"type": "rune_fired", "die_idx": die_idx, "rune": "gilded", "effect": "gold", "value": steps})
-	var doubles := _has_double(board_roll)
+	var steps := board_move
+	for i in board_choice:
+		if run.dice[i].rune == "gilded" and board_roll[i] > 0:
+			ev.append({"type": "rune_fired", "die_idx": i, "rune": "gilded", "effect": "gold", "value": board_roll[i]})
+			_gold(ev, board_roll[i], "gilded")
+	var doubles := is_board_double()
+	var hop := board_roll[board_choice[0]] if doubles else 0
 	if doubles and run.has_passive("double_trouble") and run.banked_rerolls < Balance.MAX_BANKED_REROLLS:
 		run.banked_rerolls += 1
 		ev.append(_passive_ev("double_trouble", 1))
 	board_roll.clear()
+	board_choice.clear()
+	board_move = 0
 	ev.append_array(_move(steps, false))
 	if doubles and steps > 0 and run.has_passive("fast_feet") and not _pending_has("boss"):
-		pending.push_back({"kind": "bonus_move", "steps": steps})
+		pending.push_back({"kind": "bonus_move", "steps": hop})
 	_advance(ev)
 	return ev
 
-## True if some non-blank value appears at least twice.
-static func _has_double(values: Array[int]) -> bool:
-	var seen := {}
-	for v in values:
-		if v > 0:
-			if seen.has(v):
-				return true
-			seen[v] = true
-	return false
+## Deprecated: the move is chosen automatically now. Ignores `die_idx` and calls confirm_move().
+func choose_move(_die_idx: int = 0) -> Array[Dictionary]:
+	return confirm_move()
 
 func _pending_has(kind: String) -> bool:
 	for p in pending:
@@ -393,6 +461,8 @@ func _finish(victory: bool, ev: Array[Dictionary]) -> void:
 	offer = {}
 	pending.clear()
 	board_roll.clear()
+	board_choice.clear()
+	board_move = 0
 	phase = Phase.VICTORY if victory else Phase.GAME_OVER
 	run.stats.victory = victory
 	ev.append({"type": "game_over", "victory": victory, "stats": _summary()})
@@ -941,6 +1011,8 @@ func debug_open(kind: String, arg := "") -> Array[Dictionary]:
 	combat = null
 	offer = {}
 	board_roll.clear()
+	board_choice.clear()
+	board_move = 0
 	phase = Phase.BOARD_READY
 	match kind:
 		"shop": _open_shop(ev)
@@ -968,7 +1040,7 @@ func apply(cmd: Array) -> Array[Dictionary]:
 	match String(cmd[0]):
 		"roll_board": return roll_board()
 		"board_reroll": return board_reroll()
-		"choose_move": return choose_move(a[0])
+		"confirm_move", "choose_move": return confirm_move()
 		"combat_toggle": return combat_toggle(a[0])
 		"combat_reroll": return combat_reroll()
 		"combat_set_target": return combat_set_target(a[0])
@@ -994,7 +1066,8 @@ func to_dict() -> Dictionary:
 	return {
 		"version": SAVE_VERSION, "run": run.to_dict(), "phase": int(phase),
 		"combat": combat.to_dict() if combat != null else null,
-		"board_roll": Array(board_roll), "offer": offer.duplicate(true),
+		"board_roll": Array(board_roll), "board_choice": Array(board_choice), "board_move": board_move,
+		"offer": offer.duplicate(true),
 		"board_rerolls_left": board_rerolls_left, "pending": pending.duplicate(true),
 		"commands": commands.duplicate(true),
 	}
@@ -1007,6 +1080,9 @@ static func from_dict(d: Dictionary) -> GameFlow:
 		f.combat = CombatState.from_dict(d.combat)
 	for v in d.get("board_roll", []):
 		f.board_roll.append(int(v))
+	for v in d.get("board_choice", []):
+		f.board_choice.append(int(v))
+	f.board_move = int(d.get("board_move", 0))
 	f.offer = _intify(d.get("offer", {}))
 	f.board_rerolls_left = int(d.get("board_rerolls_left", 0))
 	for p in d.get("pending", []):

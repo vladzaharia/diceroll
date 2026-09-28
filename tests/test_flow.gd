@@ -18,13 +18,14 @@ func _blank(f: GameFlow) -> void:
 func _put(f: GameFlow, idx: int, tile: Dictionary) -> void:
 	f.run.board.tiles[idx] = tile
 
-## Forces a board roll so the next choose_move(0) moves `steps`.
+## Forces a board roll so the next confirm_move() moves `steps` (one die shows `steps`,
+## the rest are blanks, so it is never a double).
 func _force_roll(f: GameFlow, steps: int) -> void:
 	f.phase = P.BOARD_ROLLED
-	var r: Array[int] = []
-	for i in f.run.dice.size():
-		r.append(steps)
-	f.board_roll = r
+	var r: Array[int] = [steps]
+	for i in range(1, f.run.dice.size()):
+		r.append(0)
+	f._select_move(r)
 
 func _types(ev: Array) -> Array:
 	var out := []
@@ -100,7 +101,7 @@ func test_illegal_commands_error_and_do_not_mutate() -> void:
 	f.roll_board()
 	var rolled := _snap(f)
 	assert_eq(f.roll_board()[0].type, "error", "cannot roll twice")
-	assert_eq(f.choose_move(9)[0].type, "error", "bad die")
+	assert_eq(f.combat_attack()[0].type, "error", "not in combat")
 	assert_eq(_snap(f), rolled)
 
 func test_roll_board_and_reroll() -> void:
@@ -112,9 +113,11 @@ func test_roll_board_and_reroll() -> void:
 	assert_eq(dr.values.size(), 2)
 	var br := _first(ev, "board_rolled")
 	assert_eq(br.values, dr.values)
-	assert_eq(br.targets, f.landing_preview())
-	for i in 2:
-		assert_eq(f.landing_preview()[i], f.board_roll[i] % 24)
+	assert_eq(br.chosen, [0, 1], "a 2-die pool moves both dice")
+	assert_eq(br.move, dr.values[0] + dr.values[1])
+	assert_eq(br.target, br.move % 24)
+	assert_eq(br.targets, [br.target])
+	assert_eq(f.landing_preview(), [br.target] as Array[int])
 	assert_eq(f.board_reroll()[0].type, "dice_rolled")
 	assert_eq(f.board_reroll()[0].type, "error", "only one board reroll for knight")
 
@@ -131,14 +134,13 @@ func test_treasury_doubles() -> void:
 		f.run.dice.append(Die.new())
 		f.run.dice.append(Die.new())
 		var before := f.run.treasury
-		f.roll_board()
-		var counts := {}
-		for v in f.board_roll:
-			counts[v] = counts.get(v, 0) + 1
-		var add := 0
-		for v in counts:
-			if counts[v] >= 2:
-				add += v * 2
+		var ev := f.roll_board()
+		var br := _first(ev, "board_rolled")
+		var a: int = f.board_roll[f.board_choice[0]]
+		var b: int = f.board_roll[f.board_choice[1]]
+		var add := a * Balance.TREASURY_PAIR_MULT if a == b and a > 0 else 0
+		assert_eq(br.double, a == b and a > 0)
+		assert_eq(br.treasury_added, add)
 		assert_eq(f.run.treasury, before + add)
 
 func test_move_to_empty() -> void:
@@ -156,10 +158,10 @@ func test_move_to_empty() -> void:
 func test_gilded_move_gold() -> void:
 	var f := _flow()
 	_blank(f)
-	f.run.dice[1].rune = "gilded"
+	f.run.dice[0].rune = "gilded"
 	f.run.gold = 0
 	_force_roll(f, 4)
-	var ev := f.choose_move(1)
+	var ev := f.confirm_move()
 	assert_eq(f.run.gold, 4)
 	assert_eq(_first(ev, "rune_fired").rune, "gilded")
 
@@ -978,3 +980,104 @@ func test_board_32_replay() -> void:
 		f.apply(Bot.next_command(f))
 	var r := GameFlow.replay("rogue", 77, f.commands, 32)
 	assert_eq(JSON.stringify(r.to_dict()), JSON.stringify(f.to_dict()))
+
+# ================================================================ automatic two-dice movement
+
+func _pick(values: Array, s := 1) -> Array:
+	var v: Array[int] = []
+	v.assign(values)
+	return Array(GameFlow.pick_move_dice(v, Rng.new(s)))
+
+func test_move_pair_wins() -> void:
+	assert_eq(_pick([2, 5, 2, 6, 1]), [0, 2])
+	assert_eq(_pick([4, 4, 4, 1]), [0, 1], "trips: two of them")
+	assert_eq(_pick([3, 6, 6, 6, 3]), [1, 2], "three 6s beat a pair of 3s")
+
+func test_move_two_pair_tie_random_but_seeded() -> void:
+	var seen := {}
+	for s in 40:
+		var p := _pick([5, 2, 5, 2, 1], s)
+		assert_true(p == [0, 2] or p == [1, 3], "one of the pairs")
+		assert_eq(p, _pick([5, 2, 5, 2, 1], s), "deterministic by seed")
+		seen[str(p)] = true
+	assert_eq(seen.size(), 2, "both pairs happen")
+
+func test_move_all_unique_random_two() -> void:
+	var seen := {}
+	for s in 60:
+		var p := _pick([1, 2, 3, 4, 5], s)
+		assert_eq(p.size(), 2)
+		assert_true(p[0] < p[1])
+		seen[str(p)] = true
+	assert_true(seen.size() > 5, "random pairs")
+
+func test_move_ignores_blanks() -> void:
+	assert_eq(_pick([0, 0, 3, 5]).size(), 2)
+	for s in 20:
+		var p := _pick([0, 0, 3, 5], s)
+		assert_eq(p, [2, 3], "zeros ignored (%d)" % s)
+		var q := _pick([0, 0, 0, 4], s)
+		assert_true(q.has(3), "the only live die moves")
+	assert_eq(_pick([0, 6, 0, 6]), [1, 3], "a pair of 6s, not the blank pair")
+
+func test_move_two_dice_pool_takes_both() -> void:
+	assert_eq(_pick([0, 0]), [0, 1])
+	assert_eq(_pick([6, 2]), [0, 1])
+
+func test_confirm_move_and_phase_validation() -> void:
+	var f := _flow()
+	_blank(f)
+	assert_eq(f.confirm_move()[0].type, "error", "nothing rolled")
+	f.phase = P.BOARD_ROLLED
+	var r: Array[int] = [2, 3]
+	f._select_move(r)
+	assert_eq(f.board_move, 5)
+	assert_eq(f.landing_preview(), [5] as Array[int])
+	var ev := f.confirm_move()
+	assert_eq(f.run.pos, 5)
+	assert_eq(_first(ev, "hero_moved").path, [1, 2, 3, 4, 5])
+	assert_eq(f.commands.back(), ["confirm_move"])
+	assert_eq(f.confirm_move()[0].type, "error", "already moved")
+	assert_eq(f.board_reroll()[0].type, "error")
+
+func test_choose_move_is_a_deprecated_alias() -> void:
+	var f := _flow()
+	_blank(f)
+	f.phase = P.BOARD_ROLLED
+	var r: Array[int] = [1, 1]
+	f._select_move(r)
+	f.choose_move(7)
+	assert_eq(f.run.pos, 2)
+	var g := GameFlow.replay("knight", 1, [["roll_board"], ["choose_move", 0]], 24)
+	assert_eq(g.phase != P.BOARD_ROLLED, true, "old logs replay")
+
+func test_gilded_fires_for_each_chosen_die() -> void:
+	var f := _flow()
+	_blank(f)
+	f.run.dice[0].rune = "gilded"
+	f.run.dice[1].rune = "gilded"
+	f.run.gold = 0
+	f.phase = P.BOARD_ROLLED
+	var r: Array[int] = [2, 3]
+	f._select_move(r)
+	var ev := f.confirm_move()
+	assert_eq(f.run.gold, 5)
+	var n := 0
+	for e in ev:
+		if e.type == "rune_fired" and e.rune == "gilded":
+			n += 1
+	assert_eq(n, 2)
+
+func test_treasury_only_on_chosen_doubles() -> void:
+	var f := _flow()
+	f.run.dice.append(Die.new())
+	f.run.dice.append(Die.new())
+	f.phase = P.BOARD_ROLLED
+	var r: Array[int] = [5, 5, 2, 2]
+	for s in 10:
+		f.run.rng = Rng.new(s)
+		f._select_move(r)
+		assert_true(f.is_board_double())
+	var u: Array[int] = [1, 2, 3, 4]
+	f._select_move(u)
+	assert_true(not f.is_board_double())

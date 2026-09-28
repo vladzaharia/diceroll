@@ -28,7 +28,7 @@ const DEFS := {
 	"loaded_hands": {"name": "Loaded Hands", "rarity": "uncommon", "icon": "dice",
 		"desc": "+1 reroll on the first turn of every fight."},
 	"double_trouble": {"name": "Double Trouble", "rarity": "uncommon", "icon": "double",
-		"desc": "Moving with a board roll that has doubles banks +1 combat reroll."},
+		"desc": "Moving on doubles banks +1 combat reroll for your next fight."},
 	# ---- runes
 	"rune_echo": {"name": "Rune Echo", "rarity": "rare", "icon": "echo",
 		"desc": "Runes on combo dice have a 25% chance to trigger twice."},
@@ -70,7 +70,7 @@ const DEFS := {
 	"rune_bloom": {"name": "Rune Bloom", "rarity": "boss", "icon": "bloom",
 		"desc": "Every die without a rune gains a random rune now and at the start of each act."},
 	"fast_feet": {"name": "Fast Feet", "rarity": "boss", "icon": "wing",
-		"desc": "Board doubles: after landing, hop forward again by the same amount."},
+		"desc": "Moving on doubles: after landing, hop forward again by one die's value."},
 	"resonance": {"name": "Resonance", "rarity": "boss", "icon": "wave",
 		"desc": "Runes on dice in your combo trigger twice."},
 	"phoenix": {"name": "Phoenix Feather", "rarity": "boss", "icon": "feather",
