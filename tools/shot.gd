@@ -23,8 +23,10 @@ func _ready() -> void:
 	var wait := float(args.get("wait", "1.5"))
 	var frames := int(args.get("frames", "0"))
 	if args.has("shot"):
-		# Occluded macOS windows stop drawing; keep ours on top while capturing.
-		get_window().always_on_top = true
+		# Stay in the background: never take focus, and don't pace frames to the
+		# display link (macOS throttles vsync for occluded/off-screen windows).
+		DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_NO_FOCUS, true)
+		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 		var guard := get_tree().create_timer(wait + frames * FRAME_GAP + 10.0, true, false, true)
 		guard.timeout.connect(func() -> void:
 			push_error("Shot: safety timeout, quitting")
