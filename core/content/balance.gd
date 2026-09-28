@@ -41,8 +41,8 @@ const BUFF_AMOUNT := 2
 const MAX_SUMMONED_ALIVE := 3
 
 # Enemy scaling by lap (1..15): mult = ENEMY_BASE_SCALE + ENEMY_LAP_STEP*(lap-1)
-const ENEMY_BASE_SCALE := 1.35
-const ENEMY_LAP_STEP := 0.155
+const ENEMY_BASE_SCALE := 1.2
+const ENEMY_LAP_STEP := 0.105
 const ELITE_HP_MULT := 1.3
 const ELITE_ATK_MULT := 1.15
 const ELITE_REWARD_MULT := 1.5
@@ -53,8 +53,8 @@ const ELITE_BOSS_PASSIVE_CHANCE := 0.15
 
 # Progression
 const DRAFT_MAX_HP := 8
-const XP_THRESHOLDS := [10, 25, 45, 70, 100]
-const XP_STEP_AFTER := 30
+const XP_THRESHOLDS := [6, 14, 24, 36, 50]
+const XP_STEP_AFTER := 18
 
 # Shop
 ## Dice prices live in DiceKinds.DEFS[kind].price.

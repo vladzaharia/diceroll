@@ -192,7 +192,8 @@ func test_level_up_drafts_queue() -> void:
 	var f := _flow()
 	_blank(f)
 	_put(f, 3, Board.make_tile("enemy", ["brute"]))
-	f.run.xp = 20 # brute gives 9 -> 29: level 2 (10) and 3 (25)
+	# brute gives 9 XP: start just below the level-2 threshold so it crosses levels 2 and 3
+	f.run.xp = Balance.xp_for_level(2) - 9
 	_force_roll(f, 3)
 	f.choose_move(0)
 	var ev := _win_fight(f)
