@@ -28,6 +28,10 @@ enum Mode { OVERVIEW, FOLLOW, COMBAT, POINTS }
 ## (portrait needs a more over-the-shoulder view to fit the enemy row across the screen).
 @export var combat_swing_portrait := 60.0
 @export var combat_swing_landscape := 38.0
+## Normalised screen rects the combat framing must fit into (the integration layer narrows
+## them to the space left between the top HUD and the combat panel + dice tray).
+@export var combat_rect_portrait := Rect2(0.07, 0.1, 0.86, 0.56)
+@export var combat_rect_landscape := Rect2(0.18, 0.08, 0.64, 0.62)
 
 var camera: Camera3D
 var mode := Mode.OVERVIEW
@@ -227,9 +231,9 @@ func _recompute() -> void:
 		return
 	var rect := safe_rect()
 	if mode == Mode.COMBAT and portrait:
-		rect = Rect2(0.07, 0.1, 0.86, 0.56)
+		rect = combat_rect_portrait
 	elif mode == Mode.COMBAT:
-		rect = Rect2(0.18, 0.08, 0.64, 0.62)
+		rect = combat_rect_landscape
 	_desired = solve_framing(pts, _yaw, deg_to_rad(_pitch), rect, _viewport_size(), camera.fov)
 
 

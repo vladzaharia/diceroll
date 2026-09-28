@@ -169,11 +169,11 @@ func on_event(ev: Dictionary, flow: GameFlow) -> void:
 		"hp_changed":
 			hp_bar.set_values(int(ev.total), int(ev.get("max_hp", flow.run.max_hp)), true)
 		"damage":
-			if String(ev.get("target", "")) == "hero":
-				hp_bar.set_values(flow.run.hp, flow.run.max_hp, true)
-				set_block(flow.run.block, false)
+			if str(ev.get("target", "")) == "hero":
+				hp_bar.set_values(int(ev.get("hp", flow.run.hp)), int(ev.get("max_hp", flow.run.max_hp)), true)
+				set_block(int(ev.get("block", flow.run.block)), false)
 		"block_gained":
-			if String(ev.get("target", "")) == "hero":
+			if str(ev.get("target", "")) == "hero":
 				set_block(flow.run.block, true)
 		"combat_turn_started":
 			set_block(0)

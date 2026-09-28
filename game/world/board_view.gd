@@ -355,8 +355,8 @@ func _make_marker(idx: int, vals: Array, order: int) -> Node3D:
 	root.add_child(beam)
 	# die-face badge with the value(s)
 	var badge := Node3D.new()
-	badge.position.y = 2.2
-	badge.scale = Vector3.ONE * 1.45
+	badge.position.y = 1.45
+	badge.scale = Vector3.ONE * 1.9
 	root.add_child(badge)
 	var w := 0.62 + 0.36 * float(vals.size() - 1)
 	var face := MeshInstance3D.new()
@@ -400,8 +400,8 @@ func _make_marker(idx: int, vals: Array, order: int) -> Node3D:
 	lbl.position.y = -0.01
 	badge.add_child(lbl)
 	var bt := badge.create_tween().set_loops()
-	bt.tween_property(badge, "position:y", 2.35, 0.7).set_trans(Tween.TRANS_SINE)
-	bt.tween_property(badge, "position:y", 2.15, 0.7).set_trans(Tween.TRANS_SINE)
+	bt.tween_property(badge, "position:y", 1.55, 0.7).set_trans(Tween.TRANS_SINE)
+	bt.tween_property(badge, "position:y", 1.38, 0.7).set_trans(Tween.TRANS_SINE)
 	# pop in, staggered
 	root.scale = Vector3.ONE * 0.01
 	var pt := root.create_tween()
