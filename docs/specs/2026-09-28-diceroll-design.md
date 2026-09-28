@@ -230,3 +230,12 @@ Principles: no premium currency, no paid or random rolls for power. Every upgrad
 - **Crowns:** awarded at the end of every run from laps, bosses, mini-boss kills and leftover gold. A loss still pays.
 - **Profile:** `user://profile.json`, separate from the run save. It holds meta state, unlocks, ascension and records.
 - **Balance targets (greedy bot):** fresh profile 15–25% win, mid profile about 35%, maxed profile about 60% at Ascension 0. Each Ascension level adds about 8% enemy HP/attack or removes a heal.
+
+### §16 decisions (Vlad, after the design review `docs/reviews/2026-09-28-meta-design-review.md`)
+- **Currencies:** Crowns (every run; levels) + Sigils (milestones only; unlocks) + per-pet XP. The four themed materials are removed.
+- **Targets:** maxed profile 45–50% win at Ascension 0; fresh profile about 22–30% (no base-game nerf).
+- **Classes:** a fresh profile starts with the **Knight only**. Other classes, biomes, pets, minigames and packs unlock over roughly the **first 15–25 runs**.
+- **Minigame skill:** capped at ±15% around par. AUTO plays at 85% of median.
+- **Short Road mode:** 10 laps, 2 biomes, pays about 60% Crowns.
+- **Pets** fire automatically from charge meters.
+- **Adopted from the review:** gear caps and traits; the Workshop holds unlock packs plus a pool toggle; potions heal 30%, belt max 3, one per turn, 4 potion types; one tile per equipped minigame; loss-scaled Crowns with a leftover-gold cap; catch-up bonus; Ascension as 10 global rule levels.
