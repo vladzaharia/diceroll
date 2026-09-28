@@ -43,11 +43,18 @@ const MAX_SUMMONED_ALIVE := 3
 const BURN_SCALE := 0.5
 ## Damage a Thorns enemy (Briar Beast) reflects when hit by your attack (never lethal).
 const ENEMY_THORNS := 3
-## Anti-stacking (2026-09-28 balance pass): only this many Wild dice act as Wild (the first
-## ones in pool order; offers skip Wild once you have one), and Heavy doubles pips only for
-## dice in the scoring group, at most HEAVY_MAX of them per attack.
+## Anti-stacking (2026-09-28 balance pass): each rune's effect applies to at most
+## RUNE_STACK_MAX dice per attack (the first ones in pool order whose trigger fires; for combo
+## runes, dice in the scoring group). Extra copies do nothing, so offers skip a rune the pool
+## already holds RUNE_STACK_MAX times. Wild is capped at WILD_MAX_DICE, and Heavy doubles pips
+## only for dice in the scoring group (HEAVY_MAX == RUNE_STACK_MAX).
+const RUNE_STACK_MAX := 2
 const WILD_MAX_DICE := 1
 const HEAVY_MAX := 2
+
+## Cap on copies of `rune` that act in one attack.
+static func rune_cap(rune: String) -> int:
+	return WILD_MAX_DICE if rune == "wild" else RUNE_STACK_MAX
 
 # Biome twists (core/content/biomes.gd)
 const GLADE_CAMPFIRE_HEAL_PCT := 0.45
@@ -135,6 +142,10 @@ static func act_for_lap(lap: int) -> int:
 
 static func is_shop_lap(completed_lap: int) -> bool:
 	return completed_lap % SHOP_EVERY == 0 or BIOME_LAPS.has(completed_lap + 1)
+
+## TEMP tuning dials (sim sweeps)
+static var tune_hp := 1.0
+static var tune_atk := 1.0
 
 static func enemy_scale(lap: int) -> float:
 	return ENEMY_BASE_SCALE + ENEMY_LAP_STEP * (lap - 1)

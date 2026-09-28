@@ -1,4 +1,11 @@
 extends "res://tests/test_case.gd"
+
+## Expert skill (the full smart policy): behaviour-quality tests pin it, since the default
+## realistic skill makes occasional human-like lapses.
+func _ex(r: AutoRules = null) -> AutoRules:
+	var x := r if r != null else AutoRules.new()
+	x.skill = "expert"
+	return x
 ## Bot.decide in combat: expected-value rerolls, locked dice, targets, single steps.
 
 ## A fight with the given dice (kinds) showing `values`, `rerolls` left, and enemies given as
@@ -30,7 +37,7 @@ func _fight(kinds: Array, values: Array, rerolls: int, foes: Array, runes: Array
 ## Applies decisions until the attack (or `max_steps`); returns the commands taken.
 func _steps(f: GameFlow, max_steps := 20) -> Array:
 	var out: Array = []
-	var rules := AutoRules.new()
+	var rules := _ex()
 	for k in max_steps:
 		var d := Bot.decide(f, rules)
 		out.append(d.cmd)
@@ -49,7 +56,7 @@ func test_keeps_three_of_a_kind() -> void:
 func test_single_steps() -> void:
 	var f := _fight(["standard", "standard", "standard", "standard", "standard"], [5, 5, 5, 2, 1], 1,
 		[{"id": "brute", "hp": 400}])
-	var d := Bot.decide(f, AutoRules.new())
+	var d := Bot.decide(f, _ex())
 	assert_eq(String(d.cmd[0]), "combat_toggle", "first step marks one die")
 	assert_true(String(d.reason).contains("Rerolling 2 dice"), d.reason)
 	assert_true(String(d.reason).contains("%"), "reason reports a chance: " + String(d.reason))
@@ -65,13 +72,13 @@ func test_respects_locked() -> void:
 
 func test_attacks_when_no_rerolls() -> void:
 	var f := _fight(["standard", "standard", "standard"], [1, 2, 4], 0, [{"id": "brute", "hp": 400}])
-	var d := Bot.decide(f, AutoRules.new())
+	var d := Bot.decide(f, _ex())
 	assert_eq(d.cmd, ["combat_attack"])
 
 func test_keeps_lethal_hand() -> void:
 	# 6-6-6 = Three of a Kind 18 x 2.5 = 45 kills the 40 HP brute: no reason to reroll.
 	var f := _fight(["standard", "standard", "standard"], [6, 6, 6], 2, [{"id": "brute", "hp": 40, "value": 12}])
-	var d := Bot.decide(f, AutoRules.new())
+	var d := Bot.decide(f, _ex())
 	assert_eq(d.cmd, ["combat_attack"], String(d.reason))
 
 ## Kills the enemy with the biggest incoming attack among those it can kill.
@@ -82,10 +89,10 @@ func test_targets_killable_biggest_threat() -> void:
 		{"id": "skeleton_minion", "hp": 12, "value": 4},
 		{"id": "skeleton_minion", "hp": 15, "value": 11},
 	])
-	var d := Bot.decide(f, AutoRules.new())
+	var d := Bot.decide(f, _ex())
 	assert_eq(d.cmd, ["combat_set_target", 2], String(d.reason))
 	f.apply(d.cmd)
-	d = Bot.decide(f, AutoRules.new())
+	d = Bot.decide(f, _ex())
 	assert_eq(d.cmd, ["combat_attack"])
 
 func test_no_kill_hits_biggest_threat() -> void:
@@ -93,14 +100,14 @@ func test_no_kill_hits_biggest_threat() -> void:
 		{"id": "skeleton_minion", "hp": 50, "value": 3},
 		{"id": "skeleton_minion", "hp": 50, "value": 12},
 	])
-	var d := Bot.decide(f, AutoRules.new())
+	var d := Bot.decide(f, _ex())
 	assert_eq(d.cmd, ["combat_set_target", 1], String(d.reason))
 
 ## Unmarks dice the player marked when the plan keeps them.
 func test_fixes_player_marks() -> void:
 	var f := _fight(["standard", "standard", "standard"], [6, 6, 6], 1, [{"id": "brute", "hp": 400}])
 	f.combat.marked[0] = true
-	var d := Bot.decide(f, AutoRules.new())
+	var d := Bot.decide(f, _ex())
 	assert_eq(d.cmd, ["combat_toggle", 0], "unmarks the 6")
 
 func test_wild_die_kept() -> void:

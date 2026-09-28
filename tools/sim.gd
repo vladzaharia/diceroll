@@ -30,6 +30,13 @@ var decide_us := 0
 var decide_max_us := 0
 var decide_calls := 0
 var stops := 0
+## --items: per item (rune:id / kind:id / passive:id), [count in winning builds, count in losing
+## builds, winning runs holding it, losing runs holding it]; plus the win / loss run counts.
+var items := {}
+var item_runs := [0, 0]
+var track_items := false
+## --items also tallies the combo of every attack: name -> count.
+var combos := {}
 
 func _init() -> void:
 	var runs := 100
@@ -44,6 +51,7 @@ func _init() -> void:
 	var campaigns := 20
 	var pet_override := ""
 	var focus := "balanced"
+	var scopes: Array = []
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--runs="):
 			runs = arg.substr(7).to_int()
@@ -87,9 +95,29 @@ func _init() -> void:
 			campaign = arg.substr(11).to_int()
 		elif arg.begins_with("--campaigns="):
 			campaigns = arg.substr(12).to_int()
+		elif arg.begins_with("--scopes="):
+			scopes = Array(arg.substr(9).split(",", false))
+		elif arg.begins_with("--real-heur="):
+			# realistic lapse probabilities: one value for every scope, or scope:p,scope:p
+			for part in arg.substr(12).split(",", false):
+				if part.contains(":"):
+					Bot.real_heur[part.get_slice(":", 0)] = part.get_slice(":", 1).to_float()
+				else:
+					for k in Bot.real_heur:
+						Bot.real_heur[k] = part.to_float()
+		elif arg.begins_with("--tune-hp="):
+			Balance.tune_hp = arg.substr(10).to_float()
+		elif arg.begins_with("--tune-atk="):
+			Balance.tune_atk = arg.substr(11).to_float()
+		elif arg == "--items":
+			track_items = true
 		elif arg == "--verbose":
 			verbose = true
 	rules = AutoRules.all_on(focus, "realistic" if policy == "realistic" else "expert")
+	if not scopes.is_empty():
+		# analysis: AUTO only for these scopes, the greedy Bot for the rest
+		for sc in ["board", "combat", "drafts", "shop", "forge", "events", "portal"]:
+			rules.set(sc, scopes.has(sc))
 	if campaign > 0:
 		_campaign(campaign, campaigns, seed0, board, String(opts.get("mode", "standard")))
 		quit(0 if total_errors == 0 else 1)
@@ -139,6 +167,8 @@ func _init() -> void:
 				stuck += 1
 				total_stuck += 1
 			var won := f.phase == GameFlow.Phase.VICTORY
+			if track_items:
+				_count_items(f, won)
 			if won:
 				wins += 1
 			else:
@@ -187,7 +217,11 @@ func _init() -> void:
 	_table("final boss", by_boss)
 	_table("route / final boss", by_combo)
 	_table("mini-boss", by_mini, false)
+	if track_items:
+		_items_table()
 	print("")
+	if policy == "realistic":
+		print("realistic lapses: %s" % str(Bot.real_heur))
 	print("policy=%s%s board=%d laps=%d mode=%s profile=%s asc=%d mg=%s opts=%s" % [policy, (" focus=" + focus) if policy != "greedy" else "",
 		board, Balance.TOTAL_LAPS, String(opts.get("mode", "standard")), profile_name, asc, BotMeta.minigame_mode, str(opts.keys())])
 	if policy != "greedy":
@@ -216,6 +250,8 @@ func _play(c: String, s: int, board: int, opts: Dictionary, verbose := false) ->
 				for en in e.enemies:
 					ids.append(en.id)
 				last_fight = "A%d L%d %s" % [f.run.act, f.run.lap, ",".join(ids)]
+			elif e.type == "combo" and track_items:
+				combos[String(e.name)] = int(combos.get(String(e.name), 0)) + 1
 			elif e.type == "combat_won" and e.get("miniboss", false):
 				minis.append(true)
 			elif e.type == "game_over":
@@ -230,6 +266,8 @@ func _play(c: String, s: int, board: int, opts: Dictionary, verbose := false) ->
 func _next(f: GameFlow) -> Array:
 	if policy == "greedy":
 		return Bot.next_command(f)
+	if f.phase == GameFlow.Phase.SHOP and not rules.shop:
+		return Bot.next_command(f)
 	var t1 := Time.get_ticks_usec()
 	var d := Bot.decide(f, rules)
 	var dt := Time.get_ticks_usec() - t1
@@ -237,7 +275,8 @@ func _next(f: GameFlow) -> Array:
 	decide_max_us = maxi(decide_max_us, dt)
 	decide_calls += 1
 	if d.stop:
-		stops += 1
+		if not String(d.stop_reason).contains(" off"):
+			stops += 1
 		return Bot.next_command(f)
 	return d.cmd
 
@@ -378,3 +417,45 @@ func _fmt(d: Dictionary) -> String:
 	for k in keys:
 		parts.append("%s:%d" % [k, d[k]])
 	return " ".join(parts)
+
+# ------------------------------------------------------------------ build items (--items)
+
+func _count_items(f: GameFlow, won: bool) -> void:
+	var have := {}
+	for d in f.run.dice:
+		if d.rune != "":
+			have["rune:" + d.rune] = int(have.get("rune:" + d.rune, 0)) + 1
+		have["kind:" + d.kind] = int(have.get("kind:" + d.kind, 0)) + 1
+	for p in f.run.passives:
+		have["passive:" + String(p)] = 1
+	item_runs[0 if won else 1] += 1
+	for k in have:
+		var v: Array = items.get(k, [0, 0, 0, 0])
+		v[0 if won else 1] += int(have[k])
+		v[2 if won else 3] += 1
+		items[k] = v
+
+func _items_table() -> void:
+	var tot := 0
+	for k in combos:
+		tot += int(combos[k])
+	print("")
+	print("| combo | share of attacks |")
+	print("|---|---|")
+	var ck := combos.keys()
+	ck.sort_custom(func(a, b): return int(combos[a]) > int(combos[b]))
+	for k in ck:
+		print("| %s | %.1f%% |" % [k, 100.0 * combos[k] / maxi(1, tot)])
+	var w := maxi(1, int(item_runs[0]))
+	var l := maxi(1, int(item_runs[1]))
+	for side in [0, 1]:
+		var keys := items.keys()
+		keys.sort_custom(func(a, b): return float(items[a][side]) > float(items[b][side]))
+		print("")
+		print("Top 10 items in %s builds (%d runs); per run in wins vs losses, and win%% of runs holding it:" % ["winning" if side == 0 else "losing", item_runs[side]])
+		print("| item | per winning run | per losing run | win% when held | runs held |")
+		print("|---|---|---|---|---|")
+		for k in keys.slice(0, 10):
+			var v: Array = items[k]
+			var held := int(v[2]) + int(v[3])
+			print("| %s | %.2f | %.2f | %.1f | %d |" % [k, float(v[0]) / w, float(v[1]) / l, 100.0 * v[2] / maxi(1, held), held])

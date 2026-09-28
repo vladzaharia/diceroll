@@ -38,15 +38,15 @@ const PACKS := {
 		"kinds": ["standard", "low", "high", "loaded"],
 		"passives": ["pair_master", "gold_tooth", "steady_hand", "treasure_sense", "haggler", "scholar", "second_wind",
 			"full_house_party", "pathfinder", "piggy_bank", "blacksmith", "bloodthirst",
-			"phoenix", "fast_feet", "midas_fist"]},
+			"crowd_pleaser", "fast_feet", "midas_fist"]},
 	"gamblers_kit": {"name": "Gambler's Kit", "runes": ["lucky"], "kinds": ["gambler"],
-		"passives": ["double_trouble", "encore", "crowd_pleaser"]},
+		"passives": ["double_trouble", "encore"]},
 	"cold_steel": {"name": "Cold Steel", "runes": ["frost"], "kinds": ["twin"], "passives": ["iron_skin", "thorns"]},
 	"pyromancy": {"name": "Pyromancy", "runes": ["ember"], "kinds": [], "passives": ["boxcars", "opening_salvo", "glass_cannon"]},
 	"storm": {"name": "Storm", "runes": ["thunder"], "kinds": [], "passives": ["loaded_hands", "collector"]},
 	"numerology": {"name": "Numerology", "runes": [], "kinds": ["odd", "even"], "passives": ["straight_shooter", "snake_eyes"]},
 	"resonance": {"name": "Resonance", "runes": ["echo"], "kinds": [], "passives": ["rune_echo", "resonance"]},
-	"colossus": {"name": "Colossus", "runes": ["wild"], "kinds": ["giant"], "passives": ["triple_threat", "rune_bloom", "extra_hand"]},
+	"colossus": {"name": "Colossus", "runes": ["wild"], "kinds": ["giant"], "passives": ["triple_threat", "rune_bloom", "extra_hand", "phoenix"]},
 }
 const PACK_IDS := ["starter", "gamblers_kit", "cold_steel", "pyromancy", "storm", "numerology", "resonance", "colossus"]
 

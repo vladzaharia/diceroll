@@ -75,8 +75,8 @@ static func make_enemy(rng: Rng, id: String, p_act: int, p_lap: int, p_elite: bo
 	var is_boss := EnemyDefs.is_boss(id)
 	var def := EnemyDefs.def(id)
 	var scale := 1.0 if is_boss else Balance.enemy_scale(p_lap)
-	var hp_mult := scale * (Balance.ELITE_HP_MULT if p_elite else 1.0)
-	var atk_mult := scale * (Balance.ELITE_ATK_MULT if p_elite else 1.0)
+	var hp_mult := scale * (Balance.ELITE_HP_MULT if p_elite else 1.0) * Balance.tune_hp
+	var atk_mult := scale * (Balance.ELITE_ATK_MULT if p_elite else 1.0) * Balance.tune_atk
 	var hp := int(round(float(def.hp) * hp_mult))
 	var step := 0
 	if not is_boss and def.mode == "cycle":
@@ -301,6 +301,35 @@ static func passive_mult(run: RunState, combo_id: String, base: float) -> float:
 		m += Balance.PASSIVE_SET_BONUS
 	return m
 
+## Which dice's runes act this attack (Balance.RUNE_STACK_MAX anti-stacking): per rune, the first
+## rune_cap(rune) dice in pool order whose trigger fires (combo runes: in the scoring group;
+## Ember: shows 6; Frost: shows 1; Thunder: rerolled; Lucky: kept; Guard: always).
+func rune_active(run: RunState, group: Array, eff: Array) -> Array[bool]:
+	var out: Array[bool] = []
+	var used := {}
+	for i in run.dice.size():
+		var r := run.dice[i].rune
+		var ok := false
+		match r:
+			"blade", "venom", "vampire", "echo", "heavy", "gilded":
+				ok = group.has(i)
+			"ember":
+				ok = int(eff[i]) == 6
+			"frost":
+				ok = int(eff[i]) == 1
+			"thunder":
+				ok = rerolled[i]
+			"lucky":
+				ok = not rerolled[i]
+			"guard":
+				ok = true
+		if ok and int(used.get(r, 0)) < Balance.rune_cap(r):
+			used[r] = int(used.get(r, 0)) + 1
+		else:
+			ok = false
+		out.append(ok)
+	return out
+
 func attack(run: RunState) -> Array[Dictionary]:
 	var ev: Array[Dictionary] = []
 	ev.append_array(PetLogic.fire_at_attack(run, self))
@@ -333,7 +362,7 @@ func attack(run: RunState) -> Array[Dictionary]:
 	var sum := 0
 	var bonus := 0
 	var flat := 0
-	var heavy_left := Balance.HEAVY_MAX
+	var act := rune_active(run, group, eff)
 	var wild_left := Balance.WILD_MAX_DICE
 	var steady := 0
 	var boxcars := 0
@@ -342,19 +371,18 @@ func attack(run: RunState) -> Array[Dictionary]:
 		var pips := int(eff[i])
 		var rune := run.dice[i].rune
 		var in_group := group.has(i)
-		if rune == "heavy" and in_group and heavy_left > 0:
-			# anti-stacking: Heavy doubles only inside the scoring group, at most HEAVY_MAX dice
-			heavy_left -= 1
+		if rune == "heavy" and act[i]:
+			# anti-stacking: Heavy doubles only inside the scoring group, at most 2 dice
 			sum += pips * (1 + times[i])
 			for k in times[i]:
 				ev.append(_rune(i, rune, "double_pips", pips))
 		else:
 			sum += pips
-		if rune == "blade" and in_group:
+		if rune == "blade" and act[i]:
 			bonus += pips * times[i]
 			for k in times[i]:
 				ev.append(_rune(i, rune, "bonus_damage", pips))
-		if rune == "echo" and in_group:
+		if rune == "echo" and act[i]:
 			mult += 0.5 * times[i]
 			for k in times[i]:
 				ev.append(_rune(i, rune, "mult", 0))
@@ -412,6 +440,7 @@ func attack(run: RunState) -> Array[Dictionary]:
 	if mult > float(run.stats.get("best_mult", 0.0)):
 		run.stats.best_mult = mult
 		run.stats.best_combo = combo.name
+	var alive_before := alive_indices().size()
 	var thorny := alive(target) and has_trait(enemies[target], "thorns")
 	var soak := int(enemies[target].hp) + int(enemies[target].block) if alive(target) else 0
 	var tgt0 := target
@@ -435,7 +464,7 @@ func attack(run: RunState) -> Array[Dictionary]:
 			ev.append({"type": "damage", "target": "hero", "amount": th, "blocked": 0, "source": "thorns", "attacker": target, "lethal": false, "hp": run.hp, "max_hp": run.max_hp, "block": run.block})
 	# Ember (SIX): 6 to all
 	for i in run.dice.size():
-		if run.dice[i].rune == "ember" and int(eff[i]) == 6:
+		if run.dice[i].rune == "ember" and act[i]:
 			for k in times[i]:
 				ev.append(_rune(i, "ember", "damage_all", 6))
 				for j in enemies.size():
@@ -443,7 +472,7 @@ func attack(run: RunState) -> Array[Dictionary]:
 						ev.append_array(damage_enemy(j, 6, "ember", run))
 	# Thunder (REROLLED): pips to a random enemy
 	for i in run.dice.size():
-		if run.dice[i].rune == "thunder" and rerolled[i]:
+		if run.dice[i].rune == "thunder" and act[i]:
 			for k in times[i]:
 				var a := alive_indices()
 				if a.is_empty():
@@ -465,20 +494,22 @@ func attack(run: RunState) -> Array[Dictionary]:
 		var fh := run.heal(Balance.PASSIVE_FULL_HOUSE_HEAL)
 		ev.append(_passive("full_house_party", Balance.PASSIVE_FULL_HOUSE_HEAL))
 		ev.append({"type": "hp_changed", "amount": fh, "total": run.hp, "source": "full_house_party", "max_hp": run.max_hp})
+	var killed := alive_before - alive_indices().size()
 	_fix_target()
 	for i in run.dice.size():
 		var rune := run.dice[i].rune
 		var pips := int(eff[i])
-		var in_group := group.has(i)
+		if not act[i]:
+			continue
 		for k in times[i]:
 			match rune:
 				"venom":
-					if in_group and alive(target):
+					if alive(target):
 						enemies[target].poison = int(enemies[target].poison) + pips
 						ev.append(_rune(i, rune, "poison", pips))
 						ev.append({"type": "status", "target": target, "status": "poison", "value": int(enemies[target].poison)})
 				"frost":
-					if pips == 1 and alive(target):
+					if alive(target):
 						enemies[target].frozen = true
 						ev.append(_rune(i, rune, "freeze", 1))
 						ev.append({"type": "status", "target": target, "status": "frozen", "value": 1})
@@ -488,18 +519,18 @@ func attack(run: RunState) -> Array[Dictionary]:
 					ev.append(_rune(i, rune, "block", pips))
 					ev.append({"type": "block_gained", "target": "hero", "amount": pips, "total": run.block})
 				"vampire":
-					if in_group:
+					# lifesteal on a kill: only when this attack killed an enemy
+					if killed > 0:
 						var healed := run.heal(pips)
 						ev.append(_rune(i, rune, "heal", healed))
 						ev.append({"type": "hp_changed", "amount": healed, "total": run.hp, "source": "vampire"})
 				"gilded":
-					if in_group:
-						run.gold += 2
-						run.stats.gold_earned = int(run.stats.get("gold_earned", 0)) + 2
-						ev.append(_rune(i, rune, "gold", 2))
-						ev.append({"type": "gold_changed", "amount": 2, "total": run.gold, "source": "gilded"})
+					run.gold += 2
+					run.stats.gold_earned = int(run.stats.get("gold_earned", 0)) + 2
+					ev.append(_rune(i, rune, "gold", 2))
+					ev.append({"type": "gold_changed", "amount": 2, "total": run.gold, "source": "gilded"})
 				"lucky":
-					if not rerolled[i] and run.banked_rerolls < Balance.MAX_BANKED_REROLLS:
+					if run.banked_rerolls < Balance.MAX_BANKED_REROLLS:
 						run.banked_rerolls += 1
 						ev.append(_rune(i, rune, "bank_reroll", 1))
 	ev.append_array(PetLogic.on_attack_resolved(run, self, cid, eff))

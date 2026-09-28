@@ -236,15 +236,50 @@ func test_lucky_not_when_rerolled_and_cap() -> void:
 	c.attack(run)
 	assert_eq(c.rerolls_left, 4, "max +2 banked")
 
-func test_vampire_heals_in_group() -> void:
-	_setup(["vampire", "", ""])
+func test_vampire_heals_on_kill() -> void:
+	_setup(["vampire", "", ""], ["skeleton_minion", "skeleton_minion"])
 	run.hp = 30
+	c.enemies[0].hp = 5
 	_dice([4, 4, 1])
 	var ev := c.attack(run)
 	assert_eq(run.hp, 34)
 	var hc := _first(ev, "hp_changed")
 	assert_eq(hc.amount, 4)
 	assert_eq(hc.source, "vampire")
+
+func test_vampire_no_heal_without_kill() -> void:
+	_setup(["vampire", "", ""])
+	run.hp = 30
+	_dice([4, 4, 1])
+	var ev := c.attack(run)
+	assert_eq(run.hp, 30, "no kill, no lifesteal")
+	assert_true(_first(ev, "rune_fired").is_empty())
+
+func test_rune_stack_cap_blade() -> void:
+	# three Blade dice in a Three of a Kind: only RUNE_STACK_MAX (2) add their pips
+	_setup(["blade", "blade", "blade"])
+	_dice([4, 4, 4])
+	var ev := c.attack(run)
+	assert_eq(Balance.RUNE_STACK_MAX, 2)
+	assert_eq(_first(ev, "combo").total, int((12 + 8) * 2.5), "(12 + 2 blades x4) x2.5")
+	assert_eq(_all(ev, "rune_fired").size(), 2)
+
+func test_rune_stack_cap_guard() -> void:
+	_setup(["guard", "guard", "guard"])
+	run.block = 0
+	_dice([5, 3, 6])
+	var ev := c.attack(run)
+	var got := 0
+	for e in _all(ev, "rune_fired"):
+		got += int(e.value)
+	assert_eq(got, 8, "first two Guard dice in pool order: 5 + 3")
+
+func test_rune_active_mask() -> void:
+	_setup(["blade", "ember", "blade", "ember", "ember"])
+	_dice([6, 6, 6, 2, 6])
+	var combo := c.current_combo(run)
+	var act := c.rune_active(run, combo.group, combo.values)
+	assert_eq(act, [true, true, true, false, true] as Array[bool], "4-kind of 6s: both Blades, the Embers showing 6 (max 2 act)")
 
 func test_gilded_combo_gold() -> void:
 	_setup(["gilded", "", ""])

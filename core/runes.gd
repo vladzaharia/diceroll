@@ -11,7 +11,7 @@ const DEFS := {
 	"gilded": {"name": "Gilded", "color": "#e0a030", "trigger": "MOVE", "rarity": "common", "desc": "Move: +pips gold. In combo: +2 gold."},
 	"heavy": {"name": "Heavy", "color": "#8a8a90", "trigger": "ALWAYS", "rarity": "common", "desc": "Pips count double in the damage sum."},
 	"ember": {"name": "Ember", "color": "#f08030", "trigger": "SIX", "rarity": "rare", "desc": "Shows 6: 6 damage to ALL enemies."},
-	"vampire": {"name": "Vampire", "color": "#a01830", "trigger": "COMBO", "rarity": "rare", "desc": "In combo: heal equal to pips."},
+	"vampire": {"name": "Vampire", "color": "#a01830", "trigger": "COMBO", "rarity": "rare", "desc": "In combo, when the attack kills an enemy: heal equal to pips."},
 	"lucky": {"name": "Lucky", "color": "#f0d040", "trigger": "KEPT", "rarity": "rare", "desc": "Never rerolled this turn: +1 reroll next turn (max 2 banked)."},
 	"frost": {"name": "Frost", "color": "#9ad8f0", "trigger": "ONE", "rarity": "rare", "desc": "Shows 1: target skips its next action."},
 	"thunder": {"name": "Thunder", "color": "#f0e040", "trigger": "REROLLED", "rarity": "rare", "desc": "Rerolled this turn: pips damage to a random enemy."},

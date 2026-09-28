@@ -1218,17 +1218,15 @@ func portal_pick(tile_idx: int) -> Array[Dictionary]:
 func _rand_rune(rarity := "") -> String:
 	return Runes.random_rune_in(run.rng, _rune_pool(), rarity)
 
-## The rune drop pool: the run's unlocked runes (all in legacy runs), minus Wild once the pool
-## already holds Balance.WILD_MAX_DICE Wild dice (a second one would do nothing).
+## The rune drop pool: the run's unlocked runes (all in legacy runs), minus every rune the pool
+## already holds Balance.rune_cap(rune) times (another copy would do nothing).
 func _rune_pool() -> Array:
 	var p := run.pool("runes")
-	if run.dice_with_rune("wild").size() >= Balance.WILD_MAX_DICE:
-		var out: Array = []
-		for id in (p if not p.is_empty() else Runes.IDS):
-			if id != "wild":
-				out.append(id)
-		p = out
-	return p
+	var out: Array = []
+	for id in (p if not p.is_empty() else Runes.IDS):
+		if run.dice_with_rune(String(id)).size() < Balance.rune_cap(String(id)):
+			out.append(id)
+	return out if not out.is_empty() else (p if not p.is_empty() else Runes.IDS.duplicate())
 
 func _rand_kind() -> String:
 	return DiceKinds.random_kind_in(run.rng, run.pool("kinds"))
@@ -1236,7 +1234,7 @@ func _rand_kind() -> String:
 ## Owned passives plus every passive not unlocked in the profile. `reward` (elite and mini-boss
 ## rewards) also keeps the economy-only passives out in meta runs.
 func _passive_excluded(reward := false) -> Array:
-	var out: Array = Array(run.passives)
+	var out: Array = Array(run.passives).duplicate()
 	var allowed := run.pool("passives")
 	if not allowed.is_empty():
 		for id in Passives.IDS:

@@ -1,6 +1,13 @@
 extends "res://tests/test_case.gd"
 ## Bot.decide(flow, rules): contract, purity, scopes and stop conditions.
 
+## Expert skill (the full smart policy): behaviour-quality tests pin it, since the default
+## realistic skill makes occasional human-like lapses.
+func _ex(r: AutoRules = null) -> AutoRules:
+	var x := r if r != null else AutoRules.new()
+	x.skill = "expert"
+	return x
+
 func _keys_ok(d: Dictionary) -> bool:
 	return d.has("cmd") and d.has("reason") and d.has("stop") and d.has("stop_reason")
 
@@ -128,7 +135,7 @@ func _miniboss_flow() -> GameFlow:
 
 func test_miniboss_rules() -> void:
 	var f := _miniboss_flow()
-	var rules := AutoRules.new()
+	var rules := _ex()
 	rules.stop_before_miniboss = true
 	var d := Bot.decide(f, rules)
 	assert_true(d.stop, "stops before the mini-boss")
@@ -179,10 +186,10 @@ func test_shop_reserve_for_die() -> void:
 		{"id": "face_raise", "label": "Face Raise", "desc": "", "price": 25, "needs_die": true, "sold": false},
 	]
 	f.run.gold = 45
-	var d := Bot.decide(f, AutoRules.all_on())
+	var d := Bot.decide(f, _ex(AutoRules.all_on()))
 	assert_eq(d.cmd, ["shop_leave"], "keeps the reserve for a die: " + String(d.reason))
 	f.run.gold = 200
-	d = Bot.decide(f, AutoRules.all_on())
+	d = Bot.decide(f, _ex(AutoRules.all_on()))
 	assert_eq(String(d.cmd[0]), "shop_buy", "plenty of gold: buys")
 
 func test_rune_assign_synergy() -> void:
@@ -192,7 +199,7 @@ func test_rune_assign_synergy() -> void:
 	f.run.dice.append(Die.make("", "giant"))
 	f.run.dice.append(Die.make("", "standard"))
 	f.debug_open("rune_assign", "heavy")
-	var d := Bot.decide(f, AutoRules.new())
+	var d := Bot.decide(f, _ex())
 	assert_eq(d.cmd, ["rune_assign", 1], "Heavy goes on the Giant die")
 
 func test_draft_prefers_new_die_early() -> void:
@@ -203,7 +210,7 @@ func test_draft_prefers_new_die_early() -> void:
 		{"id": "new_die", "label": "Standard Die", "desc": "", "kind": "standard"},
 		{"id": "face_raise", "label": "Face Raise", "desc": ""},
 	]
-	var d := Bot.decide(f, AutoRules.new())
+	var d := Bot.decide(f, _ex())
 	assert_eq(d.cmd, ["pick_draft", 1], "a 3rd die beats the rest")
 
 func test_focus_changes_draft() -> void:
@@ -212,7 +219,7 @@ func test_focus_changes_draft() -> void:
 	f.offer.options = [Passives.option("iron_skin"), Passives.option("piggy_bank"), Passives.option("pair_master")]
 	var picks := {}
 	for fo in ["defense", "economy", "damage"]:
-		var r := AutoRules.new()
+		var r := _ex()
 		r.focus = fo
 		picks[fo] = int(Bot.decide(f, r).cmd[1])
 	assert_eq(picks.defense, 0, "defense takes Iron Skin")
@@ -233,8 +240,8 @@ func test_board_seeks_campfire_when_low() -> void:
 	for k in range(2, b.size()):
 		if k != 5 and not b.is_corner(k):
 			b.tiles[k] = Board.make_tile("campfire")
-	var d := Bot.decide(f, AutoRules.new())
+	var d := Bot.decide(f, _ex())
 	assert_eq(d.cmd, ["board_reroll"], "low HP on a trap with campfires around: reroll")
 	f.board_move = 3
-	d = Bot.decide(f, AutoRules.new())
+	d = Bot.decide(f, _ex())
 	assert_eq(d.cmd, ["confirm_move"], "campfire when low: go")

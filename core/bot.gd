@@ -113,7 +113,7 @@ static func tile_score(f: GameFlow, idx: int, crossing: bool) -> float:
 			s = 3.0
 		"minigame":
 			s = 3.5
-	if crossing and f.run.lap < Balance.TOTAL_LAPS:
+	if crossing and f.run.lap < f.run.total_laps():
 		s += 3.0
 	return s
 
@@ -352,26 +352,34 @@ const BOARD_SAMPLES := 96
 ## Worth of a whole run in PV points (death penalties).
 const RUN_VALUE := 30.0
 
-## Realistic skill (AutoRules.skill == "realistic"): bounded rationality from a private Rng.
-##   REAL_MC_SAMPLES   Monte-Carlo samples per keep-set (expert: MC_SAMPLES)
-##   look-ahead        one reroll deep (expert: all remaining rerolls)
-##   REAL_NEAR         keep-sets within this share of the best EV are candidates, picked by
-##                     softmax with temperature REAL_TEMP x best EV
-##   REAL_GUT          chance of a "gut feel" keep: hold the best pair/set, reroll the rest
-##   REAL_TARGET_SLIP  chance of staying on the current target when the model would switch
-##                     (never when the model's pick dies to this attack)
-##   REAL_TASTE        draft/shop values get x(1 +- REAL_TASTE) noise; REAL_SHINY chance to
-##                     prefer a rare/epic/boss option by +REAL_SHINY_BONUS
-## Never: breaking a made Four of a Kind or better, or skipping a lethal-avoiding choice the
-## model is sure about (those paths are unchanged).
+## Realistic skill (AutoRules.skill == "realistic", the default and the balance reference):
+## the smart policy with human-like bounded rationality. Every random choice comes from a
+## private Rng seeded by a hash of the state, so decide() stays pure and deterministic.
+##   heuristic lapses  per decision, with probability real_heur[scope], a player falls back to
+##                     a rule of thumb instead of thinking it through: combat "keep the combo you
+##                     have, reroll the rest unless it's already Full House or better"; board
+##                     "reroll away from obviously bad tiles"; drafts/shop/forge/events the
+##                     greedy Bot's static tastes (which like shiny rarities)
+##   thinking it through   the smart evaluation with fewer samples (REAL_MC_SAMPLES), a
+##                     one-reroll look-ahead and a softmax pick among keep-sets within REAL_NEAR
+##                     of the best (temperature REAL_TEMP x best value); REAL_GUT chance of a
+##                     "gut feel" keep of the made pair/set; draft/shop values x(1 +- REAL_TASTE)
+##                     noise with a REAL_SHINY chance of favouring rare/epic/boss options
+##   targeting         REAL_TARGET_SLIP chance to hit the lowest-HP enemy instead of the model's
+##                     pick, unless that walks into lethal damage the model sees
+## Never dumb: a made Four of a Kind or better is never rerolled, a known-lethal board landing
+## is always rerolled when a reroll is left, and targeting never trades into a lethal hit.
 const REAL_MC_SAMPLES := 24
-const REAL_NEAR := 0.9
-const REAL_TEMP := 0.04
+const REAL_NEAR := 0.8
+const REAL_TEMP := 0.08
 const REAL_GUT := 0.12
-const REAL_TARGET_SLIP := 0.15
-const REAL_TASTE := 0.15
+const REAL_TARGET_SLIP := 0.25
+const REAL_TASTE := 0.25
 const REAL_SHINY := 0.25
 const REAL_SHINY_BONUS := 0.2
+## Heuristic-lapse probabilities by scope (tuned so the realistic bot hits the balance targets
+## in docs/plans/balance.md). Static vars so tools/sim.gd can sweep them (--real-heur=).
+static var real_heur := {"combat": 0.5, "board": 0.5, "build": 0.5}
 
 static func _real(rules: AutoRules) -> bool:
 	return rules != null and rules.skill == "realistic"
@@ -686,6 +694,8 @@ class CombatModel:
 	var w_lucky := 3.0
 	var win_bonus := 8.0
 	var use_memo := true
+	## >= 0: score only this (model-local) target (realistic rule-of-thumb targeting)
+	var force_t := -1
 	var memo := {}
 	var h := PackedFloat64Array()
 	var b := PackedFloat64Array()
@@ -802,47 +812,59 @@ class CombatModel:
 		var gold := 0.0
 		var lucky := 0
 		var frost := false
-		var heavy_left := Balance.HEAVY_MAX
+		# anti-stacking (CombatState.rune_active): each rune acts on at most rune_cap dice
+		var used := PackedInt32Array()
+		used.resize(13)
 		for i in n:
 			var p := eff[i]
 			var rc := rune[i]
 			var ing := ((gm >> i) & 1) == 1
 			var rerolled := ((rer >> i) & 1) == 1
 			var t := times_group if (ing and rc != 0) else 1.0
-			if rc == Bot.R_HEAVY and ing and heavy_left > 0:
-				heavy_left -= 1
+			var on := false
+			match rc:
+				Bot.R_BLADE, Bot.R_VENOM, Bot.R_VAMPIRE, Bot.R_ECHO, Bot.R_HEAVY, Bot.R_GILDED:
+					on = ing
+				Bot.R_EMBER:
+					on = p == 6
+				Bot.R_FROST:
+					on = p == 1
+				Bot.R_THUNDER:
+					on = rerolled
+				Bot.R_LUCKY:
+					on = not rerolled
+				Bot.R_GUARD:
+					on = true
+			if on:
+				if used[rc] < Balance.RUNE_STACK_MAX:
+					used[rc] += 1
+				else:
+					on = false
+			if rc == Bot.R_HEAVY and on:
 				sum += p * (1.0 + t)
 			else:
 				sum += p
-			match rc:
-				Bot.R_BLADE:
-					if ing:
+			if on:
+				match rc:
+					Bot.R_BLADE:
 						bonus += p * t
-				Bot.R_ECHO:
-					if ing:
+					Bot.R_ECHO:
 						mult += 0.5 * t
-				Bot.R_EMBER:
-					if p == 6:
+					Bot.R_EMBER:
 						ember += 6.0 * t
-				Bot.R_THUNDER:
-					if rerolled:
+					Bot.R_THUNDER:
 						thunder += p * t
-				Bot.R_VENOM:
-					if ing:
+					Bot.R_VENOM:
 						venom += p * t
-				Bot.R_FROST:
-					if p == 1:
+					Bot.R_FROST:
 						frost = true
-				Bot.R_GUARD:
-					guard += p * t
-				Bot.R_VAMPIRE:
-					if ing:
+					Bot.R_GUARD:
+						guard += p * t
+					Bot.R_VAMPIRE:
 						vamp += p * t
-				Bot.R_GILDED:
-					if ing:
+					Bot.R_GILDED:
 						gold += 2.0 * t
-				Bot.R_LUCKY:
-					if not rerolled:
+					Bot.R_LUCKY:
 						lucky += 1
 			if steady and not rerolled:
 				bonus += 1.0
@@ -861,6 +883,8 @@ class CombatModel:
 		var best_dmg := 0.0
 		var best_kills := 0
 		for t in ne:
+			if force_t >= 0 and t != force_t:
+				continue
 			for k in ne:
 				h[k] = e_hp[k]
 				b[k] = e_block[k]
@@ -910,7 +934,7 @@ class CombatModel:
 				incoming += e_hit[k]
 				pierce += e_pierce[k]
 				threat += e_other[k]
-			var heal := minf(vamp + heal_extra, hero_missing)
+			var heal := minf((vamp if kills > 0 else 0.0) + heal_extra, hero_missing)
 			if all_dead:
 				val += win_bonus
 			else:
@@ -1176,6 +1200,23 @@ static func _plan_rerolls(cm: CombatModel, cur: PackedInt32Array, rer_prev: int,
 				plan.chance = p
 	return plan
 
+## Realistic lapse in combat: keep the combo you have and reroll the other free dice (keeping
+## 5s and 6s on a High Roller), unless the hand is already Full House or better.
+static func _rule_of_thumb(cm: CombatModel, cur: PackedInt32Array, cb: Array, free_mask: int) -> Dictionary:
+	var plan := {"mask": 0, "chase": "", "chance": 0.0, "gut": true}
+	if float(cb[0]) >= 3.5:
+		return plan
+	var grp: int = cb[1]
+	var mask := 0
+	for i in cm.n:
+		if ((free_mask >> i) & 1) == 0 or ((grp >> i) & 1) == 1:
+			continue
+		if int(cb[3]) == C_HIGH and cur[i] >= 5:
+			continue
+		mask |= 1 << i
+	plan.mask = mask
+	return plan
+
 static func _combat_key(f: GameFlow, rules: AutoRules) -> int:
 	var c := f.combat
 	var en: Array = []
@@ -1211,19 +1252,22 @@ static func _combat_plan(f: GameFlow, rules: AutoRules) -> Dictionary:
 	var plan := {"mask": 0, "chase": "", "chance": 0.0}
 	var real := _real(rules)
 	var cur_cb := _combo(cur, cm.wild_mask)
+	var nrng := Rng.new(key ^ 0x6a7)
+	var lapse := real and nrng.chance(float(real_heur.combat))
 	if c.rerolls_left > 0 and free_mask != 0:
-		plan = _plan_rerolls(cm, cur, rer_prev, free_mask, c.rerolls_left, key, real)
-		if real:
-			var nrng := Rng.new(key ^ 0x6a7)
+		if lapse:
+			plan = _rule_of_thumb(cm, cur, cur_cb, free_mask)
+		else:
+			plan = _plan_rerolls(cm, cur, rer_prev, free_mask, c.rerolls_left, key, real)
 			var grp: int = cur_cb[1]
-			if nrng.chance(REAL_GUT) and grp != 0 and float(cur_cb[0]) >= 1.5 and float(cur_cb[0]) < 5.0:
+			if real and nrng.chance(REAL_GUT) and grp != 0 and float(cur_cb[0]) >= 1.5 and float(cur_cb[0]) < 5.0:
 				# gut feel: keep the pair/set, reroll everything else that can move
 				var gut := free_mask & ~grp
 				if gut != 0:
 					plan = {"mask": gut, "chase": "", "chance": 0.0, "gut": true}
-			if float(cur_cb[0]) >= 5.0:
-				# never break a made Four of a Kind or better
-				plan = {"mask": 0, "chase": "", "chance": 0.0}
+		if real and float(cur_cb[0]) >= 5.0:
+			# never break a made Four of a Kind or better
+			plan = {"mask": 0, "chase": "", "chance": 0.0}
 	var out := {"mask": int(plan.mask), "target": -1}
 	if int(plan.mask) != 0:
 		var k := 0
@@ -1232,18 +1276,31 @@ static func _combat_plan(f: GameFlow, rules: AutoRules) -> Dictionary:
 				k += 1
 		var what := "Rerolling %d %s" % [k, "die" if k == 1 else "dice"]
 		if bool(plan.get("gut", false)):
-			out.reason = "%s: keeping the %s, gut feel" % [what, String(Combo.TABLE[cur_cb[4]].name)]
+			out.reason = "%s: keeping the %s" % [what, "high dice" if int(cur_cb[3]) == C_HIGH else String(Combo.TABLE[cur_cb[4]].name)]
 		elif String(plan.chase) != "":
 			out.reason = "%s to chase %s (%d%%)" % [what, plan.chase, int(round(float(plan.chance) * 100.0))]
 		else:
 			out.reason = "%s for more damage" % what
 	else:
 		cm.use_memo = false
-		cm.score(cur, rer_prev)
+		var best_val := cm.score(cur, rer_prev)
+		var slipped := false
 		out.target = cm.last_target
-		if real and cm.last_target >= 0 and cm.last_target != c.target and c.alive(c.target) \
-				and cm.last_dmg < float(c.enemies[cm.last_target].hp) and Rng.new(key ^ 0x7a9).chance(REAL_TARGET_SLIP):
-			out.target = c.target
+		if real and cm.ne > 1 and Rng.new(key ^ 0x7a9).chance(REAL_TARGET_SLIP):
+			# rule of thumb: hit the lowest-HP enemy, unless the model sees that walk into lethal
+			var lo := 0
+			for k in cm.ne:
+				if cm.e_hp[k] < cm.e_hp[lo]:
+					lo = k
+			cm.force_t = lo
+			var alt := cm.score(cur, rer_prev)
+			if best_val - alt >= 0.5 * RUN_VALUE:
+				cm.force_t = -1
+				cm.score(cur, rer_prev)
+			else:
+				slipped = true
+			cm.force_t = -1
+			out.target = cm.last_target
 		var cb := _combo(cur, cm.wild_mask)
 		var name := String(Combo.TABLE[cb[4]].name)
 		var t := _enemy_name(f, cm.last_target)
@@ -1256,6 +1313,8 @@ static func _combat_plan(f: GameFlow, rules: AutoRules) -> Dictionary:
 			var why := "can kill it" if kill != "" else "biggest threat"
 			if String(e.intent.kind) in ["attack", "drain", "chill"] and kill != "":
 				why = "can kill it before it hits for %d" % int(e.intent.value)
+			if slipped:
+				why = "lowest HP"
 			out.target_reason = "Targeting %s: %s" % [t, why]
 	if _plan_cache.size() > 64:
 		_plan_cache.clear()
@@ -1368,7 +1427,7 @@ static func _pv_run(f: GameFlow, rules: AutoRules) -> float:
 
 ## Combat turns left in the run (rough), used to price one-off HP.
 static func _turns_left(f: GameFlow) -> float:
-	return maxf(6.0, 3.3 * float(Balance.TOTAL_LAPS - f.run.lap + 1))
+	return maxf(6.0, 3.3 * float(f.run.total_laps() - f.run.lap + 1))
 
 ## PV worth of one HP (one-off), higher when HP is low or the run is near its end.
 static func _hp_pt(f: GameFlow, rules: AutoRules) -> float:
@@ -1376,7 +1435,7 @@ static func _hp_pt(f: GameFlow, rules: AutoRules) -> float:
 	return float(_fw(rules).def) / (0.4 * _turns_left(f)) * (1.0 + 2.0 * (1.0 - r) * (1.0 - r))
 
 static func _gold_pt(f: GameFlow, rules: AutoRules) -> float:
-	var late := 1.0 if f.run.lap < Balance.TOTAL_LAPS - 2 else 0.4 # little left to buy
+	var late := 1.0 if f.run.lap < f.run.total_laps() - 2 else 0.4 # little left to buy
 	return 0.04 * float(_fw(rules).econ) * late
 
 static func _pref(rules: AutoRules, cat: String) -> float:
@@ -1439,8 +1498,8 @@ static func _passive_value(f: GameFlow, rules: AutoRules, id: String) -> float:
 	if ps.has(id):
 		return -INF
 	var pv := _pv_run(f, rules)
-	var laps_left := float(Balance.TOTAL_LAPS - run.lap + 1)
-	var frac := laps_left / Balance.TOTAL_LAPS
+	var laps_left := float(run.total_laps() - run.lap + 1)
+	var frac := laps_left / run.total_laps()
 	var hp_pt := _hp_pt(f, rules)
 	var gold_pt := _gold_pt(f, rules)
 	var reroll_v := 0.18 * pv
@@ -1574,7 +1633,15 @@ static func _taste(f: GameFlow, rules: AutoRules, o: Dictionary, v: float, salt:
 		v += absf(v) * REAL_SHINY_BONUS
 	return v
 
+## Realistic lapse for build choices (drafts, runes, shop, forge, events): true when this
+## decision falls back to the greedy Bot's static tastes.
+static func _build_lapse(f: GameFlow, rules: AutoRules, salt: int) -> bool:
+	return _real(rules) and _noise_rng(f, salt).chance(float(real_heur.build))
+
 static func _decide_draft(f: GameFlow, rules: AutoRules) -> Dictionary:
+	if _build_lapse(f, rules, 11):
+		var g := _best_draft(f)
+		return _result(["pick_draft", g], "Picking %s" % String(f.offer.options[g].get("label", "the one I like")))
 	var best := 0
 	var best_v := -INF
 	var why := ""
@@ -1591,6 +1658,8 @@ static func _decide_rune_assign(f: GameFlow, rules: AutoRules) -> Dictionary:
 	var r := String(f.offer.rune)
 	var bd := _best_rune_die(f, rules, r)
 	var i := int(bd[0])
+	if _build_lapse(f, rules, 12):
+		i = _die_for_rune(f, r)
 	var old := f.run.dice[i].rune
 	var msg := "%s Rune on die %d" % [Runes.DEFS[r].name, i + 1]
 	if old != "":
@@ -1602,6 +1671,11 @@ static func _decide_rune_assign(f: GameFlow, rules: AutoRules) -> Dictionary:
 ## Shop: buys the best value-per-gold item worth its price; keeps a reserve for the next shop's
 ## die while the pool has room; restocks once when rich and nothing is worth it; then leaves.
 static func _decide_shop(f: GameFlow, rules: AutoRules) -> Dictionary:
+	if _build_lapse(f, rules, 13):
+		var g := _shop(f)
+		if String(g[0]) == "shop_buy":
+			return _result(g, "Buying %s" % String(f.offer.items[int(g[1])].label))
+		return _result(g, "Leaving the shop")
 	var run := f.run
 	var room := run.dice.size() < run.max_dice()
 	var reserve := 40 if room else 0
@@ -1657,6 +1731,9 @@ static func _decide_shop(f: GameFlow, rules: AutoRules) -> Dictionary:
 # ------------------------------------------------------------------------------ forge
 
 static func _decide_forge(f: GameFlow, rules: AutoRules) -> Dictionary:
+	if _build_lapse(f, rules, 14):
+		var g := _forge(f)
+		return _result(g, "Forging die %d" % (int(g[1]) + 1) if String(g[3]) != "skip" else "Skipping the Forge")
 	var ops: Array = f.offer.get("ops", ["raise"])
 	var e := _best_face_edit(f, rules, ops)
 	if int(e[0]) < 0:
@@ -1672,6 +1749,9 @@ static func _decide_forge(f: GameFlow, rules: AutoRules) -> Dictionary:
 # ------------------------------------------------------------------------------ events
 
 static func _decide_event(f: GameFlow, rules: AutoRules) -> Dictionary:
+	if _build_lapse(f, rules, 15):
+		var g := _event(f)
+		return _result(["event_choose", g], "Choosing %s" % String(f.offer.choices[g].label))
 	var run := f.run
 	var ch: Array = f.offer.choices
 	var id := String(f.offer.id)
@@ -1769,7 +1849,7 @@ static func _fight_loss(f: GameFlow, rules: AutoRules, ids: Array, elite: bool) 
 	for id in ids:
 		var sid := String(id)
 		var boss := EnemyDefs.is_boss(sid)
-		var scale := 1.0 if boss else Balance.enemy_scale(run.lap)
+		var scale := 1.0 if boss else Balance.enemy_scale(run.eff_lap())
 		var hm := scale * (Balance.ELITE_HP_MULT if elite else 1.0)
 		var am := scale * (Balance.ELITE_ATK_MULT if elite else 1.0)
 		hps.append(float(EnemyDefs.def(sid).hp) * hm)
@@ -1814,7 +1894,7 @@ static func _fight_value(f: GameFlow, rules: AutoRules, t: Dictionary) -> float:
 	for id in ids:
 		var def := EnemyDefs.def(String(id))
 		var m := Balance.ELITE_REWARD_MULT if elite else 1.0
-		gold += float(def.gold) * m * Balance.gold_scale(run.lap)
+		gold += float(def.gold) * m * Balance.gold_scale(run.eff_lap())
 		xp += float(def.xp) * m
 	var xp_pt := 2.2 / maxf(6.0, float(Balance.xp_for_level(run.level) - (Balance.xp_for_level(run.level - 1) if run.level > 1 else 0)))
 	var v := gold * _gold_pt(f, rules) + xp * xp_pt
@@ -1835,14 +1915,14 @@ static func _tile_value(f: GameFlow, rules: AutoRules, idx: int, crossing: bool,
 	var hp_pt := _hp_pt(f, rules)
 	var gold_pt := _gold_pt(f, rules)
 	var v := 0.0
-	if crossing and run.lap >= Balance.TOTAL_LAPS:
+	if crossing and run.lap >= run.total_laps():
 		# the final boss: go in as healthy as possible
 		return -float(run.max_hp - run.hp) * hp_pt * 0.5
 	match String(t.type):
 		"enemy", "elite", "miniboss":
 			v = _fight_value(f, rules, t)
 		"chest":
-			v = 0.5 * 1.5 + 0.5 * 18.0 * Balance.gold_scale(run.lap) * gold_pt * (1.5 if run.has_passive("treasure_sense") else 1.0)
+			v = 0.5 * 1.5 + 0.5 * 18.0 * Balance.gold_scale(run.eff_lap()) * gold_pt * (1.5 if run.has_passive("treasure_sense") else 1.0)
 		"event":
 			v = 0.9
 		"campfire":
@@ -1881,7 +1961,7 @@ static func _move_value(f: GameFlow, rules: AutoRules, move: int, memo: Dictiona
 	var v := 0.0
 	if move > 0:
 		var crossing := run.board.crosses_start(run.pos, move)
-		var target := 0 if (crossing and run.lap >= Balance.TOTAL_LAPS) else run.board.landing(run.pos, move)
+		var target := 0 if (crossing and run.lap >= run.total_laps()) else run.board.landing(run.pos, move)
 		v = _tile_value(f, rules, target, crossing)
 		var p := run.board.path(run.pos, move)
 		for k in range(0, p.size() - 1):
@@ -1906,7 +1986,7 @@ static func _decide_board(f: GameFlow, rules: AutoRules) -> Dictionary:
 	var run := f.run
 	var target := f.board_target()
 	var crossing := run.board.crosses_start(run.pos, f.board_move)
-	var boss_next := f.board_move > 0 and crossing and run.lap >= Balance.TOTAL_LAPS
+	var boss_next := f.board_move > 0 and crossing and run.lap >= run.total_laps()
 	var tile: Dictionary = run.board.tiles[target]
 	var mini_next: bool = f.board_move > 0 and String(tile.type) == "miniboss" and not tile.enemies.is_empty()
 	if boss_next and rules.stop_before_boss:
@@ -1916,6 +1996,11 @@ static func _decide_board(f: GameFlow, rules: AutoRules) -> Dictionary:
 	var memo := {}
 	var cur := _move_value(f, rules, f.board_move, memo)
 	var label := "the boss" if boss_next else _tile_label(f, target)
+	if f.board_rerolls_left > 0 and _real(rules) and _noise_rng(f, 16).chance(float(real_heur.board)):
+		# rule of thumb: reroll away from obviously bad tiles (never walk into a known death)
+		if String(_board(f)[0]) == "board_reroll" or cur < -0.5 * RUN_VALUE:
+			return _result(["board_reroll"], "Rerolling: %s looks bad" % label)
+		return _result(["confirm_move"], "Moving %d to %s" % [f.board_move, label])
 	if f.board_rerolls_left > 0:
 		# distribution of the next roll's move (private Rng)
 		var rng := Rng.new(hash([run.seed, run.stats.get("board_turns", 0), f.board_rerolls_left, run.pos, f.board_roll]))
@@ -1957,8 +2042,8 @@ static func _decide_portal(f: GameFlow, rules: AutoRules) -> Dictionary:
 			best_v = v
 			best = ti
 	var tile: Dictionary = run.board.tiles[best]
-	if best == 0 and run.lap >= Balance.TOTAL_LAPS and rules.stop_before_boss:
+	if best == 0 and run.lap >= run.total_laps() and rules.stop_before_boss:
 		return _stop("The final boss is next.")
 	if String(tile.type) == "miniboss" and not tile.enemies.is_empty() and rules.stop_before_miniboss:
 		return _stop("The mini-boss is in portal range.")
-	return _result(["portal_pick", best], "Jumping to %s" % ("the boss" if best == 0 and run.lap >= Balance.TOTAL_LAPS else _tile_label(f, best)))
+	return _result(["portal_pick", best], "Jumping to %s" % ("the boss" if best == 0 and run.lap >= run.total_laps() else _tile_label(f, best)))
