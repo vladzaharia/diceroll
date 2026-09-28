@@ -419,7 +419,7 @@ func show_move_target(target: int, steps: int, double := false) -> void:
 		var idx := wrap_idx(hero_idx + k)
 		var last := idx == target or k == steps
 		var mat := _top_mats[idx]
-		var glow := col * (0.55 if last else 0.22)
+		var glow := col * (0.9 if last else 0.5)
 		_path_lit.append(idx)
 		var tw := create_tween()
 		tw.tween_interval(0.045 * k)

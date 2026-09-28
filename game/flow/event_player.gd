@@ -277,14 +277,14 @@ func _doubles(ev: Dictionary) -> void:
 	for i in chosen:
 		mid += c.tray.die_top_screen(int(i))
 	mid /= maxf(chosen.size(), 1)
-	c.overlay.popup(mid - Vector2(0, 16), "DOUBLES!", UiPalette.GOLD_BRIGHT, "star", 40)
+	c.overlay.popup(mid - Vector2(0, 20), "DOUBLES!", UiPalette.GOLD_BRIGHT, "star", 54)
 	var added := int(ev.get("treasury_added", 0))
 	if added > 0:
 		var to := c.ui.board_hud.top.treasury.get_global_rect().get_center()
 		Fx.fly_coins(c.overlay, mid, to, clampi(added / 2, 4, 10), 0.55 / c.speed)
 		await _wait(0.55)
 		c.ui.board_hud.top.treasury.set_value(int(ev.get("treasury", c.flow.run.treasury)), true)
-		c.overlay.popup(to + Vector2(0, 50), "+%d" % added, UiPalette.GOLD_BRIGHT, "chest", 28)
+		c.overlay.popup(to + Vector2(0, 74), "+%d" % added, UiPalette.GOLD_BRIGHT, "chest", 28)
 		Audio.play_sfx("coin")
 	await _wait(0.35)
 
