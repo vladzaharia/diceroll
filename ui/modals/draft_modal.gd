@@ -60,7 +60,7 @@ func refresh(flow: GameFlow) -> void:
 			t.tween_property(c, "modulate:a", 1.0, 0.18)
 	_choice = -1
 	_take.set_enabled(false)
-	_take.text = "CHOOSE ONE"
+	_take.text = "TAKE"
 	relayout()
 
 
