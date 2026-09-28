@@ -143,7 +143,9 @@ func _fill() -> void:
 	for e in die.edited:
 		edits += int(e)
 	var sum := die.face_sum()
-	var line := "Average roll %.1f  ·  Forge cap %d" % [sum / 6.0, die.raise_cap()]
+	var line := "Average roll %.1f  ·  Forge cap %d  ·  Pool %d/%d" % [sum / 6.0, die.raise_cap(),
+		_flow.run.dice.size(), _flow.run.max_dice()]
+
 	if edits > 0:
 		line += "  ·  %d forged face%s" % [edits, "" if edits == 1 else "s"]
 	var nl := UiTheme.label(line, 20, UiPalette.TEXT_MUTED, false, 0, false, 600)

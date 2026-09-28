@@ -36,6 +36,8 @@ var _board_idx := -1
 var _rig: CameraRig
 var _ground_y := 0.0
 var _distance := DISTANCE
+## Sideways shift of the enemy line (world units along `side`) so it clears the hero on screen.
+var _lateral := 0.0
 
 
 func _init() -> void:
@@ -52,6 +54,7 @@ func begin(p_hero: Character, anchor: Dictionary, enemy_list: Array) -> void:
 	side = (anchor.get("side", facing.cross(Vector3.UP)) as Vector3).normalized()
 	_ground_y = float(anchor.get("ground_y", hero_home.y - 0.45))
 	_distance = float(anchor.get("distance", DISTANCE))
+	_lateral = float(anchor.get("lateral", 0.0))
 	_face(hero, hero.global_position + facing, 0.3)
 	_arena()
 	var n := enemy_list.size()
@@ -70,7 +73,17 @@ func begin_on_board(board: BoardView, idx: int, enemy_list: Array, rig: CameraRi
 	_board_idx = idx
 	_rig = rig
 	board.set_tile_dressing_visible(idx, false)
-	begin(board.hero, board.combat_anchor(idx), enemy_list)
+	var anchor := board.combat_anchor(idx)
+	if rig:
+		# The combat camera swings behind the hero; shift the line toward screen-right so the
+		# enemy nearest the hero isn't hidden behind them.
+		var sw := deg_to_rad(rig.combat_swing_portrait if rig.is_portrait() else rig.combat_swing_landscape)
+		var right: Vector3 = (anchor.facing as Vector3).rotated(Vector3.UP, -sw)
+		var sgn := signf((anchor.side as Vector3).dot(right))
+		anchor["lateral"] = sgn * (1.0 if rig.is_portrait() else 0.5)
+
+	begin(board.hero, anchor, enemy_list)
+
 	var focus: Array = enemy_positions()
 	focus.append(board.hero.global_position)
 	var centre := Vector3.ZERO
@@ -157,7 +170,7 @@ func enemy_positions() -> Array[Vector3]:
 func _slot(i: int, n: int) -> Vector3:
 	var c := float(i) - float(n - 1) * 0.5
 	var along := _distance + (0.35 if n > 1 else 0.3) + absf(c) * -0.3
-	var base := hero_home + facing * along + side * c * SPACING
+	var base := hero_home + facing * along + side * (c * SPACING + _lateral * (1.0 if n > 1 else 0.5))
 	return Vector3(base.x, _ground_y + _floor_offset(), base.z)
 
 

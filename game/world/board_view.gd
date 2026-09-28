@@ -63,6 +63,9 @@ func build(p_act: int, p_tiles: Array) -> void:
 	_top_mats.clear()
 	_props.clear()
 	_figures.clear()
+	_hidden.clear()
+	_hidden_fx.clear()
+	_path_lit.clear()
 	tiles = []
 	ring_size = p_tiles.size() if p_tiles.size() >= 16 and p_tiles.size() % 4 == 0 else DEFAULT_RING
 	side = ring_size / 4 + 1
@@ -855,6 +858,20 @@ func hide_occluders(cam_xform: Transform3D, fov_deg: float, aspect: float, focus
 ## Sinks tile dressing (props + enemy previews) within `radius` of a world point, except the
 ## hero's tile. Undo with restore_occluders().
 func clear_area(center: Vector3, radius: float) -> void:
+	# moat-corner dressing standing in the fight
+	var inner := biome.get_node_or_null("InnerCorners") if biome else null
+	if inner:
+		for c in inner.get_children():
+			var n := c as Node3D
+			if n == null or not n.visible or _hidden.has(n):
+				continue
+			var p := n.global_position
+			if Vector2(p.x - center.x, p.z - center.z).length() < radius * 0.8:
+				if n is Light3D or n is GPUParticles3D:
+					_hidden_fx.append(n)
+					n.visible = false
+				else:
+					_sink(n)
 	for i in ring_size:
 		var n: Node3D = _props[i]
 		if n == null or i == hero_idx or _hidden.has(n) or not n.visible:

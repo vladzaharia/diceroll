@@ -162,7 +162,9 @@ func start(f: GameFlow) -> void:
 	if f.phase == GameFlow.Phase.BOARD_ROLLED and not f.board_roll.is_empty():
 		tray.set_values(f.board_roll)
 		tray.set_chosen(f.board_choice)
-		show_move_target(f.board_target(), f.board_move)
+		var t := f.board_target()
+		var steps := posmod(t - f.run.pos, f.run.board.size()) if f.board_move > 0 else 0
+		show_move_target(t, steps if steps > 0 or f.board_move == 0 else f.run.board.size(), f.is_board_double())
 	if f.phase == GameFlow.Phase.PORTAL:
 		player._show_portal(f.offer)
 	Audio.play_music("act%d" % f.run.act)
