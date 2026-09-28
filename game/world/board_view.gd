@@ -411,6 +411,20 @@ func _spawn_hero() -> void:
 	hero.name = "Hero"
 	hero.scale = Vector3.ONE * HERO_SCALE
 	add_child(hero)
+	var ring := MeshInstance3D.new()
+	ring.name = "HeroRing"
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(1.9, 1.9)
+	ring.mesh = pm
+	var m := Props.glow_material(Color(1.0, 0.85, 0.45), true, 1.3)
+	m.albedo_texture = Props.particle_texture("ring")
+	ring.material_override = m
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	ring.position.y = 0.03
+	hero.add_child(ring)
+	var rt := ring.create_tween().set_loops()
+	rt.tween_property(ring, "scale", Vector3.ONE * 1.12, 0.9).set_trans(Tween.TRANS_SINE)
+	rt.tween_property(ring, "scale", Vector3.ONE, 0.9).set_trans(Tween.TRANS_SINE)
 	place_hero(hero_idx)
 
 

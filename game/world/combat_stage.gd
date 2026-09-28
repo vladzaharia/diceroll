@@ -16,7 +16,7 @@ extends Node3D
 signal began
 
 const UNIT_SCALE := 0.7
-const SPACING := 1.55
+const SPACING := 1.75
 const DISTANCE := 2.7
 
 var hero: Character
@@ -48,6 +48,7 @@ func begin(p_hero: Character, anchor: Dictionary, enemy_list: Array) -> void:
 	_ground_y = float(anchor.get("ground_y", hero_home.y - 0.45))
 	_distance = float(anchor.get("distance", DISTANCE))
 	_face(hero, hero.global_position + facing, 0.3)
+	_arena()
 	var n := enemy_list.size()
 	for i in n:
 		_add(enemy_list[i], i, n, 0.05 + 0.2 * i)
@@ -303,7 +304,8 @@ func hero_attack(target_i: int, style := "") -> void:
 		"melee":
 			var dir := (ch.global_position - home)
 			dir.y = 0.0
-			var reach := home + dir - dir.normalized() * 1.05 * EnemyLooks.scale_of(String(data[target_i].get("id", "")))
+			var gap := 1.25 * EnemyLooks.scale_of(String(data[target_i].get("id", "")))
+			var reach := home + dir.normalized() * maxf(dir.length() - gap, 0.0) * 0.8
 			reach.y = home.y
 			var t := hero.create_tween()
 			t.tween_property(hero, "global_position", reach + Vector3.UP * 0.0, 0.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
@@ -311,7 +313,10 @@ func hero_attack(target_i: int, style := "") -> void:
 			await t.finished
 			hero.play_once("attack", "idle", 0.05, 1.35)
 			Audio.play_sfx("swing")
-			await get_tree().create_timer(0.36).timeout
+			await get_tree().create_timer(0.3).timeout
+			Fx.slash(self, ch.global_position + Vector3.UP * 0.9 * EnemyLooks.scale_of(String(data[target_i].get("id", ""))),
+				(ch.global_position - home).normalized())
+			await get_tree().create_timer(0.06).timeout
 			_return_hero(0.12)
 		"magic", "ranged":
 			hero.play_once("attack" if style == "ranged" else "Ranged_Magic_Shoot", "idle", 0.05, 1.2)
@@ -370,6 +375,9 @@ func clear() -> void:
 	if _target_ring:
 		_target_ring.queue_free()
 		_target_ring = null
+	if _arena_mi:
+		_arena_mi.queue_free()
+		_arena_mi = null
 	if hero and is_instance_valid(hero):
 		hero.global_position = hero_home if hero_home != Vector3.ZERO else hero.global_position
 
@@ -396,6 +404,29 @@ func _flash_white(ch: Character, id: String) -> void:
 	t.tween_callback(func() -> void:
 		if is_instance_valid(ch):
 			ch.set_tint(d.tint, float(d.strength), d.get("emission", Color.BLACK)))
+
+
+var _arena_mi: MeshInstance3D
+
+
+## Faint magic circle under the enemy line-up that anchors the fight on the floor.
+func _arena() -> void:
+	_arena_mi = MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(6.4, 6.4)
+	_arena_mi.mesh = pm
+	var m := ShaderMaterial.new()
+	m.shader = preload("res://game/world/shaders/rune_circle.gdshader")
+	m.set_shader_parameter("color", Color(1.0, 0.45, 0.35))
+	m.set_shader_parameter("intensity", 0.0)
+	m.set_shader_parameter("speed", 0.08)
+	_arena_mi.material_override = m
+	_arena_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_arena_mi)
+	var c := hero_home + facing * (_distance + 0.2)
+	_arena_mi.global_position = Vector3(c.x, _ground_y + 0.02, c.z)
+	var t := _arena_mi.create_tween()
+	t.tween_method(func(v: float) -> void: m.set_shader_parameter("intensity", v), 0.0, 0.55, 0.6)
 
 
 func _blob(r: float) -> MeshInstance3D:

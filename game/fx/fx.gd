@@ -39,7 +39,7 @@ static func popup_text(parent: Node3D, pos: Vector3, text: String, color: Color,
 	l.text = text
 	l.font = Props.font(true)
 	l.font_size = 128
-	l.pixel_size = 0.0042 * size
+	l.pixel_size = 0.0058 * size
 	l.outline_size = 30
 	l.outline_modulate = Color(0.12, 0.05, 0.08, 0.95)
 	l.modulate = color
@@ -136,6 +136,29 @@ static func hit_sparks(parent: Node3D, pos: Vector3, color := Color(1.0, 0.85, 0
 		"size": 0.28, "color": color, "tex": "spark", "damping": 4.0})
 	burst(parent, pos, {"amount": 1, "lifetime": 0.18, "speed": Vector2.ZERO, "gravity": Vector3.ZERO,
 		"size": 1.4, "color": Color(color, 0.9), "tex": "dot"})
+
+
+## A quick crescent swipe + sparks at `pos`, oriented across `dir` (melee hits).
+static func slash(parent: Node3D, pos: Vector3, dir: Vector3, color := Color(1.0, 0.95, 0.8)) -> void:
+	var mi := MeshInstance3D.new()
+	var q := QuadMesh.new()
+	q.size = Vector2(1.8, 1.8)
+	mi.mesh = q
+	var m := ShaderMaterial.new()
+	m.shader = preload("res://game/fx/shaders/slash.gdshader")
+	m.set_shader_parameter("color", color)
+	mi.material_override = m
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(mi)
+	mi.global_position = pos
+	var cam := parent.get_viewport().get_camera_3d()
+	if cam:
+		mi.global_basis = cam.global_basis
+	mi.rotate_object_local(Vector3.BACK, randf_range(-0.6, 0.2))
+	var t := mi.create_tween()
+	t.tween_method(func(k: float) -> void: m.set_shader_parameter("progress", k), 0.0, 1.0, 0.22)
+	t.tween_callback(mi.queue_free)
+	hit_sparks(parent, pos, color.lerp(GOLD, 0.4), 12)
 
 
 static func coin_burst(parent: Node3D, pos: Vector3, count := 8) -> void:

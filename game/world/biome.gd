@@ -20,10 +20,10 @@ const LOOKS := {
 		"sky_bottom": Color(0.07, 0.05, 0.1), "sky_glow": Color(1.0, 0.62, 0.35),
 		"glow_strength": 0.35, "stars": 0.35,
 		"fog": Color(0.2, 0.14, 0.2), "fog_density": 0.004, "fog_height_density": 0.0,
-		"ambient": Color(0.55, 0.48, 0.6), "ambient_energy": 0.55,
+		"ambient": Color(0.5, 0.48, 0.72), "ambient_energy": 0.6,
 		"key": Color(1.0, 0.8, 0.58), "key_energy": 1.35, "key_rot": Vector3(-56.0, -38.0, 0.0),
 		"fill": Color(0.5, 0.6, 1.0), "fill_energy": 0.35,
-		"exposure": 1.0, "saturation": 1.1, "contrast": 1.04,
+		"exposure": 1.05, "saturation": 1.2, "contrast": 1.08,
 		"island_top": Color(0.42, 0.38, 0.36), "island_side": Color(0.36, 0.3, 0.3),
 		"island_bottom": Color(0.12, 0.09, 0.13),
 		"particles": "dust", "light": Color(1.0, 0.6, 0.28),
@@ -37,11 +37,11 @@ const LOOKS := {
 		"ambient": Color(0.7, 0.5, 0.55), "ambient_energy": 0.55,
 		"key": Color(1.0, 0.7, 0.45), "key_energy": 1.5, "key_rot": Vector3(-42.0, -150.0, 0.0),
 		"fill": Color(0.55, 0.45, 1.0), "fill_energy": 0.45,
-		"exposure": 1.0, "saturation": 1.12, "contrast": 1.04,
+		"exposure": 1.02, "saturation": 1.18, "contrast": 1.08,
 		"island_top": Color(0.42, 0.32, 0.26), "island_side": Color(0.4, 0.28, 0.22),
 		"island_bottom": Color(0.16, 0.08, 0.1),
 		"particles": "fireflies", "light": Color(1.0, 0.55, 0.2),
-		"cloud_deep": Color(0.42, 0.18, 0.18), "cloud_light": Color(1.0, 0.6, 0.4), "cloud_rim": Color(1.0, 0.8, 0.5),
+		"cloud_deep": Color(0.26, 0.12, 0.24), "cloud_light": Color(0.82, 0.46, 0.44), "cloud_rim": Color(1.0, 0.8, 0.5),
 	},
 	3: {
 		"sky_top": Color(0.04, 0.04, 0.12), "sky_horizon": Color(0.12, 0.3, 0.38),
@@ -51,7 +51,7 @@ const LOOKS := {
 		"ambient": Color(0.45, 0.5, 0.8), "ambient_energy": 0.6,
 		"key": Color(0.7, 0.82, 1.0), "key_energy": 1.1, "key_rot": Vector3(-58.0, 35.0, 0.0),
 		"fill": Color(0.75, 0.4, 1.0), "fill_energy": 0.5,
-		"exposure": 1.05, "saturation": 1.12, "contrast": 1.06,
+		"exposure": 1.08, "saturation": 1.2, "contrast": 1.08,
 		"island_top": Color(0.3, 0.29, 0.36), "island_side": Color(0.26, 0.24, 0.32),
 		"island_bottom": Color(0.06, 0.06, 0.12),
 		"particles": "wisps", "light": Color(0.7, 0.4, 1.0),
@@ -419,7 +419,7 @@ static func ambient_particles(kind: String) -> GPUParticles3D:
 
 static func _crypt(d: Node3D, c: Node3D) -> void:
 	var D := Props.DUN
-	_floor(d, [D + "floor_tile_large.gltf"], 0.0)
+	_floor(d, [D + "floor_tile_large.gltf"], 0.0, 10.0, 4.0, 3, Color(0.6, 0.53, 0.52, 0.55))
 	# back wall with arches, windows, torches and banners
 	var walls := [D + "wall_arched.gltf", D + "wall.gltf", D + "wall_archedwindow_open.gltf", D + "wall.gltf",
 		D + "wall_arched.gltf"]
@@ -451,6 +451,8 @@ static func _crypt(d: Node3D, c: Node3D) -> void:
 		Props.put(d, D + "torch_lit.gltf", Vector3(side * 8.4, 0.4, -6.0))
 		flame(d, Vector3(side * 8.4, 1.1, -6.0))
 		flicker_light(d, Vector3(side * 8.2, 1.6, -6.0), Color(1.0, 0.6, 0.28), 1.8, 6.0)
+	for x in [-6.0, -2.0, 2.0, 6.0]:
+		Props.put(d, D + "barrier.gltf", Vector3(x, 0.0, 10.2), 180.0)
 	Props.put(d, D + "chest_gold.gltf", Vector3(-8.6, 0.0, 4.2), 80.0, 0.6)
 	Props.put(d, D + "coin_stack_medium.gltf", Vector3(-8.7, 0.0, 6.2), 0.0, 0.7)
 	Props.put(d, D + "keg_decorated.gltf", Vector3(8.7, 0.0, 4.4), -60.0, 0.7)
@@ -472,7 +474,11 @@ static func _crypt(d: Node3D, c: Node3D) -> void:
 
 static func _hollow(d: Node3D, c: Node3D) -> void:
 	var H := Props.HAL
-	_floor(d, [H + "floor_dirt.gltf"], 0.0)
+	_floor(d, [H + "floor_dirt.gltf"], 0.0, 10.0, 4.0, 3, Color(0.62, 0.46, 0.36, 0.45))
+	for x in [-5.0, 0.5, 5.5]:
+		Props.put(d, H + "fence_seperate_broken.gltf", Vector3(x, 0, 10.1), 180.0 + randf_range(-6.0, 6.0), 0.9)
+	for p in [Vector3(-3.0, 0, 9.0), Vector3(2.8, 0, 9.3), Vector3(7.6, 0, 9.0)]:
+		Props.put(d, H + "pumpkin_orange_small.gltf", p, randf() * 360.0, 0.9)
 	var trees := [
 		[H + "tree_pine_orange_large.gltf", Vector3(-9.0, 0, -9.4), 1.0],
 		[H + "tree_dead_large.gltf", Vector3(-4.8, 0, -10.0), 1.1],
@@ -505,7 +511,12 @@ static func _hollow(d: Node3D, c: Node3D) -> void:
 		flicker_light(d, Vector3(side * 8.3, 0.7, 6.2), Color(1.0, 0.65, 0.3), 1.0, 3.0)
 	Props.put(d, H + "arch_gate.gltf", Vector3(0.0, 0, -8.3), 0.0, 0.9)
 	# set piece: a haunted dead tree over a ring of graves and glowing pumpkins
-	Props.put(c, H + "tree_dead_large_decorated.gltf", Vector3(0.2, 0, -0.6), 20.0, 1.05)
+	Props.put(c, H + "tree_dead_large_decorated.gltf", Vector3(0.2, 0, -0.6), 20.0, 1.3)
+	Props.put(c, H + "floor_dirt_grave.gltf", Vector3(0.0, -0.49, 0.2), 0.0, 0.55)
+	for p in [Vector3(-2.3, 0, -2.2), Vector3(2.3, 0, -2.2), Vector3(-2.3, 0, 2.2), Vector3(2.3, 0, 2.2)]:
+		Props.put(c, H + "fence_pillar.gltf", p, 0.0, 0.8)
+	Props.put(c, H + "gravemarker_B.gltf", Vector3(1.9, 0, -0.4), -30.0, 0.9)
+	Props.put(c, H + "candle_melted.gltf", Vector3(-1.9, 0, 1.4), 0.0, 1.2)
 	Props.put(c, H + "gravestone.gltf", Vector3(-1.6, 0, 0.3), 25.0, 0.8)
 	Props.put(c, H + "grave_B.gltf", Vector3(1.5, 0, 0.5), -20.0, 0.8)
 	Props.put(c, H + "gravemarker_A.gltf", Vector3(-0.9, 0, -1.9), 10.0, 0.9)
@@ -542,8 +553,12 @@ static func _throne(d: Node3D, c: Node3D) -> void:
 		Props.put(d, H + "ribcage.gltf", Vector3(side * 9.2, 0, -8.4), 30.0, 0.9)
 		Props.put(d, H + "shrine_candles.gltf", Vector3(side * 8.4, 0, -8.0), 0.0, 0.9)
 		flicker_light(d, Vector3(side * 8.4, 1.6, -7.6), Color(1.0, 0.6, 0.3), 1.2, 4.0)
+	for p in [Vector3(-4.5, 0, 9.4), Vector3(0.5, 0, 9.8), Vector3(5.0, 0, 9.3)]:
+		Props.put(d, [H + "bone_B.gltf", H + "bone_C.gltf", H + "skull.gltf"][int(absf(p.x)) % 3], p, randf() * 360.0, 0.8)
+	for x in [-7.0, 7.0]:
+		Props.put(d, H + "gravestone.gltf", Vector3(x, 0, 9.6), 180.0 + x * 2.0, 0.8)
 	# set piece: the crypt with a purple rune circle and candles
-	Props.put(c, H + "crypt.gltf", Vector3(0, 0, -0.3), 0.0, 0.55)
+	Props.put(c, H + "crypt.gltf", Vector3(0, 0, 0.1), 0.0, 0.46)
 	for p in [Vector3(-2.2, 0, 1.7), Vector3(2.2, 0, 1.7), Vector3(-2.2, 0, -2.0), Vector3(2.2, 0, -2.0)]:
 		Props.put(c, H + "candle_triple.gltf", p, randf() * 360.0, 1.0)
 		flame(c, p + Vector3(0, 0.9, 0), Color(0.65, 0.4, 1.0), 0.2, 5)

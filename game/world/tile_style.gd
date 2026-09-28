@@ -102,6 +102,7 @@ static func _question_mark() -> Node3D:
 	mi.material_override = m
 	n.add_child(mi)
 	n.position = Vector3(0.15, 0.95, 0.05)
+	n.rotation.x = deg_to_rad(-30.0)
 	var t := n.create_tween().set_loops()
 	t.tween_property(n, "position:y", 1.1, 1.1).set_trans(Tween.TRANS_SINE)
 	t.tween_property(n, "position:y", 0.95, 1.1).set_trans(Tween.TRANS_SINE)
