@@ -662,3 +662,66 @@ func test_bot_run_replay_equality() -> void:
 		assert_eq(JSON.stringify(r.to_dict()), JSON.stringify(f.to_dict()), "replay identical (%s)" % cls)
 		var loaded := GameFlow.from_dict(JSON.parse_string(JSON.stringify(f.to_dict())))
 		assert_eq(JSON.stringify(loaded.to_dict()), JSON.stringify(f.to_dict()))
+
+func test_replay_mid_run_and_resume_from_save() -> void:
+	# play 150 commands, save, keep playing both the original and the loaded copy
+	var f := GameFlow.new_run("mage", 99)
+	for i in 150:
+		if f.is_over():
+			break
+		f.apply(Bot.next_command(f))
+	var g := GameFlow.from_dict(JSON.parse_string(JSON.stringify(f.to_dict())))
+	for i in 200:
+		if f.is_over():
+			break
+		f.apply(Bot.next_command(f))
+		g.apply(Bot.next_command(g))
+	assert_eq(JSON.stringify(g.to_dict()), JSON.stringify(f.to_dict()))
+	var r := GameFlow.replay("mage", 99, f.commands)
+	assert_eq(JSON.stringify(r.to_dict()), JSON.stringify(f.to_dict()))
+
+func test_elite_guarantees_rune_choice() -> void:
+	var f := _flow()
+	_blank(f)
+	_put(f, 3, Board.make_tile("elite", ["brute"], true))
+	_force_roll(f, 3)
+	f.choose_move(0)
+	assert_eq(f.combat.elite, true)
+	assert_eq(f.combat.enemies[0].hp, int(round(38 * Balance.ELITE_HP_MULT)))
+	_win_fight(f)
+	assert_eq(f.phase, P.DRAFT)
+	assert_eq(f.offer.source, "elite")
+	assert_eq(f.offer.options.size(), 3)
+	for o in f.offer.options:
+		assert_eq(o.id, "rune")
+		assert_true(Runes.DEFS.has(o.rune))
+	f.pick_draft(2)
+	assert_eq(f.offer.kind, "rune_assign")
+
+func test_debug_open_scenarios() -> void:
+	var expected := {"shop": P.SHOP, "draft": P.DRAFT, "rune_choice": P.DRAFT, "rune_assign": P.DRAFT,
+		"forge": P.FORGE, "event": P.EVENT, "portal": P.PORTAL, "combat": P.COMBAT, "boss": P.COMBAT}
+	for kind in expected:
+		var f := _flow()
+		var ev := f.debug_open(kind)
+		assert_eq(f.phase, expected[kind], kind)
+		assert_true(not ev.is_empty() and ev[0].type != "error", kind)
+	var g := _flow()
+	g.debug_open("event", "idol")
+	assert_eq(g.offer.id, "idol")
+	g.debug_open("combat", "brute,cultist")
+	assert_eq(g.combat.enemies.size(), 2)
+	assert_eq(g.debug_open("nope")[0].type, "error")
+
+func test_illegal_in_other_phases() -> void:
+	var f := _flow()
+	f.debug_open("shop")
+	var before := _snap(f)
+	for ev in [f.roll_board(), f.combat_attack(), f.pick_draft(0), f.event_choose(0), f.forge_apply(0, 0, "raise")]:
+		assert_eq(ev[0].type, "error")
+	assert_eq(_snap(f), before)
+	f.debug_open("combat")
+	before = _snap(f)
+	for ev in [f.roll_board(), f.shop_leave(), f.rune_assign(0), f.portal_pick(19), f.combat_set_target(7)]:
+		assert_eq(ev[0].type, "error")
+	assert_eq(_snap(f), before)

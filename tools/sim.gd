@@ -67,11 +67,11 @@ func _init() -> void:
 			combat_turns += int(f.run.stats.get("combat_turns", 0))
 			cmd_sum += f.commands.size()
 			level_sum += f.run.level
-			dice_sum += f.run.dice.size()
+			dice_sum += int(f.run.stats.get("fights_won", 0))
 		rows.append([c, 100.0 * wins / runs, float(act_sum) / runs, float(board_turns) / runs,
 			float(combat_turns) / runs, float(cmd_sum) / runs, float(level_sum) / runs, float(dice_sum) / runs, deaths, stuck])
 	print("")
-	print("| class | win% | avg act | avg board turns | avg combat turns | avg commands | avg level | avg dice | deaths by act |")
+	print("| class | win% | avg act | avg board turns | avg combat turns | avg commands | avg level | avg fights won | deaths by act |")
 	print("|---|---|---|---|---|---|---|---|---|")
 	for row in rows:
 		print("| %s | %.1f | %.2f | %.1f | %.1f | %.0f | %.1f | %.1f | %s |" % [row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], _fmt(row[8])])

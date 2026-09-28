@@ -679,6 +679,33 @@ func portal_pick(tile_idx: int) -> Array[Dictionary]:
 	_advance(ev)
 	return ev
 
+# ================================================================ scenarios (presentation/testing aid)
+
+## Jumps straight into a modal or fight for screenshot scenarios. Not recorded in `commands`,
+## so a flow touched by this cannot be replayed from its log. kind: shop | draft | rune_choice |
+## rune_assign | forge | event | portal | combat | boss. arg: event id, rune id, or comma
+## separated enemy ids for combat.
+func debug_open(kind: String, arg := "") -> Array[Dictionary]:
+	var ev: Array[Dictionary] = []
+	combat = null
+	offer = {}
+	board_roll.clear()
+	phase = Phase.BOARD_READY
+	match kind:
+		"shop": _open_shop(ev)
+		"draft": _open_draft(ev)
+		"rune_choice": _open_rune_choice("chest", ev)
+		"rune_assign": _set_offer({"kind": "rune_assign", "rune": arg if arg != "" else "blade"}, Phase.DRAFT, ev)
+		"forge": _set_offer({"kind": "forge", "ops": ["raise", "mirror"], "source": "tile"}, Phase.FORGE, ev)
+		"event": _open_event(ev, arg if EventDefs.DATA.has(arg) else "")
+		"portal": _set_offer({"kind": "portal", "tiles": Array(Board.portal_targets(run.pos))}, Phase.PORTAL, ev)
+		"combat":
+			var ids: Array = Array(arg.split(",", false)) if arg != "" else ["skeleton_minion", "skeleton_archer"]
+			_start_combat(ids, false, false, run.pos, ev)
+		"boss": _start_combat([EnemyDefs.ACT_BOSS[run.act - 1]], false, true, 0, ev)
+		_: return [_e("unknown debug kind " + kind)]
+	return ev
+
 # ================================================================ replay & serialisation
 
 ## Replays one logged command: [name, args...].
