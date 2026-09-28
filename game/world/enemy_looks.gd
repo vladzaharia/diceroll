@@ -73,6 +73,8 @@ static func create(id: String) -> Character:
 	for slot in d.gear:
 		ch.attach(slot, d.gear[slot])
 	ch.set_tint(d.tint, float(d.strength), d.get("emission", Color.BLACK))
+	if bool(d.get("skeleton", false)):
+		_skull_head(ch)
 	if bool(d.get("pumpkin", false)):
 		_pumpkin_head(ch)
 	if bool(d.get("glow", false)):
@@ -84,6 +86,13 @@ static func create(id: String) -> Character:
 		ch.add_child(l)
 	ch.play(clip(id, "idle"), 0.0)
 	return ch
+
+
+static func _skull_head(ch: Character) -> void:
+	var p := ch.attach("head", "res://assets/kaykit/halloween/skull.gltf")
+	if p:
+		p.scale = Vector3.ONE * 1.12
+		p.position = Vector3(0, 0.02, 0.06)
 
 
 static func _pumpkin_head(ch: Character) -> void:

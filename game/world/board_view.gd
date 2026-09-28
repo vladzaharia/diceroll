@@ -153,7 +153,7 @@ func _build_tile(i: int) -> void:
 	base.name = "Base"
 	var bw := 2.02 if corner else 1.94
 	base.scale = Vector3(bw, 1.9 if corner else 1.75, bw)
-	var bmat := _tile_material(TileStyle.BASE[act].lightened(0.08 if corner else 0.0), base)
+	var bmat := _tile_material(Color(0.8, 0.62, 0.34) if corner else TileStyle.BASE[act], base)
 	bmat.set_shader_parameter("roughness", 0.95)
 	root.add_child(base)
 	var top := Props.inst(TILE_MESH)
@@ -415,8 +415,11 @@ func _spawn_hero() -> void:
 	hero.name = "Hero"
 	hero.scale = Vector3.ONE * HERO_SCALE
 	add_child(hero)
+	var holder := Node3D.new()
+	holder.name = "HeroRing"
+	holder.position.y = 0.03
+	hero.add_child(holder)
 	var ring := MeshInstance3D.new()
-	ring.name = "HeroRing"
 	var pm := PlaneMesh.new()
 	pm.size = Vector2(1.9, 1.9)
 	ring.mesh = pm
@@ -424,8 +427,7 @@ func _spawn_hero() -> void:
 	m.albedo_texture = Props.particle_texture("ring")
 	ring.material_override = m
 	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	ring.position.y = 0.03
-	hero.add_child(ring)
+	holder.add_child(ring)
 	var rt := ring.create_tween().set_loops()
 	rt.tween_property(ring, "scale", Vector3.ONE * 1.12, 0.9).set_trans(Tween.TRANS_SINE)
 	rt.tween_property(ring, "scale", Vector3.ONE, 0.9).set_trans(Tween.TRANS_SINE)
@@ -457,6 +459,7 @@ func hop_hero(path: Array[int], step_time := 0.28) -> void:
 		return
 	clear_targets()
 	_restore_dressing(hero_idx)
+	_show_hero_ring(false)
 	hero.play("Jump_Idle", 0.08)
 	for k in path.size():
 		var to_idx := posmod(path[k], RING)
@@ -481,6 +484,7 @@ func hop_hero(path: Array[int], step_time := 0.28) -> void:
 		if k < path.size() - 1:
 			await get_tree().create_timer(step_time * 0.12).timeout
 	hero.play_once("Jump_Land", "idle", 0.05, 1.4)
+	_show_hero_ring(true)
 	pulse_tile(hero_idx)
 	_turn_hero(_rest_yaw(hero_idx), 0.35)
 	_shift_dressing_for_hero()
@@ -516,6 +520,17 @@ func _rest_yaw(idx: int) -> float:
 	var f := tile_forward(idx)
 	var v := (f * 0.6 + Vector3(0, 0, 1.0)).normalized()
 	return atan2(v.x, v.z)
+
+
+func _show_hero_ring(on: bool) -> void:
+	var ring := hero.get_node_or_null("HeroRing") as Node3D
+	if ring == null:
+		return
+	ring.visible = true
+	var t := ring.create_tween()
+	t.tween_property(ring, "scale", Vector3.ONE * (1.0 if on else 0.01), 0.15)
+	if not on:
+		t.tween_callback(func() -> void: ring.visible = false)
 
 
 func _turn_hero(yaw: float, time: float) -> void:

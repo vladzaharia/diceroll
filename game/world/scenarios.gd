@@ -8,10 +8,11 @@ extends RefCounted
 ##  combat_act1     hero vs 3 enemies, intents/HP visible, mid-attack
 ##  boss_act1..3    boss fights (Bone Warden, Hollow King, Lich + minions)
 ##  fx_gallery      every FX firing in a loop on the act 1 board
+##  enemy_gallery   every enemy look with its HUD, on the act 1 island
 ## Optional args: --hero=<class>, --tile=<idx>.
 
 const NAMES := ["board_act1", "board_act2", "board_act3", "board_follow", "board_mutate", "board_portal", "combat_act1",
-	"combat_act2", "combat_act3", "boss_act1", "boss_act2", "boss_act3", "fx_gallery"]
+	"combat_act2", "combat_act3", "boss_act1", "boss_act2", "boss_act3", "fx_gallery", "enemy_gallery"]
 
 
 static func names() -> PackedStringArray:
@@ -151,6 +152,26 @@ class _Driver extends Node3D:
 				board.set_hero_class("rogue")
 			"combat_act1", "combat_act2", "combat_act3", "boss_act1", "boss_act2", "boss_act3":
 				await _combat(act, wait)
+			"enemy_gallery":
+				var ids := EnemyLooks.DEFS.keys()
+				var pts := PackedVector3Array()
+				for i in ids.size():
+					var id: String = ids[i]
+					var ch := EnemyLooks.create(id)
+					ch.scale = Vector3.ONE * CombatStage.UNIT_SCALE * EnemyLooks.scale_of(id)
+					var p := Vector3(-5.6 + (i % 5) * 2.8, 0.05, -1.5 + (i / 5) * 4.2)
+					ch.position = p
+					add_child(ch)
+					var hud := UnitHud.new()
+					add_child(hud)
+					hud.position = p + Vector3.UP * (2.2 * EnemyLooks.scale_of(id) + 0.2)
+					hud.set_data({"hp": 10, "max_hp": 12, "block": 3 if i % 3 == 0 else 0, "boss": EnemyLooks.is_boss(id),
+						"name": id, "intent": {"kind": ["attack", "block", "buff", "curse", "summon"][i % 5], "value": 5}}, false)
+					pts.append(p)
+					pts.append(p + Vector3.UP * 3.0)
+				for c in board.biome.get_node("SetPiece").get_children():
+					c.visible = false
+				rig.frame_points(pts, 0.0, 28.0, true)
 			"fx_gallery":
 				board.place_hero(3)
 				rig.follow(board.hero, true)
@@ -168,25 +189,17 @@ class _Driver extends Node3D:
 		var boss := scenario.begins_with("boss")
 		var idx := 0 if boss else int(Shot.args.get("tile", "3"))
 		board.place_hero(idx)
-		board.set_tile_dressing_visible(idx, false)
-		var anchor := board.combat_anchor(idx)
 		var list: Array = BoardScenarios.mock_enemies(("boss_act%d" if boss else "act%d") % act)
 		stage = CombatStage.new()
 		add_child(stage)
-		# camera frames the final line-up right away (positions are deterministic)
 		rig.overview(board.ring_bounds(), true)
 		var start := Time.get_ticks_msec()
-		stage.begin(board.hero, anchor, list)
+		var begin_done := [false]
+		stage.began.connect(func() -> void: begin_done[0] = true, CONNECT_ONE_SHOT)
+		stage.begin_on_board(board, idx, list, rig)
 		rig.combat(board.hero.global_position, stage.enemy_positions(), true, stage.enemy_heights())
-		var focus: Array = stage.enemy_positions()
-		focus.append(board.hero.global_position)
-		var centre := Vector3.ZERO
-		for f: Vector3 in focus:
-			centre += f
-		board.clear_area(centre / focus.size(), 4.2)
-		var vs := get_viewport().get_visible_rect().size
-		board.hide_occluders(rig.desired_transform(), rig.camera.fov, vs.x / vs.y, focus)
-		await stage.began
+		while not begin_done[0]:
+			await get_tree().process_frame
 		var elapsed := (Time.get_ticks_msec() - start) / 1000.0
 		var hit_at := maxf(wait - 0.5, elapsed + 0.1)
 		await get_tree().create_timer(maxf(hit_at - elapsed - 0.6, 0.05)).timeout

@@ -29,6 +29,9 @@ var data: Array[Dictionary] = []
 var target := 0
 
 var _target_ring: MeshInstance3D
+var _board: BoardView
+var _board_idx := -1
+var _rig: CameraRig
 var _ground_y := 0.0
 var _distance := DISTANCE
 
@@ -55,6 +58,60 @@ func begin(p_hero: Character, anchor: Dictionary, enemy_list: Array) -> void:
 	await get_tree().create_timer(0.2 * n + 0.75).timeout
 	set_target(0)
 	began.emit()
+
+
+## One-call staging on a BoardView tile: hides the tile's dressing and nearby props,
+## spawns the enemies, frames `rig` (optional) in combat mode and sinks occluders.
+## Await it; resolves once every enemy has risen.
+func begin_on_board(board: BoardView, idx: int, enemy_list: Array, rig: CameraRig = null) -> void:
+	_board = board
+	_board_idx = idx
+	_rig = rig
+	board.set_tile_dressing_visible(idx, false)
+	begin(board.hero, board.combat_anchor(idx), enemy_list)
+	var focus: Array = enemy_positions()
+	focus.append(board.hero.global_position)
+	var centre := Vector3.ZERO
+	for f: Vector3 in focus:
+		centre += f
+	board.clear_area(centre / focus.size(), 4.2)
+	if rig:
+		rig.combat(board.hero.global_position, enemy_positions(), false, enemy_heights())
+		var vs := get_viewport().get_visible_rect().size
+		board.hide_occluders(rig.desired_transform(), rig.camera.fov, vs.x / maxf(vs.y, 1.0), focus)
+	await began
+
+
+## Re-frames the camera after the line-up changed (summons, deaths).
+func reframe() -> void:
+	if _rig and hero:
+		var pos: Array[Vector3] = []
+		var hs := []
+		var all := enemy_positions()
+		var heights := enemy_heights()
+		for i in enemies.size():
+			if enemies[i].visible:
+				pos.append(all[i])
+				hs.append(heights[i])
+		if not pos.is_empty():
+			_rig.combat(hero_home, pos, false, hs)
+
+
+## Undoes begin_on_board(): clears the stage, restores props and returns the camera to
+## follow the hero (or overview when `overview` is true).
+func end_on_board(overview := false) -> void:
+	clear()
+	if _board:
+		_board.restore_occluders()
+		_board.set_tile_dressing_visible(_board_idx, true)
+		_board.place_hero(_board_idx)
+	if _rig and _board:
+		if overview:
+			_rig.overview(_board.ring_bounds())
+		else:
+			_rig.follow(_board.hero)
+	_board = null
+	_rig = null
 
 
 ## Adds one enemy mid-fight (summons). Returns its index.
