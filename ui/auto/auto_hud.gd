@@ -289,14 +289,16 @@ func _place_ticker() -> void:
 	if not ticker.visible:
 		return
 	var view := size
-	_ticker_label.custom_minimum_size.x = 0.0
-	var natural := ticker.get_combined_minimum_size()
+	# an ellipsis label reports ~0 min width: size it from the measured text, capped
+	var ls := _ticker_label.label_settings
+	var tw := ls.font.get_string_size(_ticker_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, ls.font_size).x + 4.0
 	var maxw := minf(view.x - 48.0, 760.0)
-	ticker.size = Vector2(minf(natural.x, maxw), natural.y)
-	if natural.x > maxw:
-		_ticker_label.custom_minimum_size.x = 0.0
-		ticker.size.x = maxw
-	ticker.position = Vector2((view.x - ticker.size.x) * 0.5, _slot_bottom() - ticker.size.y + _ticker_dy)
+	_ticker_label.custom_minimum_size.x = 0.0
+	var chrome := ticker.get_combined_minimum_size().x - _ticker_label.get_minimum_size().x
+	_ticker_label.custom_minimum_size.x = minf(tw, maxw - chrome)
+	var s := ticker.get_combined_minimum_size()
+	ticker.size = s
+	ticker.position = Vector2((view.x - s.x) * 0.5, _slot_bottom() - s.y + _ticker_dy)
 
 
 func _draw() -> void:

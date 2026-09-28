@@ -57,7 +57,6 @@ static func run_ui_auto(d: Node, c: GameController, f: GameFlow, args: Dictionar
 	c.auto.set_rules(rules)
 	var timeout := float(args.get("timeout", "1500"))
 	var t0 := Time.get_ticks_msec()
-	var el := func() -> float: return (Time.get_ticks_msec() - t0) / 1000.0
 	print("UI_AUTO_START class=%s seed=%d speed=%.1f rules=%s" % [f.run.class_id, f.run.seed, c.speed, JSON.stringify(rules.to_dict())])
 	c.start(f)
 	await d.get_tree().process_frame
@@ -65,7 +64,7 @@ static func run_ui_auto(d: Node, c: GameController, f: GameFlow, args: Dictionar
 	var handbacks := 0
 	var takeover_checked := String(args.get("takeover", "1")) != "1"
 	var last_n := -1
-	var last_change := el.call()
+	var last_change := _el(t0)
 	var last_phase := -1
 	var last_act := 0
 	var handback_shots := 0
@@ -73,18 +72,18 @@ static func run_ui_auto(d: Node, c: GameController, f: GameFlow, args: Dictionar
 		await d.get_tree().create_timer(0.1, true, false, true).timeout
 		if not d.is_inside_tree():
 			return 5
-		if el.call() > timeout:
-			print("AUTO_TIMEOUT after %.0fs phase=%s" % [el.call(), GameFlow.phase_name(f.phase)])
+		if _el(t0) > timeout:
+			print("AUTO_TIMEOUT after %.0fs phase=%s" % [_el(t0), GameFlow.phase_name(f.phase)])
 			return 3
 		if f.phase != last_phase or f.run.act != last_act:
 			last_phase = f.phase
 			last_act = f.run.act
 			print("PHASE %s act=%d lap=%d pos=%d hp=%d/%d gold=%d lvl=%d dice=%d steps=%d t=%.0fs" % [GameFlow.phase_name(f.phase),
-				f.run.act, f.run.lap, f.run.pos, f.run.hp, f.run.max_hp, f.run.gold, f.run.level, f.run.dice.size(), c.auto.steps, el.call()])
+				f.run.act, f.run.lap, f.run.pos, f.run.hp, f.run.max_hp, f.run.gold, f.run.level, f.run.dice.size(), c.auto.steps, _el(t0)])
 		if f.commands.size() != last_n:
 			last_n = f.commands.size()
-			last_change = el.call()
-		elif el.call() - last_change > 30.0:
+			last_change = _el(t0)
+		elif _el(t0) - last_change > 30.0:
 			print("AUTO_STUCK phase=%s enabled=%s busy=%s can_act=%s" % [GameFlow.phase_name(f.phase), c.auto.enabled, c.busy, c.auto.can_act()])
 			return 4
 		if c.auto.enabled and not takeover_checked and f.phase == GameFlow.Phase.BOARD_READY and c.auto.steps > 12 and c.auto.can_act():
@@ -114,8 +113,12 @@ static func run_ui_auto(d: Node, c: GameController, f: GameFlow, args: Dictionar
 				toggle_on(c)
 	var won := f.phase == GameFlow.Phase.VICTORY
 	print("AUTO_END %s act=%d lap=%d lvl=%d commands=%d auto_steps=%d handbacks=%d t=%.0fs" % ["VICTORY" if won else "GAME_OVER",
-		f.run.act, f.run.lap, f.run.level, f.commands.size(), c.auto.steps, handbacks, el.call()])
+		f.run.act, f.run.lap, f.run.level, f.commands.size(), c.auto.steps, handbacks, _el(t0)])
 	return 0
+
+
+static func _el(t0: int) -> float:
+	return (Time.get_ticks_msec() - t0) / 1000.0
 
 
 static func _idle(c: GameController) -> void:

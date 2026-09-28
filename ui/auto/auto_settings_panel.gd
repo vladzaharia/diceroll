@@ -13,6 +13,9 @@ const STOPS := [["stop_before_miniboss", "Before the mini-boss", "skull"], ["sto
 	["stop_on_boss_passive", "A boss passive is offered", "star"], ["stop_on_shop", "At shops AUTO skips", "coin"]]
 const FOCUS_LABELS := {"balanced": "Balanced", "damage": "Damage", "defense": "Defense", "economy": "Economy"}
 const MINIBOSS_LABELS := {"auto": "If winnable", "always": "Always", "never": "Avoid"}
+## AutoRules.skill (when core has it): how sharp AUTO plays.
+const SKILLS := ["realistic", "expert"]
+const SKILL_LABELS := {"realistic": "Realistic", "expert": "Expert"}
 const HP_MAX := 0.6
 
 var rules: AutoRules
@@ -23,6 +26,8 @@ var _scope_btns: Dictionary = {}
 var _stop_rows: Dictionary = {}
 var _focus_btns: Dictionary = {}
 var _mb_btns: Dictionary = {}
+var _skill_btns: Dictionary = {}
+var _skill_box: Control
 var _hp_slider: HSlider
 var _hp_value: Label
 var _wide := true
@@ -69,6 +74,12 @@ func _build() -> void:
 	_left.add_child(_segmented(AutoRules.FOCUSES, FOCUS_LABELS, _focus_btns, _on_focus))
 	_left.add_child(section_label("Mini-boss fight"))
 	_left.add_child(_segmented(AutoRules.MINIBOSS_MODES, MINIBOSS_LABELS, _mb_btns, _on_miniboss))
+	# skill: only when AutoRules has it (shown by refresh())
+	_skill_box = UiTheme.vbox(10)
+	_skill_box.add_child(section_label("Skill"))
+	_skill_box.add_child(_segmented(SKILLS, SKILL_LABELS, _skill_btns, _on_skill))
+	_skill_box.visible = false
+	_left.add_child(_skill_box)
 
 	# --- stop conditions
 	_right.add_child(section_label("Pause AUTO when"))
@@ -169,6 +180,13 @@ func refresh(_flow: GameFlow = null) -> void:
 	for k in _mb_btns:
 		(_mb_btns[k] as GameButton).set_pressed_no_signal(k == rules.fight_miniboss)
 		(_mb_btns[k] as GameButton).call("_refresh")
+	var has_skill := "skill" in rules
+	_skill_box.visible = has_skill
+	if has_skill:
+		var sk := String(rules.get("skill"))
+		for k in _skill_btns:
+			(_skill_btns[k] as GameButton).set_pressed_no_signal(k == sk)
+			(_skill_btns[k] as GameButton).call("_refresh")
 	_hp_slider.set_value_no_signal(rules.stop_hp_below)
 	_hp_value.text = _hp_text(rules.stop_hp_below)
 	relayout()
@@ -201,6 +219,12 @@ func _on_focus(id: String) -> void:
 
 func _on_miniboss(id: String) -> void:
 	rules.fight_miniboss = id
+	_commit()
+
+
+func _on_skill(id: String) -> void:
+	if "skill" in rules:
+		rules.set("skill", id)
 	_commit()
 
 
