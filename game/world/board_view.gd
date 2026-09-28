@@ -461,7 +461,6 @@ func hop_hero(path: Array[int], step_time := 0.28) -> void:
 	clear_targets()
 	_restore_dressing(hero_idx)
 	_show_hero_ring(false)
-	hero.play("Jump_Idle", 0.08)
 	for k in path.size():
 		var to_idx := posmod(path[k], RING)
 		var from := hero.position
@@ -470,6 +469,12 @@ func hop_hero(path: Array[int], step_time := 0.28) -> void:
 		dir.y = 0.0
 		if dir.length() > 0.01:
 			_turn_hero(atan2(dir.x, dir.z), 0.1)
+		# one short jump clip per tile (skip the wind-up, fit the rest into the hop)
+		if hero.anim_player.has_animation("Jump_Full_Short"):
+			var jl := hero.anim_player.get_animation("Jump_Full_Short").length
+			hero.current = "Jump_Full_Short"
+			hero.anim_player.play("Jump_Full_Short", 0.04, (jl - 0.22) / (step_time * 1.1))
+			hero.anim_player.seek(0.22, true)
 		var t := create_tween()
 		var h := 0.75
 		t.tween_method(func(u: float) -> void:

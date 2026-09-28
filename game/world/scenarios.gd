@@ -204,7 +204,7 @@ class _Driver extends Node3D:
 		while not begin_done[0]:
 			await get_tree().process_frame
 		var elapsed := (Time.get_ticks_msec() - start) / 1000.0
-		var hit_at := maxf(wait - 0.5, elapsed + 0.1)
+		var hit_at := maxf(wait - 0.75, elapsed + 0.1)
 		await get_tree().create_timer(maxf(hit_at - elapsed - 0.6, 0.05)).timeout
 		var tgt := 1 if list.size() > 2 else 0
 		stage.set_target(tgt)

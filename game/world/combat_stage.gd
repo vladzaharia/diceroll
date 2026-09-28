@@ -297,7 +297,7 @@ func enemy_hit(i: int, amount: int, crit := false, blocked := 0) -> void:
 	var ch := enemies[i]
 	var id := String(data[i].get("id", ""))
 	var top := ch.global_position + Vector3.UP * (1.3 * UNIT_SCALE / 0.6 * EnemyLooks.scale_of(id))
-	var num_pos := top + _toward_camera(ch.global_position) * 0.6
+	var num_pos := top + _toward_camera(ch.global_position) * 0.6 + _camera_right() * 0.55 * EnemyLooks.scale_of(id)
 	if blocked > 0:
 		Fx.block_flash(self, ch.global_position + Vector3.UP * 0.8 * EnemyLooks.scale_of(id), 0.8 * EnemyLooks.scale_of(id))
 		Audio.play_sfx("block")
@@ -395,6 +395,11 @@ func _toward_camera(from: Vector3) -> Vector3:
 	var v := cam.global_position - from
 	v.y = 0.0
 	return v.normalized()
+
+
+func _camera_right() -> Vector3:
+	var cam := get_viewport().get_camera_3d()
+	return cam.global_basis.x if cam else Vector3.RIGHT
 
 
 func _return_hero(delay: float) -> void:

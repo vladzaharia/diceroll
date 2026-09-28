@@ -29,7 +29,7 @@ static func damage_number(parent: Node3D, pos: Vector3, amount: int, crit := fal
 		color := Color(0, 0, 0, 0)) -> Label3D:
 	var col := color if color.a > 0.0 else (CRIT_COLOR if crit else DAMAGE_COLOR)
 	var text := str(amount) + ("!" if crit else "")
-	return popup_text(parent, pos, text, col, 1.45 if crit else 1.0, crit)
+	return popup_text(parent, pos, text, col, 1.3 if crit else 1.0, crit)
 
 
 ## Floating label ("BLOCK", "+12", "MISS"...). size 1.0 ~ 0.55 world units tall.
@@ -39,7 +39,7 @@ static func popup_text(parent: Node3D, pos: Vector3, text: String, color: Color,
 	l.text = text
 	l.font = Props.font(true)
 	l.font_size = 128
-	l.pixel_size = 0.0058 * size
+	l.pixel_size = 0.005 * size
 	l.outline_size = 30
 	l.outline_modulate = Color(0.12, 0.05, 0.08, 0.95)
 	l.modulate = color
