@@ -115,3 +115,50 @@ func test_two_wilds_free_one_is_six() -> void:
 	var v: Array = c.values.duplicate()
 	v.sort()
 	assert_eq(v, [2, 3, 4, 5, 6, 6])
+
+# ---- unusual faces (0 = blank, values up to 9)
+
+func test_blanks_ignored_for_sets() -> void:
+	_check([0, 0, 6, 6, 6], "three_kind", 2.5, [2, 3, 4])
+	_check([0, 0, 3], "high_roller", 1.0, [2])
+	_check([0, 5], "high_roller", 1.0, [1])
+
+func test_blank_pairs_never_combo() -> void:
+	var c := _ev([0, 0])
+	assert_eq(c.id, "high_roller")
+	assert_eq(c.sum, 0)
+	_check([0, 0, 0, 0, 2], "high_roller", 1.0, [4])
+
+func test_high_value_straight() -> void:
+	_check([5, 6, 7, 8, 9], "straight", 3.0, [0, 1, 2, 3, 4])
+	_check([9, 7, 6, 8, 1], "small_straight", 2.5, [0, 1, 2, 3])
+	var c := _ev([5, 6, 7, 8, 9])
+	assert_eq(c.sum, 35)
+
+func test_blank_breaks_straight() -> void:
+	_check([0, 1, 2, 3, 5], "high_roller", 1.0, [4])
+	_check([0, 1, 2, 3, 4], "small_straight", 2.5, [1, 2, 3, 4])
+
+func test_high_value_sets() -> void:
+	_check([7, 7, 8, 8, 9], "two_pair", 2.0, [0, 1, 2, 3])
+	_check([7, 7, 8, 8, 8], "full_house", 3.5, [0, 1, 2, 3, 4])
+	_check([9, 9, 9, 9, 2], "four_kind", 5.0, [0, 1, 2, 3])
+	_check([9, 9, 9, 9, 9], "five_kind", 10.0, [0, 1, 2, 3, 4])
+
+func test_full_house_prefers_higher_sum() -> void:
+	var c := _ev([7, 7, 9, 9, 9])
+	assert_eq(c.id, "full_house")
+	assert_eq(c.sum, 41)
+
+func test_wild_caps_at_six() -> void:
+	# Wild may only become 1..6: 9,9 + Wild is a pair of 9s plus a free 6, not three 9s.
+	var c := _ev([9, 9, 1], [false, false, true])
+	assert_eq(c.id, "pair")
+	assert_eq(c.values, [9, 9, 6])
+	# Wild bridges into a high straight from below: W(6)-7-8-9 small straight
+	_check([7, 8, 9, 1], "small_straight", 2.5, [0, 1, 2, 3], [false, false, false, true])
+
+func test_wild_on_blank_face_still_wild() -> void:
+	var c := _ev([6, 6, 0], [false, false, true])
+	assert_eq(c.id, "three_kind")
+	assert_eq(c.values, [6, 6, 6])

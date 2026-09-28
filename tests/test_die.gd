@@ -54,3 +54,40 @@ func test_round_trip() -> void:
 	assert_eq(e.rune, "blade")
 	assert_eq(e.edited, d.edited)
 	assert_eq(JSON.stringify(e.to_dict()), JSON.stringify(d.to_dict()))
+
+func test_kind_default_and_make() -> void:
+	var d := Die.new()
+	assert_eq(d.kind, "standard")
+	var g := Die.make("blade", "gambler")
+	assert_eq(g.kind, "gambler")
+	assert_eq(g.rune, "blade")
+	assert_eq(g.faces, PackedInt32Array([0, 0, 6, 6, 6, 6]))
+	var giant := Die.make("", "giant")
+	assert_eq(giant.faces, PackedInt32Array([4, 5, 6, 7, 8, 9]))
+
+func test_raise_cap_by_kind() -> void:
+	var d := Die.make("", "giant")
+	assert_eq(d.raise_cap(), 9)
+	assert_true(d.raise_face(2), "giant 6 -> 7")
+	assert_eq(d.faces[2], 7)
+	assert_true(not d.raise_face(5), "giant 9 is capped")
+	var h := Die.make("", "high")
+	assert_eq(h.raise_cap(), 6)
+	assert_true(not h.can_raise(5))
+	assert_true(h.can_raise(0))
+
+func test_blank_face_raises_to_one() -> void:
+	var d := Die.make("", "gambler")
+	assert_eq(d.lowest_face(), 0)
+	assert_true(d.raise_face(0))
+	assert_eq(d.faces[0], 1)
+
+func test_kind_round_trip() -> void:
+	var d := Die.make("ember", "twin")
+	var parsed: Dictionary = JSON.parse_string(JSON.stringify(d.to_dict()))
+	assert_eq(parsed.kind, "twin")
+	var e := Die.from_dict(parsed)
+	assert_eq(e.kind, "twin")
+	assert_eq(e.faces, d.faces)
+	var legacy := Die.from_dict({"faces": [1, 2, 3, 4, 5, 6], "rune": ""})
+	assert_eq(legacy.kind, "standard", "old saves default to standard")

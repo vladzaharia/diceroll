@@ -47,15 +47,84 @@ func test_generation_deterministic() -> void:
 	assert_eq(JSON.stringify(a.to_dict()), JSON.stringify(b.to_dict()))
 
 func test_landing_and_path_wraparound() -> void:
-	assert_eq(Board.landing(22, 5), 3)
-	assert_eq(Board.landing(0, 4), 4)
-	assert_eq(Board.path(22, 5), [23, 0, 1, 2, 3])
-	assert_true(Board.crosses_start(22, 5))
-	assert_true(Board.crosses_start(20, 4), "landing exactly on start counts")
-	assert_true(not Board.crosses_start(0, 6), "leaving start does not")
+	var b := Board.generate(Rng.new(1), 1)
+	assert_eq(b.landing(22, 5), 3)
+	assert_eq(b.landing(0, 4), 4)
+	assert_eq(b.path(22, 5), [23, 0, 1, 2, 3])
+	assert_true(b.crosses_start(22, 5))
+	assert_true(b.crosses_start(20, 4), "landing exactly on start counts")
+	assert_true(not b.crosses_start(0, 6), "leaving start does not")
+
+func test_zero_move_stays() -> void:
+	var b := Board.generate(Rng.new(1), 1)
+	assert_eq(b.landing(5, 0), 5)
+	assert_eq(b.path(5, 0), [])
+	assert_true(not b.crosses_start(23, 0))
 
 func test_portal_targets() -> void:
-	assert_eq(Board.portal_targets(18), [19, 20, 21, 22, 23, 0, 1, 2])
+	var b := Board.generate(Rng.new(1), 1)
+	assert_eq(b.portal_range(), 8)
+	assert_eq(b.portal_targets(18), [19, 20, 21, 22, 23, 0, 1, 2])
+
+# ---- board size parameter
+
+func test_default_size_is_balance_board_size() -> void:
+	var b := Board.generate(Rng.new(2), 1)
+	assert_eq(Balance.BOARD_SIZE, 24)
+	assert_eq(b.size(), 24)
+	assert_eq(b.side(), 7)
+	assert_eq(b.corners(), {0: "start", 6: "forge", 12: "treasury", 18: "portal"})
+
+func test_size_32_geometry() -> void:
+	var b := Board.generate(Rng.new(2), 1, 32)
+	assert_eq(b.size(), 32)
+	assert_eq(b.side(), 9)
+	assert_eq(b.tiles.size(), 32)
+	assert_eq(b.corners(), {0: "start", 8: "forge", 16: "treasury", 24: "portal"})
+	assert_eq(b.tiles[8].type, "forge")
+	assert_eq(b.tiles[16].type, "treasury")
+	assert_eq(b.tiles[24].type, "portal")
+	assert_true(b.is_corner(24) and not b.is_corner(18))
+	assert_eq(b.landing(30, 5), 3)
+	assert_eq(b.path(30, 4), [31, 0, 1, 2])
+	assert_true(b.crosses_start(28, 4))
+	assert_true(not b.crosses_start(20, 9))
+	assert_eq(b.portal_range(), 10)
+	assert_eq(b.portal_targets(24), [25, 26, 27, 28, 29, 30, 31, 0, 1, 2])
+
+func test_size_32_distribution() -> void:
+	for s in 30:
+		var b := Board.generate(Rng.new(s), 1, 32)
+		assert_eq(_count(b, "enemy"), 8, "enemies seed %d" % s)
+		assert_eq(_count(b, "chest"), 4)
+		assert_eq(_count(b, "event"), 4)
+		assert_eq(_count(b, "campfire"), 3)
+		assert_eq(_count(b, "trap"), 3)
+		assert_eq(_count(b, "empty"), 6)
+		for i in [1, 2]:
+			assert_true(b.tiles[i].type != "enemy" and b.tiles[i].type != "elite", "no fight right after start")
+	var b2 := Board.generate(Rng.new(4), 2, 32)
+	assert_eq(_count(b2, "elite"), 1)
+	assert_eq(_count(b2, "enemy"), 7)
+
+func test_size_32_mutation_and_round_trip() -> void:
+	var r := Rng.new(6)
+	var b := Board.generate(r, 1, 32)
+	var enemies := _count(b, "enemy")
+	b.mutate(r, 1, 2)
+	assert_eq(_count(b, "enemy"), enemies + 3, "32 ring spawns 3 enemies per lap")
+	assert_eq(_count(b, "elite"), 1)
+	assert_eq(_count(b, "event"), 4, "events refresh to 4")
+	var parsed: Dictionary = JSON.parse_string(JSON.stringify(b.to_dict()))
+	var c := Board.from_dict(parsed)
+	assert_eq(c.size(), 32)
+	assert_eq(c.side(), 9)
+	assert_eq(JSON.stringify(c.to_dict()), JSON.stringify(b.to_dict()))
+
+func test_side_helpers() -> void:
+	assert_eq(Board.side_for(24), 7)
+	assert_eq(Board.side_for(32), 9)
+	assert_eq(Board.corners_for(32).keys(), [0, 8, 16, 24])
 
 func test_mutation() -> void:
 	var r := Rng.new(5)
@@ -63,7 +132,7 @@ func test_mutation() -> void:
 	# clear one enemy tile and consume an event
 	var cleared := -1
 	var consumed := -1
-	for i in 24:
+	for i in b.size():
 		if b.tiles[i].type == "enemy" and cleared < 0:
 			cleared = i
 		if b.tiles[i].type == "event" and consumed < 0:
@@ -71,7 +140,7 @@ func test_mutation() -> void:
 	b.clear_enemies(cleared)
 	b.tiles[consumed] = Board.make_tile("empty")
 	var protect := -1
-	for i in 24:
+	for i in b.size():
 		if b.tiles[i].type == "empty" and i != cleared and i != consumed:
 			protect = i
 			break

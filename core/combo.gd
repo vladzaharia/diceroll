@@ -1,6 +1,7 @@
 class_name Combo
 extends RefCounted
-## Yahtzee-style combo detection over 1..6 dice.
+## Yahtzee-style combo detection over dice values 0..9 (0 = blank face, never part of a combo).
+## Wild dice may become any value 1..WILD_MAX (6), never a blank and never 7..9.
 ## evaluate() returns {id, name, mult, group:Array[int] (dice indices), sum:int (group pips),
 ## values:Array[int] (effective values after Wild substitution)}.
 ## Best combo = highest multiplier; ties go to the higher group pip sum.
@@ -17,6 +18,9 @@ const TABLE := {
 	"pair": {"name": "Pair", "mult": 1.5},
 	"high_roller": {"name": "High Roller", "mult": 1.0},
 }
+
+const MAX_VALUE := 9
+const WILD_MAX := 6
 
 const _KIND_IDS := {6: "six_kind", 5: "five_kind", 4: "four_kind", 3: "three_kind", 2: "pair"}
 
@@ -41,7 +45,7 @@ static func evaluate(values: Array[int], wild: Array[bool] = []) -> Dictionary:
 			best = c
 		# advance
 		var p := assign.size() - 1
-		while p >= 0 and assign[p] == 6:
+		while p >= 0 and assign[p] == WILD_MAX:
 			p -= 1
 		if p < 0:
 			break
@@ -51,7 +55,7 @@ static func evaluate(values: Array[int], wild: Array[bool] = []) -> Dictionary:
 	# A Wild outside the scoring group is free: it shows (and counts as) a 6.
 	for i in wild_idx:
 		if not (best.group as Array).has(i):
-			best.values[i] = 6
+			best.values[i] = WILD_MAX
 	return best
 
 static func _better(a: Dictionary, b: Dictionary) -> bool:
@@ -67,27 +71,33 @@ static func _make(id: String, group: Array[int], vals: Array[int]) -> Dictionary
 	return {"id": id, "name": e.name, "mult": float(e.mult), "group": group, "sum": s, "values": vals.duplicate()}
 
 static func _evaluate_fixed(vals: Array[int]) -> Dictionary:
+	# Blank faces (0) never join a set or straight; values run 1..MAX_VALUE.
 	var by_val := {}
-	for v in range(1, 7):
+	for v in range(1, MAX_VALUE + 1):
 		by_val[v] = [] as Array[int]
 	for i in vals.size():
-		var v: int = clampi(vals[i], 1, 6)
-		(by_val[v] as Array[int]).append(i)
+		var v: int = clampi(vals[i], 0, MAX_VALUE)
+		if v > 0:
+			(by_val[v] as Array[int]).append(i)
 	var best: Dictionary = {}
 	var cands: Array[Dictionary] = []
+	var present: Array[int] = []
+	for v in range(1, MAX_VALUE + 1):
+		if not (by_val[v] as Array[int]).is_empty():
+			present.append(v)
 	# N of a kind
-	for v in range(1, 7):
+	for v in present:
 		var idx: Array[int] = by_val[v]
 		for n in [6, 5, 4, 3, 2]:
 			if idx.size() >= n:
 				cands.append(_make(_KIND_IDS[n], idx.slice(0, n), vals))
 				break
 	# Full house and two pair
-	for a in range(1, 7):
+	for a in present:
 		var ia: Array[int] = by_val[a]
 		if ia.size() < 2:
 			continue
-		for b in range(1, 7):
+		for b in present:
 			if b == a:
 				continue
 			var ib: Array[int] = by_val[b]
@@ -101,19 +111,16 @@ static func _evaluate_fixed(vals: Array[int]) -> Dictionary:
 				var g2: Array[int] = ia.slice(0, 2)
 				g2.append_array(ib.slice(0, 2))
 				cands.append(_make("two_pair", g2, vals))
-	# Straights
-	for start in range(1, 4):
+	# Straights: runs of consecutive non-zero values
+	for start in present:
 		for length in [5, 4]:
-			if start + length - 1 > 6:
-				continue
 			var ok := true
 			var g3: Array[int] = []
 			for v in range(start, start + length):
-				var iv: Array[int] = by_val[v]
-				if iv.is_empty():
+				if v > MAX_VALUE or (by_val[v] as Array[int]).is_empty():
 					ok = false
 					break
-				g3.append(iv[0])
+				g3.append((by_val[v] as Array[int])[0])
 			if ok:
 				cands.append(_make("straight" if length == 5 else "small_straight", g3, vals))
 	# High roller
