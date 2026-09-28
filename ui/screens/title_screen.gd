@@ -130,8 +130,12 @@ class _Vignette:
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 
+	var _tex: Texture2D
+
 	func _draw() -> void:
-		# soft darkening at top and bottom for text contrast
-		var ink := Color(0.02, 0.02, 0.07)
-		var tex := UiTheme.vgradient(Color(ink, 0.7), Color(ink, 0.75), Color(ink, 0.12))
-		draw_texture_rect(tex, Rect2(Vector2.ZERO, size), false)
+		# soft darkening at top and bottom for text contrast (texture kept alive: RIDs of a
+		# temporary texture would be freed before the frame renders)
+		if _tex == null:
+			var ink := Color(0.02, 0.02, 0.07)
+			_tex = UiTheme.vgradient(Color(ink, 0.7), Color(ink, 0.75), Color(ink, 0.12))
+		draw_texture_rect(_tex, Rect2(Vector2.ZERO, size), false)

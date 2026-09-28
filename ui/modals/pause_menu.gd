@@ -29,7 +29,8 @@ func _build() -> void:
 	settings.pressed.connect(func() -> void: settings_pressed.emit())
 	_main.add_child(settings)
 	_main.add_child(UiTheme.spacer(6))
-	var abandon := GameButton.make("ABANDON RUN", "flag", GameButton.Kind.DANGER, 28)
+	var abandon := GameButton.make("ABANDON RUN", "flag", GameButton.Kind.DANGER, 26)
+	abandon.min_height = 88
 	abandon.icon_tint = UiPalette.TEXT
 	abandon.pressed.connect(_ask)
 	_main.add_child(abandon)

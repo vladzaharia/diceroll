@@ -267,7 +267,7 @@ class UiBackdrop:
 		cam.current = true
 		var view := get_viewport().get_visible_rect().size
 		var portrait := view.y > view.x
-		var dist := 13.0 if portrait else 9.5
+		var dist := 16.0 if portrait else 11.0
 		if combat:
 			cam.position = Vector3(-2.5, 4.5, 8.0)
 			cam.look_at(Vector3(0, 0.5, 1.5))

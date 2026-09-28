@@ -8,10 +8,10 @@ signal class_chosen(class_id: String)
 signal back_pressed
 
 const TAGLINES := {
-	"knight": "Sturdy shield-bearer. A Guard die blocks damage every turn.",
-	"barbarian": "Hits hard. A Heavy die doubles its pips, plus 2 ATK.",
-	"mage": "Glass cannon. Ember scorches all foes, Echo boosts combos.",
-	"rogue": "Poison and luck. Venom stacks up, Lucky banks rerolls.",
+	"knight": "Sturdy and steady. His Guard die blocks every turn.",
+	"barbarian": "Hits hard: a Heavy die and +2 ATK on every attack.",
+	"mage": "Ember scorches every foe, Echo boosts combos.",
+	"rogue": "Venom stacks poison, Lucky banks extra rerolls.",
 }
 
 var selected := "knight"
@@ -31,6 +31,7 @@ var _dice_box: VBoxContainer
 var _header: Label
 var _panel: PanelContainer
 var _bg: _Backdrop
+var _cam: Camera3D
 
 
 func _init() -> void:
@@ -164,6 +165,7 @@ func _build_preview() -> void:
 	_pivot = Node3D.new()
 	world.add_child(_pivot)
 	var cam := Camera3D.new()
+	_cam = cam
 	cam.fov = 32
 	cam.position = Vector3(0, 1.35, 5.2)
 	cam.transform = Transform3D(Basis.looking_at(Vector3(0, 0.85, 0) - cam.position), cam.position)
@@ -182,8 +184,8 @@ func select(id: String, animate := true) -> void:
 	UiTheme.clear(_stats)
 	_stats.add_child(_stat("heart", "%d" % int(def.hp), "HP", UiPalette.HP))
 	_stats.add_child(_stat("sword", "+%d" % int(def.atk), "ATK", UiPalette.TEXT))
-	_stats.add_child(_stat("reroll", "%d" % int(def.board_rerolls), "BOARD REROLL", UiPalette.GOLD_BRIGHT))
-	_stats.add_child(_stat("dice", "%d" % Balance.COMBAT_REROLLS, "COMBAT REROLLS", UiPalette.DIE_BODY))
+	_stats.add_child(_stat("reroll", "%d" % int(def.board_rerolls), "MOVE REROLL", UiPalette.GOLD_BRIGHT))
+	_stats.add_child(_stat("dice", "%d" % Balance.COMBAT_REROLLS, "FIGHT REROLLS", UiPalette.DIE_BODY))
 	UiTheme.clear(_dice_box)
 	var runes: Array = def.runes
 	for r in runes:
@@ -206,7 +208,7 @@ func _stat(icon: String, value: String, label: String, col: Color) -> Control:
 	v.add_child(r)
 	r.add_child(UiIcons.rect(icon, 30))
 	r.add_child(UiTheme.label(value, 30, col, true, 0))
-	var l := UiTheme.label(label, 13, UiPalette.TEXT_MUTED, false, 0, false, 700)
+	var l := UiTheme.label(label, 15, UiPalette.TEXT_MUTED, false, 0, false, 700)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(l)
 	return p
@@ -277,6 +279,7 @@ func _layout() -> void:
 		var avail := _panel.position.y - top + 30.0
 		_preview.position = Vector2(0, top)
 		_preview.size = Vector2(size.x, maxf(200.0, avail))
+		_cam.fov = 32
 	else:
 		var w := minf(UiTheme.MODAL_MAX_W, size.x * 0.46)
 		_panel.reset_size()
@@ -285,9 +288,11 @@ func _layout() -> void:
 		_panel.size = Vector2(w, ph)
 		var x := size.x * 0.5 + (size.x * 0.5 - w) * 0.35
 		_panel.position = Vector2(x, maxf(safe.top + 90.0, (size.y - ph) * 0.5 + 40.0))
-		_preview.position = Vector2(0, safe.top + 60.0)
-		_preview.size = Vector2(size.x * 0.52, size.y - safe.top - 60.0 - safe.bottom)
-		_header.size = Vector2(size.x * 0.52, 88)
+		_preview.position = Vector2(size.x * 0.04, safe.top)
+		_preview.size = Vector2(size.x * 0.48, size.y - safe.top - safe.bottom)
+		_cam.fov = 40
+		_header.size = Vector2(w, 88)
+		_header.position = Vector2(x, _panel.position.y - 100.0)
 
 
 class _Backdrop:

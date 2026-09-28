@@ -240,19 +240,19 @@ static func tray_height(view: Vector2) -> float:
 
 
 ## Vertical gradient texture (top -> bottom colours, optional middle stop).
-static func vgradient(top: Color, bottom: Color, mid: Variant = null) -> GradientTexture2D:
-	var g := Gradient.new()
-	g.set_color(0, top)
-	g.set_color(1, bottom)
-	if mid is Color:
-		g.add_point(0.5, mid)
-	var t := GradientTexture2D.new()
-	t.gradient = g
-	t.fill_from = Vector2(0, 0)
-	t.fill_to = Vector2(0, 1)
-	t.width = 4
-	t.height = 128
-	return t
+## Built synchronously from an Image (GradientTexture2D updates deferred and can draw blank).
+static func vgradient(top: Color, bottom: Color, mid: Variant = null) -> Texture2D:
+	var h := 128
+	var img := Image.create(1, h, false, Image.FORMAT_RGBA8)
+	for y in h:
+		var t := float(y) / float(h - 1)
+		var c: Color
+		if mid is Color:
+			c = top.lerp(mid, t * 2.0) if t < 0.5 else (mid as Color).lerp(bottom, (t - 0.5) * 2.0)
+		else:
+			c = top.lerp(bottom, t)
+		img.set_pixel(0, y, c)
+	return ImageTexture.create_from_image(img)
 
 
 ## Removes and frees every child of `node`.

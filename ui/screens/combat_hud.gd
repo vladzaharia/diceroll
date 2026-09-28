@@ -146,7 +146,7 @@ func _build_sheet() -> void:
 		m.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		h.add_child(m)
 		_sheet_rows[id] = r
-	var foot := UiTheme.para("Damage = (pip sum) × multiplier + ATK. Heavy pips count twice.", 20, UiPalette.TEXT_DIM)
+	var foot := UiTheme.label("Damage = all pips × multiplier + ATK", 20, UiPalette.TEXT_DIM, false, 0, false, 500)
 	foot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(UiTheme.spacer(6))
 	col.add_child(foot)
