@@ -157,6 +157,13 @@ class _Driver extends Node3D:
 				await get_tree().create_timer(maxf(wait - 0.5, 0.2)).timeout
 				_fx_all()
 
+	func _process(_dt: float) -> void:
+		if Shot and Shot.args.has("perf") and Engine.get_process_frames() % 60 == 0:
+			print("PERF fps=%d draws=%d prims=%d objects=%d" % [Engine.get_frames_per_second(),
+				Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
+				Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME),
+				Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME)])
+
 	func _combat(act: int, wait: float) -> void:
 		var boss := scenario.begins_with("boss")
 		var idx := 0 if boss else int(Shot.args.get("tile", "3"))
@@ -181,7 +188,7 @@ class _Driver extends Node3D:
 		board.hide_occluders(rig.desired_transform(), rig.camera.fov, vs.x / vs.y, focus)
 		await stage.began
 		var elapsed := (Time.get_ticks_msec() - start) / 1000.0
-		var hit_at := maxf(wait - 0.3, elapsed + 0.1)
+		var hit_at := maxf(wait - 0.5, elapsed + 0.1)
 		await get_tree().create_timer(maxf(hit_at - elapsed - 0.6, 0.05)).timeout
 		var tgt := 1 if list.size() > 2 else 0
 		stage.set_target(tgt)

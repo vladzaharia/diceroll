@@ -22,7 +22,7 @@ const DEFS := {
 		"gear": {}, "clips": {"attack": "Ranged_Magic_Shoot"}},
 	"bandit": {"model": "rogue_hooded", "tint": Color(0.5, 0.3, 0.25), "strength": 0.25, "scale": 1.0,
 		"gear": {}, "clips": {}},
-	"brute": {"model": "mannequin_large", "tint": Color(0.5, 0.58, 0.36), "strength": 0.82, "scale": 1.1,
+	"brute": {"model": "mannequin_large", "tint": Color(0.46, 0.56, 0.32), "strength": 0.95, "scale": 1.05,
 		"gear": {}, "clips": {}},
 	"boss_bone_warden": {"model": "knight", "tint": Color(0.93, 0.89, 0.78), "strength": 0.8, "scale": 1.6,
 		"gear": {}, "clips": {}, "boss": true},
