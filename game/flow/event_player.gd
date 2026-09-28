@@ -382,8 +382,8 @@ func _board_mutated(ev: Dictionary) -> void:
 ## the view returns.
 func _miniboss_appears(idx: int, ch: Dictionary) -> void:
 	var p := c.board.tile_global_position(idx)
-	var pts := PackedVector3Array([p + Vector3(-2.4, 0, -2.0), p + Vector3(2.4, 0, 2.0), p + Vector3.UP * 2.6])
-	c.rig.frame_points(pts, 0.0, 40.0)
+	var pts := PackedVector3Array([p + Vector3(-3.2, 0, -2.4), p + Vector3(3.2, 0, 3.6), p + Vector3.UP * 3.0])
+	c.rig.frame_points(pts, 0.0, 44.0)
 	await _wait(0.55)
 	c.overlay.vignette(0.5, 0.3)
 	Audio.play_sfx("trap")
@@ -396,8 +396,9 @@ func _miniboss_appears(idx: int, ch: Dictionary) -> void:
 	var nm := String(EnemyDefs.def(String(ids[0])).name) if not ids.is_empty() else "A mini-boss"
 	await _wait(0.25)
 	Audio.play_sfx("fanfare")
-	c.overlay.announce("MINI-BOSS!", "%s appears on the board" % nm, Color("ff8a4a"), 1.2)
-	c.overlay.toast("Optional fight: beat it for a boss-tier passive", "skull", Color("ffb070"), 0.62)
+	c.overlay.announce("MINI-BOSS!", "%s appears on the board" % nm, Color("ff8a4a"), 1.2, 0.6)
+	c.overlay.toast("Optional fight: beat it for a boss-tier passive", "skull", Color("ffb070"), 0.7)
+
 	await _wait(1.6)
 	c.overlay.vignette(0.0, 0.4)
 	c.rig.home(c.board.hero)

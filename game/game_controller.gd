@@ -392,6 +392,10 @@ func _boss_intro(tile: int, enemies: Array) -> void:
 	var nm := String(enemies[0].get("name", "Boss")) if not enemies.is_empty() else "Boss"
 	Audio.play_music("calm", 0.6)
 	overlay.vignette(0.85, 0.6)
+	# cinematic: no HUD bottom bar or tray while the boss rises
+	ui.combat_hud.visible = false
+	var tt := tray.create_tween()
+	tt.tween_property(tray, "modulate:a", 0.0, 0.3 / speed)
 	await wait(0.4)
 	var begun := [false]
 	stage.began.connect(func() -> void: begun[0] = true, CONNECT_ONE_SHOT)
@@ -413,6 +417,13 @@ func _boss_intro(tile: int, enemies: Array) -> void:
 	stage.reframe()
 	overlay.vignette(0.0, 0.8)
 	Audio.play_music("act3", 1.2)
+	ui.combat_hud.visible = true
+	ui.combat_hud.modulate.a = 0.0
+	var ht := ui.combat_hud.create_tween()
+	ht.tween_property(ui.combat_hud, "modulate:a", 1.0, 0.4 / speed)
+	var tt2 := tray.create_tween()
+	tt2.tween_property(tray, "modulate:a", 1.0, 0.4 / speed)
+
 	stage.set_target(flow.combat.target if flow.combat else 0)
 	await wait(0.3)
 

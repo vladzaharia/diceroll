@@ -26,7 +26,7 @@ enum Mode { OVERVIEW, FOLLOW, COMBAT, POINTS }
 @export var follow_smooth_time := 0.3
 ## Degrees the combat camera swings from a pure side view toward the hero's back
 ## (portrait needs a more over-the-shoulder view to fit the enemy row across the screen).
-@export var combat_swing_portrait := 60.0
+@export var combat_swing_portrait := 46.0
 @export var combat_swing_landscape := 38.0
 ## Normalised screen rects the combat framing must fit into (the integration layer narrows
 ## them to the space left between the top HUD and the combat panel + dice tray).

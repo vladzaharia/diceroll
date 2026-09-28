@@ -44,6 +44,8 @@ var _props: Array = []          # per tile: Node3D or null (prop + figures)
 var _figures: Array = []        # per tile: Array[Character]
 var _hero_turn_tween: Tween
 var _hidden: Array[Node3D] = []
+## Tiles whose top glows for the current move preview (cleared by clear_targets()).
+var _path_lit: Array[int] = []
 var _hidden_fx: Array[Node3D] = []
 
 
@@ -260,7 +262,7 @@ func _dress_tile(i: int, animate: bool) -> void:
 ## hovering skull emblem and a slow red ground glow. Returns the figure.
 func _dress_miniboss(holder: Node3D, id: String) -> Character:
 	var ch := EnemyLooks.create(id)
-	ch.scale = Vector3.ONE * PREVIEW_SCALE * 1.5 * EnemyLooks.scale_of(id) / 1.3
+	ch.scale = Vector3.ONE * PREVIEW_SCALE * 1.35 * EnemyLooks.scale_of(id) / 1.3
 	ch.position = Vector3(0, 0, 0.02)
 	ch.rotation.y = deg_to_rad(12.0)
 	holder.add_child(ch)
@@ -283,9 +285,9 @@ func _dress_miniboss(holder: Node3D, id: String) -> Character:
 	gt.tween_property(glow, "scale", Vector3.ONE * 0.94, 0.8).set_trans(Tween.TRANS_SINE)
 	var emblem := Node3D.new()
 	emblem.name = "Emblem"
-	emblem.position = Vector3(0, 1.75, 0)
+	emblem.position = Vector3(0, 2.25, -0.25)
 	holder.add_child(emblem)
-	var skull := Props.put(emblem, Props.HAL + "skull.gltf", Vector3.ZERO, 0.0, 0.62)
+	var skull := Props.put(emblem, Props.HAL + "skull.gltf", Vector3.ZERO, 0.0, 0.46)
 	Props.tint(skull, Color(1.0, 0.86, 0.7), 0.35, Color(0.6, 0.12, 0.05))
 	var l := OmniLight3D.new()
 	l.light_color = Color(1.0, 0.35, 0.2)
@@ -294,8 +296,8 @@ func _dress_miniboss(holder: Node3D, id: String) -> Character:
 	l.position = Vector3(0, 0.1, 0.4)
 	emblem.add_child(l)
 	var bob := emblem.create_tween().set_loops()
-	bob.tween_property(emblem, "position:y", 1.9, 1.0).set_trans(Tween.TRANS_SINE)
-	bob.tween_property(emblem, "position:y", 1.72, 1.0).set_trans(Tween.TRANS_SINE)
+	bob.tween_property(emblem, "position:y", 2.4, 1.0).set_trans(Tween.TRANS_SINE)
+	bob.tween_property(emblem, "position:y", 2.22, 1.0).set_trans(Tween.TRANS_SINE)
 	var spin := skull.create_tween().set_loops()
 	spin.tween_property(skull, "rotation:y", deg_to_rad(35.0), 1.4).set_trans(Tween.TRANS_SINE)
 	spin.tween_property(skull, "rotation:y", deg_to_rad(-35.0), 1.4).set_trans(Tween.TRANS_SINE)
@@ -402,34 +404,29 @@ func show_move_target(target: int, steps: int, double := false) -> void:
 	am.billboard_mode = BaseMaterial3D.BILLBOARD_FIXED_Y
 	arrow.material_override = am
 	arrow.rotation.z = PI
-	arrow.position.y = 1.45
+	arrow.position.y = 1.2
 	arrow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	m.add_child(arrow)
 	var at := arrow.create_tween().set_loops()
-	at.tween_property(arrow, "position:y", 1.15, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	at.tween_property(arrow, "position:y", 1.55, 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	at.tween_property(arrow, "position:y", 0.95, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	at.tween_property(arrow, "position:y", 1.3, 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
 	if double:
 		Fx.elite_sparkle(m, Vector3(0, 0.2, 0), 0.8, 1.6)
-	for k in range(1, steps):
+	# the tiles on the way light up in a quick wave, the target stays lit brighter
+	_path_lit.clear()
+	for k in range(1, steps + 1):
 		var idx := wrap_idx(hero_idx + k)
-		if idx == target:
+		var last := idx == target or k == steps
+		var mat := _top_mats[idx]
+		var glow := col * (0.55 if last else 0.22)
+		_path_lit.append(idx)
+		var tw := create_tween()
+		tw.tween_interval(0.045 * k)
+		tw.tween_method(func(e: float) -> void: mat.set_shader_parameter("emission", glow * e), 2.2, 1.0, 0.3) \
+			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		if last:
 			break
-		var dot := MeshInstance3D.new()
-		var q := PlaneMesh.new()
-		q.size = Vector2(0.4, 0.4)
-		dot.mesh = q
-		var dm := Props.glow_material(Color(1.0, 0.9, 0.55), false, 1.0)
-		dm.albedo_texture = Props.particle_texture("hard")
-		dot.material_override = dm
-		dot.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		dot.position = tile_position(idx) + Vector3.UP * 0.14
-
-		dot.scale = Vector3.ONE * 0.01
-		_targets_root.add_child(dot)
-		var dt := dot.create_tween()
-		dt.tween_interval(0.035 * k)
-		dt.tween_property(dot, "scale", Vector3.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-		dt.tween_property(dot, "scale", Vector3.ONE * 0.7, 0.5).set_trans(Tween.TRANS_SINE)
 
 
 func clear_targets() -> void:
@@ -437,6 +434,10 @@ func clear_targets() -> void:
 		return
 	for c in _targets_root.get_children():
 		c.queue_free()
+	for idx in _path_lit:
+		if idx < _top_mats.size():
+			_top_mats[idx].set_shader_parameter("emission", Color.BLACK)
+	_path_lit.clear()
 
 
 func _make_marker(idx: int, vals: Array, order: int, big := 1.0, col := Color(1.0, 0.86, 0.45)) -> Node3D:
@@ -476,7 +477,8 @@ func _make_marker(idx: int, vals: Array, order: int, big := 1.0, col := Color(1.
 	root.add_child(beam)
 	# die-face badge with the value(s)
 	var badge := Node3D.new()
-	badge.position.y = 1.45 * big
+	var bh := 1.45 + 0.35 * (big - 1.0)
+	badge.position.y = bh
 	badge.scale = Vector3.ONE * 1.9 * big
 	root.add_child(badge)
 	var chars := 0
@@ -524,8 +526,8 @@ func _make_marker(idx: int, vals: Array, order: int, big := 1.0, col := Color(1.
 	lbl.position.y = -0.01
 	badge.add_child(lbl)
 	var bt := badge.create_tween().set_loops()
-	bt.tween_property(badge, "position:y", 1.55 * big, 0.7).set_trans(Tween.TRANS_SINE)
-	bt.tween_property(badge, "position:y", 1.38 * big, 0.7).set_trans(Tween.TRANS_SINE)
+	bt.tween_property(badge, "position:y", bh + 0.1, 0.7).set_trans(Tween.TRANS_SINE)
+	bt.tween_property(badge, "position:y", bh - 0.07, 0.7).set_trans(Tween.TRANS_SINE)
 	# pop in, staggered
 	root.scale = Vector3.ONE * 0.01
 	var pt := root.create_tween()
@@ -827,6 +829,16 @@ func hide_occluders(cam_xform: Transform3D, fov_deg: float, aspect: float, focus
 			var vc := inv * box.get_center()
 			var on_screen := slo.x < 1.0 and shi.x > -1.0 and slo.y < 1.0 and shi.y > -1.0
 			hit = on_screen and -vc.z < near - 0.8
+			# 3) tall props level with the nearest fighter that overlap the fight on screen
+			# (lantern posts, gallows and trees right beside the hero)
+			if not hit:
+				var dmin := INF
+				for k in 8:
+					dmin = minf(dmin, -(inv * box.get_endpoint(k)).z)
+				var g := 0.15
+				var overlap := slo.x < hi.x + g and shi.x > lo.x - g and slo.y < hi.y + g and shi.y > lo.y - g
+				hit = overlap and dmin < near + 0.6
+
 		if hit:
 			_sink(n)
 			sunk.append(box.grow(0.9))

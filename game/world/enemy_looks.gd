@@ -25,14 +25,14 @@ const DEFS := {
 	"brute": {"model": "mannequin_large", "tint": Color(0.46, 0.56, 0.32), "strength": 0.95, "scale": 1.05,
 		"gear": {}, "clips": {}},
 	# Mini-bosses: clearly stronger than elites (bigger, armoured, lit), smaller than the Lich.
-	"mini_pumpkin_knight": {"model": "knight", "tint": Color(0.22, 0.16, 0.14), "strength": 0.55, "scale": 1.3,
+	"mini_pumpkin_knight": {"model": "knight", "tint": Color(0.22, 0.16, 0.14), "strength": 0.55, "scale": 1.45,
 		"emission": Color(0.1, 0.03, 0.0), "gear": {"handslot.r": ADV + "sword_2handed_color.gltf",
 		"handslot.l": ADV + "shield_spikes_color.gltf"}, "clips": {"attack": "Melee_2H_Attack_Chop"},
 		"pumpkin": true, "aura": Color(1.0, 0.5, 0.12), "miniboss": true},
-	"mini_bone_champion": {"model": "barbarian", "tint": Color(0.93, 0.9, 0.8), "strength": 0.85, "scale": 1.3,
+	"mini_bone_champion": {"model": "barbarian", "tint": Color(0.93, 0.9, 0.8), "strength": 0.85, "scale": 1.45,
 		"skeleton_head": true, "gear": {"handslot.r": ADV + "axe_2handed.gltf"},
 		"clips": {"attack": "Melee_2H_Attack_Chop"}, "aura": Color(0.75, 0.85, 1.0), "miniboss": true},
-	"mini_grave_mage": {"model": "mage", "tint": Color(0.16, 0.36, 0.26), "strength": 0.7, "scale": 1.3,
+	"mini_grave_mage": {"model": "mage", "tint": Color(0.16, 0.36, 0.26), "strength": 0.7, "scale": 1.45,
 		"emission": Color(0.02, 0.12, 0.06), "gear": {"handslot.r": ADV + "staff.gltf", "handslot.l": ADV + "spellbook_open.gltf"},
 		"clips": {"attack": "Ranged_Magic_Spellcasting"}, "skeleton_head": true, "aura": Color(0.35, 1.0, 0.55),
 		"miniboss": true},
@@ -112,7 +112,7 @@ static func _skull_head(ch: Character, replace := false) -> void:
 	if replace:
 		for m in ch.model.find_children("*", "MeshInstance3D", true, false):
 			var n := String(m.name).to_lower()
-			if n.contains("head") or n.contains("hat") or n.contains("hood"):
+			if n.contains("head") or n.contains("hat") or n.contains("hood") or n.contains("helmet"):
 				(m as MeshInstance3D).visible = false
 	var p := ch.attach("head", "res://assets/kaykit/halloween/skull.gltf")
 	if p:
@@ -137,7 +137,7 @@ static func _aura(ch: Character, color: Color) -> void:
 static func _pumpkin_head(ch: Character) -> void:
 	for m in ch.model.find_children("*", "MeshInstance3D", true, false):
 		var n := String(m.name).to_lower()
-		if n.contains("head") or n.contains("hat"):
+		if n.contains("head") or n.contains("hat") or n.contains("helmet"):
 			(m as MeshInstance3D).visible = false
 	var p := ch.attach("head", "res://assets/kaykit/halloween/pumpkin_orange_jackolantern.gltf")
 	if p:

@@ -221,10 +221,10 @@ void fragment() {
 	if (kind_mark > 0 && wild < 0.5) {
 		float km = 0.0;
 		for (int c = 0; c < 2; c++) {
-			vec2 at = (c == 0) ? vec2(-0.64, -0.64) : vec2(0.64, 0.64);
-			vec2 q = (p - at) / 0.088;
+			vec2 at = (c == 0) ? vec2(-0.63, -0.63) : vec2(0.63, 0.63);
+			vec2 q = (p - at) / 0.1;
 			q.y = -q.y;
-			float d = sd_kind(q, kind_mark) * 0.088;
+			float d = sd_kind(q, kind_mark) * 0.1;
 			float ka = fwidth(d) * 0.9;
 			km = max(km, 1.0 - smoothstep(-ka, ka, d));
 		}

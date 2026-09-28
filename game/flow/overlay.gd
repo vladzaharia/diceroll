@@ -263,7 +263,7 @@ func passive_pop(at: Vector2, id: String, text := "") -> void:
 # --- announcements -------------------------------------------------------------------------
 
 ## Big centred title + subtitle that pops in, holds, and fades (non-blocking).
-func announce(title: String, subtitle := "", color: Color = UiPalette.GOLD_BRIGHT, hold := 1.1) -> void:
+func announce(title: String, subtitle := "", color: Color = UiPalette.GOLD_BRIGHT, hold := 1.1, y_ratio := 0.3) -> void:
 	_ann_title.text = title
 	var fs := 84
 	var tw := UiTheme.display_font().get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + fs * 0.5
@@ -276,7 +276,7 @@ func announce(title: String, subtitle := "", color: Color = UiPalette.GOLD_BRIGH
 	_announce.reset_size()
 	var s := _announce.get_combined_minimum_size()
 	_announce.size = Vector2(size.x, s.y)
-	_announce.position = Vector2(0, size.y * 0.3 - s.y * 0.5)
+	_announce.position = Vector2(0, size.y * y_ratio - s.y * 0.5)
 	_announce.pivot_offset = _announce.size * 0.5
 	_announce.scale = Vector2(0.4, 0.4)
 	_announce.modulate.a = 0.0

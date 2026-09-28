@@ -40,6 +40,8 @@ var kind := "standard"
 var chosen := false
 ## Board move: this die is not moving (darkened).
 var dimmed := false
+## Body size (Giant dice are a little bigger).
+var size_k := 1.0
 
 ## Floor position the die rests at (x, 0, z); tray layout sets it.
 var rest_pos := Vector3.ZERO
@@ -143,8 +145,22 @@ func set_data(d: Variant) -> void:
 
 func _apply_look() -> void:
 	var look: Array = RUNE_LOOKS[rune]
-	mat.set_shader_parameter("body_color", look[0])
-	mat.set_shader_parameter("edge_color", look[1])
+	var kc := UiPalette.kind_color(kind)
+	var special := kind != "standard" and UiPalette.kind_mark(kind) > 0
+	size_k = 1.13 if kind == "giant" else 1.0
+	pivot.scale = Vector3.ONE * size_k
+	ring.scale = Vector3.ONE * size_k
+	# kind identity on plain dice: a tinted bevel band and a faint body tint (runes keep theirs)
+	var body_c: Color = look[0]
+	var edge_c: Color = look[1]
+	if special and rune == "":
+		body_c = body_c.lerp(kc, 0.1)
+		edge_c = edge_c.lerp(kc, 0.62)
+	elif special:
+		edge_c = edge_c.lerp(kc, 0.3)
+	mat.set_shader_parameter("body_color", body_c)
+	mat.set_shader_parameter("edge_color", edge_c)
+
 	mat.set_shader_parameter("pip_color", look[2])
 	mat.set_shader_parameter("rim_color", look[3])
 	mat.set_shader_parameter("rim_strength", 0.0 if rune == "" else RIM_STRENGTH)
@@ -279,14 +295,14 @@ func show_value(value: int, rng: RandomNumberGenerator) -> void:
 	_rolling = false
 	rest_basis = target_basis(pick_slot(value, rng), rng, body.basis)
 	body.basis = rest_basis
-	pivot.position = Vector3(0.0, 0.5 + _lift, 0.0)
+	pivot.position = Vector3(0.0, 0.5 * size_k + _lift, 0.0)
 	squash.scale = Vector3.ONE
 
 
 ## Starts a throw that ends at `end_pos` (floor x/z, relative to the tray) showing `value`.
 func start_roll(value: int, end_pos: Vector3, rng: RandomNumberGenerator, delay: float, duration: float, drift: Vector3, apex: float) -> void:
 	_p0 = position
-	_h0 = pivot.position.y - DieMesh.support_down(body.basis)
+	_h0 = pivot.position.y - DieMesh.support_down(body.basis) * size_k
 	_q0 = body.basis.get_rotation_quaternion()
 	var tb := target_basis(pick_slot(value, rng), rng, body.basis)
 	_q1 = tb.get_rotation_quaternion()
@@ -339,7 +355,7 @@ func tick(dt: float, speed: float) -> bool:
 	_lift = lerpf(_lift, lift_target, k)
 	if not _rolling:
 		var bob := sin(_time * 2.6 + _phase) * 0.03 * (_lift / MARK_LIFT)
-		pivot.position = Vector3(0.0, 0.5 + _lift + bob, 0.0)
+		pivot.position = Vector3(0.0, 0.5 * size_k + _lift + bob, 0.0)
 	_glow = lerpf(_glow, 1.0 if (marked or chosen) and not locked else 0.0, k)
 	_dim = lerpf(_dim, 1.0 if dimmed and not _rolling else 0.0, k)
 	mat.set_shader_parameter("dim", _dim)
@@ -360,7 +376,7 @@ func tick(dt: float, speed: float) -> bool:
 	_chain_scale = lerpf(_chain_scale, chain_target, 1.0 - exp(-dt * 14.0))
 	chains.visible = _chain_scale > 0.02
 	chains.position = pivot.position
-	chains.scale = Vector3.ONE * maxf(_chain_scale, 0.001)
+	chains.scale = Vector3.ONE * maxf(_chain_scale, 0.001) * size_k
 	return finished
 
 
@@ -402,4 +418,4 @@ func _pose(s: float) -> void:
 	squash.scale = Vector3(1.0 + sq * 0.55, 1.0 - sq, 1.0 + sq * 0.55)
 	var support := DieMesh.support_down(bs) * (1.0 - sq)
 	position = Vector3(hp.x, 0.0, hp.z)
-	pivot.position = Vector3(0.0, support + h, 0.0)
+	pivot.position = Vector3(0.0, support * size_k + h, 0.0)
