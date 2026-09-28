@@ -16,6 +16,7 @@ var dice_faces: Array[int] = []    # rolled face index per die
 var rerolled: Array[bool] = []     # die rerolled at least once this turn
 var boss: bool = false
 var elite: bool = false
+var miniboss: bool = false
 var tile: int = -1
 var act: int = 1
 var lap: int = 1
@@ -27,9 +28,10 @@ var xp_reward: int = 0
 
 # ---------------------------------------------------------------- setup
 
-func begin(run: RunState, ids: Array, p_elite: bool, p_boss: bool, p_tile: int) -> Array[Dictionary]:
+func begin(run: RunState, ids: Array, p_elite: bool, p_boss: bool, p_tile: int, p_miniboss := false) -> Array[Dictionary]:
 	elite = p_elite
 	boss = p_boss
+	miniboss = p_miniboss
 	tile = p_tile
 	act = run.act
 	lap = run.lap
@@ -38,7 +40,7 @@ func begin(run: RunState, ids: Array, p_elite: bool, p_boss: bool, p_tile: int) 
 	for i in enemies.size():
 		roll_intent(run.rng, i)
 	var ev: Array[Dictionary] = []
-	ev.append({"type": "combat_started", "enemies": enemies.duplicate(true), "boss": boss, "elite": elite, "tile": tile})
+	ev.append({"type": "combat_started", "enemies": enemies.duplicate(true), "boss": boss, "elite": elite, "miniboss": miniboss, "tile": tile})
 	for i in enemies.size():
 		ev.append({"type": "enemy_intent", "enemy_idx": i, "intent": enemies[i].intent.duplicate()})
 	ev.append_array(start_turn(run))
@@ -58,6 +60,7 @@ static func make_enemy(rng: Rng, id: String, p_act: int, p_lap: int, p_elite: bo
 		"id": id, "name": String(def.name), "hp": hp, "max_hp": hp, "block": 0, "atk_bonus": 0,
 		"poison": 0, "frozen": false, "intent": {"kind": "aim", "value": 0}, "boss": is_boss, "phase": 1,
 		"elite": p_elite, "atk_mult": atk_mult, "step": step, "summoned": summoned,
+		"miniboss": EnemyDefs.is_miniboss(id),
 	}
 
 func alive(i: int) -> bool:
@@ -87,8 +90,8 @@ func roll_intent(rng: Rng, i: int) -> void:
 	if e.boss:
 		pattern = EnemyDefs.BOSSES[e.id].phases[int(e.phase) - 1]
 	else:
-		pattern = EnemyDefs.ENEMIES[e.id].pattern
-		mode = EnemyDefs.ENEMIES[e.id].mode
+		pattern = EnemyDefs.def(e.id).pattern
+		mode = EnemyDefs.def(e.id).mode
 	var entry: Dictionary
 	if mode == "random":
 		entry = rng.pick(pattern)
@@ -115,6 +118,14 @@ func start_turn(run: RunState) -> Array[Dictionary]:
 	run.block = 0
 	rerolls_left = run.combat_rerolls + run.banked_rerolls
 	run.banked_rerolls = 0
+	var pev: Array[Dictionary] = []
+	if run.has_passive("loaded_hands") and turn == 1:
+		rerolls_left += 1
+		pev.append(_passive("loaded_hands", 1))
+	if run.has_passive("iron_skin"):
+		run.block = Balance.PASSIVE_IRON_SKIN
+		pev.append(_passive("iron_skin", run.block))
+		pev.append({"type": "block_gained", "target": "hero", "amount": run.block, "total": run.block})
 	var n := run.dice.size()
 	marked.resize(n)
 	marked.fill(false)
@@ -133,7 +144,8 @@ func start_turn(run: RunState) -> Array[Dictionary]:
 			lock_list.append(idx[k])
 		pending_curse = 0
 	lock_list.sort()
-	ev.append({"type": "combat_turn_started", "turn": turn, "rerolls_left": rerolls_left, "locked": lock_list, "hero_block": 0})
+	ev.append({"type": "combat_turn_started", "turn": turn, "rerolls_left": rerolls_left, "locked": lock_list, "hero_block": run.block})
+	ev.append_array(pev)
 	for i in lock_list:
 		ev.append({"type": "status", "target": "hero", "status": "curse", "value": 1, "die_idx": i})
 	var all: Array[int] = []
@@ -163,13 +175,19 @@ func reroll(run: RunState) -> Array[Dictionary]:
 			idx.append(i)
 	if idx.is_empty():
 		return [_err("no dice marked")]
+	var before_mult := float(current_combo(run).mult)
 	rerolls_left -= 1
 	for i in idx:
 		dice_faces[i] = run.dice[i].roll(run.rng)
 		dice_values[i] = run.dice[i].value(dice_faces[i])
 		rerolled[i] = true
 		marked[i] = false
-	return [{"type": "dice_rolled", "values": dice_values.duplicate(), "indices": idx, "context": "combat", "faces": dice_faces.duplicate(), "rerolls_left": rerolls_left}]
+	var ev: Array[Dictionary] = []
+	if run.has_passive("encore") and float(current_combo(run).mult) > before_mult:
+		rerolls_left += 1
+		ev.append(_passive("encore", 1))
+	ev.push_front({"type": "dice_rolled", "values": dice_values.duplicate(), "indices": idx, "context": "combat", "faces": dice_faces.duplicate(), "rerolls_left": rerolls_left})
+	return ev
 
 func set_target(i: int) -> Array[Dictionary]:
 	if not alive(i):
@@ -191,33 +209,99 @@ func _fix_target() -> void:
 
 # ---------------------------------------------------------------- resolution
 
+## Combo multiplier after combo passives (Crowd Pleaser, Pair Master, Triple Threat).
+static func passive_mult(run: RunState, combo_id: String, base: float) -> float:
+	var m := base
+	if combo_id == "pair" and run.has_passive("crowd_pleaser"):
+		m = maxf(m, float(Combo.TABLE.three_kind.mult))
+	if (combo_id == "pair" or combo_id == "two_pair") and run.has_passive("pair_master"):
+		m += Balance.PASSIVE_PAIR_BONUS
+	if combo_id in ["three_kind", "four_kind", "five_kind", "six_kind"] and run.has_passive("triple_threat"):
+		m += Balance.PASSIVE_SET_BONUS
+	return m
+
 func attack(run: RunState) -> Array[Dictionary]:
 	var ev: Array[Dictionary] = []
 	_fix_target()
 	var combo := current_combo(run)
 	var eff: Array = combo.values
 	var group: Array = combo.group
-	var mult := float(combo.mult)
+	var cid := String(combo.id)
+	var mult := passive_mult(run, cid, float(combo.mult))
+	if cid == "pair" and run.has_passive("crowd_pleaser"):
+		ev.append(_passive("crowd_pleaser", 0))
+	if (cid == "pair" or cid == "two_pair") and run.has_passive("pair_master"):
+		ev.append(_passive("pair_master", 0))
+	if cid in ["three_kind", "four_kind", "five_kind", "six_kind"] and run.has_passive("triple_threat"):
+		ev.append(_passive("triple_threat", 0))
+	# How many times each die's rune triggers (Resonance: combo dice x2; Rune Echo: 25% x2).
+	var times: Array[int] = []
+	for i in run.dice.size():
+		var t := 1
+		if run.dice[i].rune != "" and group.has(i):
+			if run.has_passive("resonance"):
+				t = 2
+			elif run.has_passive("rune_echo") and run.rng.chance(Balance.PASSIVE_RUNE_ECHO_CHANCE):
+				t = 2
+				ev.append(_passive("rune_echo", i))
+		times.append(t)
 	var sum := 0
 	var bonus := 0
+	var flat := 0
+	var steady := 0
+	var boxcars := 0
+	var snakes := 0
 	for i in run.dice.size():
 		var pips := int(eff[i])
 		var rune := run.dice[i].rune
 		var in_group := group.has(i)
 		if rune == "heavy":
-			sum += pips * 2
-			ev.append(_rune(i, rune, "double_pips", pips))
+			sum += pips * (1 + times[i])
+			for k in times[i]:
+				ev.append(_rune(i, rune, "double_pips", pips))
 		else:
 			sum += pips
 		if rune == "blade" and in_group:
-			bonus += pips
-			ev.append(_rune(i, rune, "bonus_damage", pips))
+			bonus += pips * times[i]
+			for k in times[i]:
+				ev.append(_rune(i, rune, "bonus_damage", pips))
 		if rune == "echo" and in_group:
-			mult += 0.5
-			ev.append(_rune(i, rune, "mult", 0))
+			mult += 0.5 * times[i]
+			for k in times[i]:
+				ev.append(_rune(i, rune, "mult", 0))
 		if rune == "wild":
 			ev.append(_rune(i, rune, "wild", pips))
-	var total := int(floor((sum + bonus) * mult)) + run.atk
+		if run.has_passive("steady_hand") and not rerolled[i]:
+			steady += 1
+		if run.has_passive("boxcars") and in_group and pips == 6:
+			boxcars += Balance.PASSIVE_BOXCARS
+		if run.has_passive("snake_eyes") and pips == 1:
+			snakes += Balance.PASSIVE_SNAKE_EYES
+	if steady > 0:
+		bonus += steady
+		ev.append(_passive("steady_hand", steady))
+	if boxcars > 0:
+		bonus += boxcars
+		ev.append(_passive("boxcars", boxcars))
+	if snakes > 0:
+		flat += snakes
+		ev.append(_passive("snake_eyes", snakes))
+	if run.has_passive("straight_shooter") and (cid == "straight" or cid == "small_straight"):
+		flat += Balance.PASSIVE_STRAIGHT_DAMAGE
+		ev.append(_passive("straight_shooter", Balance.PASSIVE_STRAIGHT_DAMAGE))
+	if run.has_passive("midas_fist"):
+		var m := mini(Balance.PASSIVE_MIDAS_MAX, run.gold / Balance.PASSIVE_MIDAS_GOLD)
+		if m > 0:
+			flat += m
+			ev.append(_passive("midas_fist", m))
+	var factor := 1.0
+	if run.has_passive("glass_cannon"):
+		factor *= Balance.PASSIVE_DAMAGE_MULT
+		ev.append(_passive("glass_cannon", 0))
+	if run.has_passive("opening_salvo") and turn == 1:
+		factor *= Balance.PASSIVE_DAMAGE_MULT
+		ev.append(_passive("opening_salvo", 0))
+	var total := int(floor(((sum + bonus) * mult + flat) * factor)) + run.atk
 	last_combo = {"id": combo.id, "name": combo.name, "mult": mult, "base_mult": float(combo.mult), "group": group.duplicate(), "total": total, "values": eff.duplicate()}
 	ev.append({"type": "combo", "id": combo.id, "name": combo.name, "mult": mult, "group": group.duplicate(), "total": total, "values": eff.duplicate(), "sum": sum + bonus})
 	if mult > float(run.stats.get("best_mult", 0.0)):
@@ -227,54 +311,71 @@ func attack(run: RunState) -> Array[Dictionary]:
 	# Ember (SIX): 6 to all
 	for i in run.dice.size():
 		if run.dice[i].rune == "ember" and int(eff[i]) == 6:
-			ev.append(_rune(i, "ember", "damage_all", 6))
-			for j in enemies.size():
-				if alive(j):
-					ev.append_array(damage_enemy(j, 6, "ember", run))
+			for k in times[i]:
+				ev.append(_rune(i, "ember", "damage_all", 6))
+				for j in enemies.size():
+					if alive(j):
+						ev.append_array(damage_enemy(j, 6, "ember", run))
 	# Thunder (REROLLED): pips to a random enemy
 	for i in run.dice.size():
 		if run.dice[i].rune == "thunder" and rerolled[i]:
-			var a := alive_indices()
-			if a.is_empty():
-				break
-			var j: int = run.rng.pick(a)
-			ev.append(_rune(i, "thunder", "damage_random", int(eff[i])))
-			ev.append_array(damage_enemy(j, int(eff[i]), "thunder", run))
+			for k in times[i]:
+				var a := alive_indices()
+				if a.is_empty():
+					break
+				var j: int = run.rng.pick(a)
+				ev.append(_rune(i, "thunder", "damage_random", int(eff[i])))
+				ev.append_array(damage_enemy(j, int(eff[i]), "thunder", run))
+	if run.has_passive("gold_tooth"):
+		var sixes := 0
+		for i in run.dice.size():
+			if int(eff[i]) == 6:
+				sixes += 1
+		if sixes > 0:
+			run.gold += sixes
+			run.stats.gold_earned = int(run.stats.get("gold_earned", 0)) + sixes
+			ev.append(_passive("gold_tooth", sixes))
+			ev.append({"type": "gold_changed", "amount": sixes, "total": run.gold, "source": "gold_tooth"})
+	if run.has_passive("full_house_party") and cid == "full_house":
+		var fh := run.heal(Balance.PASSIVE_FULL_HOUSE_HEAL)
+		ev.append(_passive("full_house_party", Balance.PASSIVE_FULL_HOUSE_HEAL))
+		ev.append({"type": "hp_changed", "amount": fh, "total": run.hp, "source": "full_house_party", "max_hp": run.max_hp})
 	_fix_target()
 	for i in run.dice.size():
 		var rune := run.dice[i].rune
 		var pips := int(eff[i])
 		var in_group := group.has(i)
-		match rune:
-			"venom":
-				if in_group and alive(target):
-					enemies[target].poison = int(enemies[target].poison) + pips
-					ev.append(_rune(i, rune, "poison", pips))
-					ev.append({"type": "status", "target": target, "status": "poison", "value": int(enemies[target].poison)})
-			"frost":
-				if pips == 1 and alive(target):
-					enemies[target].frozen = true
-					ev.append(_rune(i, rune, "freeze", 1))
-					ev.append({"type": "status", "target": target, "status": "frozen", "value": 1})
-			"guard":
-				run.block += pips
-				ev.append(_rune(i, rune, "block", pips))
-				ev.append({"type": "block_gained", "target": "hero", "amount": pips, "total": run.block})
-			"vampire":
-				if in_group:
-					var healed := run.heal(pips)
-					ev.append(_rune(i, rune, "heal", healed))
-					ev.append({"type": "hp_changed", "amount": healed, "total": run.hp, "source": "vampire"})
-			"gilded":
-				if in_group:
-					run.gold += 2
-					run.stats.gold_earned = int(run.stats.get("gold_earned", 0)) + 2
-					ev.append(_rune(i, rune, "gold", 2))
-					ev.append({"type": "gold_changed", "amount": 2, "total": run.gold, "source": "gilded"})
-			"lucky":
-				if not rerolled[i] and run.banked_rerolls < Balance.MAX_BANKED_REROLLS:
-					run.banked_rerolls += 1
-					ev.append(_rune(i, rune, "bank_reroll", 1))
+		for k in times[i]:
+			match rune:
+				"venom":
+					if in_group and alive(target):
+						enemies[target].poison = int(enemies[target].poison) + pips
+						ev.append(_rune(i, rune, "poison", pips))
+						ev.append({"type": "status", "target": target, "status": "poison", "value": int(enemies[target].poison)})
+				"frost":
+					if pips == 1 and alive(target):
+						enemies[target].frozen = true
+						ev.append(_rune(i, rune, "freeze", 1))
+						ev.append({"type": "status", "target": target, "status": "frozen", "value": 1})
+				"guard":
+					run.block += pips
+					ev.append(_rune(i, rune, "block", pips))
+					ev.append({"type": "block_gained", "target": "hero", "amount": pips, "total": run.block})
+				"vampire":
+					if in_group:
+						var healed := run.heal(pips)
+						ev.append(_rune(i, rune, "heal", healed))
+						ev.append({"type": "hp_changed", "amount": healed, "total": run.hp, "source": "vampire"})
+				"gilded":
+					if in_group:
+						run.gold += 2
+						run.stats.gold_earned = int(run.stats.get("gold_earned", 0)) + 2
+						ev.append(_rune(i, rune, "gold", 2))
+						ev.append({"type": "gold_changed", "amount": 2, "total": run.gold, "source": "gilded"})
+				"lucky":
+					if not rerolled[i] and run.banked_rerolls < Balance.MAX_BANKED_REROLLS:
+						run.banked_rerolls += 1
+						ev.append(_rune(i, rune, "bank_reroll", 1))
 	if all_dead():
 		ev.append_array(_win(run))
 		return ev
@@ -301,6 +402,10 @@ func damage_enemy(i: int, amount: int, source: String, run: RunState, ignore_blo
 		e.poison = 0
 		e.frozen = false
 		ev.append({"type": "enemy_died", "enemy_idx": i, "id": e.id})
+		if run.has_passive("bloodthirst"):
+			var h := run.heal(Balance.PASSIVE_BLOODTHIRST)
+			ev.append(_passive("bloodthirst", Balance.PASSIVE_BLOODTHIRST))
+			ev.append({"type": "hp_changed", "amount": h, "total": run.hp, "source": "bloodthirst", "max_hp": run.max_hp})
 	elif e.boss and int(e.phase) == 1 and int(e.hp) * 2 <= int(e.max_hp):
 		e.phase = 2
 		e.step = 0
@@ -336,6 +441,11 @@ func _enemy_phase(run: RunState) -> Array[Dictionary]:
 			ev.append_array(_execute_intent(run, i))
 			if result == "lost":
 				return ev
+			if all_dead():
+				ev.append_array(_win(run))
+				return ev
+			if not alive(i):
+				continue
 		roll_intent(run.rng, i)
 		ev.append({"type": "enemy_intent", "enemy_idx": i, "intent": e.intent.duplicate()})
 	return ev
@@ -350,10 +460,20 @@ func _execute_intent(run: RunState, i: int) -> Array[Dictionary]:
 			run.block -= blocked
 			var dealt := mini(v - blocked, run.hp)
 			run.hp -= dealt
+			var saved := ""
+			if run.hp <= 0:
+				saved = run.survive_lethal()
+				if saved != "":
+					dealt -= 1
 			run.stats.damage_taken = int(run.stats.get("damage_taken", 0)) + dealt
 			ev.append({"type": "damage", "target": "hero", "amount": dealt, "blocked": blocked, "source": String(e.id), "attacker": i, "lethal": run.hp <= 0, "hp": run.hp, "max_hp": run.max_hp, "block": run.block})
+			if saved != "":
+				ev.append(_passive(saved, 1))
 			if run.hp <= 0:
 				result = "lost"
+			elif dealt > 0 and run.has_passive("thorns"):
+				ev.append(_passive("thorns", Balance.PASSIVE_THORNS))
+				ev.append_array(damage_enemy(i, Balance.PASSIVE_THORNS, "thorns", run))
 		"block":
 			e.block = int(e.block) + v
 			ev.append({"type": "block_gained", "target": i, "amount": v, "total": int(e.block)})
@@ -402,9 +522,11 @@ func _win(run: RunState) -> Array[Dictionary]:
 		var m := Balance.ELITE_REWARD_MULT if e.elite else 1.0
 		g += float(def.gold) * m * (1.0 if e.boss else gold_mult)
 		x += float(def.xp) * m
+	if run.has_passive("scholar"):
+		x *= Balance.PASSIVE_SCHOLAR
 	gold_reward = int(round(g))
 	xp_reward = int(round(x))
-	var ev: Array[Dictionary] = [{"type": "combat_won", "gold": gold_reward, "xp": xp_reward, "boss": boss, "elite": elite}]
+	var ev: Array[Dictionary] = [{"type": "combat_won", "gold": gold_reward, "xp": xp_reward, "boss": boss, "elite": elite, "miniboss": miniboss}]
 	ev.append_array(restore_chaos(run))
 	return ev
 
@@ -420,6 +542,9 @@ func restore_chaos(run: RunState) -> Array[Dictionary]:
 	chaos.clear()
 	return ev
 
+static func _passive(id: String, value: int) -> Dictionary:
+	return {"type": "passive_triggered", "id": id, "value": value}
+
 func _rune(i: int, rune: String, effect: String, value: int) -> Dictionary:
 	return {"type": "rune_fired", "die_idx": i, "rune": rune, "effect": effect, "value": value}
 
@@ -433,7 +558,7 @@ func to_dict() -> Dictionary:
 		"enemies": enemies.duplicate(true), "dice_values": Array(dice_values), "marked": Array(marked),
 		"locked": Array(locked), "rerolls_left": rerolls_left, "target": target, "turn": turn,
 		"last_combo": last_combo.duplicate(true), "dice_faces": Array(dice_faces), "rerolled": Array(rerolled),
-		"boss": boss, "elite": elite, "tile": tile, "act": act, "lap": lap, "pending_curse": pending_curse,
+		"boss": boss, "elite": elite, "miniboss": miniboss, "tile": tile, "act": act, "lap": lap, "pending_curse": pending_curse,
 		"chaos": chaos.duplicate(true), "result": result, "gold_reward": gold_reward, "xp_reward": xp_reward,
 	}
 
@@ -455,6 +580,7 @@ static func from_dict(d: Dictionary) -> CombatState:
 		c.set(k, int(d[k]))
 	c.boss = bool(d.boss)
 	c.elite = bool(d.elite)
+	c.miniboss = bool(d.get("miniboss", false))
 	c.result = String(d.result)
 	c.last_combo = _norm_combo(d.last_combo)
 	for ch in d.chaos:
@@ -467,7 +593,7 @@ static func _norm_enemy(ed: Dictionary) -> Dictionary:
 		"block": int(ed.block), "atk_bonus": int(ed.atk_bonus), "poison": int(ed.poison), "frozen": bool(ed.frozen),
 		"intent": {"kind": String(ed.intent.kind), "value": int(ed.intent.value)}, "boss": bool(ed.boss),
 		"phase": int(ed.phase), "elite": bool(ed.elite), "atk_mult": float(ed.atk_mult), "step": int(ed.step),
-		"summoned": bool(ed.summoned),
+		"summoned": bool(ed.summoned), "miniboss": bool(ed.get("miniboss", false)),
 	}
 
 static func _norm_combo(lc: Dictionary) -> Dictionary:

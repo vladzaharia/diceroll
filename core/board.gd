@@ -3,7 +3,8 @@ extends RefCounted
 ## Ring board: the perimeter of an n x n grid, ring size 4(n-1). Supported sizes: 24 (7x7)
 ## and 32 (9x9); any 4(n-1) with n >= 5 works with proportionally scaled tile counts.
 ## Tile 0 is Start; the other corners (n-1, 2(n-1), 3(n-1)) are Forge, Treasury and Portal.
-## Each tile: {type, enemies:Array[String], elite:bool}. Presentation lays the ring out with
+## Each tile: {type, enemies:Array[String], elite:bool}. Types: start forge treasury portal enemy
+## elite miniboss chest event campfire trap empty. Presentation lays the ring out with
 ## side()/size()/corners(); tile i walks clockwise from Start.
 
 const CORNER_TYPES := ["start", "forge", "treasury", "portal"]
@@ -113,7 +114,7 @@ static func generate(rng: Rng, act: int, ring_size: int = Balance.BOARD_SIZE) ->
 	return b
 
 static func _is_fight(type: String) -> bool:
-	return type == "enemy" or type == "elite"
+	return type == "enemy" or type == "elite" or type == "miniboss"
 
 static func _spawn(rng: Rng, type: String, act: int, lap: int) -> Dictionary:
 	if type == "enemy":
@@ -210,6 +211,34 @@ func mutate(rng: Rng, act: int, lap: int, protect: Array = []) -> Array[Dictiona
 				changes.remove_at(c)
 		changes.append(change(idx))
 	return changes
+
+## Turns one Empty or uncleared Enemy tile into the act's mini-boss tile. The tile is not a
+## corner, not in `protect`, and more than 3 tiles (either way round) from `hero_pos`.
+## Returns the change, or {} when no tile qualifies.
+func spawn_miniboss(rng: Rng, id: String, hero_pos: int, protect: Array = []) -> Dictionary:
+	var n := size()
+	var cands: Array[int] = []
+	for i in n:
+		var d := (i - hero_pos + n) % n
+		if mini(d, n - d) <= 3 or is_corner(i) or protect.has(i):
+			continue
+		var t: Dictionary = tiles[i]
+		if t.type == "empty" or (t.type == "enemy" and not t.get("cleared", false)):
+			cands.append(i)
+	if cands.is_empty():
+		return {}
+	var idx: int = rng.pick(cands)
+	tiles[idx] = make_tile("miniboss", [id])
+	return change(idx)
+
+## Removes any undefeated mini-boss (the act boss is starting). Returns the changes.
+func remove_minibosses() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for i in size():
+		if tiles[i].type == "miniboss":
+			tiles[i] = make_tile("empty")
+			out.append(change(i))
+	return out
 
 func to_dict() -> Dictionary:
 	var t: Array = []

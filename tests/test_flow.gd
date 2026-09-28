@@ -505,6 +505,17 @@ func test_event_shrine() -> void:
 	var f := _flow()
 	_event(f, "shrine")
 	assert_eq(f.offer.choices.size(), 2)
+	var id: String = f.offer.choices[0].passive
+	f.event_choose(0)
+	assert_true(f.run.passives.has(id))
+
+func test_event_shrine_falls_back_to_blessings() -> void:
+	var f := _flow()
+	for id in Passives.IDS:
+		if not Passives.is_boss(id):
+			f.run.passives.append(id)
+	_event(f, "shrine")
+	assert_eq(f.offer.choices.size(), 2)
 	var b: String = f.offer.choices[0].blessing
 	var snap := {"atk": f.run.atk, "max_hp": f.run.max_hp, "gold": f.run.gold}
 	f.event_choose(0)
@@ -578,7 +589,7 @@ func test_boss_win_next_act() -> void:
 		guard += 1
 		if guard > 10:
 			break
-		if f.offer.kind == "draft":
+		if f.offer.kind == "draft" or f.offer.kind == "passive":
 			ev.append_array(f.pick_draft(0))
 		elif f.offer.kind == "rune_assign":
 			ev.append_array(f.rune_assign(0))
@@ -680,7 +691,7 @@ func test_replay_mid_run_and_resume_from_save() -> void:
 	var r := GameFlow.replay("mage", 99, f.commands)
 	assert_eq(JSON.stringify(r.to_dict()), JSON.stringify(f.to_dict()))
 
-func test_elite_guarantees_rune_choice() -> void:
+func test_elite_guarantees_passive_choice() -> void:
 	var f := _flow()
 	_blank(f)
 	_put(f, 3, Board.make_tile("elite", ["brute"], true))
@@ -689,14 +700,18 @@ func test_elite_guarantees_rune_choice() -> void:
 	assert_eq(f.combat.elite, true)
 	assert_eq(f.combat.enemies[0].hp, int(round(38 * Balance.ELITE_HP_MULT)))
 	_win_fight(f)
-	assert_eq(f.phase, P.DRAFT)
+	for k in 6:
+		if f.phase == P.DRAFT and f.offer.kind == "passive":
+			break
+		if f.offer.kind == "draft":
+			f.pick_draft(0)
+		elif f.offer.kind == "rune_assign":
+			f.rune_assign(0)
+		elif f.phase == P.FORGE:
+			f.forge_apply(0, 0, "skip")
+	assert_eq(f.offer.kind, "passive")
 	assert_eq(f.offer.source, "elite")
 	assert_eq(f.offer.options.size(), 3)
-	for o in f.offer.options:
-		assert_eq(o.id, "rune")
-		assert_true(Runes.DEFS.has(o.rune))
-	f.pick_draft(2)
-	assert_eq(f.offer.kind, "rune_assign")
 
 func test_debug_open_scenarios() -> void:
 	var expected := {"shop": P.SHOP, "draft": P.DRAFT, "rune_choice": P.DRAFT, "rune_assign": P.DRAFT,

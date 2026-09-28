@@ -26,6 +26,10 @@ var treasury: int = Balance.TREASURY_START
 var stats: Dictionary = {}
 ## Extra: whether the +1 combat reroll shop item was bought this act.
 var shop_reroll_bought: bool = false
+## Owned passive ids (Passives.DEFS), in pickup order.
+var passives: Array[String] = []
+## Passive bookkeeping: second_wind_used:bool, phoenix_act:int (act the feather was spent in).
+var passive_state: Dictionary = {}
 
 static func create(p_class_id: String, p_seed: int, p_board_size: int = Balance.BOARD_SIZE) -> RunState:
 	var r := RunState.new()
@@ -46,6 +50,26 @@ static func create(p_class_id: String, p_seed: int, p_board_size: int = Balance.
 		"gold_earned": 0, "best_combo": "", "best_mult": 0.0, "max_act": 1, "commands": 0,
 	}
 	return r
+
+func has_passive(id: String) -> bool:
+	return passives.has(id)
+
+## Pool cap: MAX_DICE, +1 with Extra Hand.
+func max_dice() -> int:
+	return Balance.MAX_DICE + (1 if has_passive("extra_hand") else 0)
+
+## Called when a hit would drop HP to 0 or below: Phoenix Feather (once per act) then Second
+## Wind (once per run) leave the hero at 1 HP. Returns the passive that saved them, or "".
+func survive_lethal() -> String:
+	if has_passive("phoenix") and int(passive_state.get("phoenix_act", 0)) != act:
+		passive_state["phoenix_act"] = act
+		hp = 1
+		return "phoenix"
+	if has_passive("second_wind") and not bool(passive_state.get("second_wind_used", false)):
+		passive_state["second_wind_used"] = true
+		hp = 1
+		return "second_wind"
+	return ""
 
 func laps_per_act() -> int:
 	return Balance.laps_per_act(board_size)
@@ -76,6 +100,7 @@ func to_dict() -> Dictionary:
 		"combat_rerolls": combat_rerolls, "board_rerolls": board_rerolls, "banked_rerolls": banked_rerolls,
 		"act": act, "lap": lap, "pos": pos, "board": board.to_dict(), "board_size": board_size, "treasury": treasury,
 		"stats": stats.duplicate(true), "shop_reroll_bought": shop_reroll_bought,
+		"passives": Array(passives), "passive_state": passive_state.duplicate(true),
 	}
 
 static func from_dict(d: Dictionary) -> RunState:
@@ -102,4 +127,10 @@ static func from_dict(d: Dictionary) -> RunState:
 		else:
 			r.stats[k] = v
 	r.shop_reroll_bought = bool(d.get("shop_reroll_bought", false))
+	for p in d.get("passives", []):
+		r.passives.append(String(p))
+	var ps: Dictionary = d.get("passive_state", {})
+	for k in ps:
+		var v: Variant = ps[k]
+		r.passive_state[k] = int(v) if v is float else v
 	return r

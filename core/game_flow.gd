@@ -45,7 +45,7 @@ func roll_board() -> Array[Dictionary]:
 		return _err("roll_board")
 	_record(["roll_board"])
 	run.stats.board_turns = int(run.stats.get("board_turns", 0)) + 1
-	board_rerolls_left = run.board_rerolls
+	board_rerolls_left = run.board_rerolls + (1 if run.has_passive("pathfinder") else 0)
 	phase = Phase.BOARD_ROLLED
 	return _do_board_roll()
 
@@ -100,10 +100,32 @@ func choose_move(die_idx: int) -> Array[Dictionary]:
 	if run.dice[die_idx].rune == "gilded":
 		_gold(ev, steps, "gilded")
 		ev.insert(0, {"type": "rune_fired", "die_idx": die_idx, "rune": "gilded", "effect": "gold", "value": steps})
+	var doubles := _has_double(board_roll)
+	if doubles and run.has_passive("double_trouble") and run.banked_rerolls < Balance.MAX_BANKED_REROLLS:
+		run.banked_rerolls += 1
+		ev.append(_passive_ev("double_trouble", 1))
 	board_roll.clear()
 	ev.append_array(_move(steps, false))
+	if doubles and steps > 0 and run.has_passive("fast_feet") and not _pending_has("boss"):
+		pending.push_back({"kind": "bonus_move", "steps": steps})
 	_advance(ev)
 	return ev
+
+## True if some non-blank value appears at least twice.
+static func _has_double(values: Array[int]) -> bool:
+	var seen := {}
+	for v in values:
+		if v > 0:
+			if seen.has(v):
+				return true
+			seen[v] = true
+	return false
+
+func _pending_has(kind: String) -> bool:
+	for p in pending:
+		if p.kind == kind:
+			return true
+	return false
 
 ## Moves the hero `steps` tiles forward (or teleports), handling lap completion.
 func _move(steps: int, teleport: bool) -> Array[Dictionary]:
@@ -137,7 +159,20 @@ func _move(steps: int, teleport: bool) -> Array[Dictionary]:
 		ev.append({"type": "lap_completed", "lap": completed, "healed": healed, "hp": run.hp, "boss": false})
 		ev.append({"type": "hp_changed", "amount": healed, "total": run.hp, "source": "lap", "max_hp": run.max_hp})
 		var changes := run.board.mutate(run.rng, run.act, run.lap, [dest])
+		if completed == 1:
+			# the act's mini-boss appears on the board after lap 1
+			var mb := run.board.spawn_miniboss(run.rng, EnemyDefs.ACT_MINIBOSS[run.act - 1], dest, [dest])
+			if not mb.is_empty():
+				for c in range(changes.size() - 1, -1, -1):
+					if changes[c].idx == mb.idx:
+						changes.remove_at(c)
+				changes.append(mb)
 		ev.append({"type": "board_mutated", "changes": changes})
+		if run.has_passive("piggy_bank"):
+			var interest := mini(Balance.PASSIVE_PIGGY_MAX, int(run.gold * Balance.PASSIVE_PIGGY_PCT))
+			if interest > 0:
+				ev.append(_passive_ev("piggy_bank", interest))
+				_gold(ev, interest, "piggy_bank")
 		pending.push_back({"kind": "shop"})
 	if dest != 0:
 		pending.push_back({"kind": "tile", "idx": dest})
@@ -167,7 +202,15 @@ func _advance(ev: Array[Dictionary]) -> void:
 			"rune_choice":
 				_open_rune_choice(String(step.get("source", "reward")), ev)
 			"boss":
+				var gone := run.board.remove_minibosses()
+				if not gone.is_empty():
+					ev.append({"type": "board_mutated", "changes": gone})
 				_start_combat([EnemyDefs.ACT_BOSS[run.act - 1]], false, true, 0, ev)
+			"passive_choice":
+				_open_passive_choice(String(step.get("source", "elite")), ev)
+			"bonus_move":
+				ev.append(_passive_ev("fast_feet", int(step.steps)))
+				ev.append_array(_move(int(step.steps), false))
 			"next_act":
 				_next_act(ev)
 			"victory":
@@ -194,12 +237,18 @@ func _trigger_tile(idx: int, ev: Array[Dictionary]) -> void:
 		"enemy", "elite":
 			if not tile.enemies.is_empty():
 				_start_combat(tile.enemies, bool(tile.elite), false, idx, ev)
+		"miniboss":
+			if not tile.enemies.is_empty():
+				_start_combat(tile.enemies, false, false, idx, ev, true)
 		"chest":
 			_consume(idx, ev)
 			if run.rng.chance(Balance.CHEST_RUNE_CHANCE):
 				_open_rune_choice("chest", ev)
 			else:
 				var g := int(round(run.rng.randi_range(Balance.CHEST_GOLD_MIN, Balance.CHEST_GOLD_MAX) * (1.0 + Balance.GOLD_ACT_STEP * (run.act - 1))))
+				if run.has_passive("treasure_sense"):
+					g = int(round(g * Balance.PASSIVE_TREASURE_MULT))
+					ev.append(_passive_ev("treasure_sense", g))
 				_gold(ev, g, "chest")
 		"event":
 			_consume(idx, ev)
@@ -213,14 +262,20 @@ func _trigger_tile(idx: int, ev: Array[Dictionary]) -> void:
 			var dodged := roll >= Balance.TRAP_DODGE_MIN
 			var dmg := 0 if dodged else mini(run.hp, run.pct_of_max(Balance.TRAP_DAMAGE_PCT))
 			run.hp -= dmg
+			var saved := run.survive_lethal() if run.hp <= 0 else ""
+			if saved != "":
+				dmg -= 1
 			run.stats.damage_taken = int(run.stats.get("damage_taken", 0)) + dmg
 			ev.append({"type": "trap", "roll": roll, "dodged": dodged, "damage": dmg})
 			if dmg > 0:
 				ev.append({"type": "hp_changed", "amount": -dmg, "total": run.hp, "source": "trap", "max_hp": run.max_hp})
+			if saved != "":
+				ev.append(_passive_ev(saved, 1))
 			if run.hp <= 0:
 				_finish(false, ev)
 		"forge":
-			_set_offer({"kind": "forge", "ops": ["raise", "mirror"], "source": "tile"}, Phase.FORGE, ev)
+			var uses := 2 if run.has_passive("blacksmith") else 1
+			_set_offer({"kind": "forge", "ops": ["raise", "mirror"], "source": "tile", "uses": uses}, Phase.FORGE, ev)
 		"treasury":
 			var amount := run.treasury
 			run.treasury = Balance.TREASURY_START
@@ -252,10 +307,10 @@ func _gold(ev: Array[Dictionary], amount: int, source: String) -> void:
 
 # ================================================================ combat
 
-func _start_combat(ids: Array, elite: bool, boss: bool, tile: int, ev: Array[Dictionary]) -> void:
+func _start_combat(ids: Array, elite: bool, boss: bool, tile: int, ev: Array[Dictionary], miniboss := false) -> void:
 	combat = CombatState.new()
 	phase = Phase.COMBAT
-	ev.append_array(combat.begin(run, ids, elite, boss, tile))
+	ev.append_array(combat.begin(run, ids, elite, boss, tile, miniboss))
 
 func combat_toggle(die_idx: int) -> Array[Dictionary]:
 	if phase != Phase.COMBAT:
@@ -312,13 +367,19 @@ func _on_combat_won(ev: Array[Dictionary]) -> void:
 		_finish(true, ev)
 		return
 	var front: Array[Dictionary] = []
-	if c.elite:
-		front.append({"kind": "rune_choice", "source": "elite"})
 	run.xp += c.xp_reward
 	while run.xp >= Balance.xp_for_level(run.level):
 		run.level += 1
 		ev.append({"type": "level_up", "level": run.level, "xp": run.xp, "next": Balance.xp_for_level(run.level)})
 		front.append({"kind": "draft"})
+	# After the level-up drafts: elites give 1 of 3 regular passives; mini-bosses and the
+	# Act 1/2 bosses give 1 of 3 boss passives.
+	if c.boss:
+		front.append({"kind": "passive_choice", "source": "boss"})
+	elif c.miniboss:
+		front.append({"kind": "passive_choice", "source": "miniboss"})
+	elif c.elite:
+		front.append({"kind": "passive_choice", "source": "elite"})
 	if c.boss:
 		front.append({"kind": "next_act"})
 	front.append_array(pending)
@@ -354,6 +415,8 @@ func _next_act(ev: Array[Dictionary]) -> void:
 	ev.append({"type": "act_started", "act": run.act, "biome": EnemyDefs.ACT_BIOME[run.act - 1], "board": run.board.to_dict(), "treasury": run.treasury})
 	var h := run.heal(run.pct_of_max(Balance.ACT_START_HEAL_PCT))
 	ev.append({"type": "hp_changed", "amount": h, "total": run.hp, "source": "act_start", "max_hp": run.max_hp})
+	if run.has_passive("rune_bloom"):
+		_rune_bloom(ev)
 	pending.push_front({"kind": "shop"})
 
 # ================================================================ draft & runes
@@ -365,7 +428,7 @@ func _open_draft(ev: Array[Dictionary]) -> void:
 	if run.combat_rerolls < Balance.MAX_COMBAT_REROLLS:
 		ids.append("combat_reroll")
 	run.rng.shuffle(ids)
-	if run.dice.size() < Balance.MAX_DICE:
+	if run.dice.size() < run.max_dice():
 		ids.insert(run.rng.randi_range(0, 2), "new_die")
 	var options: Array = []
 	for k in 3:
@@ -392,15 +455,90 @@ func _open_rune_choice(source: String, ev: Array[Dictionary]) -> void:
 		options.append(Runes.option(id))
 	_set_offer({"kind": "draft", "options": options, "source": source}, Phase.DRAFT, ev)
 
+# ================================================================ passives
+
+## Offer {kind:"passive", options:[{id,label,desc,rarity,icon}], source} in phase DRAFT; the
+## player picks with pick_draft(i). source "elite" rolls regular passives; "boss"/"miniboss" roll
+## boss passives (falling back to rares when fewer than 3 remain). Nothing left: no offer.
+func _open_passive_choice(source: String, ev: Array[Dictionary]) -> void:
+	var owned: Array = Array(run.passives)
+	var ids: Array[String]
+	if source == "boss" or source == "miniboss":
+		ids = Passives.roll_boss(run.rng, 3, owned)
+	else:
+		ids = Passives.roll_regular(run.rng, 3, owned)
+	if ids.is_empty():
+		return
+	var options: Array = []
+	for id in ids:
+		options.append(Passives.option(id))
+	_set_offer({"kind": "passive", "options": options, "source": source}, Phase.DRAFT, ev)
+
+func _gain_passive(id: String, ev: Array[Dictionary]) -> void:
+	if run.has_passive(id) or not Passives.DEFS.has(id):
+		return
+	run.passives.append(id)
+	var d: Dictionary = Passives.DEFS[id]
+	ev.append({"type": "passive_gained", "id": id, "name": String(d.name), "rarity": String(d.rarity)})
+	match id:
+		"glass_cannon":
+			var loss := int(round(run.max_hp * Balance.PASSIVE_GLASS_HP_PCT))
+			run.max_hp -= loss
+			var before := run.hp
+			run.hp = mini(run.hp, run.max_hp)
+			ev.append({"type": "hp_changed", "amount": run.hp - before, "total": run.hp, "source": "glass_cannon", "max_hp": run.max_hp})
+		"collector":
+			var n := 0
+			for die in run.dice:
+				if die.rune != "":
+					n += 1
+			_collector_hp(n, ev)
+		"extra_hand":
+			_add_die(ev, "standard")
+		"rune_bloom":
+			_rune_bloom(ev)
+
+func _passive_ev(id: String, value: int) -> Dictionary:
+	return {"type": "passive_triggered", "id": id, "value": value}
+
+func _collector_hp(runes: int, ev: Array[Dictionary]) -> void:
+	if runes <= 0:
+		return
+	var gain := runes * Balance.PASSIVE_COLLECTOR_HP
+	run.max_hp += gain
+	var h := run.heal(gain)
+	ev.append(_passive_ev("collector", gain))
+	ev.append({"type": "hp_changed", "amount": h, "total": run.hp, "source": "collector", "max_hp": run.max_hp})
+
+## Puts `rune` on a die (replacing any rune). Collector adds max HP when a blank die gains one.
+func _assign_rune(die_idx: int, rune: String, ev: Array[Dictionary]) -> void:
+	var old := run.dice[die_idx].rune
+	run.dice[die_idx].rune = rune
+	ev.append({"type": "rune_assigned", "die_idx": die_idx, "rune": rune, "replaced": old})
+	if old == "" and run.has_passive("collector"):
+		_collector_hp(1, ev)
+
+## Rune Bloom: every die without a rune gets a random rune.
+func _rune_bloom(ev: Array[Dictionary]) -> void:
+	for i in run.dice.size():
+		if run.dice[i].rune == "":
+			ev.append(_passive_ev("rune_bloom", i))
+			_assign_rune(i, Runes.random_rune(run.rng), ev)
+
 func pick_draft(i: int) -> Array[Dictionary]:
-	if phase != Phase.DRAFT or offer.get("kind", "") != "draft":
+	if phase != Phase.DRAFT or not (offer.get("kind", "") in ["draft", "passive"]):
 		return _err("pick_draft")
 	if i < 0 or i >= offer.options.size():
 		return [_e("bad option")]
 	_record(["pick_draft", i])
 	var ev: Array[Dictionary] = []
 	var opt: Dictionary = offer.options[i]
+	var is_passive := String(offer.kind) == "passive"
 	_close_offer(ev)
+	if is_passive:
+		_gain_passive(String(opt.id), ev)
+		_advance(ev)
+		return ev
 	match String(opt.id):
 		"new_die":
 			_add_die(ev, String(opt.get("kind", "standard")))
@@ -419,7 +557,7 @@ func pick_draft(i: int) -> Array[Dictionary]:
 	return ev
 
 func _add_die(ev: Array[Dictionary], kind := "standard") -> void:
-	if run.dice.size() >= Balance.MAX_DICE:
+	if run.dice.size() >= run.max_dice():
 		return
 	run.dice.append(Die.make("", kind))
 	ev.append({"type": "die_added", "die_idx": run.dice.size() - 1, "kind": kind, "die": run.dice.back().to_dict()})
@@ -445,10 +583,8 @@ func rune_assign(die_idx: int) -> Array[Dictionary]:
 	_record(["rune_assign", die_idx])
 	var ev: Array[Dictionary] = []
 	var rune := String(offer.rune)
-	var old := run.dice[die_idx].rune
-	run.dice[die_idx].rune = rune
-	ev.append({"type": "rune_assigned", "die_idx": die_idx, "rune": rune, "replaced": old})
 	_close_offer(ev)
+	_assign_rune(die_idx, rune, ev)
 	_advance(ev)
 	return ev
 
@@ -461,11 +597,13 @@ func _open_shop(ev: Array[Dictionary]) -> void:
 ## at most 2 dice per stock (distinct kinds), runes repeat (distinct), anything else once.
 func _shop_stock() -> Array:
 	var weights := {}
-	var pool_open := run.dice.size() < Balance.MAX_DICE
+	var pool_open := run.dice.size() < run.max_dice()
 	for id in ShopDefs.ITEMS:
 		if id == "die" and not pool_open:
 			continue
 		if id == "combat_reroll" and (run.shop_reroll_bought or run.combat_rerolls >= Balance.MAX_COMBAT_REROLLS):
+			continue
+		if id == "passive" and Passives.roll_regular(Rng.new(1), 1, Array(run.passives)).is_empty():
 			continue
 		weights[id] = ShopDefs.ITEMS[id].weight
 	var n := run.rng.randi_range(Balance.SHOP_MIN_ITEMS, Balance.SHOP_MAX_ITEMS)
@@ -518,6 +656,16 @@ func _shop_item(id: String, used: Dictionary) -> Dictionary:
 			item.label = "%s Rune" % Runes.DEFS[r].name
 			item.desc = String(Runes.DEFS[r].desc)
 			item.price = int(Balance.RUNE_PRICE[Runes.rarity(r)])
+		"passive":
+			var pid: String = Passives.roll_regular(run.rng, 1, Array(run.passives))[0]
+			var pd: Dictionary = Passives.DEFS[pid]
+			item.passive = pid
+			item.rarity = String(pd.rarity)
+			item.label = String(pd.name)
+			item.desc = String(pd.desc)
+			item.price = int(Balance.PASSIVE_PRICE[pd.rarity])
+	if run.has_passive("haggler"):
+		item.price = int(round(item.price * Balance.PASSIVE_HAGGLE))
 	return item
 
 func shop_buy(i: int, die_idx := -1) -> Array[Dictionary]:
@@ -534,7 +682,7 @@ func shop_buy(i: int, die_idx := -1) -> Array[Dictionary]:
 		return [_e("choose a die")]
 	match String(item.id):
 		"die":
-			if run.dice.size() >= Balance.MAX_DICE:
+			if run.dice.size() >= run.max_dice():
 				return [_e("dice pool is full")]
 		"face_raise":
 			if not run.dice[die_idx].can_raise(run.dice[die_idx].lowest_face()):
@@ -542,6 +690,9 @@ func shop_buy(i: int, die_idx := -1) -> Array[Dictionary]:
 		"combat_reroll":
 			if run.combat_rerolls >= Balance.MAX_COMBAT_REROLLS or run.shop_reroll_bought:
 				return [_e("unavailable")]
+		"passive":
+			if run.has_passive(String(item.passive)):
+				return [_e("already owned")]
 	_record(["shop_buy", i, die_idx])
 	var ev: Array[Dictionary] = []
 	run.gold -= int(item.price)
@@ -551,9 +702,9 @@ func shop_buy(i: int, die_idx := -1) -> Array[Dictionary]:
 		"die":
 			_add_die(ev, String(item.get("kind", "standard")))
 		"rune":
-			var old := run.dice[die_idx].rune
-			run.dice[die_idx].rune = String(item.rune)
-			ev.append({"type": "rune_assigned", "die_idx": die_idx, "rune": String(item.rune), "replaced": old})
+			_assign_rune(die_idx, String(item.rune), ev)
+		"passive":
+			_gain_passive(String(item.passive), ev)
 		"potion":
 			var h := run.heal(run.pct_of_max(Balance.SHOP_POTION_PCT))
 			ev.append({"type": "hp_changed", "amount": h, "total": run.hp, "source": "potion", "max_hp": run.max_hp})
@@ -612,6 +763,15 @@ func forge_apply(die_idx: int, face_idx: int, op: String, src_face := -1) -> Arr
 	elif op == "mirror":
 		run.dice[die_idx].mirror_face(face_idx, src_face)
 		ev.append(_face_ev(die_idx, face_idx))
+	var uses := int(offer.get("uses", 1))
+	if op != "skip" and uses > 1:
+		# Blacksmith: the Forge stays open for another edit
+		var again := offer.duplicate(true)
+		again["uses"] = uses - 1
+		_close_offer(ev)
+		ev.append(_passive_ev("blacksmith", uses - 1))
+		_set_offer(again, Phase.FORGE, ev)
+		return ev
 	_close_offer(ev)
 	_advance(ev)
 	return ev
@@ -627,11 +787,17 @@ func _open_event(ev: Array[Dictionary], forced_id := "") -> void:
 	var choices: Array = []
 	match id:
 		"shrine":
+			# Two regular passives; flat blessings only fill in when passives run out.
+			for pid in Passives.roll_regular(run.rng, 2, Array(run.passives)):
+				var pd: Dictionary = Passives.DEFS[pid]
+				choices.append({"label": String(pd.name), "desc": String(pd.desc), "enabled": true, "passive": pid, "rarity": String(pd.rarity)})
 			var keys: Array = EventDefs.BLESSINGS.keys()
 			run.rng.shuffle(keys)
-			for k in 2:
+			var k := 0
+			while choices.size() < 2:
 				var b: Dictionary = EventDefs.BLESSINGS[keys[k]]
 				choices.append({"label": b.label, "desc": b.desc, "enabled": true, "blessing": keys[k]})
+				k += 1
 		"duel":
 			choices.append({"label": "Bet 10 gold", "desc": "Win: +10. Lose: -10.", "enabled": run.gold >= 10, "bet": 10})
 			choices.append({"label": "Bet 25 gold", "desc": "Win: +25. Lose: -25.", "enabled": run.gold >= 25, "bet": 25})
@@ -647,7 +813,7 @@ func _open_event(ev: Array[Dictionary], forced_id := "") -> void:
 		"dicesmith":
 			# Two different kinds. With room the die is added; on a full pool it reforges the
 			# weakest die (lowest face sum) into that kind, keeping its rune.
-			var full := run.dice.size() >= Balance.MAX_DICE
+			var full := run.dice.size() >= run.max_dice()
 			var kinds: Array[String] = []
 			while kinds.size() < 2:
 				var k := DiceKinds.random_kind(run.rng)
@@ -677,7 +843,9 @@ func event_choose(i: int) -> Array[Dictionary]:
 	_close_offer(ev)
 	match id:
 		"shrine":
-			match String(choice.blessing):
+			if choice.has("passive"):
+				_gain_passive(String(choice.passive), ev)
+			match String(choice.get("blessing", "")):
 				"atk":
 					run.atk += Balance.SHRINE_ATK
 					ev.append({"type": "stat_changed", "stat": "atk", "value": run.atk})
@@ -724,7 +892,7 @@ func event_choose(i: int) -> Array[Dictionary]:
 				_set_offer({"kind": "rune_assign", "rune": Runes.random_rune(run.rng, "rare")}, Phase.DRAFT, ev)
 		"dicesmith":
 			if choice.has("kind"):
-				if run.dice.size() < Balance.MAX_DICE:
+				if run.dice.size() < run.max_dice():
 					_add_die(ev, String(choice.kind))
 				else:
 					_reforge_die(ev, _weakest_die(), String(choice.kind))

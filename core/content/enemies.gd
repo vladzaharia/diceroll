@@ -36,6 +36,19 @@ const BOSSES := {
 	]},
 }
 
+## Mini-bosses: one per act, spawned on a `miniboss` tile after lap 1 (optional fight).
+## Scaled like regular enemies (act/lap), single phase, not "boss" (no phases, not unscaled).
+## Reward: gold + XP + a choice of 1 of 3 boss-tier passives.
+const MINIBOSSES := {
+	"mini_bone_champion": {"name": "Bone Champion", "hp": 110, "gold": 25, "xp": 12, "mode": "cycle",
+		"pattern": [{"kind": "attack", "value": 9}, {"kind": "block", "value": 10}, {"kind": "attack", "value": 12}]},
+	"mini_pumpkin_knight": {"name": "Pumpkin Knight", "hp": 105, "gold": 30, "xp": 15, "mode": "cycle",
+		"pattern": [{"kind": "curse", "value": 1}, {"kind": "attack", "value": 9}, {"kind": "attack", "value": 11}, {"kind": "buff", "value": 2}]},
+	"mini_grave_mage": {"name": "Grave Mage", "hp": 100, "gold": 35, "xp": 18, "mode": "cycle",
+		"pattern": [{"kind": "summon", "value": 1}, {"kind": "attack", "value": 10}, {"kind": "chaos", "value": 1}, {"kind": "attack", "value": 12}]},
+}
+
+const ACT_MINIBOSS := ["mini_bone_champion", "mini_pumpkin_knight", "mini_grave_mage"]
 const ACT_BOSS := ["boss_bone_warden", "boss_hollow_king", "boss_lich"]
 const ACT_BIOME := ["crypt", "hollow", "throne"]
 const SUMMON_ID := "skeleton_minion"
@@ -57,7 +70,12 @@ static func band(act: int, lap: int) -> int:
 static func is_boss(id: String) -> bool:
 	return BOSSES.has(id)
 
+static func is_miniboss(id: String) -> bool:
+	return MINIBOSSES.has(id)
+
 static func def(id: String) -> Dictionary:
 	if BOSSES.has(id):
 		return BOSSES[id]
+	if MINIBOSSES.has(id):
+		return MINIBOSSES[id]
 	return ENEMIES[id]

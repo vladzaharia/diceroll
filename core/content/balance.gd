@@ -55,6 +55,29 @@ const SHOP_MIN_ITEMS := 3
 const SHOP_MAX_ITEMS := 4
 const RUNE_PRICE := {"common": 35, "rare": 50, "epic": 70}
 
+# Passives (see core/content/passives.gd)
+const PASSIVE_PRICE := {"common": 60, "uncommon": 80, "rare": 110}
+const PASSIVE_PAIR_BONUS := 0.5
+const PASSIVE_SET_BONUS := 1.0
+const PASSIVE_FULL_HOUSE_HEAL := 8
+const PASSIVE_STRAIGHT_DAMAGE := 8
+const PASSIVE_SNAKE_EYES := 5
+const PASSIVE_BOXCARS := 3
+const PASSIVE_RUNE_ECHO_CHANCE := 0.25
+const PASSIVE_COLLECTOR_HP := 5
+const PASSIVE_TREASURE_MULT := 1.5
+const PASSIVE_PIGGY_PCT := 0.10
+const PASSIVE_PIGGY_MAX := 15
+const PASSIVE_HAGGLE := 0.8
+const PASSIVE_SCHOLAR := 1.25
+const PASSIVE_THORNS := 3
+const PASSIVE_IRON_SKIN := 3
+const PASSIVE_BLOODTHIRST := 3
+const PASSIVE_DAMAGE_MULT := 1.5
+const PASSIVE_GLASS_HP_PCT := 0.2
+const PASSIVE_MIDAS_GOLD := 8
+const PASSIVE_MIDAS_MAX := 15
+
 # Events
 const IDOL_DAMAGE := 15
 const MERCHANT_HP_PCT := 0.10
