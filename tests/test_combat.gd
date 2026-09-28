@@ -51,10 +51,10 @@ func test_begin_emits_start_events() -> void:
 	assert_eq(c.enemies[0].hp, 12, "act1 lap1 minion hp")
 	assert_eq(c.turn, 1)
 	assert_eq(c.rerolls_left, 2)
-	assert_eq(c.dice_values.size(), 3)
+	assert_eq(c.dice_values.size(), 2)
 	var dr := _first(ev, "dice_rolled")
 	assert_eq(dr.context, "combat")
-	assert_eq(dr.values.size(), 3)
+	assert_eq(dr.values.size(), 2)
 
 func test_enemy_scaling() -> void:
 	run = RunState.create("knight", 1)
@@ -305,6 +305,7 @@ func test_enemy_block_intent_and_reset() -> void:
 
 func test_boss_phase_and_summon() -> void:
 	run = RunState.create("knight", 1)
+	run.dice.append(Die.new())
 	c = CombatState.new()
 	c.begin(run, ["boss_bone_warden"], false, true, 0)
 	assert_eq(c.enemies[0].hp, int(EnemyDefs.BOSSES.boss_bone_warden.hp), "bosses are not scaled")
@@ -423,6 +424,7 @@ func test_chaos_restore_emits_face_changed() -> void:
 
 func test_summon_at_cap_blocks_immediately() -> void:
 	run = RunState.create("knight", 1)
+	run.dice.append(Die.new())
 	c = CombatState.new()
 	c.begin(run, ["boss_bone_warden"], false, true, 0)
 	for k in 3:

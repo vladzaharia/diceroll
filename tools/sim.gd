@@ -1,6 +1,6 @@
 extends SceneTree
 ## Balance simulator: plays N runs per class with the greedy Bot.
-## Usage: godot --headless --path . -s tools/sim.gd -- --runs=300 --class=all --seed=1
+## Usage: godot --headless --path . -s tools/sim.gd -- --runs=300 --class=all --seed=1 [--board=32]
 ## Prints per class: win%, avg act reached, avg board turns, avg combat turns,
 ## avg run length in commands, plus any error events and command-cap hits (both must be zero;
 ## either one exits with code 1).
@@ -12,6 +12,7 @@ func _init() -> void:
 	var cls := "all"
 	var seed0 := 1
 	var verbose := false
+	var board := Balance.BOARD_SIZE
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--runs="):
 			runs = arg.substr(7).to_int()
@@ -19,6 +20,8 @@ func _init() -> void:
 			cls = arg.substr(8)
 		elif arg.begins_with("--seed="):
 			seed0 = arg.substr(7).to_int()
+		elif arg.begins_with("--board="):
+			board = arg.substr(8).to_int()
 		elif arg == "--verbose":
 			verbose = true
 	var classes: Array = HeroDefs.IDS if cls == "all" else [cls]
@@ -38,7 +41,7 @@ func _init() -> void:
 		var stuck := 0
 		for r in runs:
 			var s: int = seed0 + r * 7919
-			var f := GameFlow.new_run(c, s)
+			var f := GameFlow.new_run(c, s, board)
 			var n := 0
 			var last_fight := ""
 			while not f.is_over() and n < MAX_COMMANDS:
@@ -61,7 +64,7 @@ func _init() -> void:
 			if f.phase == GameFlow.Phase.VICTORY:
 				wins += 1
 			else:
-				var key := "act%d%s" % [f.run.act, "boss" if last_fight.contains("boss_") and f.run.lap == 3 else ""]
+				var key := "act%d%s" % [f.run.act, "boss" if last_fight.contains("boss_") and f.run.lap == f.run.laps_per_act() else ""]
 				deaths[key] = int(deaths.get(key, 0)) + 1
 				if verbose:
 					print("  died %s seed=%d at %s lvl=%d dice=%d" % [c, s, last_fight, f.run.level, f.run.dice.size()])
@@ -81,6 +84,7 @@ func _init() -> void:
 		if row[9] > 0:
 			print("  WARNING: %d runs hit the command cap" % row[9])
 	print("")
+	print("board=%d laps/act=%d" % [board, Balance.laps_per_act(board)])
 	print("runs/class=%d seed=%d errors=%d capped=%d time=%.1fs" % [runs, seed0, total_errors, total_stuck, (Time.get_ticks_msec() - t0) / 1000.0])
 	quit(0 if total_errors == 0 and total_stuck == 0 else 1)
 

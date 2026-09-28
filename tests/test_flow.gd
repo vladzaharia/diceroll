@@ -12,7 +12,7 @@ func _flow(cls := "knight", s := 1) -> GameFlow:
 ## All non-corner tiles empty so movement tests are predictable.
 func _blank(f: GameFlow) -> void:
 	for i in 24:
-		if not Board.is_corner(i):
+		if not f.run.board.is_corner(i):
 			f.run.board.tiles[i] = Board.make_tile("empty")
 
 func _put(f: GameFlow, idx: int, tile: Dictionary) -> void:
@@ -57,7 +57,7 @@ func test_new_run_classes() -> void:
 		assert_eq(g.run.max_hp, int(HeroDefs.DATA[id].hp))
 	var k := GameFlow.new_run("knight", 1)
 	assert_eq(k.phase, P.BOARD_READY)
-	assert_eq(k.run.dice.size(), 3)
+	assert_eq(k.run.dice.size(), 2)
 	assert_eq(k.run.dice[0].rune, "guard")
 	assert_eq(k.run.act, 1)
 	assert_eq(k.run.lap, 1)
@@ -109,11 +109,11 @@ func test_roll_board_and_reroll() -> void:
 	assert_eq(f.phase, P.BOARD_ROLLED)
 	var dr := _first(ev, "dice_rolled")
 	assert_eq(dr.context, "board")
-	assert_eq(dr.values.size(), 3)
+	assert_eq(dr.values.size(), 2)
 	var br := _first(ev, "board_rolled")
 	assert_eq(br.values, dr.values)
 	assert_eq(br.targets, f.landing_preview())
-	for i in 3:
+	for i in 2:
 		assert_eq(f.landing_preview()[i], f.board_roll[i] % 24)
 	assert_eq(f.board_reroll()[0].type, "dice_rolled")
 	assert_eq(f.board_reroll()[0].type, "error", "only one board reroll for knight")
@@ -225,7 +225,7 @@ func test_draft_options() -> void:
 	var f := _flow()
 	_draft_with(f, {"id": "new_die", "label": "", "desc": ""})
 	var ev := f.pick_draft(0)
-	assert_eq(f.run.dice.size(), 4)
+	assert_eq(f.run.dice.size(), 3)
 	assert_true(_types(ev).has("die_added"))
 	assert_true(_types(ev).has("offer_closed"))
 	assert_eq(f.phase, P.BOARD_READY)
@@ -318,7 +318,7 @@ func test_shop_purchases() -> void:
 	_shop_with(f, [_item("die", 40, false), _item("rune", 50, true, "frost"), _item("potion", 20, false),
 		_item("face_raise", 25, true), _item("combat_reroll", 90, false)])
 	var ev := f.shop_buy(0)
-	assert_eq(f.run.dice.size(), 4)
+	assert_eq(f.run.dice.size(), 3)
 	assert_eq(f.run.gold, 260)
 	assert_eq(_first(ev, "gold_changed").amount, -40)
 	assert_eq(f.shop_buy(0)[0].type, "error", "sold")
@@ -519,7 +519,7 @@ func test_event_shrine() -> void:
 			var total := 0
 			for d in f.run.dice:
 				total += d.face_sum()
-			assert_eq(total, 21 * 3 + 1)
+			assert_eq(total, 21 * 2 + 1)
 
 func test_portal() -> void:
 	var f := _flow()

@@ -403,7 +403,7 @@ func pick_draft(i: int) -> Array[Dictionary]:
 	_close_offer(ev)
 	match String(opt.id):
 		"new_die":
-			_add_die(ev)
+			_add_die(ev, String(opt.get("kind", "standard")))
 		"rune":
 			_set_offer({"kind": "rune_assign", "rune": String(opt.rune)}, Phase.DRAFT, ev)
 		"max_hp":
@@ -491,7 +491,16 @@ func _shop_item(id: String, used: Dictionary) -> Dictionary:
 	var item := {"id": id, "label": String(def.label), "desc": String(def.desc), "price": 0, "needs_die": bool(def.needs_die), "sold": false}
 	match id:
 		"die":
-			item.price = Balance.SHOP_DIE_PRICE
+			var kind := DiceKinds.random_kind(run.rng)
+			for attempt in 5:
+				if not used.has("die:" + kind):
+					break
+				kind = DiceKinds.random_kind(run.rng)
+			used["die:" + kind] = true
+			item.kind = kind
+			item.label = DiceKinds.label(kind)
+			item.desc = String(DiceKinds.DEFS[kind].desc)
+			item.price = int(DiceKinds.DEFS[kind].price)
 		"potion":
 			item.price = Balance.SHOP_POTION_PRICE
 		"face_raise":
@@ -540,7 +549,7 @@ func shop_buy(i: int, die_idx := -1) -> Array[Dictionary]:
 	item.sold = true
 	match String(item.id):
 		"die":
-			_add_die(ev)
+			_add_die(ev, String(item.get("kind", "standard")))
 		"rune":
 			var old := run.dice[die_idx].rune
 			run.dice[die_idx].rune = String(item.rune)
@@ -635,6 +644,20 @@ func _open_event(ev: Array[Dictionary], forced_id := "") -> void:
 			var loss := run.pct_of_max(Balance.MERCHANT_HP_PCT)
 			choices.append({"label": "Trade %d max HP" % loss, "desc": "Receive a random Rare rune.", "enabled": run.max_hp - loss >= 10})
 			choices.append({"label": "Decline", "desc": "Keep walking.", "enabled": true})
+		"dicesmith":
+			# Two different kinds. With room the die is added; on a full pool it reforges the
+			# weakest die (lowest face sum) into that kind, keeping its rune.
+			var full := run.dice.size() >= Balance.MAX_DICE
+			var kinds: Array[String] = []
+			while kinds.size() < 2:
+				var k := DiceKinds.random_kind(run.rng)
+				if k != "standard" and not kinds.has(k):
+					kinds.append(k)
+			for k in kinds:
+				var dk: Dictionary = DiceKinds.DEFS[k]
+				var lbl := ("Reforge into %s" if full else "Take the %s") % DiceKinds.label(k)
+				choices.append({"label": lbl, "desc": String(dk.desc), "enabled": true, "kind": k})
+			choices.append({"label": "Walk away", "desc": "Keep your dice as they are.", "enabled": true})
 		"idol":
 			choices.append({"label": "Offer blood", "desc": "Take %d damage. The lowest face of every die gets +1." % Balance.IDOL_DAMAGE, "enabled": run.hp > Balance.IDOL_DAMAGE})
 			choices.append({"label": "Leave", "desc": "Nothing happens.", "enabled": true})
@@ -668,7 +691,7 @@ func event_choose(i: int) -> Array[Dictionary]:
 					var opts: Array = []
 					for d in run.dice.size():
 						for f in 6:
-							if run.dice[d].faces[f] < 6:
+							if run.dice[d].can_raise(f):
 								opts.append([d, f])
 					if not opts.is_empty():
 						var p: Array = run.rng.pick(opts)
@@ -699,6 +722,12 @@ func event_choose(i: int) -> Array[Dictionary]:
 				run.hp = mini(run.hp, run.max_hp)
 				ev.append({"type": "hp_changed", "amount": run.hp - before, "total": run.hp, "source": "merchant", "max_hp": run.max_hp})
 				_set_offer({"kind": "rune_assign", "rune": Runes.random_rune(run.rng, "rare")}, Phase.DRAFT, ev)
+		"dicesmith":
+			if choice.has("kind"):
+				if run.dice.size() < Balance.MAX_DICE:
+					_add_die(ev, String(choice.kind))
+				else:
+					_reforge_die(ev, _weakest_die(), String(choice.kind))
 		"idol":
 			if i == 0:
 				run.hp -= Balance.IDOL_DAMAGE

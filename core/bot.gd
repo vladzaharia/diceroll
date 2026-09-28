@@ -9,6 +9,11 @@ const RUNE_SCORE := {
 	"thunder": 5, "lucky": 5, "frost": 5, "guard": 5, "gilded": 3,
 }
 
+## How much the bot wants a new die of each kind.
+const KIND_SCORE := {
+	"giant": 10, "high": 9, "twin": 7, "gambler": 6, "loaded": 7, "even": 7, "standard": 6, "odd": 5, "low": 4,
+}
+
 static func next_command(f: GameFlow) -> Array:
 	match f.phase:
 		GameFlow.Phase.BOARD_READY:
@@ -79,7 +84,7 @@ static func tile_score(f: GameFlow, idx: int, crossing: bool) -> float:
 			s = 2.0
 		"start":
 			s = 3.0
-	if crossing and f.run.lap < Balance.LAPS_PER_ACT:
+	if crossing and f.run.lap < f.run.laps_per_act():
 		s += 3.0
 	return s
 
@@ -88,8 +93,9 @@ static func _board(f: GameFlow) -> Array:
 	var best_s := -INF
 	var targets := f.landing_preview()
 	for i in f.board_roll.size():
-		var crossing := Board.crosses_start(f.run.pos, f.board_roll[i])
-		var s := tile_score(f, targets[i], crossing)
+		var crossing := f.run.board.crosses_start(f.run.pos, f.board_roll[i])
+		# a blank (0) stays put and triggers nothing
+		var s := 0.0 if f.board_roll[i] <= 0 else tile_score(f, targets[i], crossing)
 		if s > best_s:
 			best_s = s
 			best = i
@@ -135,7 +141,7 @@ static func _combat(f: GameFlow) -> Array:
 static func _draft_score(f: GameFlow, o: Dictionary) -> float:
 	match String(o.id):
 		"new_die":
-			return 10.0
+			return 9.0 + float(KIND_SCORE.get(String(o.get("kind", "standard")), 6)) / 5.0
 		"rune":
 			return float(RUNE_SCORE.get(String(o.get("rune", "")), 4))
 		"combat_reroll":
@@ -183,7 +189,7 @@ static func _shop(f: GameFlow) -> Array:
 			"potion":
 				s = 9.0 if hp_ratio(f) < 0.55 else 0.0
 			"die":
-				s = 8.0 if f.run.dice.size() < Balance.MAX_DICE else 0.0
+				s = (8.0 + float(KIND_SCORE.get(String(it.get("kind", "standard")), 6)) / 5.0) if f.run.dice.size() < Balance.MAX_DICE else 0.0
 			"rune":
 				var rs := float(RUNE_SCORE.get(String(it.rune), 4))
 				var target := _die_for_rune(f, String(it.rune))

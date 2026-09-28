@@ -9,9 +9,10 @@ const DATA := {
 	"garden": {"title": "Flower Garden", "text": "Petals drift over the path. Treasure blooms on the road ahead."},
 	"merchant": {"title": "Wandering Merchant", "text": "\"A rare rune, friend. It costs only a little of your life.\""},
 	"idol": {"title": "Cursed Idol", "text": "The idol demands blood. In return, your dice grow stronger."},
+	"dicesmith": {"title": "Wandering Dicesmith", "text": "A hunched carver spills odd dice across a cloth. \"Take one. They roll true... mostly.\""},
 }
 
-const IDS := ["shrine", "duel", "outbreak", "garden", "merchant", "idol"]
+const IDS := ["shrine", "duel", "outbreak", "garden", "merchant", "idol", "dicesmith"]
 
 ## Shrine blessings (pick 2 of these at random).
 const BLESSINGS := {

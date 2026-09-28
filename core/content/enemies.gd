@@ -26,11 +26,11 @@ const BOSSES := {
 		[{"kind": "attack", "value": 10}, {"kind": "block", "value": 12}, {"kind": "summon", "value": 1}],
 		[{"kind": "attack", "value": 12}, {"kind": "summon", "value": 1}, {"kind": "attack", "value": 10}, {"kind": "block", "value": 12}],
 	]},
-	"boss_hollow_king": {"name": "Hollow King", "hp": 450, "gold": 60, "xp": 30, "phases": [
+	"boss_hollow_king": {"name": "Hollow King", "hp": 380, "gold": 60, "xp": 30, "phases": [
 		[{"kind": "attack", "value": 18}, {"kind": "curse", "value": 2}, {"kind": "buff", "value": 3}],
 		[{"kind": "attack", "value": 18}, {"kind": "attack", "value": 20}, {"kind": "curse", "value": 2}, {"kind": "buff", "value": 3}],
 	]},
-	"boss_lich": {"name": "The Lich", "hp": 800, "gold": 0, "xp": 0, "phases": [
+	"boss_lich": {"name": "The Lich", "hp": 700, "gold": 0, "xp": 0, "phases": [
 		[{"kind": "attack", "value": 22}, {"kind": "curse", "value": 1}, {"kind": "block", "value": 30}],
 		[{"kind": "attack", "value": 26}, {"kind": "chaos", "value": 1}, {"kind": "attack", "value": 22}, {"kind": "curse", "value": 1}],
 	]},
