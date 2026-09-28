@@ -1,0 +1,72 @@
+class_name EventModal
+extends UiModal
+## Board event card (offer {kind:"event", id, title, text, choices}). Medallion art, flavour
+## text and one card per choice (disabled choices greyed). Emits event_chosen(i).
+
+signal event_chosen(index: int)
+
+const ART := {
+	"shrine": ["star", Color("ffd86a")], "duel": ["dice", UiPalette.DIE_BODY], "outbreak": ["skull", Color("efe6d4")],
+	"garden": ["rune_lucky", Color("7ad35a")], "merchant": ["coin", UiPalette.COIN], "idol": ["curse", UiPalette.CURSE],
+}
+const CHOICE_ICONS := {
+	"atk": "sword", "max_hp": "heart", "gold": "coin", "face": "anvil",
+}
+
+var _art: CenterContainer
+var _text: Label
+var _choices: VBoxContainer
+
+
+func _build() -> void:
+	_art = CenterContainer.new()
+	_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	body.add_child(_art)
+	_text = UiTheme.para("", 26, UiPalette.TEXT, 500)
+	_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	body.add_child(_text)
+	body.add_child(UiTheme.spacer(4))
+	_choices = UiTheme.vbox(12)
+	body.add_child(_choices)
+
+
+func refresh(flow: GameFlow) -> void:
+	var o := flow.offer
+	var id := String(o.get("id", ""))
+	set_title(String(o.get("title", "Event")).to_upper(), Color("9a7ae0"))
+	UiTheme.clear(_art)
+	var art: Array = ART.get(id, ["star", UiPalette.GOLD])
+	_art.add_child(OptionCard.Medallion.make(art[0], 132, art[1], Color("9a7ae0")))
+	_text.text = String(o.get("text", ""))
+	UiTheme.clear(_choices)
+	var choices: Array = o.get("choices", [])
+	for i in choices.size():
+		var ch: Dictionary = choices[i]
+		var c := OptionCard.make(String(ch.get("label", "")), String(ch.get("desc", "")))
+		var icon := _choice_icon(id, ch, i)
+		if icon != "":
+			c.set_icon(icon)
+		c.set_tag("", Color("9a7ae0"))
+		c.set_enabled(bool(ch.get("enabled", true)))
+		if not bool(ch.get("enabled", true)):
+			c.set_tag("LOCKED", UiPalette.TEXT_MUTED)
+		c.pressed.connect(func() -> void: event_chosen.emit(i))
+		_choices.add_child(c)
+	relayout()
+
+
+static func _choice_icon(id: String, ch: Dictionary, i: int) -> String:
+	if ch.has("blessing"):
+		return CHOICE_ICONS.get(String(ch.blessing), "star")
+	match id:
+		"duel":
+			return "coin" if int(ch.get("bet", 0)) > 0 else "arrow_right"
+		"merchant":
+			return "rune_wild" if i == 0 else "arrow_right"
+		"idol":
+			return "heart" if i == 0 else "arrow_right"
+		"outbreak":
+			return "skull"
+		"garden":
+			return "chest"
+	return "arrow_right"
