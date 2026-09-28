@@ -29,8 +29,8 @@ const BUFF_AMOUNT := 2
 const MAX_SUMMONED_ALIVE := 3
 
 # Enemy scaling: mult = 1 + ACT_STEP*(act-1) + LAP_STEP*(lap-1)
-const ENEMY_ACT_STEP := 0.35
-const ENEMY_LAP_STEP := 0.10
+const ENEMY_ACT_STEP := 1.0
+const ENEMY_LAP_STEP := 0.25
 const ELITE_HP_MULT := 1.3
 const ELITE_ATK_MULT := 1.15
 const ELITE_REWARD_MULT := 1.5

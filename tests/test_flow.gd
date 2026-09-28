@@ -2,8 +2,12 @@ extends "res://tests/test_case.gd"
 
 const P := GameFlow.Phase
 
+## Arithmetic in these tests assumes a 70 HP hero, independent of balance tuning.
 func _flow(cls := "knight", s := 1) -> GameFlow:
-	return GameFlow.new_run(cls, s)
+	var f := GameFlow.new_run(cls, s)
+	f.run.max_hp = 70
+	f.run.hp = 70
+	return f
 
 ## All non-corner tiles empty so movement tests are predictable.
 func _blank(f: GameFlow) -> void:
@@ -47,9 +51,12 @@ func _win_fight(f: GameFlow) -> Array[Dictionary]:
 	return f.combat_attack()
 
 func test_new_run_classes() -> void:
-	var k := _flow("knight")
+	for id in HeroDefs.IDS:
+		var g := GameFlow.new_run(id, 1)
+		assert_eq(g.run.hp, int(HeroDefs.DATA[id].hp))
+		assert_eq(g.run.max_hp, int(HeroDefs.DATA[id].hp))
+	var k := GameFlow.new_run("knight", 1)
 	assert_eq(k.phase, P.BOARD_READY)
-	assert_eq(k.run.hp, 70)
 	assert_eq(k.run.dice.size(), 3)
 	assert_eq(k.run.dice[0].rune, "guard")
 	assert_eq(k.run.act, 1)
@@ -57,14 +64,11 @@ func test_new_run_classes() -> void:
 	assert_eq(k.run.pos, 0)
 	assert_eq(k.run.combat_rerolls, 2)
 	var b := _flow("barbarian")
-	assert_eq(b.run.hp, 60)
 	assert_eq(b.run.atk, 2)
 	assert_eq(b.run.dice[0].rune, "heavy")
 	var m := _flow("mage")
-	assert_eq(m.run.hp, 50)
 	assert_eq([m.run.dice[0].rune, m.run.dice[1].rune], ["ember", "echo"])
 	var r := _flow("rogue")
-	assert_eq(r.run.hp, 55)
 	assert_eq(r.run.board_rerolls, 2)
 	assert_eq([r.run.dice[0].rune, r.run.dice[1].rune], ["venom", "lucky"])
 

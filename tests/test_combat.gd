@@ -62,8 +62,8 @@ func test_enemy_scaling() -> void:
 	run.lap = 3
 	c = CombatState.new()
 	c.begin(run, ["skeleton_warrior"], false, false, 3)
-	# 20 * (1 + 0.35 + 0.2) = 31
-	assert_eq(c.enemies[0].hp, 31)
+	# warrior base 20 scaled by act 2, lap 3
+	assert_eq(c.enemies[0].hp, int(round(20 * Balance.enemy_scale(2, 3))))
 
 func test_damage_formula_pair() -> void:
 	_setup(["", "", ""])
@@ -307,8 +307,10 @@ func test_boss_phase_and_summon() -> void:
 	run = RunState.create("knight", 1)
 	c = CombatState.new()
 	c.begin(run, ["boss_bone_warden"], false, true, 0)
-	assert_eq(c.enemies[0].hp, 120)
+	assert_eq(c.enemies[0].hp, int(EnemyDefs.BOSSES.boss_bone_warden.hp), "bosses are not scaled")
 	assert_eq(c.enemies[0].boss, true)
+	c.enemies[0].hp = 120
+	c.enemies[0].max_hp = 120
 	c.enemies[0].intent = {"kind": "summon", "value": 1}
 	c.dice_values.assign([6, 6, 6]) # three 6s = 45
 	var ev := c.attack(run)

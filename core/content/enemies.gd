@@ -22,17 +22,17 @@ const ENEMIES := {
 
 ## Bosses have two phases; phase 2 starts at or below half HP. Boss numbers are not scaled.
 const BOSSES := {
-	"boss_bone_warden": {"name": "Bone Warden", "hp": 120, "gold": 40, "xp": 20, "phases": [
+	"boss_bone_warden": {"name": "Bone Warden", "hp": 200, "gold": 40, "xp": 20, "phases": [
 		[{"kind": "attack", "value": 10}, {"kind": "block", "value": 12}, {"kind": "summon", "value": 1}],
 		[{"kind": "attack", "value": 12}, {"kind": "summon", "value": 1}, {"kind": "attack", "value": 10}, {"kind": "block", "value": 12}],
 	]},
-	"boss_hollow_king": {"name": "Hollow King", "hp": 180, "gold": 60, "xp": 30, "phases": [
-		[{"kind": "attack", "value": 14}, {"kind": "curse", "value": 2}, {"kind": "buff", "value": 2}],
-		[{"kind": "attack", "value": 14}, {"kind": "attack", "value": 14}, {"kind": "curse", "value": 2}, {"kind": "buff", "value": 2}],
+	"boss_hollow_king": {"name": "Hollow King", "hp": 450, "gold": 60, "xp": 30, "phases": [
+		[{"kind": "attack", "value": 18}, {"kind": "curse", "value": 2}, {"kind": "buff", "value": 3}],
+		[{"kind": "attack", "value": 18}, {"kind": "attack", "value": 20}, {"kind": "curse", "value": 2}, {"kind": "buff", "value": 3}],
 	]},
-	"boss_lich": {"name": "The Lich", "hp": 260, "gold": 0, "xp": 0, "phases": [
-		[{"kind": "attack", "value": 14}, {"kind": "curse", "value": 1}, {"kind": "block", "value": 15}],
-		[{"kind": "attack", "value": 16}, {"kind": "chaos", "value": 1}, {"kind": "attack", "value": 14}, {"kind": "curse", "value": 1}],
+	"boss_lich": {"name": "The Lich", "hp": 800, "gold": 0, "xp": 0, "phases": [
+		[{"kind": "attack", "value": 22}, {"kind": "curse", "value": 1}, {"kind": "block", "value": 30}],
+		[{"kind": "attack", "value": 26}, {"kind": "chaos", "value": 1}, {"kind": "attack", "value": 22}, {"kind": "curse", "value": 1}],
 	]},
 }
 
