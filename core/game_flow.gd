@@ -124,10 +124,12 @@ func _move(steps: int, teleport: bool) -> Array[Dictionary]:
 		var completed := run.lap
 		if run.lap >= Balance.LAPS_PER_ACT:
 			ev.append({"type": "lap_completed", "lap": completed, "healed": healed, "hp": run.hp, "boss": true})
+			ev.append({"type": "hp_changed", "amount": healed, "total": run.hp, "source": "lap", "max_hp": run.max_hp})
 			pending.push_front({"kind": "boss"})
 			return ev
 		run.lap += 1
 		ev.append({"type": "lap_completed", "lap": completed, "healed": healed, "hp": run.hp, "boss": false})
+		ev.append({"type": "hp_changed", "amount": healed, "total": run.hp, "source": "lap", "max_hp": run.max_hp})
 		var changes := run.board.mutate(run.rng, run.act, run.lap, [dest])
 		ev.append({"type": "board_mutated", "changes": changes})
 		pending.push_back({"kind": "shop"})
@@ -217,10 +219,20 @@ func _trigger_tile(idx: int, ev: Array[Dictionary]) -> void:
 			var amount := run.treasury
 			run.treasury = Balance.TREASURY_START
 			_gold(ev, amount, "treasury")
+			ev.back()["treasury"] = run.treasury
 		"portal":
-			_set_offer({"kind": "portal", "tiles": Array(Board.portal_targets(idx))}, Phase.PORTAL, ev)
+			_set_offer({"kind": "portal", "tiles": _portal_tiles(idx)}, Phase.PORTAL, ev)
 		_:
 			pass
+
+## Portal destinations from the hero's tile. On the last lap they stop at Start (the boss).
+func _portal_tiles(from: int) -> Array:
+	var out: Array = []
+	for t in Board.portal_targets(from):
+		out.append(t)
+		if t == 0 and run.lap >= Balance.LAPS_PER_ACT:
+			break
+	return out
 
 func _consume(idx: int, ev: Array[Dictionary]) -> void:
 	run.board.tiles[idx] = Board.make_tile("empty")
@@ -280,6 +292,10 @@ func _on_combat_won(ev: Array[Dictionary]) -> void:
 	var c := combat
 	combat = null
 	phase = Phase.BOARD_READY
+	if run.block > 0:
+		var old_block := run.block
+		run.block = 0
+		ev.append({"type": "block_gained", "target": "hero", "amount": -old_block, "total": 0})
 	run.stats.fights_won = int(run.stats.get("fights_won", 0)) + 1
 	if c.gold_reward > 0:
 		_gold(ev, c.gold_reward, "combat")
@@ -329,7 +345,7 @@ func _next_act(ev: Array[Dictionary]) -> void:
 	run.shop_reroll_bought = false
 	run.board = Board.generate(run.rng, run.act)
 	run.stats.max_act = maxi(int(run.stats.get("max_act", 1)), run.act)
-	ev.append({"type": "act_started", "act": run.act, "biome": EnemyDefs.ACT_BIOME[run.act - 1], "board": run.board.to_dict()})
+	ev.append({"type": "act_started", "act": run.act, "biome": EnemyDefs.ACT_BIOME[run.act - 1], "board": run.board.to_dict(), "treasury": run.treasury})
 	var h := run.heal(run.pct_of_max(Balance.ACT_START_HEAL_PCT))
 	ev.append({"type": "hp_changed", "amount": h, "total": run.hp, "source": "act_start", "max_hp": run.max_hp})
 	pending.push_front({"kind": "shop"})
@@ -698,7 +714,7 @@ func debug_open(kind: String, arg := "") -> Array[Dictionary]:
 		"rune_assign": _set_offer({"kind": "rune_assign", "rune": arg if arg != "" else "blade"}, Phase.DRAFT, ev)
 		"forge": _set_offer({"kind": "forge", "ops": ["raise", "mirror"], "source": "tile"}, Phase.FORGE, ev)
 		"event": _open_event(ev, arg if EventDefs.DATA.has(arg) else "")
-		"portal": _set_offer({"kind": "portal", "tiles": Array(Board.portal_targets(run.pos))}, Phase.PORTAL, ev)
+		"portal": _set_offer({"kind": "portal", "tiles": _portal_tiles(run.pos)}, Phase.PORTAL, ev)
 		"combat":
 			var ids: Array = Array(arg.split(",", false)) if arg != "" else ["skeleton_minion", "skeleton_archer"]
 			_start_combat(ids, false, false, run.pos, ev)

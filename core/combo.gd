@@ -48,6 +48,10 @@ static func evaluate(values: Array[int], wild: Array[bool] = []) -> Dictionary:
 		assign[p] += 1
 		for q in range(p + 1, assign.size()):
 			assign[q] = assign[p]
+	# A Wild outside the scoring group is free: it shows (and counts as) a 6.
+	for i in wild_idx:
+		if not (best.group as Array).has(i):
+			best.values[i] = 6
 	return best
 
 static func _better(a: Dictionary, b: Dictionary) -> bool:

@@ -35,10 +35,11 @@ func begin(run: RunState, ids: Array, p_elite: bool, p_boss: bool, p_tile: int) 
 	lap = run.lap
 	for id in ids:
 		enemies.append(make_enemy(run.rng, String(id), act, lap, elite))
+	for i in enemies.size():
+		roll_intent(run.rng, i)
 	var ev: Array[Dictionary] = []
 	ev.append({"type": "combat_started", "enemies": enemies.duplicate(true), "boss": boss, "elite": elite, "tile": tile})
 	for i in enemies.size():
-		roll_intent(run.rng, i)
 		ev.append({"type": "enemy_intent", "enemy_idx": i, "intent": enemies[i].intent.duplicate()})
 	ev.append_array(start_turn(run))
 	return ev
@@ -89,15 +90,12 @@ func roll_intent(rng: Rng, i: int) -> void:
 		pattern = EnemyDefs.ENEMIES[e.id].pattern
 		mode = EnemyDefs.ENEMIES[e.id].mode
 	var entry: Dictionary
-	for attempt in pattern.size():
-		if mode == "random":
-			entry = rng.pick(pattern)
-		else:
-			entry = pattern[int(e.step) % pattern.size()]
-			e.step = int(e.step) + 1
-		if entry.kind == "summon" and _summoned_alive() >= Balance.MAX_SUMMONED_ALIVE:
-			continue
-		break
+	if mode == "random":
+		entry = rng.pick(pattern)
+	else:
+		entry = pattern[int(e.step) % pattern.size()]
+		e.step = int(e.step) + 1
+	# At the summon cap the step is spent on Block 8 instead (rule 21).
 	if entry.kind == "summon" and _summoned_alive() >= Balance.MAX_SUMMONED_ALIVE:
 		entry = {"kind": "block", "value": 8}
 	var value := int(entry.value)
@@ -316,7 +314,10 @@ func _enemy_phase(run: RunState) -> Array[Dictionary]:
 		if not alive(i):
 			continue
 		var e := enemies[i]
+		var old_block := int(e.block)
 		e.block = 0
+		if old_block > 0:
+			ev.append({"type": "block_gained", "target": i, "amount": -old_block, "total": 0})
 		if int(e.poison) > 0:
 			var p := int(e.poison)
 			ev.append_array(damage_enemy(i, p, "poison", run, true))
@@ -403,13 +404,21 @@ func _win(run: RunState) -> Array[Dictionary]:
 		x += float(def.xp) * m
 	gold_reward = int(round(g))
 	xp_reward = int(round(x))
-	restore_chaos(run)
-	return [{"type": "combat_won", "gold": gold_reward, "xp": xp_reward, "boss": boss, "elite": elite}]
+	var ev: Array[Dictionary] = [{"type": "combat_won", "gold": gold_reward, "xp": xp_reward, "boss": boss, "elite": elite}]
+	ev.append_array(restore_chaos(run))
+	return ev
 
-func restore_chaos(run: RunState) -> void:
-	for c in chaos:
-		run.dice[int(c.die)].faces[int(c.face)] = int(c.value)
+## Restores faces set to 1 by Chaos; one face_changed event per restored face.
+func restore_chaos(run: RunState) -> Array[Dictionary]:
+	var ev: Array[Dictionary] = []
+	for k in range(chaos.size() - 1, -1, -1):
+		var c: Dictionary = chaos[k]
+		var d := int(c.die)
+		var f := int(c.face)
+		run.dice[d].faces[f] = int(c.value)
+		ev.append({"type": "face_changed", "die_idx": d, "face_idx": f, "value": int(c.value), "faces": Array(run.dice[d].faces)})
 	chaos.clear()
+	return ev
 
 func _rune(i: int, rune: String, effect: String, value: int) -> Dictionary:
 	return {"type": "rune_fired", "die_idx": i, "rune": rune, "effect": effect, "value": value}

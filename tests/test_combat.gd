@@ -383,3 +383,59 @@ func test_round_trip_mid_combat() -> void:
 	var parsed: Dictionary = JSON.parse_string(JSON.stringify(d))
 	var c2 := CombatState.from_dict(parsed)
 	assert_eq(JSON.stringify(c2.to_dict()), JSON.stringify(d))
+
+func test_enemy_block_reset_emits_event() -> void:
+	_setup(["", "", ""], ["skeleton_warrior"])
+	c.enemies[0].block = 7
+	c.enemies[0].poison = 2
+	c.enemies[0].intent = {"kind": "attack", "value": 1}
+	var ev := c._enemy_phase(run)
+	var bg := {}
+	var bg_i := -1
+	var dmg_i := -1
+	for k in ev.size():
+		if ev[k].type == "block_gained" and bg_i < 0:
+			bg = ev[k]
+			bg_i = k
+		if ev[k].type == "damage" and str(ev[k].source) == "poison" and dmg_i < 0:
+			dmg_i = k
+	assert_eq(bg, {"type": "block_gained", "target": 0, "amount": -7, "total": 0})
+	assert_true(bg_i >= 0 and bg_i < dmg_i, "block reset before poison tick")
+	# no event when there was no block
+	_setup(["", "", ""], ["skeleton_warrior"])
+	c.enemies[0].intent = {"kind": "attack", "value": 1}
+	assert_true(not _types(c._enemy_phase(run)).has("block_gained"))
+
+func test_chaos_restore_emits_face_changed() -> void:
+	run = RunState.create("knight", 1)
+	c = CombatState.new()
+	c.begin(run, ["skeleton_minion"], false, false, 0)
+	c.chaos.append({"die": 1, "face": 5, "value": run.dice[1].faces[5]})
+	var orig: int = run.dice[1].faces[5]
+	run.dice[1].faces[5] = 1
+	c.enemies[0].hp = 1
+	c.enemies[0].block = 0
+	c.dice_values.assign([6, 6, 6])
+	var ev := c.attack(run)
+	assert_eq(c.result, "won")
+	var fc := _first(ev, "face_changed")
+	assert_eq(fc, {"type": "face_changed", "die_idx": 1, "face_idx": 5, "value": orig, "faces": Array(run.dice[1].faces)})
+
+func test_summon_at_cap_blocks_immediately() -> void:
+	run = RunState.create("knight", 1)
+	c = CombatState.new()
+	c.begin(run, ["boss_bone_warden"], false, true, 0)
+	for k in 3:
+		c.enemies.append(CombatState.make_enemy(run.rng, "skeleton_minion", 1, 1, false, true))
+	c.enemies[0].step = 2 # next pattern entry: summon
+	c.roll_intent(run.rng, 0)
+	assert_eq(c.enemies[0].intent, {"kind": "block", "value": 8})
+	assert_eq(c.enemies[0].step, 3, "step still advances by one")
+
+func test_combat_started_carries_intents() -> void:
+	run = RunState.create("knight", 1)
+	c = CombatState.new()
+	var ev := c.begin(run, ["boss_bone_warden"], false, true, 0)
+	var cs := _first(ev, "combat_started")
+	assert_eq(cs.enemies[0].intent, {"kind": "attack", "value": 10})
+	assert_true(_types(ev).has("enemy_intent"))

@@ -2,7 +2,8 @@ extends SceneTree
 ## Balance simulator: plays N runs per class with the greedy Bot.
 ## Usage: godot --headless --path . -s tools/sim.gd -- --runs=300 --class=all --seed=1
 ## Prints per class: win%, avg act reached, avg board turns, avg combat turns,
-## avg run length in commands, plus any error events (must be zero).
+## avg run length in commands, plus any error events and command-cap hits (both must be zero;
+## either one exits with code 1).
 
 const MAX_COMMANDS := 20000
 
@@ -22,6 +23,7 @@ func _init() -> void:
 			verbose = true
 	var classes: Array = HeroDefs.IDS if cls == "all" else [cls]
 	var total_errors := 0
+	var total_stuck := 0
 	var rows: Array = []
 	var t0 := Time.get_ticks_msec()
 	for c in classes:
@@ -31,7 +33,7 @@ func _init() -> void:
 		var combat_turns := 0
 		var cmd_sum := 0
 		var level_sum := 0
-		var dice_sum := 0
+		var fights_won_sum := 0
 		var deaths := {}
 		var stuck := 0
 		for r in runs:
@@ -55,6 +57,7 @@ func _init() -> void:
 						last_fight = "A%d L%d %s" % [f.run.act, f.run.lap, ",".join(ids)]
 			if not f.is_over():
 				stuck += 1
+				total_stuck += 1
 			if f.phase == GameFlow.Phase.VICTORY:
 				wins += 1
 			else:
@@ -67,9 +70,9 @@ func _init() -> void:
 			combat_turns += int(f.run.stats.get("combat_turns", 0))
 			cmd_sum += f.commands.size()
 			level_sum += f.run.level
-			dice_sum += int(f.run.stats.get("fights_won", 0))
+			fights_won_sum += int(f.run.stats.get("fights_won", 0))
 		rows.append([c, 100.0 * wins / runs, float(act_sum) / runs, float(board_turns) / runs,
-			float(combat_turns) / runs, float(cmd_sum) / runs, float(level_sum) / runs, float(dice_sum) / runs, deaths, stuck])
+			float(combat_turns) / runs, float(cmd_sum) / runs, float(level_sum) / runs, float(fights_won_sum) / runs, deaths, stuck])
 	print("")
 	print("| class | win% | avg act | avg board turns | avg combat turns | avg commands | avg level | avg fights won | deaths by act |")
 	print("|---|---|---|---|---|---|---|---|---|")
@@ -78,8 +81,8 @@ func _init() -> void:
 		if row[9] > 0:
 			print("  WARNING: %d runs hit the command cap" % row[9])
 	print("")
-	print("runs/class=%d seed=%d errors=%d time=%.1fs" % [runs, seed0, total_errors, (Time.get_ticks_msec() - t0) / 1000.0])
-	quit(0 if total_errors == 0 else 1)
+	print("runs/class=%d seed=%d errors=%d capped=%d time=%.1fs" % [runs, seed0, total_errors, total_stuck, (Time.get_ticks_msec() - t0) / 1000.0])
+	quit(0 if total_errors == 0 and total_stuck == 0 else 1)
 
 func _fmt(d: Dictionary) -> String:
 	var keys := d.keys()

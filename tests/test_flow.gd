@@ -725,3 +725,70 @@ func test_illegal_in_other_phases() -> void:
 	for ev in [f.roll_board(), f.shop_leave(), f.rune_assign(0), f.portal_pick(19), f.combat_set_target(7)]:
 		assert_eq(ev[0].type, "error")
 	assert_eq(_snap(f), before)
+
+func test_hero_block_cleared_after_combat_win() -> void:
+	var f := _flow()
+	_blank(f)
+	_put(f, 3, Board.make_tile("enemy", ["skeleton_minion"]))
+	_force_roll(f, 3)
+	f.choose_move(0)
+	f.combat.dice_values.assign([6, 6, 6])
+	for e in f.combat.enemies:
+		e.hp = 1
+		e.block = 0
+	f.run.block = 9
+	# knight's guard die adds block during the attack; whatever remains must be cleared
+	var ev := f.combat_attack()
+	assert_eq(f.run.block, 0, "hero block cleared after fight")
+	var last := {}
+	for e in ev:
+		if e.type == "block_gained" and str(e.target) == "hero":
+			last = e
+	assert_eq(last.get("total", -1), 0, "final hero block event reports 0")
+	assert_true(int(last.get("amount", 0)) < 0, "reset amount is negative")
+
+func test_lap_heal_emits_hp_changed() -> void:
+	var f := _flow()
+	_blank(f)
+	f.run.pos = 22
+	f.run.hp = 40
+	_force_roll(f, 5)
+	var ev := f.choose_move(0)
+	var hc := {}
+	for e in ev:
+		if e.type == "hp_changed" and e.source == "lap":
+			hc = e
+	assert_eq(hc, {"type": "hp_changed", "amount": 11, "total": 51, "source": "lap", "max_hp": 70})
+
+func test_treasury_payout_reports_reset() -> void:
+	var f := _flow()
+	_blank(f)
+	f.run.pos = 8
+	f.run.treasury = 34
+	f.run.gold = 5
+	_force_roll(f, 4)
+	var ev := f.choose_move(0)
+	var gc := _first(ev, "gold_changed")
+	assert_eq(gc, {"type": "gold_changed", "amount": 34, "total": 39, "source": "treasury", "treasury": Balance.TREASURY_START})
+
+func test_act_started_reports_treasury() -> void:
+	var f := _flow()
+	var ev: Array[Dictionary] = []
+	f.run.treasury = 77
+	f._next_act(ev)
+	assert_eq(_first(ev, "act_started").get("treasury", -1), Balance.TREASURY_START)
+
+func test_portal_lap3_stops_at_start() -> void:
+	var f := _flow()
+	_blank(f)
+	f.run.lap = 3
+	f.run.pos = 14
+	_force_roll(f, 4)
+	f.choose_move(0)
+	assert_eq(f.phase, P.PORTAL)
+	assert_eq(f.offer.tiles, [19, 20, 21, 22, 23, 0])
+	f.debug_open("portal")
+	assert_eq(f.offer.tiles, [19, 20, 21, 22, 23, 0], "debug portal from pos 18")
+	var ev := f.portal_pick(0)
+	assert_eq(f.phase, P.COMBAT)
+	assert_eq(f.combat.boss, true)

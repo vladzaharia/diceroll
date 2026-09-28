@@ -96,3 +96,22 @@ func test_all_wild_six_dice() -> void:
 	var c := _ev([1, 1, 1, 1, 1, 1], [true, true, true, true, true, true])
 	assert_eq(c.id, "six_kind")
 	assert_eq(c.sum, 36)
+
+func test_free_wild_outside_group_is_six() -> void:
+	var c := _ev([2, 3, 4, 5, 6, 1], [false, false, false, false, false, true])
+	assert_eq(c.id, "straight")
+	var g: Array = c.group.duplicate()
+	g.sort()
+	assert_eq(g, [0, 1, 2, 3, 4], "straight 2-6 from fixed dice")
+	assert_eq(c.values, [2, 3, 4, 5, 6, 6], "free wild becomes 6")
+
+func test_two_wilds_free_one_is_six() -> void:
+	var c := _ev([2, 3, 4, 5, 1, 1], [false, false, false, false, true, true])
+	assert_eq(c.id, "straight")
+	assert_eq(c.sum, 20, "straight 2-6")
+	for i in [4, 5]:
+		if not c.group.has(i):
+			assert_eq(c.values[i], 6, "free wild %d becomes 6" % i)
+	var v: Array = c.values.duplicate()
+	v.sort()
+	assert_eq(v, [2, 3, 4, 5, 6, 6])

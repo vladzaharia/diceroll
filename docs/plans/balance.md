@@ -9,14 +9,14 @@ Seed 1:
 
 | class | win% | avg act | avg board turns | avg combat turns | avg commands | avg level | avg fights won | deaths by act |
 |---|---|---|---|---|---|---|---|---|
-| knight | 35.7 | 2.88 | 48.1 | 45.8 | 298 | 10.0 | 19.5 | act1boss:1 act2:13 act2boss:21 act3:87 act3boss:71 |
-| barbarian | 29.0 | 2.83 | 47.4 | 42.7 | 287 | 9.7 | 18.8 | act1boss:1 act2:22 act2boss:27 act3:84 act3boss:79 |
-| mage | 28.7 | 2.78 | 46.6 | 41.7 | 282 | 9.4 | 18.1 | act1:1 act1boss:1 act2:29 act2boss:33 act3:71 act3boss:79 |
-| rogue | 29.7 | 2.78 | 46.4 | 42.1 | 289 | 9.4 | 18.1 | act1boss:3 act2:22 act2boss:38 act3:85 act3boss:63 |
+| knight | 37.7 | 2.88 | 48.3 | 45.9 | 299 | 10.0 | 19.6 | act1boss:1 act2:13 act2boss:22 act3:79 act3boss:72 |
+| barbarian | 31.3 | 2.83 | 47.5 | 42.7 | 287 | 9.7 | 18.8 | act1boss:1 act2:21 act2boss:28 act3:82 act3boss:74 |
+| mage | 28.0 | 2.79 | 46.7 | 41.6 | 283 | 9.4 | 18.2 | act1:1 act1boss:1 act2:26 act2boss:32 act3:76 act3boss:80 |
+| rogue | 29.7 | 2.79 | 46.6 | 42.1 | 291 | 9.4 | 18.2 | act1boss:3 act2:21 act2boss:36 act3:86 act3boss:65 |
 
-Seed 4242 (check against seed overfitting): knight 37.7, barbarian 37.0, mage 26.7, rogue 29.3.
+Seed 4242 (check against seed overfitting): knight 38.0, barbarian 38.0, mage 27.3, rogue 30.3.
 
-Zero error events in all runs. Fights last about 2.3 player turns on average. Deaths cluster in Act 3, split roughly evenly between regular fights and the Lich, with Act 2's boss as the first real wall.
+Zero error events and zero command-cap hits in all runs (the sim exits 1 on either). Fights last about 2.3 player turns on average. Deaths cluster in Act 3, split roughly evenly between regular fights and the Lich, with Act 2's boss as the first real wall.
 "avg act" is the act the run ended in, and a victory counts as act 3.
 
 ## Numbers changed from the spec
