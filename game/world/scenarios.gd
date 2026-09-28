@@ -4,12 +4,13 @@ extends RefCounted
 ##  board_act1..3   overview of each biome: hero, mixed tiles incl. enemies + elite, targets
 ##  board_follow    follow camera mid-hop
 ##  board_mutate    tiles popping to new types (use --frames)
+##  board_portal    hero teleports from the portal corner (use --frames)
 ##  combat_act1     hero vs 3 enemies, intents/HP visible, mid-attack
 ##  boss_act1..3    boss fights (Bone Warden, Hollow King, Lich + minions)
 ##  fx_gallery      every FX firing in a loop on the act 1 board
 ## Optional args: --hero=<class>, --tile=<idx>.
 
-const NAMES := ["board_act1", "board_act2", "board_act3", "board_follow", "board_mutate", "combat_act1",
+const NAMES := ["board_act1", "board_act2", "board_act3", "board_follow", "board_mutate", "board_portal", "combat_act1",
 	"combat_act2", "combat_act3", "boss_act1", "boss_act2", "boss_act3", "fx_gallery"]
 
 
@@ -142,6 +143,12 @@ class _Driver extends Node3D:
 				board.set_tile(13, {"type": "elite", "enemies": ["brute"]})
 				board.set_tile(22, {"type": "chest"})
 				board.pulse_tile(0)
+			"board_portal":
+				board.place_hero(18)
+				rig.follow(board.hero, true)
+				await get_tree().create_timer(maxf(wait - 0.4, 0.3)).timeout
+				await board.teleport_hero(22)
+				board.set_hero_class("rogue")
 			"combat_act1", "combat_act2", "combat_act3", "boss_act1", "boss_act2", "boss_act3":
 				await _combat(act, wait)
 			"fx_gallery":

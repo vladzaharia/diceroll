@@ -13,6 +13,8 @@ extends Node3D
 ## Treasury), down the right edge (18 = Portal), back along the front.
 
 signal hero_landed(idx: int)
+## Emitted when set_hero_class() replaces the hero node (re-target cameras on it).
+signal hero_changed(hero: Character)
 
 const RING := 24
 const PITCH := 2.1                 ## tile centre spacing (world units)
@@ -209,6 +211,8 @@ func _dress_tile(i: int, animate: bool) -> void:
 			var ch := EnemyLooks.create(id)
 			var s := PREVIEW_SCALE * (1.0 if n == 1 else 0.85) * (1.15 if elite else 1.0)
 			s *= clampf(EnemyLooks.scale_of(id), 1.0, 1.25)
+			if String(EnemyLooks.def(id).model) == "mannequin_large":
+				s *= 0.72
 			ch.scale = Vector3.ONE * s
 			ch.position = spots[k]
 			ch.rotation.y = deg_to_rad(randf_range(-25.0, 25.0))
@@ -431,9 +435,12 @@ func _spawn_hero() -> void:
 ## Swaps the hero model (knight | barbarian | mage | rogue), keeping its tile.
 func set_hero_class(id: String) -> void:
 	hero_class = id
+	var rot := hero.rotation.y if hero else 0.0
 	if hero:
 		hero.queue_free()
 	_spawn_hero()
+	hero.rotation.y = rot
+	hero_changed.emit(hero)
 
 
 ## Puts the hero on a tile instantly, turned toward the camera.

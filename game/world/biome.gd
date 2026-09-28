@@ -125,7 +125,8 @@ static func make_environment(act: int) -> WorldEnvironment:
 	env.glow_bloom = 0.04
 	env.glow_hdr_threshold = 0.9
 	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
-	env.ssao_enabled = true
+	# SSAO is Forward+ only (the Mobile renderer on iOS warns and ignores it).
+	env.ssao_enabled = RenderingServer.get_current_rendering_method() == "forward_plus"
 	env.ssao_radius = 0.9
 	env.ssao_intensity = 1.6
 	env.ssao_power = 1.4
