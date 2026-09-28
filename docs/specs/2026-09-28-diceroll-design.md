@@ -212,3 +212,21 @@ Meta currencies, gear, pets, online features, more than 4 classes, Ranger class,
   - Focus: balanced, damage, defense or economy.
   - Tapping any game control turns AUTO off.
   - Combat choices use expected value, computed with a private RNG that never touches the run's RNG.
+
+## 16. Meta layer (2026-09-28, from Vlad): Camp, minigames, pets, potions. Non-monetized
+
+Principles: no premium currency, no paid or random rolls for power. Every upgrade has a known cost and a deterministic result. Meta power is bounded, and wins unlock **Ascension** levels to counter it.
+
+- **Potions (in-run):** a potion belt holds 2 (the meta layer upgrades it to 4). A run starts with 1. Using one is a free action at any time, on the board or in combat, and heals 30% max HP. Sources: shop, chests, minigames, pets. Other heals: the lap heal (Heroll-style), campfires, and heal passives.
+- **Minigames:** Fossil Hunter (dig grid, find hidden fossils with limited digs), Bubble Breaker (pop same-colour clusters with limited taps), Scratch-off (reveal 3 of 9), Claw Machine (timing grab).
+  - Owned minigames are equipped in a **loadout of 2 per run** (a 3rd slot unlocks through meta), and they appear as **minigame tiles** on the board.
+  - Each pays an in-run reward (gold, potions, face upgrades) plus its own meta material: Fossils (Workshop), Pearls (Pet Den), Tickets (Arcade), Tokens (Armory).
+  - Rules and outcomes are in core and deterministic from the run RNG plus the player's inputs.
+- **Camp (hub between runs):** a 3D camp scene. Title → Camp → Start Run (class, pet and minigame loadout) → run → results (Crowns and materials earned) → Camp.
+  - **Armory:** Helm (+HP), Blade (+ATK), Boots (+board reroll / move), Charm (+gold). Crafted and levelled with Crowns and Tokens.
+  - **Dice Workshop:** permanent starting-dice upgrades. It also unlocks runes, die kinds and passives into the drop pools; a fresh profile starts with a curated subset.
+  - **Pet Den:** about 6 pets (familiars built from KayKit props: Pumpkin Sprite heal · Skull Buddy attack · Lantern Ghost burn · Crystal Wisp +reroll · Guard Die block · Coin Mimic gold). One is equipped per run. Each acts in combat on a cooldown and levels up with Pearls.
+  - **Arcade:** unlock and upgrade minigames and loadout slots with Tickets and Crowns.
+- **Crowns:** awarded at the end of every run from laps, bosses, mini-boss kills and leftover gold. A loss still pays.
+- **Profile:** `user://profile.json`, separate from the run save. It holds meta state, unlocks, ascension and records.
+- **Balance targets (greedy bot):** fresh profile 15–25% win, mid profile about 35%, maxed profile about 60% at Ascension 0. Each Ascension level adds about 8% enemy HP/attack or removes a heal.
