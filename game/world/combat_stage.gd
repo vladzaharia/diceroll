@@ -27,6 +27,8 @@ var enemies: Array[Character] = []
 var huds: Array[UnitHud] = []
 var data: Array[Dictionary] = []
 var target := 0
+## Presentation speed (game speed setting): scales beat timers, tweens and enemy clips.
+var speed := 1.0
 
 var _target_ring: MeshInstance3D
 var _board: BoardView
@@ -55,7 +57,7 @@ func begin(p_hero: Character, anchor: Dictionary, enemy_list: Array) -> void:
 	var n := enemy_list.size()
 	for i in n:
 		_add(enemy_list[i], i, n, 0.05 + 0.2 * i)
-	await get_tree().create_timer(0.2 * n + 0.75).timeout
+	await get_tree().create_timer((0.2 * n + 0.75) / speed, false).timeout
 	set_target(0)
 	began.emit()
 
@@ -165,6 +167,7 @@ func _floor_offset() -> float:
 func _add(d: Dictionary, i: int, n: int, rise_delay := -1.0) -> void:
 	var id := String(d.get("id", "skeleton_minion"))
 	var ch := EnemyLooks.create(id)
+	ch.anim_player.speed_scale = speed
 	var s := UNIT_SCALE * EnemyLooks.scale_of(id)
 	ch.scale = Vector3.ONE * s
 	add_child(ch)
@@ -201,7 +204,7 @@ func _rise(ch: Character, id: String, hud: UnitHud, delay: float) -> void:
 	hud.visible = false
 	ch.visible = false
 	if delay > 0.0:
-		await get_tree().create_timer(delay).timeout
+		await get_tree().create_timer((delay) / speed, false).timeout
 	if not is_instance_valid(ch):
 		return
 	ch.visible = true
@@ -211,12 +214,12 @@ func _rise(ch: Character, id: String, hud: UnitHud, delay: float) -> void:
 	Fx.shockwave(self, final + Vector3.UP * 0.04, Color(0.8, 0.5, 1.0) if EnemyLooks.is_boss(id) else Color(1.0, 0.6, 0.4), 1.6)
 	var clip := EnemyLooks.clip(id, "spawn")
 	ch.play_once(clip, EnemyLooks.clip(id, "idle"))
-	var t := ch.create_tween()
+	var t := ch.create_tween().set_speed_scale(speed)
 	t.tween_property(ch, "global_position", final, 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	t.tween_callback(func() -> void:
 		hud.visible = true
 		hud.scale = Vector3.ONE * 0.01
-		var ht := hud.create_tween()
+		var ht := hud.create_tween().set_speed_scale(speed)
 		ht.tween_property(hud, "scale", Vector3.ONE * (1.2 if EnemyLooks.is_boss(id) else 1.0), 0.25) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT))
 	Audio.play_sfx("trap", 0.1)
@@ -226,9 +229,9 @@ func _relayout() -> void:
 	var n := enemies.size()
 	for i in n:
 		var p := _slot(i, n)
-		var t := enemies[i].create_tween()
+		var t := enemies[i].create_tween().set_speed_scale(speed)
 		t.tween_property(enemies[i], "global_position", p, 0.3).set_trans(Tween.TRANS_SINE)
-		var ht := huds[i].create_tween()
+		var ht := huds[i].create_tween().set_speed_scale(speed)
 		ht.tween_property(huds[i], "global_position", p + Vector3.UP * _hud_height(String(data[i].get("id", ""))), 0.3)
 
 
@@ -254,7 +257,7 @@ func set_target(i: int) -> void:
 		_target_ring.material_override = m
 		_target_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(_target_ring)
-		var t := _target_ring.create_tween().set_loops()
+		var t := _target_ring.create_tween().set_speed_scale(speed).set_loops()
 		t.tween_property(_target_ring, "scale", Vector3.ONE * 1.1, 0.5).set_trans(Tween.TRANS_SINE)
 		t.tween_property(_target_ring, "scale", Vector3.ONE * 0.92, 0.5).set_trans(Tween.TRANS_SINE)
 	if i < 0 or i >= enemies.size():
@@ -277,16 +280,16 @@ func enemy_attack(i: int) -> void:
 	var home := ch.global_position
 	var ranged := id == "skeleton_archer" or id == "cultist" or id == "boss_lich"
 	var lunge := home + (hero.global_position - home).normalized() * (0.2 if ranged else 0.9)
-	var t := ch.create_tween()
+	var t := ch.create_tween().set_speed_scale(speed)
 	t.tween_property(ch, "global_position", lunge, 0.18).set_trans(Tween.TRANS_SINE)
 	var clip := EnemyLooks.clip(id, "attack")
 	ch.play_once(clip, EnemyLooks.clip(id, "idle"), 0.08, 1.3)
 	Audio.play_sfx("swing")
-	await get_tree().create_timer(0.32).timeout
+	await get_tree().create_timer((0.32) / speed, false).timeout
 	if ranged:
 		var col := Color(0.7, 0.4, 1.0) if id != "skeleton_archer" else Color(1.0, 0.9, 0.7)
-		await Fx.projectile(self, ch.global_position + Vector3.UP * 1.1, hero.global_position + Vector3.UP * 0.8, col, 0.28)
-	var back := ch.create_tween()
+		await Fx.projectile(self, ch.global_position + Vector3.UP * 1.1, hero.global_position + Vector3.UP * 0.8, col, 0.28 / speed)
+	var back := ch.create_tween().set_speed_scale(speed)
 	back.tween_property(ch, "global_position", home, 0.3).set_trans(Tween.TRANS_SINE).set_delay(0.1)
 
 
@@ -310,7 +313,7 @@ func enemy_hit(i: int, amount: int, crit := false, blocked := 0) -> void:
 		dir.y = 0.0
 		dir = dir.normalized()
 		var home := _slot(i, enemies.size())
-		var t := ch.create_tween()
+		var t := ch.create_tween().set_speed_scale(speed)
 		t.tween_property(ch, "global_position", home + dir * (0.45 if crit else 0.25), 0.07)
 		t.tween_property(ch, "global_position", home, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		ch.play_once("hit", EnemyLooks.clip(id, "idle"), 0.05)
@@ -322,7 +325,7 @@ func enemy_hit(i: int, amount: int, crit := false, blocked := 0) -> void:
 	d["block"] = maxi(int(d.get("block", 0)) - blocked, 0)
 	d["hp"] = maxi(int(d.get("hp", 0)) - amount, 0)
 	huds[i].set_data(d, true)
-	await get_tree().create_timer(0.35).timeout
+	await get_tree().create_timer((0.35) / speed, false).timeout
 
 
 ## Enemy i dies: death clip, sink into the ground, burst. HUD fades.
@@ -332,7 +335,7 @@ func enemy_die(i: int) -> void:
 	var ch := enemies[i]
 	var id := String(data[i].get("id", ""))
 	var hud := huds[i]
-	var ht := hud.create_tween()
+	var ht := hud.create_tween().set_speed_scale(speed)
 	ht.tween_method(hud.set_opacity, 1.0, 0.0, 0.3)
 	ht.tween_callback(func() -> void: hud.visible = false)
 	Audio.play_sfx("death")
@@ -341,7 +344,7 @@ func enemy_die(i: int) -> void:
 	Fx.burst(self, pos + Vector3.UP * 0.4, {"amount": 26, "lifetime": 0.9, "speed": Vector2(0.6, 2.2),
 		"gravity": Vector3(0, 1.5, 0), "size": 0.34, "color": Color(0.8, 0.75, 1.0, 0.8), "tex": "dot",
 		"spread": 60.0})
-	var t := ch.create_tween()
+	var t := ch.create_tween().set_speed_scale(speed)
 	t.tween_property(ch, "global_position", pos - Vector3.UP * 1.4, 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	t.parallel().tween_property(ch, "scale", ch.scale * 0.7, 0.5)
 	await t.finished
@@ -369,23 +372,23 @@ func hero_attack(target_i: int, style := "") -> void:
 			var gap := 1.25 * EnemyLooks.scale_of(String(data[target_i].get("id", "")))
 			var reach := home + dir.normalized() * maxf(dir.length() - gap, 0.0) * 0.8
 			reach.y = home.y
-			var t := hero.create_tween()
+			var t := hero.create_tween().set_speed_scale(speed)
 			t.tween_property(hero, "global_position", reach + Vector3.UP * 0.0, 0.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 			hero.play("Running_A", 0.05)
 			await t.finished
 			hero.play_once("attack", "idle", 0.05, 1.35)
 			Audio.play_sfx("swing")
-			await get_tree().create_timer(0.3).timeout
+			await get_tree().create_timer((0.3) / speed, false).timeout
 			Fx.slash(self, ch.global_position + Vector3.UP * 0.9 * EnemyLooks.scale_of(String(data[target_i].get("id", ""))),
 				(ch.global_position - home).normalized())
-			await get_tree().create_timer(0.06).timeout
+			await get_tree().create_timer((0.06) / speed, false).timeout
 			_return_hero(0.12)
 		"magic", "ranged":
 			hero.play_once("attack" if style == "ranged" else "Ranged_Magic_Shoot", "idle", 0.05, 1.2)
-			await get_tree().create_timer(0.25).timeout
+			await get_tree().create_timer((0.25) / speed, false).timeout
 			var col := Color(0.5, 0.75, 1.0) if style == "magic" else Color(1.0, 0.9, 0.7)
 			await Fx.projectile(self, hero.global_position + Vector3.UP * 1.0 + facing * 0.4,
-				ch.global_position + Vector3.UP * 0.9, col, 0.3)
+				ch.global_position + Vector3.UP * 0.9, col, 0.3 / speed)
 
 
 func _toward_camera(from: Vector3) -> Vector3:
@@ -403,7 +406,7 @@ func _camera_right() -> Vector3:
 
 
 func _return_hero(delay: float) -> void:
-	var t := hero.create_tween()
+	var t := hero.create_tween().set_speed_scale(speed)
 	t.tween_interval(delay)
 	t.tween_property(hero, "global_position", hero_home, 0.28).set_trans(Tween.TRANS_SINE)
 
@@ -427,7 +430,7 @@ func hero_hit(amount: int, blocked := 0) -> void:
 		var rig := cam.get_parent() as CameraRig if cam else null
 		if rig:
 			rig.shake(clampf(float(amount) / 15.0, 0.25, 0.9), 0.3)
-	await get_tree().create_timer(0.35).timeout
+	await get_tree().create_timer((0.35) / speed, false).timeout
 
 
 ## Removes every enemy, HUD and marker and returns the hero home.
@@ -459,14 +462,14 @@ func _face(ch: Node3D, at: Vector3, time: float) -> void:
 		ch.rotation.y = yaw
 		return
 	var cur := ch.rotation.y
-	var t := ch.create_tween()
+	var t := ch.create_tween().set_speed_scale(speed)
 	t.tween_property(ch, "rotation:y", cur + wrapf(yaw - cur, -PI, PI), time)
 
 
 func _flash_white(ch: Character, id: String) -> void:
 	var d := EnemyLooks.def(id)
 	ch.set_tint(d.tint, float(d.strength), Color(0.9, 0.85, 0.8))
-	var t := ch.create_tween()
+	var t := ch.create_tween().set_speed_scale(speed)
 	t.tween_interval(0.08)
 	t.tween_callback(func() -> void:
 		if is_instance_valid(ch):
@@ -492,7 +495,7 @@ func _arena() -> void:
 	add_child(_arena_mi)
 	var c := hero_home + facing * (_distance + 0.2)
 	_arena_mi.global_position = Vector3(c.x, _ground_y + 0.02, c.z)
-	var t := _arena_mi.create_tween()
+	var t := _arena_mi.create_tween().set_speed_scale(speed)
 	t.tween_method(func(v: float) -> void: m.set_shader_parameter("intensity", v), 0.0, 0.55, 0.6)
 
 

@@ -18,6 +18,8 @@ var _hint_label: Label
 var _bar: HBoxContainer
 var _toast_holder: Control
 var _phase := -1
+## True while the game plays events back: the bottom bar is hidden (input locked).
+var busy := false
 
 
 func _init() -> void:
@@ -87,7 +89,7 @@ func refresh(flow: GameFlow) -> void:
 	_phase = ph
 	var ready := ph == GameFlow.Phase.BOARD_READY
 	var rolled := ph == GameFlow.Phase.BOARD_ROLLED
-	_bar.visible = ready or rolled
+	_bar.visible = (ready or rolled) and not busy
 	roll_btn.visible = ready
 	hint.visible = rolled
 	reroll_btn.visible = rolled
@@ -102,6 +104,13 @@ func refresh(flow: GameFlow) -> void:
 			UiTheme.pop(roll_btn, 1.08, 0.3)
 		else:
 			UiTheme.pop(hint, 1.08, 0.3)
+
+
+## Locks (hides) the bottom bar while events play; the next refresh() restores it.
+func set_busy(on: bool) -> void:
+	busy = on
+	if on:
+		_bar.visible = false
 
 
 func on_event(ev: Dictionary, flow: GameFlow) -> void:

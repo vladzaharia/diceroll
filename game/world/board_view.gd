@@ -356,7 +356,7 @@ func _make_marker(idx: int, vals: Array, order: int) -> Node3D:
 	# die-face badge with the value(s)
 	var badge := Node3D.new()
 	badge.position.y = 2.2
-	badge.scale = Vector3.ONE * 1.45
+	badge.scale = Vector3.ONE * 1.9
 	root.add_child(badge)
 	var w := 0.62 + 0.36 * float(vals.size() - 1)
 	var face := MeshInstance3D.new()

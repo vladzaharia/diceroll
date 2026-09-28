@@ -30,6 +30,8 @@ var _sheet_rows: Dictionary = {}
 var _panel: PanelContainer
 var _bottom: VBoxContainer
 var _last_combo := ""
+## True while the game plays events back: Reroll / Attack are disabled.
+var busy := false
 
 
 func _init() -> void:
@@ -217,7 +219,8 @@ func refresh(flow: GameFlow) -> void:
 		ic.modulate.a = 1.0 if on else 0.55
 		pips.add_child(ic)
 	reroll_btn.sub_text = "%d left" % c.rerolls_left
-	reroll_btn.set_enabled(marked > 0 and c.rerolls_left > 0)
+	reroll_btn.set_enabled(not busy and marked > 0 and c.rerolls_left > 0)
+	attack_btn.set_enabled(not busy)
 	if c.rerolls_left <= 0:
 		hint_label.text = "No rerolls left. Attack!"
 	elif marked == 0:
@@ -247,6 +250,19 @@ static func project(flow: GameFlow) -> Dictionary:
 			mult += 0.5
 	var total := int(floor((sum + bonus) * mult)) + run.atk
 	return {"id": combo.id, "name": combo.name, "mult": mult, "total": total, "group": group}
+
+
+## Top edge (canvas y) of the bottom panel; 3D framing should stay above it.
+func content_top(view: Vector2) -> float:
+	return view.y - UiTheme.tray_height(view) - 20.0 - _bottom.get_combined_minimum_size().y
+
+
+## Disables Reroll / Attack while events play; the next refresh() restores them.
+func set_busy(on: bool) -> void:
+	busy = on
+	if on:
+		reroll_btn.set_enabled(false)
+		attack_btn.set_enabled(false)
 
 
 func on_event(ev: Dictionary, flow: GameFlow) -> void:
