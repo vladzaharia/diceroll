@@ -80,6 +80,12 @@ static func create(p_class_id: String, p_seed: int, p_board_size: int = Balance.
 		r.meta = MetaRun.normalize(opts.meta)
 	elif opts.has("profile"):
 		r.meta = MetaRun.build(opts.profile, p_class_id)
+	if opts.has("ascension") and not r.meta.is_empty():
+		# explicit ascension (0..MAX_ASCENSION) overrides the profile's selected level
+		var asc := clampi(int(opts.ascension), 0, UnlockDefs.MAX_ASCENSION)
+		r.meta.asc = asc
+		r.meta.asc_keys = UnlockDefs.ascension_keys(asc)
+		r.meta.potions = 0 if r.meta.asc_keys.has("potions") else mini(Balance.POTION_START, int(r.meta.potion_cap))
 	if r.meta.is_empty():
 		r.route = BiomeDefs.pick_route(r.rng)
 	else:

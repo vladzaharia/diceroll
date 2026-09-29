@@ -35,6 +35,7 @@ var minigame: Minigame = null
 ## opts (optional, scenarios/tests): {route:[tier1, tier2, tier3], miniboss:id, boss:id}.
 ## Without them the route (one biome per tier) and bosses are drawn from the seed.
 ## opts.mode: "standard" (15 laps, 3 biomes) | "short" (Short Road: 10 laps, 2 biomes).
+## opts.ascension: int 0..10, overrides the profile's selected ascension (meta runs only).
 ## opts.profile: a Profile.to_dict() snapshot (or opts.meta: a MetaRun.build() config) enables the
 ## meta layer (gear, traits, workshop, pet, potion belt, minigame loadout, unlocked pools, biomes
 ## and bosses, ascension). The run stores the derived config in run.meta, so saves and replays
@@ -1428,8 +1429,10 @@ func _start_minigame(id: String, ev: Array[Dictionary]) -> void:
 	var plays: Dictionary = run.stats.get("minigame_plays", {})
 	plays[id] = int(plays.get(id, 0)) + 1
 	run.stats["minigame_plays"] = plays
+	# save_point: the presentation auto-saves here (spec decision: save at minigame entry), so
+	# quitting mid-game and reloading resumes the same board (no save-scumming).
 	ev.append({"type": "minigame_started", "id": id, "name": MinigameDefs.name_of(id), "state": minigame.public_state(),
-		"actions_left": minigame.actions_left})
+		"actions_left": minigame.actions_left, "save_point": true})
 	_set_offer(_minigame_offer(), Phase.MINIGAME, ev)
 
 func _minigame_offer() -> Dictionary:
