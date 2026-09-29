@@ -46,6 +46,7 @@ var last_runes: Array[Dictionary] = []
 # Necromancer (ClassLogic "bone_harvest")
 var extra_dice: Array[Die] = []    # temporary dice for this fight (Bone dice), after run.dice
 var pending_bones: int = 0         # Bone dice raised this turn: they join the pool next turn
+var attack_target: int = -1        # the main attack's target this turn (BOO!)
 var bones_raised: int = 0          # Bone dice raised this fight (max ClassLogic.BONE_MAX)  # runes that triggered in the last attack [{rune, value, die}] (Grimoire)
 
 # ---------------------------------------------------------------- setup
@@ -116,6 +117,7 @@ static func make_enemy(rng: Rng, id: String, p_act: int, p_lap: int, p_elite: bo
 		"miniboss": EnemyDefs.is_miniboss(id), "traits": EnemyDefs.traits(id, 1).duplicate(),
 		"frenzy": 0, "form": EnemyDefs.form(id, 1),
 		"affixes": [], "thorns_value": Balance.ENEMY_THORNS, "actions": 0, "chilled": false,
+		"brave": false, "cower": false, "weakened": false, "fled": false,
 	}
 
 ## Meta-layer enemy modifiers (ascension): A1 elites +15% HP; A6 +4% HP/attack (not bosses);
@@ -350,13 +352,21 @@ func current_combo(run: RunState) -> Dictionary:
 	var pd := pool_dice(run)
 	var wild: Array[bool] = []
 	var left := Balance.WILD_MAX_DICE
-	for d in pd:
-		# anti-stacking: only the first WILD_MAX_DICE Wild dice act as Wild
-		var w := d.rune == "wild" and left > 0
+	var vals := dice_values
+	for i in pd.size():
+		var d := pd[i]
+		# anti-stacking: only the first WILD_MAX_DICE Wild dice act as Wild; the Monster Kid's
+		# ★ face shares the cap
+		var star := i < dice_values.size() and dice_values[i] == Die.PRETEND
+		var w := (d.rune == "wild" or star) and left > 0
 		if w:
 			left -= 1
+		elif star:
+			if vals == dice_values:
+				vals = dice_values.duplicate()
+			vals[i] = 0 # a ★ beyond the Wild cap scores nothing
 		wild.append(w)
-	return Combo.evaluate(dice_values, wild)
+	return Combo.evaluate(vals, wild)
 
 func _fix_target() -> void:
 	if not alive(target):
@@ -390,9 +400,9 @@ func rune_active(run: RunState, group: Array, eff: Array) -> Array[bool]:
 			"blade", "venom", "vampire", "echo", "heavy", "gilded":
 				ok = group.has(i)
 			"ember":
-				ok = int(eff[i]) == 6
+				ok = int(eff[i]) == 6 and dice_values[i] != Die.PRETEND
 			"frost":
-				ok = int(eff[i]) == 1
+				ok = int(eff[i]) == 1 and dice_values[i] != Die.PRETEND
 			"thunder":
 				ok = rerolled[i]
 			"lucky":
@@ -534,6 +544,7 @@ func attack(run: RunState) -> Array[Dictionary]:
 	var thorny := alive(target) and has_trait(enemies[target], "thorns")
 	var soak := int(enemies[target].hp) + int(enemies[target].block) if alive(target) else 0
 	var tgt0 := target
+	attack_target = tgt0
 	ev.append_array(damage_enemy(target, total, "attack", run))
 	ev.append_array(ClassLogic.after_main_hit(run, self, tgt0, last_overkill))
 	if run.has_trait("blade_overflow") and not alive(tgt0) and total > soak:
@@ -769,6 +780,10 @@ func _enemy_phase(run: RunState) -> Array[Dictionary]:
 		if bool(e.frozen):
 			e.frozen = false
 			ev.append({"type": "status", "target": i, "status": "frozen", "value": 0, "skipped": true})
+		elif bool(e.get("cower", false)):
+			# BOO!: a scared regular/elite enemy cowers instead of acting
+			e.cower = false
+			ev.append({"type": "status", "target": i, "status": "cower", "value": 0, "skipped": true})
 		else:
 			ev.append_array(_affix_before_action(run, i))
 			ev.append_array(_execute_intent(run, i))
@@ -878,6 +893,10 @@ func _execute_intent(run: RunState, i: int) -> Array[Dictionary]:
 	var ev: Array[Dictionary] = []
 	var e := enemies[i]
 	var v := int(e.intent.value)
+	if bool(e.get("weakened", false)) and ["attack", "chill", "drain"].has(String(e.intent.kind)):
+		# BOO! on a boss or mini-boss: its next attack deals -ClassLogic.BOO_WEAKEN
+		e.weakened = false
+		v = int(round(v * (1.0 - ClassLogic.BOO_WEAKEN)))
 	match String(e.intent.kind):
 		"attack":
 			ev.append_array(_hit_hero(run, i, v))
@@ -902,7 +921,7 @@ func _execute_intent(run: RunState, i: int) -> Array[Dictionary]:
 			var opts: Array = []
 			for d in run.dice.size():
 				for f in 6:
-					if run.dice[d].faces[f] > 0:
+					if run.dice[d].faces[f] > 0 and run.dice[d].faces[f] != Die.PRETEND:
 						opts.append([d, f])
 			if not opts.is_empty():
 				var pk: Array = run.rng.pick(opts)
@@ -945,7 +964,7 @@ func _execute_intent(run: RunState, i: int) -> Array[Dictionary]:
 			var options: Array = []
 			for d in run.dice.size():
 				for f in 6:
-					if run.dice[d].faces[f] > 1:
+					if run.dice[d].faces[f] > 1 and run.dice[d].faces[f] != Die.PRETEND:
 						options.append([d, f])
 			if not options.is_empty():
 				var pick: Array = run.rng.pick(options)
@@ -969,8 +988,10 @@ func _win(run: RunState) -> Array[Dictionary]:
 		var def := EnemyDefs.def(e.id)
 		var m := Balance.ELITE_REWARD_MULT if e.elite else 1.0
 		var am := AffixDefs.reward_mult(e.get("affixes", []))
-		g += float(def.gold) * m * (1.0 if e.boss else gold_mult) * float(am[0])
-		x += float(def.xp) * m * float(am[1])
+		var fled := bool(e.get("fled", false))
+		g += float(def.gold) * m * (1.0 if e.boss else gold_mult) * float(am[0]) * (ClassLogic.FLEE_GOLD if fled else 1.0)
+		if not fled:
+			x += float(def.xp) * m * float(am[1])
 	if run.has_passive("scholar"):
 		x *= Balance.PASSIVE_SCHOLAR
 	gold_reward = int(round(g * Balance.tune_gold))
@@ -1015,6 +1036,7 @@ func to_dict() -> Dictionary:
 		"rerolls_used_this_turn": rerolls_used_this_turn, "refunds_this_turn": refunds_this_turn, "oath": oath,
 		"pet_thorns": pet_thorns, "pet_block_turn": pet_block_turn, "last_runes": last_runes.duplicate(true),
 		"extra_dice": extra_dice.map(func(d): return d.to_dict()), "pending_bones": pending_bones, "bones_raised": bones_raised,
+		"attack_target": attack_target,
 	}
 
 static func from_dict(d: Dictionary) -> CombatState:
@@ -1054,6 +1076,7 @@ static func from_dict(d: Dictionary) -> CombatState:
 		c.extra_dice.append(Die.from_dict(xd))
 	c.pending_bones = int(d.get("pending_bones", 0))
 	c.bones_raised = int(d.get("bones_raised", 0))
+	c.attack_target = int(d.get("attack_target", -1))
 	for lr in d.get("last_runes", []):
 		c.last_runes.append({"rune": String(lr.rune), "value": int(lr.value), "die": int(lr.die)})
 	c.last_combo = _norm_combo(d.last_combo)
@@ -1072,6 +1095,8 @@ static func _norm_enemy(ed: Dictionary) -> Dictionary:
 		"frenzy": int(ed.get("frenzy", 0)), "form": String(ed.get("form", "")),
 		"affixes": _strings(ed.get("affixes", [])), "thorns_value": int(ed.get("thorns_value", Balance.ENEMY_THORNS)),
 		"actions": int(ed.get("actions", 0)), "chilled": bool(ed.get("chilled", false)),
+		"brave": bool(ed.get("brave", false)), "cower": bool(ed.get("cower", false)),
+		"weakened": bool(ed.get("weakened", false)), "fled": bool(ed.get("fled", false)),
 	}
 
 static func _strings(a: Array) -> Array:

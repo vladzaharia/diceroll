@@ -319,9 +319,9 @@ static func _forge(f: GameFlow) -> Array:
 	var die := f.run.dice[d]
 	var lo := die.lowest_face()
 	if ops.has("mirror"):
-		var hi := 0
+		var hi := lo
 		for k in 6:
-			if die.faces[k] > die.faces[hi]:
+			if die.faces[k] > die.faces[hi] and die.faces[k] != Die.PRETEND:
 				hi = k
 		if die.faces[hi] - die.faces[lo] > 1:
 			return ["forge_apply", d, lo, "mirror", hi]
@@ -745,6 +745,10 @@ class CombatModel:
 	var aim_ok := false      # Ranger: no reroll spent yet this turn
 	var pierce_carry := false  # Ranger: overkill carries once to the next living enemy
 	var kill_value := 0.0    # Necromancer: worth of a kill beyond the enemy itself (a Bone die)
+	var pretend_mask := 0    # Monster Kid: dice whose ★ face (Die.PRETEND) acts as Wild
+	var wild_rune_mask := 0  # dice with the Wild rune (with pretend dice they share the Wild cap)
+	var e_boo := PackedByteArray()      # BOO! effect per enemy: 0 none (brave), 1 cower, 2 cower/flee, 3 weaken
+	var e_max := PackedFloat64Array()   # max HP per enemy (flee threshold)
 	var ne := 0
 	var e_idx := PackedInt32Array()
 	var e_hp := PackedFloat64Array()
@@ -854,12 +858,26 @@ class CombatModel:
 		var key := 0
 		if use_memo:
 			for i in n:
-				key = key * 10 + vals[i]
+				key = key * 11 + vals[i]
 			key = key * 64 + rer
 			var m: Variant = memo.get(key)
 			if m != null:
 				return m
-		var cb: Array = Bot._combo(vals, wild_mask)
+		var raw := vals
+		var wm := wild_mask
+		var star := false
+		if pretend_mask != 0:
+			# the first Wild-rune die or ★ face in pool order is the Wild; a ★ beyond the cap scores 0
+			raw = vals.duplicate()
+			wm = 0
+			for i in n:
+				var is_star := ((pretend_mask >> i) & 1) == 1 and vals[i] == Die.PRETEND
+				star = star or is_star
+				if (is_star or ((wild_rune_mask >> i) & 1) == 1) and wm == 0:
+					wm = 1 << i
+				elif is_star:
+					raw[i] = 0
+		var cb: Array = Bot._combo(raw, wm)
 		var gm: int = cb[1]
 		var eff: PackedInt32Array = cb[2]
 		var code: int = cb[3]
@@ -903,9 +921,9 @@ class CombatModel:
 				Bot.R_BLADE, Bot.R_VENOM, Bot.R_VAMPIRE, Bot.R_ECHO, Bot.R_HEAVY, Bot.R_GILDED:
 					on = ing
 				Bot.R_EMBER:
-					on = p == 6
+					on = p == 6 and vals[i] != Die.PRETEND
 				Bot.R_FROST:
-					on = p == 1
+					on = p == 1 and vals[i] != Die.PRETEND
 				Bot.R_THUNDER:
 					on = rerolled
 				Bot.R_LUCKY:
@@ -1016,6 +1034,17 @@ class CombatModel:
 					val += minf(h[k], venom * 1.5) * 0.7
 				if e_frozen[k] == 1 or (frost and k == t):
 					continue
+				if star and k == t and e_boo.size() > k and e_boo[k] > 0:
+					if e_boo[k] == 3:
+						incoming += e_hit[k] * (1.0 - ClassLogic.BOO_WEAKEN)
+						pierce += e_pierce[k] * (1.0 - ClassLogic.BOO_WEAKEN)
+						threat += e_other[k]
+						continue
+					if e_boo[k] == 2 and h[k] <= e_max[k] * ClassLogic.FLEE_PCT:
+						val += e_future[k] * 0.8 + h[k] * 0.5 # it runs off: no more threat
+						continue
+					threat += e_other[k] * 0.5
+					continue # cowers: no action this turn
 				incoming += e_hit[k]
 				pierce += e_pierce[k]
 				threat += e_other[k]
@@ -1079,7 +1108,6 @@ static func _combat_model(f: GameFlow, rules: AutoRules) -> CombatModel:
 	var cm := CombatModel.new()
 	cm.set_dice(_dice_desc(c.pool_dice(run)))
 	cm.set_passives(Array(run.passives), run.gold, c.turn == 1)
-	_class_model(cm, run, c)
 	cm.atk = run.atk
 	cm.lucky_room = maxi(0, Balance.MAX_BANKED_REROLLS - run.banked_rerolls)
 	cm.hero_hp = float(run.hp)
@@ -1133,11 +1161,28 @@ static func _combat_model(f: GameFlow, rules: AutoRules) -> CombatModel:
 		cm.add_enemy(k, float(e.hp), float(e.block), float(e.poison), hit, pierce, other, future,
 			(CombatState.has_trait(e, "ward") and summons > 0) or (CombatState.has_trait(e, "ward_allies") and c._unwarded_others(k) > 0),
 			bool(e.frozen), CombatState.has_trait(e, "thorns"))
+	_class_model(cm, run, c)
 	return cm
 
 ## Class mechanics in the combat model (c == null: the pool-value model, no fight yet).
 static func _class_model(cm: CombatModel, run: RunState, c: CombatState, dice: Array = []) -> void:
 	match HeroDefs.mechanic(run.class_id):
+		"boo":
+			var pd: Array = c.pool_dice(run) if c != null else []
+			for i in cm.n:
+				var desc_faces: PackedInt32Array = cm.faces[i]
+				if desc_faces.has(Die.PRETEND):
+					cm.pretend_mask |= 1 << i
+				if cm.rune[i] == Bot.R_WILD:
+					cm.wild_rune_mask |= 1 << i
+			if c != null:
+				for k in cm.ne:
+					var e: Dictionary = c.enemies[cm.e_idx[k]]
+					var bv := 0
+					if not bool(e.get("brave", false)):
+						bv = 3 if (bool(e.boss) or bool(e.get("miniboss", false))) else (1 if bool(e.elite) else 2)
+					cm.e_boo.append(bv)
+					cm.e_max.append(float(e.max_hp))
 		"oath":
 			if c != null:
 				cm.oath = c.oath
@@ -1628,7 +1673,7 @@ static func _best_face_edit(f: GameFlow, rules: AutoRules, ops: Array, lowest_on
 					best = [i, fi, "raise", -1, g]
 			if ops.has("mirror") and fi == d.lowest_face():
 				for src in 6:
-					if d.faces[src] <= d.faces[fi] or tried.has("m%d" % d.faces[src]):
+					if d.faces[src] <= d.faces[fi] or d.faces[src] == Die.PRETEND or tried.has("m%d" % d.faces[src]):
 						continue
 					tried["m%d" % d.faces[src]] = true
 					var g2 := _face_gain(f, rules, i, fi, d.faces[src])

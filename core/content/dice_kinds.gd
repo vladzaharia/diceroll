@@ -26,6 +26,8 @@ const DEFS := {
 	"giant": {"name": "Giant", "faces": [4, 5, 6, 7, 8, 9], "rarity": "epic", "price": 65, "cap": 9,
 		"desc": "Faces 4 to 9. Forge can raise it up to 9."},
 	# class-only kinds (never in shops, drafts or drops): the Necromancer's temporary Bone die
+	"pretend": {"name": "Pretend", "faces": [1, 2, 3, 4, 5, 10], "rarity": "class", "price": 0, "cap": 6, "class_only": true,
+		"desc": "Faces 1-5 and a ★: a Wild in fights, it copies the most common value on the board."},
 	"bone": {"name": "Bone", "faces": [1, 2, 2, 3, 3, 4], "rarity": "class", "price": 0, "cap": 6, "class_only": true,
 		"desc": "Faces 1,2,2,3,3,4. Raised from a fallen foe for the rest of the fight."},
 }

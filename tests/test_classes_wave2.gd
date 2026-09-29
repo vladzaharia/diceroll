@@ -155,8 +155,112 @@ func test_engineer_greedy_bot_fills_the_turret() -> void:
 	f.debug_open("rune_assign", "frost")
 	assert_eq(Bot.next_command(f), ["rune_assign", GameFlow.TURRET])
 
+# ================================================================ Monster Kid
+
+func test_monster_kid_pretend_die() -> void:
+	var f := GameFlow.new_run("monster_kid", 2)
+	assert_eq(f.run.dice[0].kind, "pretend")
+	assert_eq(Array(f.run.dice[0].faces), [1, 2, 3, 4, 5, Die.PRETEND])
+	assert_true(not f.run.dice[0].can_raise(5), "the ★ can't be edited")
+	assert_true(not f.run.dice[0].mirror_face(0, 5))
+	assert_true(bool(HeroDefs.DATA.monster_kid.secret))
+	assert_true(not DiceKinds.IDS.has("pretend"), "never in shops or drops")
+
+func test_star_is_a_wild_in_combat() -> void:
+	_setup("monster_kid", [["pretend", ""], ["standard", ""]])
+	_dice([Die.PRETEND, 5])
+	var cb := c.current_combo(run)
+	assert_eq(cb.id, "pair")
+	assert_eq(cb.values, [5, 5])
+	_setup("monster_kid", [["pretend", ""], ["standard", "wild"], ["standard", ""]])
+	_dice([Die.PRETEND, 2, 4])
+	cb = c.current_combo(run)
+	assert_eq(int(cb.values[0]) > 0, true, "the ★ comes first in pool order and takes the Wild cap")
+	assert_eq(int(cb.values[1]), 2, "the Wild rune die shows its own face")
+
+func test_star_never_triggers_six_or_one_runes() -> void:
+	_setup("monster_kid", [["pretend", "ember"], ["standard", ""]])
+	_dice([Die.PRETEND, 6])
+	var act := c.rune_active(run, [0, 1], [6, 6])
+	assert_eq(act[0], false)
+
+func test_star_on_the_board_copies_the_most_common_value() -> void:
+	assert_eq(ClassLogic.pretend_board_value([Die.PRETEND, 4, 4, 2], 0), 4)
+	assert_eq(ClassLogic.pretend_board_value([Die.PRETEND, 2, 5], 0), 5, "ties: higher")
+	assert_eq(ClassLogic.pretend_board_value([Die.PRETEND, 0], 0), 3, "alone: 3")
+	var f := GameFlow.new_run("monster_kid", 2)
+	f.run.dice[0].faces = PackedInt32Array([10, 10, 10, 10, 10, 10])
+	f.run.dice[1].faces = PackedInt32Array([4, 4, 4, 4, 4, 4])
+	var ev := f.roll_board()
+	assert_eq(f.board_move, 8, "the ★ joins the double")
+	assert_true(f.is_board_double())
+	assert_eq(ev[0].pretend, [0])
+
+func test_boo_cowers_a_regular_enemy_once() -> void:
+	_setup("monster_kid", [["pretend", ""], ["standard", ""]], ["bandit", "bandit"])
+	c.target = 0
+	_dice([Die.PRETEND, 2])
+	c.enemies[0].intent = {"kind": "attack", "value": 5}
+	var hp := run.hp
+	var ev := c.attack(run)
+	assert_eq(_all(ev, "class_triggered", "boo").size(), 1)
+	assert_eq(_all(ev, "enemy_scared")[0].effect, "cower")
+	assert_true(bool(c.enemies[0].brave))
+	var cow := false
+	for e in ev:
+		if e.type == "status" and String(e.status) == "cower":
+			cow = true
+	assert_true(cow, "it skipped its action")
+	assert_eq(run.hp, hp)
+	_dice([Die.PRETEND, 2])
+	c.target = 0
+	assert_true(_all(c.attack(run), "enemy_scared").is_empty(), "brave now")
+
+func test_boo_makes_a_weak_regular_flee() -> void:
+	_setup("monster_kid", [["pretend", ""], ["standard", ""]], ["bandit", "bandit"])
+	c.enemies[0].hp = 20
+	c.target = 0
+	_dice([Die.PRETEND, 3])
+	# pair of 3s: 6 x 1.5 = 9 -> 11 left of 100 max (<= 25%)
+	var ev := c.attack(run)
+	var fl := _all(ev, "enemy_fled")
+	assert_eq(fl.size(), 1)
+	assert_true(not c.alive(0))
+	assert_true(_all(ev, "enemy_died").is_empty(), "not a kill")
+	assert_eq(int(run.stats.get("kills", 0)), 0)
+
+func test_boo_weakens_bosses() -> void:
+	var f := GameFlow.new_run("monster_kid", 4)
+	f.debug_open("boss", "boss_lich")
+	var bc := f.combat
+	bc.dice_values.assign([Die.PRETEND, 1])
+	bc.enemies[0].intent = {"kind": "attack", "value": 20}
+	f.run.hp = 60
+	f.run.max_hp = 60
+	var ev := f.combat_attack()
+	assert_eq(_all(ev, "enemy_scared")[0].effect, "weaken")
+	var hit := 0
+	for e in ev:
+		if e.type == "damage" and str(e.target) == "hero":
+			hit += int(e.amount) + int(e.blocked)
+	assert_eq(hit, 14, "-30%")
+
+func test_monster_kid_is_secret_and_not_for_sale() -> void:
+	assert_eq(UnlockDefs.sigil_cost("classes", "monster_kid"), {})
+	var owned := HeroDefs.IDS.duplicate()
+	owned.erase("monster_kid")
+	assert_eq(UnlockDefs.buyable_classes(owned), [], "outside the next-two rule")
+	var m := UnlockDefs.milestone("trick_or_treat")
+	assert_true(bool(m.hidden))
+	var p := Profile.fresh()
+	p.records.counters.hollow_events = 13
+	assert_true(not p._cond(m.cond), "also needs 6 classes")
+	for id in ["barbarian", "paladin", "mage", "ranger", "rogue"]:
+		p.grant("classes", id)
+	assert_true(p._cond(m.cond))
+
 func test_wave2_full_runs_replay() -> void:
-	for cls in ["necromancer", "engineer"]:
+	for cls in ["necromancer", "engineer", "monster_kid"]:
 		for s in [5, 6]:
 			var f := GameFlow.new_run(cls, s)
 			var n := 0

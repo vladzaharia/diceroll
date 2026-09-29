@@ -4,7 +4,8 @@ extends RefCounted
 ## `kinds` (DiceKinds id) and `tags` (Die.tags entry, "" = none, e.g. "seed").
 ## `combat_rerolls`: rerolls per combat turn (default Balance.COMBAT_REROLLS).
 ## `mechanic`: the class mechanic id (ClassLogic; "" = none). `style`: attack style for the
-## presentation (melee_1h | melee_2h | ranged | magic | dual).
+## presentation (melee_1h | melee_2h | ranged | magic | dual | unarmed). `secret` (Monster Kid): the
+## class shelf shows a "???" silhouette with the milestone hint until it is unlocked.
 ## docs/design/2026-09-28-classes-enemies-skins.md has the class sheets.
 
 const DATA := {
@@ -30,13 +31,17 @@ const DATA := {
 		"kinds": ["standard", "standard"], "tags": ["", ""], "combat_rerolls": 2, "mechanic": "bone_harvest", "style": "magic"},
 	"engineer": {"name": "Engineer", "model": "engineer", "hp": 58, "atk": 0, "runes": ["gilded", ""], "board_rerolls": 1,
 		"kinds": ["standard", "standard"], "tags": ["", ""], "combat_rerolls": 2, "mechanic": "turret", "style": "melee_1h"},
+	# secret 11th class (hidden milestone trick_or_treat; never sold for Sigils)
+	"monster_kid": {"name": "Monster Kid", "model": "monster_kid", "hp": 56, "atk": 0, "runes": ["", ""], "board_rerolls": 1,
+		"kinds": ["pretend", "standard"], "tags": ["", ""], "combat_rerolls": 2, "mechanic": "boo", "style": "unarmed",
+		"secret": true},
 }
 
 ## Unlock order (UnlockDefs milestones, the Sigil "next two" rule and the class shelf).
-const IDS := ["knight", "barbarian", "paladin", "mage", "ranger", "rogue", "ninja", "druid", "engineer", "necromancer"]
+const IDS := ["knight", "barbarian", "paladin", "mage", "ranger", "rogue", "ninja", "druid", "engineer", "necromancer", "monster_kid"]
 
 ## Mechanic names for the class badge (presentation).
-const MECHANIC_NAMES := {"oath": "Oath", "aim": "Aim", "shadow_step": "Shadow Step", "overgrowth": "Overgrowth", "bone_harvest": "Bone Harvest", "turret": "Clockwork Turret"}
+const MECHANIC_NAMES := {"oath": "Oath", "aim": "Aim", "shadow_step": "Shadow Step", "overgrowth": "Overgrowth", "bone_harvest": "Bone Harvest", "turret": "Clockwork Turret", "boo": "BOO!"}
 
 ## Sim-only analysis dial (tools/sim.gd --hero=<id>.<field>=<value>): per-class field overrides.
 ## The game never sets it; the DATA values ARE the shipped numbers.

@@ -36,6 +36,15 @@ extends RefCounted
 ##                         6, frost freezes on a 1, gilded gold on the board move. Offers address
 ##                         it as die_idx GameFlow.TURRET (-2). turret_fired {value, damage, rune,
 ##                         target}.
+##   boo (Monster Kid)     the Pretend die's ★ face (Die.PRETEND) is a Wild in combat (sharing
+##                         WILD_MAX_DICE; never a SIX/ONE trigger) and the most common other value
+##                         on the board (3 alone). Attacking with a ★ showing Scares the target
+##                         once per fight (then it is "brave"): regular/elite enemies cower
+##                         (skip their next action); a scared regular at <= FLEE_PCT of max HP
+##                         flees (removed with FLEE_GOLD of its gold, no XP, not a kill);
+##                         mini-bosses and bosses deal -BOO_WEAKEN on their next attack. Events:
+##                         class_triggered {id: "boo", enemy_idx}, enemy_scared {enemy_idx,
+##                         effect: cower|flee|weaken}, enemy_fled {enemy_idx, gold}.
 ##   overgrowth (Druid)    each lap completion raises the lowest face of every "seed" die by 1
 ##                         (face_changed {source: "growth"}); each biome change tags the
 ##                         untagged die with the lowest face sum as a seed (max DRUID_MAX_SEEDS);
@@ -56,6 +65,9 @@ static var DRUID_GROWTH := 1
 static var DRUID_MAX_SEEDS := 3
 static var DRUID_PET_CHARGE := 1
 static var TURRET_T := [1.0, 2.0, 3.0]
+static var FLEE_PCT := 0.25
+static var BOO_WEAKEN := 0.3
+const FLEE_GOLD := 0.5
 const TURRET_RUNES := ["guard", "heavy", "ember", "frost", "gilded"]
 static var BONE_MAX := 2
 static var BONE_POOL_MAX := 6
@@ -77,6 +89,8 @@ static func tune_knob(knob: String, v: float) -> bool:
 		"DRUID_MAX_SEEDS": DRUID_MAX_SEEDS = int(v)
 		"DRUID_PET_CHARGE": DRUID_PET_CHARGE = int(v)
 		"BONE_MAX": BONE_MAX = int(v)
+		"FLEE_PCT": FLEE_PCT = v
+		"BOO_WEAKEN": BOO_WEAKEN = v
 		"TURRET_T3": TURRET_T = [TURRET_T[0], TURRET_T[1], v]
 		"TURRET_T2": TURRET_T = [TURRET_T[0], v, TURRET_T[2]]
 		"TURRET_T1": TURRET_T = [v, TURRET_T[1], TURRET_T[2]]
@@ -257,6 +271,8 @@ static func after_main_hit(run: RunState, c: CombatState, tgt: int, overkill: in
 ## After the main attack and its runes (enemies may be dead): the Engineer's Turret fires.
 static func after_attack(run: RunState, c: CombatState) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
+	if mech(run) == "boo":
+		return _boo(run, c)
 	if mech(run) != "turret" or run.turret == null or c.all_dead():
 		return out
 	c._fix_target()
@@ -286,6 +302,52 @@ static func after_attack(run: RunState, c: CombatState) -> Array[Dictionary]:
 				c.enemies[t].frozen = true
 				out.append({"type": "status", "target": t, "status": "frozen", "value": 1, "source": "turret"})
 	return out
+
+## True when a ★ face shows in the combat pool.
+static func star_showing(c: CombatState) -> bool:
+	return c.dice_values.has(Die.PRETEND)
+
+## BOO!: the ★ face scares the main attack's target (once per enemy per fight).
+static func _boo(run: RunState, c: CombatState) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var t := c.attack_target
+	if not star_showing(c) or not c.alive(t):
+		return out
+	var e: Dictionary = c.enemies[t]
+	if bool(e.get("brave", false)):
+		return out
+	e["brave"] = true
+	out.append(ev(run, "boo", 1, {"enemy_idx": t}))
+	if bool(e.boss) or bool(e.get("miniboss", false)):
+		e["weakened"] = true
+		out.append({"type": "enemy_scared", "enemy_idx": t, "effect": "weaken"})
+	elif not bool(e.elite) and int(e.hp) <= int(floor(int(e.max_hp) * FLEE_PCT)):
+		var def := EnemyDefs.def(String(e.id))
+		var gold := int(round(float(def.gold) * Balance.gold_scale(c.lap) * FLEE_GOLD))
+		e["fled"] = true
+		e.hp = 0
+		e.poison = 0
+		out.append({"type": "enemy_scared", "enemy_idx": t, "effect": "flee"})
+		out.append({"type": "enemy_fled", "enemy_idx": t, "gold": gold, "id": String(e.id)})
+	else:
+		e["cower"] = true
+		out.append({"type": "enemy_scared", "enemy_idx": t, "effect": "cower"})
+	return out
+
+## Board value of a ★ face: the most common value among the other dice (ties: higher), 3 alone.
+static func pretend_board_value(values: Array, idx: int) -> int:
+	var cnt := {}
+	for j in values.size():
+		var v := int(values[j])
+		if j != idx and v > 0 and v != Die.PRETEND:
+			cnt[v] = int(cnt.get(v, 0)) + 1
+	var best := 0
+	var n := 0
+	for v in cnt:
+		if int(cnt[v]) > n or (int(cnt[v]) == n and int(v) > best):
+			best = int(v)
+			n = int(cnt[v])
+	return best if best > 0 else 3
 
 ## An enemy died (any source).
 static func on_enemy_killed(run: RunState, c: CombatState, _i: int, _source: String) -> Array[Dictionary]:

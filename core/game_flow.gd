@@ -118,7 +118,13 @@ func _do_board_roll() -> Array[Dictionary]:
 	for i in run.dice.size():
 		values.append(run.dice[i].value(run.dice[i].roll(run.rng)))
 		idx.append(i)
-	ev.append({"type": "dice_rolled", "values": values.duplicate(), "indices": idx, "context": "board"})
+	var stars: Array[int] = []
+	for i in values.size():
+		if values[i] == Die.PRETEND:
+			stars.append(i)
+	for i in stars:
+		values[i] = ClassLogic.pretend_board_value(values, i)
+	ev.append({"type": "dice_rolled", "values": values.duplicate(), "indices": idx, "context": "board", "pretend": stars})
 	_select_move(values)
 	# Doubles feed the Treasury bank: +pair value * TREASURY_PAIR_MULT.
 	var added := 0
@@ -1131,7 +1137,8 @@ func forge_apply(die_idx: int, face_idx: int, op: String, src_face := -1) -> Arr
 		var d := _die(die_idx)
 		if op == "raise" and not d.can_raise(face_idx):
 			return [_e("face is already at its cap (%d)" % d.raise_cap())]
-		if op == "mirror" and (src_face < 0 or src_face > 5 or src_face == face_idx or d.faces[src_face] == d.faces[face_idx]):
+		if op == "mirror" and (src_face < 0 or src_face > 5 or src_face == face_idx or d.faces[src_face] == d.faces[face_idx]
+				or d.faces[src_face] == Die.PRETEND or d.faces[face_idx] == Die.PRETEND):
 			return [_e("bad mirror source")]
 	_record(["forge_apply", die_idx, face_idx, op, src_face])
 	var ev: Array[Dictionary] = []
@@ -1393,7 +1400,7 @@ func _biome_curse(ev: Array[Dictionary]) -> void:
 	var opts: Array = []
 	for d in run.dice.size():
 		for f in 6:
-			if run.dice[d].faces[f] > 1:
+			if run.dice[d].faces[f] > 1 and run.dice[d].faces[f] != Die.PRETEND:
 				opts.append([d, f])
 	if opts.is_empty():
 		return
