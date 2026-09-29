@@ -50,7 +50,7 @@ extends RefCounted
 ##                         untagged die with the lowest face sum as a seed (max DRUID_MAX_SEEDS);
 ##                         Wild Bond: the pet starts every fight with +1 charge ("wild_bond")
 
-static var PALADIN_OATH_MULT := 0.4
+static var PALADIN_OATH_MULT := 0.5
 static var PALADIN_OATH_PIP := 0
 ## Sanctify uses per run (one per biome change; 2 in a standard run).
 static var PALADIN_SANCTIFY := 2
@@ -64,7 +64,7 @@ static var NINJA_BOARD_REFUNDS := 1
 static var DRUID_GROWTH := 1
 static var DRUID_MAX_SEEDS := 3
 static var DRUID_PET_CHARGE := 1
-static var TURRET_T := [0.5, 0.75, 1.0]
+static var TURRET_T := [0.25, 0.75, 1.0]
 static var FLEE_PCT := 0.25
 static var BOO_WEAKEN := 0.3
 const FLEE_GOLD := 0.5

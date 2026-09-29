@@ -255,7 +255,7 @@ func test_monster_kid_is_secret_and_not_for_sale() -> void:
 	var m := UnlockDefs.milestone("trick_or_treat")
 	assert_true(bool(m.hidden))
 	var p := Profile.fresh()
-	p.records.counters.hollow_events = 30
+	p.records.counters.hollow_events = 40
 	assert_true(not p._cond(m.cond), "also needs 6 classes")
 	for id in ["barbarian", "paladin", "mage", "ranger", "rogue"]:
 		p.grant("classes", id)

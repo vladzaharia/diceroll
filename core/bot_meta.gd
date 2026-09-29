@@ -252,16 +252,16 @@ static func choose_loadout(p: Profile) -> Array:
 
 ## Spends Crowns and Sigils greedily: the cheapest affordable item each step, Sigil unlocks in
 ## CLASS -> PACK -> PET -> MINIGAME -> BIOME order, gear traits keep their default. A player who
-## just got a class from a milestone plays it before buying another (`got_class`). Returns the
-## commands applied.
-static func spend(camp: Camp, got_class := false) -> Array:
+## just got a major unlock (class, pet or biome) from a milestone enjoys it before buying another
+## (`got_major`). Returns the commands applied.
+static func spend(camp: Camp, got_major := false) -> Array:
 	var done: Array = []
 	for guard in 200:
 		var best: Dictionary = {}
 		for it in camp.catalog():
 			if not bool(it.affordable):
 				continue
-			if got_class and String(it.kind) == "classes":
+			if got_major and UnlockDefs.MAJOR_KINDS.has(String(it.kind)):
 				continue
 			if best.is_empty() or _spend_rank(it) < _spend_rank(best):
 				best = it

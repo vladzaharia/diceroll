@@ -13,14 +13,14 @@ const DATA := {
 		"kinds": ["standard", "standard"], "tags": ["", ""], "combat_rerolls": 2, "mechanic": "", "style": "melee_1h"},
 	"barbarian": {"name": "Barbarian", "model": "barbarian", "hp": 60, "atk": 2, "runes": ["heavy", ""], "board_rerolls": 1,
 		"kinds": ["standard", "standard"], "tags": ["", ""], "combat_rerolls": 2, "mechanic": "", "style": "melee_2h"},
-	"mage": {"name": "Mage", "model": "mage", "hp": 62, "atk": 0, "runes": ["ember", "echo"], "board_rerolls": 1,
+	"mage": {"name": "Mage", "model": "mage", "hp": 64, "atk": 0, "runes": ["ember", "echo"], "board_rerolls": 1,
 		"kinds": ["standard", "standard"], "tags": ["", ""], "combat_rerolls": 2, "mechanic": "", "style": "magic"},
-	"rogue": {"name": "Rogue", "model": "rogue", "hp": 58, "atk": 0, "runes": ["venom", "lucky"], "board_rerolls": 2,
+	"rogue": {"name": "Rogue", "model": "rogue", "hp": 56, "atk": 0, "runes": ["venom", "lucky"], "board_rerolls": 2,
 		"kinds": ["standard", "standard"], "tags": ["", ""], "combat_rerolls": 2, "mechanic": "", "style": "dual"},
 	# --- wave 1 (docs/design/2026-09-28-classes-enemies-skins.md §1.2)
 	"paladin": {"name": "Paladin", "model": "paladin", "hp": 60, "atk": 0, "runes": ["", ""], "board_rerolls": 1,
 		"kinds": ["twin", "standard"], "tags": ["", ""], "combat_rerolls": 2, "mechanic": "oath", "style": "melee_1h"},
-	"ranger": {"name": "Ranger", "model": "ranger", "hp": 50, "atk": 0, "runes": ["blade", ""], "board_rerolls": 1,
+	"ranger": {"name": "Ranger", "model": "ranger", "hp": 48, "atk": 0, "runes": ["blade", ""], "board_rerolls": 1,
 		"kinds": ["loaded", "standard"], "tags": ["", ""], "combat_rerolls": 2, "mechanic": "aim", "style": "ranged"},
 	"ninja": {"name": "Ninja", "model": "ninja", "hp": 55, "atk": 0, "runes": ["thunder", ""], "board_rerolls": 1,
 		"kinds": ["standard", "odd"], "tags": ["", ""], "combat_rerolls": 3, "mechanic": "shadow_step", "style": "dual"},
@@ -29,7 +29,7 @@ const DATA := {
 	# --- wave 2
 	"necromancer": {"name": "Necromancer", "model": "necromancer", "hp": 54, "atk": 0, "runes": ["vampire", ""], "board_rerolls": 1,
 		"kinds": ["standard", "standard"], "tags": ["", ""], "combat_rerolls": 2, "mechanic": "bone_harvest", "style": "magic"},
-	"engineer": {"name": "Engineer", "model": "engineer", "hp": 56, "atk": 0, "runes": ["", ""], "board_rerolls": 1,
+	"engineer": {"name": "Engineer", "model": "engineer", "hp": 54, "atk": 0, "runes": ["", ""], "board_rerolls": 1,
 		"kinds": ["standard", "standard"], "tags": ["", ""], "combat_rerolls": 2, "mechanic": "turret", "style": "melee_1h",
 		"turret_rune": "gilded"},
 	# secret 11th class (hidden milestone trick_or_treat; never sold for Sigils)

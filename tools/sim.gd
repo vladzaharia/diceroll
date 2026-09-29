@@ -475,7 +475,7 @@ func _campaign(n: int, m: int, seed0: int, board: int, mode: String) -> void:
 					if not milestone_run.has(e.id):
 						milestone_run[e.id] = []
 					(milestone_run[e.id] as Array).append(r + 1)
-			for cmd in BotMeta.spend(camp, classes_this_run > 0):
+			for cmd in BotMeta.spend(camp, majors_this_run > 0):
 				if String(cmd[0]) == "unlock":
 					if String(cmd[1]) == "classes":
 						classes_this_run += 1

@@ -228,8 +228,8 @@ func grant(kind: String, id: String) -> bool:
 
 ## Banks a finished run (the game_over event's stats): Crowns, pet XP, minigame mastery,
 ## records and counters, first-time Sigils, milestone unlocks, skins and the ascension ladder.
-## At most one class unlocks from milestones per run: a second class milestone waits for the
-## next banked run. Returns {crowns, sigils, firsts:[[kind, id]], milestones:[ids],
+## At most one MAJOR unlock (a class, pet or biome: UnlockDefs.MAJOR_KINDS) comes from milestones
+## per run: a second major milestone waits for the next banked run. Returns {crowns, sigils, firsts:[[kind, id]], milestones:[ids],
 ## unlocked:[[kind, id]], ascension_unlocked:int (-1 = none), skins_unlocked:[[class, skin]]}.
 func apply_run_result(stats: Dictionary) -> Dictionary:
 	var r: Dictionary = stats.get("rewards", {})
@@ -293,17 +293,18 @@ func apply_run_result(stats: Dictionary) -> Dictionary:
 	# milestones
 	var hit: Array = []
 	var unlocked: Array = []
-	var class_given := false
+	var major_given := false
 	for m in UnlockDefs.MILESTONES:
 		if milestones.has(m.id) or not _cond(m.cond):
 			continue
-		var gives_class := false
+		var gives_major := false
 		for u in m.unlocks:
-			if String(u[0]) == "classes" and not owns("classes", String(u[1])) and UnlockDefs.all_ids("classes").has(String(u[1])):
-				gives_class = true
-		if gives_class and class_given:
-			continue # one class per run: this milestone fires on a later banked run
-		class_given = class_given or gives_class
+			var uk := String(u[0])
+			if UnlockDefs.MAJOR_KINDS.has(uk) and not owns(uk, String(u[1])) and UnlockDefs.all_ids(uk).has(String(u[1])):
+				gives_major = true
+		if gives_major and major_given:
+			continue # one major unlock per run: this milestone fires on a later banked run
+		major_given = major_given or gives_major
 		milestones.append(m.id)
 		hit.append(m.id)
 		for u in m.unlocks:

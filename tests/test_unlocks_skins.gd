@@ -66,18 +66,17 @@ func test_one_class_per_run_from_milestones() -> void:
 	var p := Profile.fresh()
 	p.records.counters.runs = 15
 	p.records.counters.fights = 100
-	var res := p.apply_run_result(_stats(false))
-	var classes := []
-	for u in res.unlocked:
-		if u[0] == "classes":
-			classes.append(u[1])
-	assert_eq(classes.size(), 1, "one class this run: %s" % str(classes))
-	res = p.apply_run_result(_stats(false))
-	var more := 0
-	for u in res.unlocked:
-		if u[0] == "classes":
-			more += 1
-	assert_eq(more, 1, "the next one waits for the next run")
+	var total := 0
+	for k in 6:
+		var res := p.apply_run_result(_stats(false))
+		var majors := []
+		for u in res.unlocked:
+			if UnlockDefs.MAJOR_KINDS.has(String(u[0])):
+				majors.append(u[1])
+		assert_true(majors.size() <= 1, "one major unlock per run: %s" % str(majors))
+		total += majors.size()
+	assert_true(total >= 3, "the waiting ones arrive on later runs (%d)" % total)
+	assert_true(p.owns("classes", "paladin") and p.owns("classes", "barbarian"))
 
 func test_new_counters_and_records() -> void:
 	var p := Profile.fresh()
