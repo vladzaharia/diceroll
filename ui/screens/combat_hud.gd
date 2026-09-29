@@ -22,6 +22,8 @@ var attack_btn: GameButton
 var help_btn: GameButton
 var combo_name: Label
 var combo_mult: Label
+## Class bonus on this attack ("OATH", "AIM ×1.3"), next to the multiplier.
+var class_tag: Label
 var dmg_label: Label
 var hint_label: Label
 var pips: HBoxContainer
@@ -65,6 +67,10 @@ func _init() -> void:
 	nr.add_child(combo_name)
 	combo_mult = UiTheme.label("×1.5", 32, UiPalette.TEXT, true, 6)
 	nr.add_child(combo_mult)
+	class_tag = UiTheme.label("", 22, UiPalette.GOLD_BRIGHT, true, 5)
+	class_tag.visible = false
+	class_tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	nr.add_child(class_tag)
 	var dmg := PanelContainer.new()
 	dmg.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(0.35, 0.06, 0.1, 0.8), 18, 2, Color(1, 0.45, 0.4, 0.4)), 14, 6))
 	dmg.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -204,6 +210,10 @@ func refresh(flow: GameFlow) -> void:
 	var cname := String(p.name)
 	combo_name.text = cname
 	combo_mult.text = "×" + _fmt(float(p.mult))
+	var cls := String(p.get("class", ""))
+	class_tag.visible = cls != ""
+	class_tag.text = cls
+	class_tag.label_settings = UiTheme.label_settings(22, ClassInfo.mechanic_color(HeroDefs.mechanic(flow.run.class_id)).lightened(0.2), true, 5)
 	dmg_label.text = str(int(p.total))
 	if cname != _last_combo and _last_combo != "" and is_inside_tree():
 		UiTheme.pop(combo_name, 1.15, 0.25)
@@ -245,16 +255,28 @@ static func project(flow: GameFlow) -> Dictionary:
 	var mult := float(combo.mult)
 	var sum := 0
 	var bonus := 0
-	for i in run.dice.size():
+	var pool := c.pool_dice(run)
+	for i in pool.size():
 		var pips_v := int(eff[i]) if i < eff.size() else 0
-		var rune := run.dice[i].rune
+		var rune := pool[i].rune
 		sum += pips_v * (2 if rune == "heavy" else 1)
 		if rune == "blade" and group.has(i):
 			bonus += pips_v
 		if rune == "echo" and group.has(i):
 			mult += 0.5
-	var total := int(floor((sum + bonus) * mult)) + run.atk
-	return {"id": combo.id, "name": combo.name, "mult": mult, "total": total, "group": group}
+	# class bonuses (mirrors CombatState.attack): the Paladin's Oath set, the Ranger's Aim
+	var cls := ""
+	var ob := ClassLogic.oath_bonus(c.oath, String(combo.id), group, eff) if c.oath > 0 else [0.0, 0]
+	if float(ob[0]) > 0.0:
+		mult += float(ob[0])
+		sum += int(ob[1])
+		cls = "OATH"
+	var factor := 1.0
+	if HeroDefs.mechanic(run.class_id) == "aim" and c.rerolls_used_this_turn == 0:
+		factor = ClassLogic.aim_mult(c.dice_values.size())
+		cls = "AIM ×%s" % ClassInfo._num(factor)
+	var total := int(floor((sum + bonus) * mult * factor)) + run.atk
+	return {"id": combo.id, "name": combo.name, "mult": mult, "total": total, "group": group, "class": cls}
 
 
 ## Top edge (canvas y) of the bottom panel; 3D framing should stay above it.

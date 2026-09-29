@@ -5,7 +5,7 @@ extends Node3D
 ## face the active camera every frame, so the layout stays screen-aligned and crisp.
 
 const INTENT_KINDS := {"attack": 0, "block": 1, "buff": 2, "curse": 3, "summon": 4, "aim": 6, "chaos": 7,
-	"heal": 8, "drain": 9, "burn": 10, "chill": 11, "scorch": 12, "rally": 2}
+	"heal": 8, "drain": 9, "burn": 10, "chill": 11, "scorch": 12, "rally": 2, "bury": 17, "moonfall": 18}
 ## Trait chips under the HP bar (intent_icon.gdshader kinds).
 const TRAIT_KINDS := {"armor": 13, "thorns": 14, "ward": 15, "pierce": 16}
 const INTENT_COLORS := {
@@ -15,6 +15,7 @@ const INTENT_COLORS := {
 	"burn": Color(0.95, 0.42, 0.12), "chill": Color(0.36, 0.68, 0.92), "scorch": Color(0.78, 0.28, 0.08),
 	"armor": Color(0.5, 0.5, 0.56), "thorns": Color(0.42, 0.62, 0.26), "ward": Color(0.56, 0.36, 0.86),
 	"pierce": Color(0.9, 0.4, 0.22), "rally": Color(0.86, 0.3, 0.12),
+	"bury": Color(0.78, 0.58, 0.28), "moonfall": Color(0.42, 0.44, 0.82),
 }
 ## Traits without a drawn chip kind use their affix badge glyph (frenzy on the Orc Raider).
 const TRAIT_ICONS := {"frenzy": "affix_frenzied", "ward_allies": "affix_warded"}
@@ -36,6 +37,23 @@ var _traits: Array = []
 var affix_badges: Array[MeshInstance3D] = []
 var affixes: Array = []
 var _affix_count: Label3D
+## The Moon King's moon meter (data keys moon / moon_max / moon_blood): a moon disc that fills
+## with the tide, pips for the tide steps; hidden for everyone else.
+var moon_badge: MeshInstance3D
+var _moon_mat: ShaderMaterial
+var _moon := -99
+var _moon_fill := 0.0
+var _moon_tween: Tween
+const MOON_SIZE := 0.64
+## A short-lived note under the HP bar (the moon meter's "TIDE 2/4"): laid out in the HUD's own
+## frame, below the status line and affix row, so it never covers the intent, HP or the moon.
+var note_label: Label3D
+var _note_tween: Tween
+
+## BOO! (Monster Kid): a cowering enemy's intent shows a scared face; a Brave chip after.
+var scare_badge: MeshInstance3D
+var brave_chip: MeshInstance3D
+const SCARE_COLOR := Color(0.36, 0.62, 0.24)
 
 var _bar_mat: ShaderMaterial
 var _intent_mat: ShaderMaterial
@@ -85,10 +103,35 @@ func _init() -> void:
 	status_label = _label(54, Color(0.6, 1.0, 0.45), 12)
 	status_label.position = Vector3(0, -0.2, 0.01)
 	add_child(status_label)
+	scare_badge = affix_badge("intent_cower", SCARE_COLOR, 0.46)
+	scare_badge.name = "Cower"
+	scare_badge.position = Vector3(0.0, 0.42, 0.0)
+	scare_badge.visible = false
+	add_child(scare_badge)
+	brave_chip = affix_badge("trait_brave", Color(0.72, 0.56, 0.2), 0.28)
+	brave_chip.name = "Brave"
+	brave_chip.position = Vector3(-BAR_SIZE.x * 0.5 - 0.1, 0.0, 0.006)
+	brave_chip.visible = false
+	add_child(brave_chip)
 	name_label = _label(64, Color(1.0, 0.86, 0.5), 12)
 	name_label.position = Vector3(0, 0.82, 0.01)
 	name_label.visible = false
 	add_child(name_label)
+	moon_badge = MeshInstance3D.new()
+	moon_badge.name = "MoonMeter"
+	moon_badge.mesh = Props.quad(MOON_SIZE)
+	_moon_mat = ShaderMaterial.new()
+	_moon_mat.shader = preload("res://game/world/shaders/moon_meter.gdshader")
+	_moon_mat.render_priority = 11
+	moon_badge.material_override = _moon_mat
+	moon_badge.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	moon_badge.position = Vector3(BAR_SIZE.x * 0.5 + 0.12, 0.5, 0.0)
+	moon_badge.visible = false
+	add_child(moon_badge)
+	note_label = _label(72, Color.WHITE, 14)
+	note_label.name = "Note"
+	note_label.visible = false
+	add_child(note_label)
 
 
 func _process(_dt: float) -> void:
@@ -130,8 +173,12 @@ func set_data(data: Dictionary, animate := true) -> void:
 		st.append("POISON %d" % int(data.get("poison", 0)))
 	if bool(data.get("frozen", false)):
 		st.append("FROZEN")
+	if bool(data.get("weakened", false)):
+		st.append("SPOOKED")
 	status_label.text = "  ".join(st)
 	status_label.modulate = Fx.STATUS_COLORS["poison"] if int(data.get("poison", 0)) > 0 else Fx.STATUS_COLORS["frost"]
+	if bool(data.get("weakened", false)) and int(data.get("poison", 0)) <= 0 and not bool(data.get("frozen", false)):
+		status_label.modulate = SCARE_COLOR.lightened(0.45)
 	if data.has("affixes"):
 		set_affixes(data.affixes, int(data.get("frenzy", 0)))
 	if int(data.get("frenzy", 0)) > 0 and not affixes.has("frenzied"):
@@ -140,6 +187,9 @@ func set_data(data: Dictionary, animate := true) -> void:
 		status_label.modulate = SkinRules.AFFIXES.frenzied.color
 	if data.has("traits"):
 		set_traits(data.traits)
+	if data.has("moon"):
+		set_moon(int(data.moon), int(data.get("moon_max", 4)), bool(data.get("moon_blood", false)), animate)
+	set_scared(bool(data.get("cower", false)), bool(data.get("brave", false)), animate)
 	var nm := String(data.get("name", ""))
 	var mini := bool(data.get("miniboss", false))
 	name_label.visible = (boss or mini) and nm != ""
@@ -162,6 +212,65 @@ func set_intent(kind: String, value: int, animate := true) -> void:
 	if animate and key != _intent_key:
 		_punch(intent_badge, 1.35)
 	_intent_key = key
+
+
+## The moon meter: `value` of `max` tide steps (a negative start shows as empty), red in the blood
+## moon (phase 2). Animates the fill and punches on a change.
+func set_moon(value: int, max_v: int, blood := false, animate := true) -> void:
+	moon_badge.visible = true
+	_moon_mat.set_shader_parameter("pips", maxi(max_v, 1))
+	_moon_mat.set_shader_parameter("lit", clampi(value, 0, max_v))
+	_moon_mat.set_shader_parameter("blood", 1.0 if blood else 0.0)
+	var f := clampf(float(value) / float(maxi(max_v, 1)), 0.0, 1.0)
+	if _moon_tween:
+		_moon_tween.kill()
+	if animate and value != _moon and _moon != -99:
+		_moon_tween = create_tween()
+		_moon_tween.tween_method(_set_moon_fill, _moon_fill, f, 0.45).set_trans(Tween.TRANS_CUBIC)
+		_moon_tween.parallel().tween_method(func(v: float) -> void: _moon_mat.set_shader_parameter("pulse", v), 0.8, 0.0, 0.6)
+		_punch(moon_badge, 1.35)
+	else:
+		_set_moon_fill(f)
+	_moon = value
+
+
+## Pops `text` in under the HP bar (below the status line / affix row), holds, fades out.
+func flash_note(text: String, color: Color, hold := 0.9) -> void:
+	note_label.text = text
+	note_label.modulate = color
+	note_label.outline_modulate.a = 1.0
+	note_label.position = Vector3(0, -0.66 if not affixes.is_empty() else -0.44, 0.012)
+	note_label.visible = true
+	if _note_tween:
+		_note_tween.kill()
+	note_label.scale = Vector3.ONE * 0.3
+	_note_tween = create_tween()
+	_note_tween.tween_property(note_label, "scale", Vector3.ONE * 1.15, 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_note_tween.tween_property(note_label, "scale", Vector3.ONE, 0.12).set_trans(Tween.TRANS_SINE)
+	_note_tween.tween_interval(hold)
+	_note_tween.tween_property(note_label, "modulate:a", 0.0, 0.3)
+	_note_tween.parallel().tween_property(note_label, "outline_modulate:a", 0.0, 0.3)
+	_note_tween.tween_callback(func() -> void: note_label.visible = false)
+
+
+func _set_moon_fill(v: float) -> void:
+	_moon_fill = v
+	_moon_mat.set_shader_parameter("fill", v)
+
+## BOO!: `cower` swaps the intent for the scared face (its next action is skipped); `brave`
+## (scared once this fight) shows a small chip left of the HP bar, under the block badge.
+func set_scared(cower: bool, brave: bool, animate := true) -> void:
+	if cower != scare_badge.visible:
+		scare_badge.visible = cower
+		if cower and animate:
+			_punch(scare_badge, 1.4)
+	intent_badge.visible = intent_badge.visible and not cower
+	intent_label.visible = intent_label.visible and not cower
+	var show_brave := brave and not cower and not block_badge.visible
+	if show_brave != brave_chip.visible:
+		brave_chip.visible = show_brave
+		if show_brave and animate:
+			_punch(brave_chip, 1.3)
 
 
 ## Trait chips (armor, thorns, ward, pierce) to the right of the HP bar.
@@ -256,7 +365,9 @@ func set_opacity(a: float) -> void:
 		_affix_count.outline_modulate.a = a
 	for c in trait_chips:
 		(c.material_override as ShaderMaterial).set_shader_parameter("opacity", a)
-	for m in [_bar_mat, _intent_mat, _block_mat]:
+	for c in [scare_badge, brave_chip]:
+		((c as MeshInstance3D).material_override as ShaderMaterial).set_shader_parameter("opacity", a)
+	for m in [_bar_mat, _intent_mat, _block_mat, _moon_mat]:
 		(m as ShaderMaterial).set_shader_parameter("opacity", a)
 	for l in [hp_label, intent_label, block_label, status_label, name_label]:
 		(l as Label3D).modulate.a = a

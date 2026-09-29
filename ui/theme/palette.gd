@@ -71,6 +71,16 @@ const KIND := {
 	"twin": [6, Color("ff6fae")],
 	"gambler": [7, Color("3fcf6a")],
 	"giant": [8, Color("ffb020")],
+	# class-only kinds: the Monster Kid's Pretend die (★ face) and the Necromancer's Bone dice
+	"pretend": [10, Color("8ee35a")],
+	"bone": [9, Color("7cf0b8")],
+}
+
+## Class accent colours (class cards, the class badge, mechanic pops, HeroLook).
+const CLASS := {
+	"knight": Color("6fa8ff"), "barbarian": Color("ff7a4a"), "mage": Color("b58cff"), "rogue": Color("5fd68a"),
+	"paladin": Color("ffd257"), "ranger": Color("a6d65a"), "ninja": Color("ff5a6e"), "druid": Color("4fd69a"),
+	"engineer": Color("f0a64a"), "necromancer": Color("7cf0b8"), "monster_kid": Color("8ee35a"),
 }
 
 ## Die body colours.
@@ -92,6 +102,9 @@ const INTENT := {
 	"burn": ["intent_burn", Color("ff8a3a")],
 	"chill": ["intent_chill", Color("8fd8ff")],
 	"scorch": ["intent_scorch", Color("ff6a2a")],
+	"rally": ["intent_rally", Color("e0582e")],
+	"bury": ["intent_bury", Color("e8b860")],
+	"moonfall": ["intent_moonfall", Color("c8d4ff")],
 }
 
 ## Enemy trait -> [icon, colour, name, one-line rule]
@@ -106,6 +119,7 @@ const TRAIT := {
 const BIOME := {
 	"glade": Color("8fdc5a"), "crypt": Color("ffb36a"), "hollow": Color("ff8a3a"),
 	"frost": Color("8fd8ff"), "throne": Color("b58aff"), "magma": Color("ff6a2a"),
+	"mines": Color("5fe0d0"), "warcamp": Color("e8564a"), "ruins": Color("ffd24a"), "moonlit": Color("9fb4ff"),
 }
 
 
@@ -129,6 +143,10 @@ static func passive_color(rarity: String) -> Color:
 
 static func kind_color(kind: String) -> Color:
 	return KIND.get(kind, KIND["standard"])[1]
+
+
+static func class_color(class_id: String) -> Color:
+	return CLASS.get(class_id, GOLD_BRIGHT)
 
 
 static func kind_mark(kind: String) -> int:

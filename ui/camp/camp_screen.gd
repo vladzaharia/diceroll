@@ -34,6 +34,10 @@ var workshop: WorkshopModal
 var pet_den: PetDenModal
 var arcade: ArcadeModal
 var setup: RunSetupModal
+var wardrobe: WardrobeModal
+## The Wardrobe entry in the bottom panel (red NEW dot while unseen skins wait).
+var wardrobe_btn: GameButton
+var _wardrobe_dot: Control
 var welcome: WelcomeModal
 var tags: Dictionary = {}
 
@@ -90,7 +94,8 @@ func _init() -> void:
 	pet_den = PetDenModal.new()
 	arcade = ArcadeModal.new()
 	setup = RunSetupModal.new()
-	_modals = [armory, workshop, pet_den, arcade, setup]
+	wardrobe = WardrobeModal.new()
+	_modals = [armory, workshop, pet_den, arcade, setup, wardrobe]
 	for m in _modals:
 		add_child(m)
 		m.camp_command.connect(func(c: Array) -> void: command.emit(c))
@@ -183,6 +188,7 @@ func modal(id: String) -> CampModal:
 		"pet_den": return pet_den
 		"arcade": return arcade
 		"setup": return setup
+		"wardrobe": return wardrobe
 	return null
 
 
@@ -271,6 +277,27 @@ func _build_loadout(p: Profile) -> void:
 		_loadout.add_child(_badge(String(CampInfo.PET_ICON.get(pet, "heart")), CampInfo.PET_COLOR.get(pet, UiPalette.GOLD), "L%d" % p.pet_level(pet)))
 	for id in p.loadout.get("minigames", []):
 		_loadout.add_child(_badge(String(CampInfo.MINIGAME_ICON.get(String(id), "star")), CampInfo.MINIGAME_COLOR.get(String(id), UiPalette.GOLD), ""))
+	_loadout.add_child(_wardrobe_entry(p))
+
+
+## The Wardrobe button (hanger), with a red dot while skins wait unseen.
+func _wardrobe_entry(p: Profile) -> Control:
+	var holder := Control.new()
+	holder.custom_minimum_size = Vector2(72, 72)
+	holder.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	holder.mouse_filter = Control.MOUSE_FILTER_PASS
+	wardrobe_btn = GameButton.round_icon("wardrobe", 72)
+	wardrobe_btn.kind = GameButton.Kind.SECONDARY
+	wardrobe_btn.icon_tint = Color("c79bff")
+	wardrobe_btn.tooltip_text = "Wardrobe"
+	wardrobe_btn.pressed.connect(open_station.bind("wardrobe"))
+	holder.add_child(wardrobe_btn)
+	_wardrobe_dot = WardrobeModal._Dot.new()
+	_wardrobe_dot.size = Vector2(22, 22)
+	_wardrobe_dot.position = Vector2(52, -2)
+	_wardrobe_dot.visible = not (p.cosmetics.get("unseen", []) as Array).is_empty()
+	holder.add_child(_wardrobe_dot)
+	return holder
 
 
 func _badge(icon: String, color: Color, text: String) -> Control:

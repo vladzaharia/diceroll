@@ -14,6 +14,8 @@ uniform float speck_amount = 0.35;
 uniform float glint = 0.0;
 uniform float lip = 0.22;
 uniform float roughness = 0.9;
+// wind ripples in sand (Sunscorched Ruins; 0 = none)
+uniform float ripple = 0.0;
 
 varying vec3 world_pos;
 varying vec3 world_nrm;
@@ -50,6 +52,10 @@ void fragment() {
 	float sp = noise(p * speck_scale) * noise(p * speck_scale * 2.3 + 5.0);
 	top = mix(top, speck_color.rgb, smoothstep(0.25, 0.45, sp) * speck_amount);
 	top *= 0.95 + 0.1 * noise(p * 14.0);
+	if (ripple > 0.0) {
+		float w = sin(dot(p, vec2(0.93, 0.37)) * 5.5 + fbm(p * 0.35) * 7.0);
+		top *= 1.0 + ripple * (smoothstep(0.55, 1.0, w) * 0.1 - smoothstep(-0.2, -0.9, w) * 0.07);
+	}
 	// sides: earth below a lip of the top colour (with a wavy edge)
 	float wave = 0.06 * sin(world_pos.x * 5.0 + world_pos.z * 4.0);
 	float on_lip = step(-lip + wave, world_pos.y);

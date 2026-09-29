@@ -25,16 +25,18 @@ const STATUS_COLORS := {
 # --- floating text -------------------------------------------------------------------
 
 ## Bouncy damage number. Crits are bigger, gold and shake.
+## `rise`: how far it floats up (world units); enemy hits keep it short so the number stays under
+## the unit's HUD (intent badge, HP bar) instead of drifting through it.
 static func damage_number(parent: Node3D, pos: Vector3, amount: int, crit := false,
-		color := Color(0, 0, 0, 0)) -> Label3D:
+		color := Color(0, 0, 0, 0), rise := 1.0) -> Label3D:
 	var col := color if color.a > 0.0 else (CRIT_COLOR if crit else DAMAGE_COLOR)
 	var text := str(amount) + ("!" if crit else "")
-	return popup_text(parent, pos, text, col, 1.3 if crit else 1.0, crit)
+	return popup_text(parent, pos, text, col, 1.3 if crit else 1.0, crit, rise)
 
 
 ## Floating label ("BLOCK", "+12", "MISS"...). size 1.0 ~ 0.55 world units tall.
 static func popup_text(parent: Node3D, pos: Vector3, text: String, color: Color, size := 1.0,
-		shake := false) -> Label3D:
+		shake := false, rise := 1.0) -> Label3D:
 	var l := Label3D.new()
 	l.text = text
 	l.font = Props.font(true)
@@ -51,11 +53,11 @@ static func popup_text(parent: Node3D, pos: Vector3, text: String, color: Color,
 	l.position = pos
 	l.scale = Vector3.ONE * 0.2
 	parent.add_child(l)
-	var drift := Vector3(randf_range(-0.35, 0.35), 0.0, randf_range(-0.1, 0.1))
+	var drift := Vector3(randf_range(-0.35, 0.35), 0.0, randf_range(-0.1, 0.1)) * minf(rise, 1.0)
 	var t := l.create_tween()
 	t.tween_property(l, "scale", Vector3.ONE * 1.3, 0.11).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	t.tween_property(l, "scale", Vector3.ONE, 0.14).set_trans(Tween.TRANS_SINE)
-	t.parallel().tween_property(l, "position", pos + Vector3(0, 1.0, 0) + drift, 1.0) \
+	t.parallel().tween_property(l, "position", pos + Vector3(0, rise, 0) + drift, 1.0) \
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	t.tween_property(l, "modulate:a", 0.0, 0.3).set_delay(0.25)
 	t.parallel().tween_property(l, "outline_modulate:a", 0.0, 0.3).set_delay(0.25)

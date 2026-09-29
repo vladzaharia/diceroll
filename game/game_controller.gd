@@ -118,6 +118,8 @@ func _ready() -> void:
 	overlay = GameOverlay.new()
 	ov_layer.add_child(overlay)
 	overlay.modal_check = any_modal_open
+	overlay.framed_rect = func() -> Rect2:
+		return tray.get_global_rect() if is_instance_valid(tray) and tray.is_visible_in_tree() else Rect2()
 
 	player = EventPlayer.new(self)
 	pets = PetHost.new(self)
@@ -143,7 +145,11 @@ func show_title() -> void:
 	tray.visible = false
 	var rng := Rng.new(int(Time.get_unix_time_from_system()) % 100000 + 7)
 	var b := Board.generate(rng, 1)
-	board.hero_class = HeroDefs.IDS[randi() % HeroDefs.IDS.size()]
+	# never the secret class on the title (it would spoil the Monster Kid)
+	var shown := HeroDefs.IDS.filter(func(id: String) -> bool: return not bool(HeroDefs.DATA[id].get("secret", false)))
+	board.hero_class = String(shown[randi() % shown.size()])
+	board.hero_skin = "default"
+	board.hero_prestige = false
 	board.hero_idx = 0
 	board.variant_seed = randi()
 	board.build(1, b.to_dict().tiles)
@@ -158,6 +164,7 @@ func show_title() -> void:
 func show_class_select() -> void:
 	mode = "class"
 	tray.visible = false
+	ui.class_select.set_profile(profile)
 	ui.show_class_select()
 
 
@@ -199,17 +206,21 @@ func start(f: GameFlow) -> void:
 	ui.combat_hud.modulate.a = 1.0
 	overlay.vignette(0.0, 0.01)
 	board.hero_class = f.run.class_id
+	board.hero_skin = f.run.skin
+	board.hero_prestige = f.run.skin_prestige
 
 	board.hero_idx = f.run.pos
 	EnemyLooks.run_seed = f.run.seed  # per-run enemy variants
 	board.variant_seed = hash([f.run.seed, f.run.biome()])
+	board.moon_phase = f.run.moon_phase()
 	board.build(f.run.biome(), f.run.board.to_dict().tiles)
 	if f.phase == GameFlow.Phase.BOARD_READY:
 		rig.home(board.hero, true)
 	else:
 		rig.overview(board.ring_bounds(), true)
 	tray.visible = true
-	tray.set_dice(f.run.dice)
+	tray.set_badge("")
+	ClassBeats.sync_tray(self)
 	if f.phase == GameFlow.Phase.BOARD_ROLLED and not f.board_roll.is_empty():
 		tray.set_values(f.board_roll)
 		tray.set_chosen(f.board_choice)
@@ -378,8 +389,8 @@ func _enter_idle() -> void:
 	ui.board_hud.busy = false
 	ui.combat_hud.busy = false
 	var ph := flow.phase
-	if tray.dice.size() != flow.run.dice.size():
-		tray.set_dice(flow.run.dice)
+	if tray.dice.size() != ClassBeats.pool(flow).size():
+		ClassBeats.sync_tray(self)
 	ui.sync(flow)
 	match ph:
 		GameFlow.Phase.BOARD_READY:
@@ -525,6 +536,7 @@ func _boss_intro(tile: int, enemies: Array) -> void:
 
 
 func end_combat(ev: Dictionary) -> void:
+	tray.set_badge("")
 	# swap to the board HUD (bottom bar stays hidden while the rest of the batch plays); its
 	# top bar takes over the combat HUD's numbers so rewards animate from there
 	ui.combat_hud.visible = false
@@ -580,6 +592,7 @@ func change_biome(ev: Dictionary) -> void:
 	await overlay.dissolve(true, Color(look.sky_top).lerp(Color(look.sky_glow), 0.25), Color(look.sky_glow), 0.7, centre)
 	board.hero_idx = pos
 	board.variant_seed = hash([flow.run.seed, bid])
+	board.moon_phase = flow.run.moon_phase()
 	board.build(bid, tiles)
 	board.hide_tiles()
 	rig.overview(board.ring_bounds(), true)
@@ -859,6 +872,12 @@ func camp_command(cmd: Array) -> void:
 					CampInfo.icon_of(String(e.kind), String(e.id)), UiPalette.GOLD_BRIGHT)
 			"trait_set", "pool_toggled", "starter_kind_set", "ascension_changed", "loadout_changed":
 				Audio.play_sfx("dice_select")
+			"skin_equipped", "prestige_set":
+				Audio.play_sfx("buff")
+			"skin_unlocked":
+				Audio.play_sfx("fanfare")
+				overlay.toast("New skin: %s, %s" % [CampInfo.name_of("classes", String(e["class"])), String(SkinDefs.NAMES.get(String(e.skin), e.skin))],
+					"wardrobe", Color("c79bff"))
 	if camp_scene:
 		camp_scene.apply_profile(profile)
 	ui.camp.show_profile(profile, TitleScreen.has_save())

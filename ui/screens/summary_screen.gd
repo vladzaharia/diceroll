@@ -295,12 +295,28 @@ func _build_extra() -> void:
 		_extra.add_child(UiModal.section_label("Unlocked!"))
 		for e in ms:
 			for u in e.unlocks:
-				var card := _unlock_card(String(u[0]), String(u[1]), String(e.desc))
+				var card: Control
+				if String(u[0]) == "classes" and ClassCard.is_secret(String(u[1])):
+					card = SecretReveal.make(String(u[1]))
+				else:
+					card = _unlock_card(String(u[0]), String(u[1]), String(e.desc))
 				card.modulate.a = 0.0
 				_extra.add_child(card)
 				_cards.append(card)
 		if asc_up > 0:
 			var card := _asc_card(asc_up)
+			card.modulate.a = 0.0
+			_extra.add_child(card)
+			_cards.append(card)
+	# skin unlocks (records: Victor / Ascendant / Bossbane / Prestige), one toast card each
+	var skins: Array = []
+	for e in evs:
+		if String(e.type) == "skin_unlocked":
+			skins.append(e)
+	if not skins.is_empty():
+		_extra.add_child(UiModal.section_label("New skins!"))
+		for e in skins:
+			var card := _skin_card(String(e["class"]), String(e.skin))
 			card.modulate.a = 0.0
 			_extra.add_child(card)
 			_cards.append(card)
@@ -341,6 +357,32 @@ func _unlock_card(kind: String, id: String, why: String) -> Control:
 	v.add_child(UiTheme.label("NEW " + String(CampInfo.KIND_LABEL.get(kind, kind)).to_upper(), 16, UiPalette.GOLD, false, 0, false, 800))
 	v.add_child(UiTheme.label(CampInfo.name_of(kind, id), 30, UiPalette.TEXT, true, 6))
 	v.add_child(UiTheme.para(why, 18, UiPalette.TEXT_DIM, 500))
+	return c
+
+
+## "New skin: Knight, Victor" with the hero in that skin on a small pedestal.
+func _skin_card(class_id: String, skin: String) -> Control:
+	var c := CampUi.card(true, Color("c79bff"))
+	var row := UiTheme.hbox(14)
+	c.add_child(row)
+	var por := HeroPortrait.new()
+	por.custom_minimum_size = Vector2(110, 130)
+	por.zoom = 1.2
+	por.spin = 0.0
+	por.ring_color = UiPalette.class_color(class_id)
+	var prestige := SkinDefs.is_prestige(skin)
+	por.set_hero(class_id, "default" if prestige else skin, prestige, false)
+	row.add_child(por)
+	var v := UiTheme.vbox(0)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_child(v)
+	var kick := UiTheme.hbox(6)
+	v.add_child(kick)
+	kick.add_child(UiIcons.rect("wardrobe", 22, Color("c79bff")))
+	kick.add_child(UiTheme.label("NEW SKIN", 16, Color("c79bff"), false, 0, false, 800))
+	v.add_child(UiTheme.label("%s, %s" % [CampInfo.name_of("classes", class_id), String(SkinDefs.NAMES.get(skin, skin))], 28, UiPalette.TEXT, true, 6))
+	v.add_child(UiTheme.para("Wear it from the Wardrobe in the Camp.", 17, UiPalette.TEXT_DIM, 500))
 	return c
 
 
@@ -426,6 +468,10 @@ func _animate() -> void:
 		if gen != _anim_gen:
 			return
 		(card as Control).modulate.a = 1.0
+		if card is SecretReveal:
+			_scroll.ensure_control_visible(card)
+			await (card as SecretReveal).play()
+			continue
 		UiTheme.pop(card, 1.08, 0.3)
 		UiTheme.sfx("buff")
 
@@ -440,3 +486,5 @@ func finish_now() -> void:
 		_total_l.text = str(int(_total_row.get_meta("total", 0)))
 	for card in _cards:
 		(card as Control).modulate.a = 1.0
+		if card is SecretReveal:
+			(card as SecretReveal).finish_now()

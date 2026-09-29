@@ -25,6 +25,11 @@ var _vig_tween: Tween
 var _live_pops: Array = []
 ## Returns true while a modal is open; toasts are skipped then (the modal shows the change).
 var modal_check: Callable
+## Returns the dice tray's screen rect (Rect2() when hidden): popups anchored on it keep clear of
+## its frame (inside the felt, or wholly above the frame) instead of rising across the frame edge.
+var framed_rect: Callable
+## The tray frame's width in px (DiceTray.FRAME_PX) plus a little air.
+const FRAME_CLEAR := 17.0
 
 
 func _init() -> void:
@@ -390,12 +395,26 @@ func popup(at: Vector2, text: String, color: Color, icon := "", font := 30) -> v
 	row.reset_size()
 	var s := row.get_combined_minimum_size()
 	var p := _stack(at - Vector2(s.x * 0.5, s.y), s)
+	var end_y := p.y - 70.0
+	var tr: Rect2 = framed_rect.call() if framed_rect.is_valid() else Rect2()
+	if tr.size != Vector2.ZERO and tr.grow(8.0).has_point(at):
+		# a tray callout: never on the frame. Inside the felt it rises only up to the frame's inner
+		# edge; if it can't fit there (stacked, or anchored on the frame) it sits above the frame.
+		var inner_top := tr.position.y + FRAME_CLEAR
+		var outer_top := tr.position.y - 4.0
+		if p.y >= inner_top:
+			end_y = maxf(end_y, inner_top)
+		elif p.y + s.y > outer_top:
+			p.y = outer_top - s.y
+			end_y = p.y - 40.0
+		if not _live_pops.is_empty():
+			_live_pops[-1].rect = Rect2(p, s)
 	row.position = p
 	row.pivot_offset = s * 0.5
 	row.scale = Vector2(0.3, 0.3)
 	var t := create_tween()
 	t.tween_property(row, "scale", Vector2.ONE, _d(0.18)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	t.parallel().tween_property(row, "position:y", p.y - 70.0, _d(0.9)).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	t.parallel().tween_property(row, "position:y", end_y, _d(0.9)).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	t.tween_property(row, "modulate:a", 0.0, _d(0.3))
 	t.tween_callback(row.queue_free)
 

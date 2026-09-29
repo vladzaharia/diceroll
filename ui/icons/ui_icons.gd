@@ -21,6 +21,7 @@ const DEFAULT := {
 	"potion": UiPalette.HP_BRIGHT, "anvil": Color("aab4c8"), "portal": Color("a56bff"), "chest": UiPalette.GOLD,
 	"campfire": Color("ff9a3a"), "flag": UiPalette.GOLD, "axe": Color("d8d2e2"), "staff": Color("8fd0ff"),
 	"dagger": Color("d8d2e2"), "mirror": Color("9ad8f0"), "up": UiPalette.HEAL,
+	"sun": Color("ffb340"), "oasis": Color("5fd8f0"), "ore": Color("8a8494"), "drum": Color("c88a58"),
 }
 
 static var _cache: Dictionary = {}
@@ -40,6 +41,10 @@ static func default_color(icon: String) -> Color:
 		var tk := icon.substr(6)
 		if UiPalette.TRAIT.has(tk):
 			return UiPalette.TRAIT[tk][1]
+	if icon.begins_with("class_"):
+		return UiPalette.class_color(icon.substr(6))
+	if icon.begins_with("mech_"):
+		return ClassInfo.mechanic_color(icon.substr(5))
 	if icon.begins_with("intent_"):
 		var k := icon.substr(7)
 		if UiPalette.INTENT.has(k):
@@ -108,4 +113,11 @@ static func biome_icon(id: String) -> String:
 
 
 static func class_icon(class_id: String) -> String:
+	if exists("class_" + class_id):
+		return "class_" + class_id
 	return {"knight": "shield", "barbarian": "axe", "mage": "staff", "rogue": "dagger"}.get(class_id, "sword")
+
+
+## Icon of a class mechanic (HeroDefs mechanic id; "" = the class has none).
+static func mechanic_icon(mechanic: String) -> String:
+	return "mech_" + mechanic if exists("mech_" + mechanic) else "star"

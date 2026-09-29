@@ -22,6 +22,10 @@ const REGISTRY := {
 const PROVIDERS := [
 	"res://game/actors/scenarios.gd",
 	"res://game/world/scenarios.gd",
+	# the four 2026-09-29 biomes: boards, twist moments and their boss fights
+	"res://game/world/biome_scenarios.gd",
+	"res://game/flow/twist_scenarios.gd",
+	"res://game/enemies/new_boss_scenarios.gd",
 	"res://game/dice/scenarios.gd",
 	"res://game/fx/scenarios.gd",
 	"res://ui/scenarios.gd",
@@ -32,6 +36,8 @@ const PROVIDERS := [
 	"res://tools/icon_scenarios.gd",
 	"res://ui/icons/rendered/rendered_icons.gd",
 	"res://game/boot/scenarios.gd",
+	"res://game/classes/class_scenarios.gd",
+	"res://ui/camp/wardrobe_scenarios.gd",
 ]
 
 
