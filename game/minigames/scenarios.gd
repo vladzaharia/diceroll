@@ -238,18 +238,34 @@ class _Driver extends Node:
 						break
 				_click(o + cb.size * 0.5)
 			_:
-				# (assign first: `if not await b.scripted_input(...)` miscompiles in 4.7.2 when the
-				# override awaits)
-				var ok: bool = await b.scripted_input(a, self)
-				if not ok:
+				# the board's own input (awaited in a helper: in 4.7.2 locals of a function that
+				# awaited an overridden coroutine can come back corrupted)
+				await _scripted(b, a)
+				if not _scripted_ok:
 					print("MG_INPUT_UNSUPPORTED %s %s" % [id, str(a)])
 					return false
-		for k in 160:
-			if f.commands.size() > n:
-				return true
-			await _pause(0.05)
+		_landed_ok = false
+		await _wait_landed(f, n)
+		if _landed_ok:
+			return true
 		print("MG_INPUT_MISSED %s %s" % [id, str(a)])
 		return false
+
+	var _scripted_ok := false
+	var _landed_ok := false
+
+	func _scripted(b: MgBoard, a: Array) -> void:
+		_scripted_ok = false
+		var r: Variant = await b.call("scripted_input", a, self)
+		_scripted_ok = r == true
+
+	## Polls until the core recorded a command beyond `n` (8 s max); sets _landed_ok.
+	func _wait_landed(f: GameFlow, n: int) -> void:
+		for k in 160:
+			if f.commands.size() > n:
+				_landed_ok = true
+				return
+			await _pause(0.05)
 
 	# --- model icons ---------------------------------------------------------------------
 
