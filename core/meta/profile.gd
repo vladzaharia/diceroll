@@ -25,7 +25,7 @@ const VERSION := 1
 
 const COUNTERS := ["runs", "laps", "fights", "minigames", "rerolls", "kept", "poison_kills", "cashouts", "block",
 	"straights", "minibosses_reached", "minibosses_killed", "bosses_reached", "wins", "act2_runs", "act3_runs",
-	"frost_visits", "throne_wins", "mage_wins", "full_runes"]
+	"frost_visits", "throne_wins", "mage_wins", "full_runes", "kills"]
 
 var crowns: int = 0
 var sigils: int = 0
@@ -119,6 +119,9 @@ func active_traits() -> Array:
 func counter(stat: String) -> int:
 	if stat == "best_lap":
 		return int(records.get("best_lap", 0))
+	if stat == "boss_kinds":
+		# distinct final bosses defeated (the Sigil firsts list)
+		return ((records.get("firsts", {}) as Dictionary).get("boss", []) as Array).size()
 	return int((records.get("counters", {}) as Dictionary).get(stat, 0))
 
 func can_afford(cost: Dictionary) -> bool:
@@ -239,6 +242,7 @@ func _count(st: Dictionary, victory: bool) -> void:
 	add.call("block", int(st.get("block_gained", 0)))
 	add.call("straights", int(st.get("straights", 0)))
 	add.call("full_runes", 1 if int(st.get("full_rune_fights", 0)) > 0 else 0)
+	add.call("kills", int(st.get("kills", 0)))
 	add.call("minibosses_reached", 1 if bool(st.get("miniboss_reached", false)) else 0)
 	add.call("minibosses_killed", (st.get("minibosses_killed", []) as Array).size())
 	add.call("bosses_reached", 1 if bool(st.get("boss_reached", false)) else 0)
