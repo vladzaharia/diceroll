@@ -22,6 +22,8 @@ const BUST_COL := Color("ff4d5e")
 const BTN := ["higher", "lower", "cash"]
 
 var _die_val := 1
+var _btn_val := 1      # the value the buttons (and their odds) refer to
+var _chosen := -1       # the button of the action in flight
 var _die_off := Vector2.ZERO
 var _die_rot := 0.0
 var _die_sq := Vector2.ONE
@@ -57,6 +59,8 @@ func set_state(st: Dictionary, instant := true) -> void:
 		return
 	super.set_state(st, instant)
 	_die_val = int(state.get("die", 1))
+	_btn_val = _die_val
+	_chosen = -1
 	_marker = float(state.get("rung", 0))
 	_lit = int(state.get("rung", 0))
 	_broken.clear()
@@ -115,9 +119,9 @@ func can_press(b: int) -> bool:
 	if locked or _busy or _over() or state.is_empty():
 		return false
 	if b == 0:
-		return _die_val < 6
+		return _btn_val < 6
 	if b == 1:
-		return _die_val > 1
+		return _btn_val > 1
 	return true
 
 
@@ -162,7 +166,7 @@ func _layout() -> void:
 	_ladder = Rect2(Vector2(pad, top), Vector2(lw, area_h))
 	_stage = Rect2(Vector2(pad + lw + gap, top), Vector2(w - pad * 2.0 - lw - gap, area_h))
 	_step = (_ladder.size.y - 40.0 * _u) / float(maxi(1, _prizes().size()))
-	_die_s = minf(_stage.size.x * 0.52, _stage.size.y * 0.36)
+	_die_s = minf(_stage.size.x * 0.6, _stage.size.y * 0.36)
 	_die_c = _stage.position + Vector2(_stage.size.x * 0.5, _stage.size.y * 0.47)
 
 
@@ -194,6 +198,7 @@ func _gui_input(e: InputEvent) -> void:
 				_press[b] = time
 			return
 		_press[b] = time
+		_chosen = b
 		MgBoard.sfx("dice_select" if b < 2 else "chips")
 		send([BTN[b]])
 
@@ -237,6 +242,8 @@ func play_update(ev: Dictionary) -> void:
 		await _play_guess(info)
 	state = new_state
 	_die_val = int(state.get("die", _die_val))
+	_btn_val = _die_val
+	_chosen = -1
 	_marker = float(state.get("rung", 0))
 	_lit = int(state.get("rung", 0))
 	_busy = false
@@ -287,7 +294,7 @@ func _play_guess(info: Dictionary) -> void:
 
 
 func _tumble(k: float) -> void:
-	_die_off = Vector2(sin(k * PI * 2.0) * 10.0 * _u, -sin(k * PI) * _die_s * 0.75)
+	_die_off = Vector2(sin(k * PI * 2.0) * 10.0 * _u, -sin(k * PI) * _die_s * 0.42)
 	_die_rot = k * TAU * 2.0
 	_die_sq = Vector2.ONE * (1.0 + 0.12 * sin(k * PI))
 	# cosmetic face flicker while airborne (the real roll is only shown on landing)
@@ -298,7 +305,7 @@ func _tumble(k: float) -> void:
 func _play_up(from_rung: int, to_rung: int, guess: String) -> void:
 	_die_flash = Color(HIGH_COL, 0.55)
 	create_tween().tween_property(self, "_die_flash:a", 0.0, dur(0.5))
-	float_text(_die_c + Vector2(0, -_die_s * 0.75), ("HIGHER!" if guess == "higher" else "LOWER!"), HIGH_COL.lightened(0.3), int(34 * _u), 0.9)
+	float_text(_die_c + Vector2(0, -_die_s * 0.25), ("HIGHER!" if guess == "higher" else "LOWER!"), HIGH_COL.lightened(0.3), int(34 * _u), 0.9)
 	# the climb: a hop up to the next rung
 	var t := create_tween()
 	t.tween_method(func(v: float) -> void:
@@ -327,13 +334,13 @@ func _play_up(from_rung: int, to_rung: int, guess: String) -> void:
 
 func _play_push() -> void:
 	MgBoard.sfx("tin")
-	float_text(_die_c + Vector2(0, -_die_s * 0.75), "PUSH!", Color("e6ecff"), int(40 * _u), 1.0)
+	float_text(_die_c + Vector2(0, -_die_s * 0.25), "PUSH!", Color("e6ecff"), int(40 * _u), 1.0)
 	var t := create_tween()
 	for k in 5:
 		t.tween_property(self, "_die_rot", 0.22 * (1.0 if k % 2 == 0 else -1.0) * (1.0 - k * 0.18), dur(0.07))
 	t.tween_property(self, "_die_rot", 0.0, dur(0.07))
 	await t.finished
-	float_text(_die_c + Vector2(0, _die_s * 0.2), "same value - go again", UiPalette.TEXT_DIM, int(18 * _u), 1.0)
+	float_text(_die_c + Vector2(0, _die_s * 1.2), "SAME - GO AGAIN", Color("e6ecff"), int(clampf(18 * _u, 14, 36)), 1.0)
 	await wait(0.35)
 
 
@@ -342,7 +349,7 @@ func _play_bust(from_rung: int, to_rung: int) -> void:
 	_die_flash = Color(BUST_COL, 0.7)
 	create_tween().tween_property(self, "_die_flash:a", 0.25, dur(0.6))
 	kick.emit(0.75, Color(1.0, 0.15, 0.2, 0.45))
-	float_text(_die_c + Vector2(0, -_die_s * 0.8), "BUST!", BUST_COL.lightened(0.25), int(48 * _u), 1.2)
+	float_text(_die_c + Vector2(0, -_die_s * 0.25), "WRONG!", BUST_COL.lightened(0.25), int(44 * _u), 0.8)
 	shake(10.0)
 	# the ladder cracks from the top of the climb down to the safety rung
 	for r in range(from_rung, to_rung, -1):
@@ -471,24 +478,25 @@ func _draw_stage() -> void:
 		draw_line(Vector2(s.position.x + 16 * u, y), Vector2(s.end.x - 16 * u, y), Color(1, 1, 1, 0.025), 2.0 * u)
 	# info plates: bank now / a bust keeps
 	var rung := int(round(_marker)) if _busy else int(state.get("rung", 0))
-	var ph := 34.0 * u
+	var ph := maxf(40.0 * u, 34.0)
 	var pw := (s.size.x - 30.0 * u) * 0.5
 	var bank := Rect2(s.position + Vector2(10 * u, 10 * u), Vector2(pw, ph))
 	var keep := Rect2(Vector2(bank.end.x + 10 * u, bank.position.y), Vector2(pw, ph))
 	rrect(bank, Color(0, 0, 0, 0.35), 12 * u)
 	rrect(keep, Color(0, 0, 0, 0.35), 12 * u)
-	var fs := int(clampf(15.0 * u, 11.0, 30.0))
-	text_c(bank.position + Vector2(bank.size.x * 0.5, ph * 0.3), "BANK", int(fs * 0.75), UiPalette.TEXT_DIM, 0, false)
-	text_c(bank.position + Vector2(bank.size.x * 0.5, ph * 0.68), "+%d" % _prize(_lit), fs, CASH_COL, int(4 * u))
-	text_c(keep.position + Vector2(keep.size.x * 0.5, ph * 0.3), "BUST KEEPS", int(fs * 0.75), UiPalette.TEXT_DIM, 0, false)
-	_shield(keep.position + Vector2(keep.size.x * 0.5 - 22 * u, ph * 0.68), 9.0 * u)
-	text_c(keep.position + Vector2(keep.size.x * 0.5 + 6 * u, ph * 0.68), "+%d" % _prize(HighLow.safety(rung)), fs, Color("9fd8ff"), int(4 * u))
+	var fs := int(clampf(20.0 * u, 16.0, 40.0))
+	var lfs := int(clampf(12.0 * u, 10.0, 24.0))
+	text_c(bank.position + Vector2(bank.size.x * 0.5, ph * 0.26), "BANK", lfs, UiPalette.TEXT_DIM, 0, false)
+	text_c(bank.position + Vector2(bank.size.x * 0.5, ph * 0.66), "+%d" % _prize(_lit), fs, CASH_COL, int(4 * u))
+	text_c(keep.position + Vector2(keep.size.x * 0.5, ph * 0.26), "BUST KEEPS", lfs, UiPalette.TEXT_DIM, 0, false)
+	_shield(keep.position + Vector2(keep.size.x * 0.5 - fs * 1.1, ph * 0.66), fs * 0.38)
+	text_c(keep.position + Vector2(keep.size.x * 0.5 + fs * 0.25, ph * 0.66), "+%d" % _prize(HighLow.safety(rung)), fs, Color("9fd8ff"), int(4 * u))
 	# the die
 	var c := _die_c
 	var ds := _die_s
 	var idle := not _busy and not _over()
 	var bob := sin(time * 2.2) * 4.0 * u if idle else 0.0
-	var hgt := clampf(-_die_off.y / (ds * 0.75), 0.0, 1.0)
+	var hgt := clampf(-_die_off.y / (ds * 0.42), 0.0, 1.0)
 	draw_set_transform(c + Vector2(0, ds * 0.62), 0.0, Vector2(1.0 - 0.35 * hgt, 0.3 * (1.0 - 0.35 * hgt)))
 	draw_circle(Vector2.ZERO, ds * 0.52, Color(0, 0, 0, 0.35))
 	draw_set_transform(Vector2.ZERO)
@@ -505,7 +513,7 @@ func _draw_stage() -> void:
 	# history strip
 	var hist: Array = state.get("history", [])
 	var n := mini(hist.size(), 6)
-	var hs := minf(26.0 * u, (s.size.x - 30 * u) / 6.0 - 6 * u)
+	var hs := minf(maxf(28.0 * u, 22.0), (s.size.x - 20 * u) / 6.0 - 7 * u)
 	var hy := s.end.y - hs * 0.5 - 16.0 * u
 	if n == 0:
 		text_c(Vector2(s.get_center().x, hy), "higher or lower?", int(clampf(15 * u, 11, 30)), Color(1, 1, 1, 0.3), 0, false)
@@ -710,7 +718,7 @@ func _arrow(c: Vector2, r: float, up: bool, col: Color) -> void:
 
 func _draw_buttons() -> void:
 	var u := _u
-	var v := _die_val
+	var v := _btn_val
 	for i in 3:
 		var r := _btns[i]
 		var ok := can_press(i)
@@ -739,7 +747,7 @@ func _draw_buttons() -> void:
 		rrect(face, col.lightened(0.12) if hov else col, 14 * u)
 		rrect(Rect2(face.position + Vector2(6 * u, 4 * u), Vector2(face.size.x - 12 * u, face.size.y * 0.26)), Color(1, 1, 1, 0.25), 9 * u)
 		var fs := int(clampf(face.size.y * 0.3, 14.0, 40.0))
-		var sub_fs := int(clampf(face.size.y * 0.2, 11.0, 28.0))
+		var sub_fs := int(clampf(face.size.y * 0.22, 13.0, 30.0))
 		var tcol := Color.WHITE if not dead else Color(1, 1, 1, 0.45)
 		var fc := face.get_center()
 		if i < 2:
@@ -771,6 +779,10 @@ func _draw_buttons() -> void:
 				var band := PackedVector2Array([Vector2(sx, face.position.y), Vector2(sx + 18 * u, face.position.y),
 					Vector2(sx - 6 * u, face.end.y), Vector2(sx - 24 * u, face.end.y)])
 				clipped(band, rect_poly(face.grow(-4 * u)), Color(1, 1, 1, 0.3))
+		if _busy and i != _chosen and not dead:
+			rrect(face.grow(3 * u), Color(0.02, 0.03, 0.06, 0.45), 16 * u)
+		elif _busy and i == _chosen:
+			rrect(face.grow(5 * u), Color(0, 0, 0, 0), 18 * u, int(4 * u), Color(1, 1, 1, 0.6 + 0.4 * sin(time * 12.0)))
 		draw_set_transform(Vector2.ZERO)
 
 
