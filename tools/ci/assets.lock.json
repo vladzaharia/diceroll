@@ -1,285 +1,285 @@
 {
-  "lock_hash": "33d628826ebacbba",
+  "lock_hash": "da33571ef6b790c3",
   "schema": 1,
   "units": {
     "fonts": {
       "bundle_bytes": 114406,
-      "bundle_sha256": "ebbe68bb203c3581953cd25f589ef7b2db161829891e46a340ced718199d2bd4",
+      "bundle_sha256": "23d9437b3e0ced56c61f0e8a2b5f6e23977ece4328630fe9d78f16b55a311ed1",
       "dest": "assets/fonts",
-      "file": "bundles/fonts/fonts-02af806e8b09675b.tar.zst.age",
+      "file": "bundles/fonts/fonts-cf3be47a3c301aa7.tar.zst.age",
       "files": 6,
       "plain_bytes": 197631,
-      "sha256": "02af806e8b09675b97b21015ec9cd59a842b04188f986b4aea1eaf982ba03fed"
+      "sha256": "cf3be47a3c301aa748e25eefb3fec15ff7fbb20c209fca3c2205328247a13caf"
     },
     "kaykit-adventurers": {
       "bundle_bytes": 894764,
-      "bundle_sha256": "7e1e9a359511b7278b31cd8ae05fe853171f0c8da6417de07d2d0cc033e11133",
+      "bundle_sha256": "11d2b1e7952ef42723c43542eca53567749143797d6f9284896b58136280ea61",
       "dest": "assets/kaykit/adventurers",
-      "file": "bundles/kaykit-adventurers/kaykit-adventurers-24c542fbf3ab4941.tar.zst.age",
+      "file": "bundles/kaykit-adventurers/kaykit-adventurers-63772d74e4063839.tar.zst.age",
       "files": 128,
       "plain_bytes": 3154860,
-      "sha256": "24c542fbf3ab49413e520d42ab8f7a476e2a4ab37aad13947d89d8dfbbdb0834"
+      "sha256": "63772d74e4063839957b1f6f1ed9a43ffb0887b2942fd0ade26e87997eddd129"
     },
     "kaykit-adventurers_x": {
       "bundle_bytes": 1056132,
-      "bundle_sha256": "dbb15d6a9357ab86683e48a7d4ea969bd9f39e324587792821e8fa4656a7ba43",
+      "bundle_sha256": "aa45c687c9c805b01fc540aca6f201c5d4f18910aa382e355a1163954ede6763",
       "dest": "assets/kaykit/adventurers_x",
-      "file": "bundles/kaykit-adventurers_x/kaykit-adventurers_x-0e558950a07df9ac.tar.zst.age",
+      "file": "bundles/kaykit-adventurers_x/kaykit-adventurers_x-47cd3da5e9b66287.tar.zst.age",
       "files": 205,
       "plain_bytes": 3385134,
-      "sha256": "0e558950a07df9ac173b9ff3af4957006c0cdc00f4de0fb47a889c010f359d59"
+      "sha256": "47cd3da5e9b66287479beb99e8159e04cab8406b8bf0d03c00fb4f93dd53b1ad"
     },
     "kaykit-animations": {
       "bundle_bytes": 2146892,
-      "bundle_sha256": "9feb7e9135541a7988e7be511ab6a0cace3ba3468459efe60a07aa00fcc75ee0",
+      "bundle_sha256": "6d9d6bc47617cd04f0a3f9d7d6407a7505ea97e005290b60b76c2e70822dd3db",
       "dest": "assets/kaykit/animations",
-      "file": "bundles/kaykit-animations/kaykit-animations-1a1402bf6ac0b3c9.tar.zst.age",
+      "file": "bundles/kaykit-animations/kaykit-animations-9967399ae6c8084f.tar.zst.age",
       "files": 37,
       "plain_bytes": 12591618,
-      "sha256": "1a1402bf6ac0b3c96228d1f45574e47de8a0002abc83277979accaf569e7c647"
+      "sha256": "9967399ae6c8084f00bcfa6d95e7fbf08bab5768dab9bf3cab42d1c3e29081c7"
     },
     "kaykit-blocks": {
       "bundle_bytes": 200381,
-      "bundle_sha256": "926f048f54f907235f87c28bf685013c6ec5cefd4fcfd54c6451eff046e109af",
+      "bundle_sha256": "fb76201abd55dfc063fb212f8321fbdd836823d8686df97d6bcd1a1f5540e84a",
       "dest": "assets/kaykit/blocks",
-      "file": "bundles/kaykit-blocks/kaykit-blocks-081fb94888176a27.tar.zst.age",
+      "file": "bundles/kaykit-blocks/kaykit-blocks-52865f7a7b22941c.tar.zst.age",
       "files": 57,
       "plain_bytes": 848818,
-      "sha256": "081fb94888176a27561e6e774cf35ecfbd620f0de41bbc631413a43e98c8acfa"
+      "sha256": "52865f7a7b22941c5cb5ada3f6c27e96c6be262a0245a308b96e41595edc89d9"
     },
     "kaykit-boardgame": {
       "bundle_bytes": 2161797,
-      "bundle_sha256": "6174e4dc18b172efec65210995d53154ab794ea175b69d5642db0f2d457ef22c",
+      "bundle_sha256": "7ab85583160437fecfafa5373122fe4be128b4dd720c245d9e9280ef26f75ed0",
       "dest": "assets/kaykit/boardgame",
-      "file": "bundles/kaykit-boardgame/kaykit-boardgame-1b2b70cb6370d4ed.tar.zst.age",
+      "file": "bundles/kaykit-boardgame/kaykit-boardgame-b84c33458ebe1ffe.tar.zst.age",
       "files": 409,
       "plain_bytes": 4058249,
-      "sha256": "1b2b70cb6370d4ed4d025de35e37bf21292264a8c9934c960ae2e02dbb9269df"
+      "sha256": "b84c33458ebe1ffeaea36abd4e18e0c84ec760a78a239dd22fadb2f9dd249b71"
     },
     "kaykit-dungeon": {
       "bundle_bytes": 1077270,
-      "bundle_sha256": "bdea5f7aff3eba51b9551da678b8fa33c61ef45642d5cd63162c4ab7e5cff332",
+      "bundle_sha256": "770fd95d224198e7d4453f778fb16aab73ee748b4734fc5c55843e0cca75b142",
       "dest": "assets/kaykit/dungeon",
-      "file": "bundles/kaykit-dungeon/kaykit-dungeon-3b9a78e318dbed70.tar.zst.age",
+      "file": "bundles/kaykit-dungeon/kaykit-dungeon-4198e2d562e4ec39.tar.zst.age",
       "files": 636,
       "plain_bytes": 6163436,
-      "sha256": "3b9a78e318dbed702e41960b90b5ae6c3673f56b50fb0d0f07f89a3b0aafe1f0"
+      "sha256": "4198e2d562e4ec391aa840b464ca6c6edfd30edc9d82f0b1644ecf68793a036e"
     },
     "kaykit-dungeon_x": {
       "bundle_bytes": 883598,
-      "bundle_sha256": "7954fde0ac6185f1197ed590a9f3fad416a2f684b84aba6e9418fe78ac13c538",
+      "bundle_sha256": "60b049b932fbb60559e7f6d39a2d41c7237329e4ba49f6c629440ff4c5b1767a",
       "dest": "assets/kaykit/dungeon_x",
-      "file": "bundles/kaykit-dungeon_x/kaykit-dungeon_x-5cb7ce1046820125.tar.zst.age",
+      "file": "bundles/kaykit-dungeon_x/kaykit-dungeon_x-c9ab83b000c1b4b3.tar.zst.age",
       "files": 513,
       "plain_bytes": 4759720,
-      "sha256": "5cb7ce1046820125fed0cfbe78645fbc889f7d65e35d79a9aff34eab76978666"
+      "sha256": "c9ab83b000c1b4b3c1fa4079bee01844af565c610f5cfaa16a97d3136889b132"
     },
     "kaykit-foes": {
       "bundle_bytes": 2466307,
-      "bundle_sha256": "c0614b89cc4a7ff6a7e90d60721edfea25b648be5b45bafdc9558011a54edde3",
+      "bundle_sha256": "e66a8b63401aa77bfde32f9354bb438a4bb917cc81fbb9fc2fd97e34547aafcd",
       "dest": "assets/kaykit/foes",
-      "file": "bundles/kaykit-foes/kaykit-foes-37b70abb9b3226ce.tar.zst.age",
+      "file": "bundles/kaykit-foes/kaykit-foes-96c4183d589adf56.tar.zst.age",
       "files": 281,
       "plain_bytes": 8211712,
-      "sha256": "37b70abb9b3226cefb4768124b1bd5abed9e1746da35fb8dc834d94eafac5b51"
+      "sha256": "96c4183d589adf56d3b90105077a4d271f30b21f9cdddb1d75b22dff7b9aa55c"
     },
     "kaykit-forest": {
       "bundle_bytes": 1788983,
-      "bundle_sha256": "7cf044f190936f19ba1dccc6d2f4dff0b6869cd656cd4324529f1389f884a64a",
+      "bundle_sha256": "c0d48af1125195363d68f62c253dda2367e950e1cb0dc014965fccd910f9ec57",
       "dest": "assets/kaykit/forest",
-      "file": "bundles/kaykit-forest/kaykit-forest-3ba631be53304099.tar.zst.age",
+      "file": "bundles/kaykit-forest/kaykit-forest-a46aa081cb518804.tar.zst.age",
       "files": 3977,
       "plain_bytes": 23339849,
-      "sha256": "3ba631be5330409957480fd424bd130cbebd05d15efdeeef14489b592c3dce05"
+      "sha256": "a46aa081cb518804a8be94f25ea6d48dd239ec2db2273f603f79efe939472f26"
     },
     "kaykit-halloween": {
       "bundle_bytes": 351999,
-      "bundle_sha256": "f5d70e3b842eb4e80eb0919374d3caaee97d679a00e48cdc1181fce2adf4bf7a",
+      "bundle_sha256": "830d442adb2ef9dfa1fb237b39c0c2db193e3a7502fcef5be04b9a6e7656942e",
       "dest": "assets/kaykit/halloween",
-      "file": "bundles/kaykit-halloween/kaykit-halloween-a88a78be7bfee13d.tar.zst.age",
+      "file": "bundles/kaykit-halloween/kaykit-halloween-fa6d8a3c83b04c98.tar.zst.age",
       "files": 192,
       "plain_bytes": 1426041,
-      "sha256": "a88a78be7bfee13d12942abcbb25e38ad79378036b83a50ef22a2600b1b25e72"
+      "sha256": "fa6d8a3c83b04c9871d98d35f7a209a28f3d438c3af684570868b5bd09bdf09c"
     },
     "kaykit-mystery": {
       "bundle_bytes": 765544,
-      "bundle_sha256": "03eaa4ed24ef5d6a95a06881a8e33ad0037044347f94b6a0d2a05381d3fd071a",
+      "bundle_sha256": "59fa1e9084066666a7fca2d7d53d9c21e646323dea90031e8f18fd9df119a220",
       "dest": "assets/kaykit/mystery",
-      "file": "bundles/kaykit-mystery/kaykit-mystery-f805111b534093ba.tar.zst.age",
+      "file": "bundles/kaykit-mystery/kaykit-mystery-eb8e7e1bb5c2d6b0.tar.zst.age",
       "files": 136,
       "plain_bytes": 2364168,
-      "sha256": "f805111b534093ba17d94048087606f5acd77e2a04cadeefaa8cd60c22ef45ad"
+      "sha256": "eb8e7e1bb5c2d6b00f2102cda5f92e9af85bd74e39355b08c24af1bbfcfdcd80"
     },
     "kaykit-platformer": {
       "bundle_bytes": 46462,
-      "bundle_sha256": "c7f51905768a86c00c11eb7a0979d44f7c970cbc72c4f4d342f0c4010c3aec6f",
+      "bundle_sha256": "58d4e7d13f2ed6cb28875b5206f34c36c720c07f1288d838d2f1ac62983fc3bd",
       "dest": "assets/kaykit/platformer",
-      "file": "bundles/kaykit-platformer/kaykit-platformer-251f5549f5a5824a.tar.zst.age",
+      "file": "bundles/kaykit-platformer/kaykit-platformer-fe594a4dedadf9c1.tar.zst.age",
       "files": 34,
       "plain_bytes": 199433,
-      "sha256": "251f5549f5a5824ae723bc1d1eb61ba22c35f93a6cfb75d6b31e486a73c1c22b"
+      "sha256": "fe594a4dedadf9c1431c451a16ca4aa9b3b10386e122a295ae2ceafcd0f72199"
     },
     "kaykit-potions": {
       "bundle_bytes": 19757,
-      "bundle_sha256": "add1234277a190e57105880966bc4c541518ec5e0544cc04f7f17aa6458819e2",
+      "bundle_sha256": "e880989a80c68b8538fb1d1d3a8c1fd01ea6c77849b305b935647fe103df84ba",
       "dest": "assets/kaykit/potions",
-      "file": "bundles/kaykit-potions/kaykit-potions-ce10f4ca4eee27dc.tar.zst.age",
+      "file": "bundles/kaykit-potions/kaykit-potions-1579c14b628395de.tar.zst.age",
       "files": 15,
       "plain_bytes": 63368,
-      "sha256": "ce10f4ca4eee27dc06e23cf2230b9bed5cdd7202158a7a8836f4a6ddcff032f4"
+      "sha256": "1579c14b628395de949a32c000fd688bc395b5d5ddb328b6cb91e53adce80590"
     },
     "kaykit-resource": {
       "bundle_bytes": 93786,
-      "bundle_sha256": "6de6850badf48385c94ec38d58311fce3efea98ac5db1ba176ccb40644bd6b10",
+      "bundle_sha256": "1b5d0c61850f3fb00764b4dfb251a096f59529b1d4dd86b32b7208056d4d6e23",
       "dest": "assets/kaykit/resource",
-      "file": "bundles/kaykit-resource/kaykit-resource-d56ed0e133b95b01.tar.zst.age",
+      "file": "bundles/kaykit-resource/kaykit-resource-1df14b54d546e2c1.tar.zst.age",
       "files": 57,
       "plain_bytes": 300587,
-      "sha256": "d56ed0e133b95b0127c606c9f0f612faa3831ab355e87c429f1a1132d049dbb0"
+      "sha256": "1df14b54d546e2c1ca0fcbbf10d42088aa951aff09d814f0c46eccb7800e5a7c"
     },
     "kaykit-resources": {
       "bundle_bytes": 1238748,
-      "bundle_sha256": "ffcecf1f4bb8f7b2b1d2eac98aa4d5d95b07098557f3043eecc4e9f6a04b6407",
+      "bundle_sha256": "92149fefd3842926a18ed18bf9219141eada25bfed70337b586b63a4ff8be69f",
       "dest": "assets/kaykit/resources",
-      "file": "bundles/kaykit-resources/kaykit-resources-264fccea2268f161.tar.zst.age",
+      "file": "bundles/kaykit-resources/kaykit-resources-76459bbdc553c38a.tar.zst.age",
       "files": 336,
       "plain_bytes": 5388883,
-      "sha256": "264fccea2268f1614efc946a3158630b9dc9414bc91d7944d6318d051d534f8c"
+      "sha256": "76459bbdc553c38a66ee02229c767b352189e8eff5dd45e3cfb3d626f5c9dcfc"
     },
     "kaykit-resources_x": {
       "bundle_bytes": 282382,
-      "bundle_sha256": "139b741f2d47f2315dc8ac6867eacdb77fbae818bc67adb1be523c18321d26ea",
+      "bundle_sha256": "4db0b590936c342821ad1c027973853dcce1814be968949dfd9d64a978ab2043",
       "dest": "assets/kaykit/resources_x",
-      "file": "bundles/kaykit-resources_x/kaykit-resources_x-06f9dd1fc7c14394.tar.zst.age",
+      "file": "bundles/kaykit-resources_x/kaykit-resources_x-631b8c5b4fe4aa68.tar.zst.age",
       "files": 48,
       "plain_bytes": 847387,
-      "sha256": "06f9dd1fc7c143945ebc4c6f654b0ed00f8177f9ea5c46cf9f36c2d065aeb7ba"
+      "sha256": "631b8c5b4fe4aa682a6f03b11785fcc3bebfc9598f30df9f4dd2cd160d0a576b"
     },
     "kaykit-skeleton_props": {
       "bundle_bytes": 215281,
-      "bundle_sha256": "d424b1927dee6e37bdbdc4deed502a1bf9ed2d5c52f62119da51196fbfc98077",
+      "bundle_sha256": "3584bad1d8d467279aea127c50efb38636a7d0ccce7005662661fad5715b54d5",
       "dest": "assets/kaykit/skeleton_props",
-      "file": "bundles/kaykit-skeleton_props/kaykit-skeleton_props-7c8ddcdaeaa0dd0d.tar.zst.age",
+      "file": "bundles/kaykit-skeleton_props/kaykit-skeleton_props-1209253eca98e6ed.tar.zst.age",
       "files": 60,
       "plain_bytes": 670012,
-      "sha256": "7c8ddcdaeaa0dd0de136293e6dc875eca32a166cc932a326fc2ccf9c59f23460"
+      "sha256": "1209253eca98e6ed1c332a3359dda8cabd2af072487b8021ab9c5edc639507bf"
     },
     "kaykit-skeletons": {
       "bundle_bytes": 121021,
-      "bundle_sha256": "853855b7ce6608fd4bb23b898aa815a1a7248414195f6987879748aa2fb0f53c",
+      "bundle_sha256": "fd3f545037822d0259fe642d35bbc28efded62f60dd63a616f068439921af84f",
       "dest": "assets/kaykit/skeletons",
-      "file": "bundles/kaykit-skeletons/kaykit-skeletons-09879fba4e202ba4.tar.zst.age",
+      "file": "bundles/kaykit-skeletons/kaykit-skeletons-492e214d5173406d.tar.zst.age",
       "files": 7,
       "plain_bytes": 357396,
-      "sha256": "09879fba4e202ba439f8abc8132fbd6a77bddb4a418688a2a79341604b0a11d5"
+      "sha256": "492e214d5173406d5cbbf0c8abd8146f477112b618989ea57e3da63deb3d39ec"
     },
     "kaykit-tools": {
       "bundle_bytes": 444668,
-      "bundle_sha256": "d5dafe49b4f4448b6115ee5d15d283f9563d55ba9db029199668bd51e61b47c8",
+      "bundle_sha256": "26549fc0131c4ffacce46696cdb46cb06afde22ac6bebfe123bb2c134b1cb4fd",
       "dest": "assets/kaykit/tools",
-      "file": "bundles/kaykit-tools/kaykit-tools-366fd090defc1154.tar.zst.age",
+      "file": "bundles/kaykit-tools/kaykit-tools-12e6b48f828da146.tar.zst.age",
       "files": 156,
       "plain_bytes": 1289656,
-      "sha256": "366fd090defc115404fa94ebeaeddda344e1e5407bc8d4d0754ee0a045123601"
+      "sha256": "12e6b48f828da1467ba04ed9b6517d7f3637ceffda910bd8d364fb19054e66e9"
     },
     "kaykit-tools_extra": {
       "bundle_bytes": 86449,
-      "bundle_sha256": "8ed36dd3580891f5c6ca1d9e5da7746455ffda73a9cba52c337151a21fdfcd34",
+      "bundle_sha256": "af8e3f94f0a1554f150e6f28453d53c0b4f597c4cb61b7f55ffb81c622443a26",
       "dest": "assets/kaykit/tools_extra",
-      "file": "bundles/kaykit-tools_extra/kaykit-tools_extra-3537e09e7765d575.tar.zst.age",
+      "file": "bundles/kaykit-tools_extra/kaykit-tools_extra-994dbb8db1935463.tar.zst.age",
       "files": 21,
       "plain_bytes": 189666,
-      "sha256": "3537e09e7765d5757d0146126187ca46da6319266cb226e5b3d1aa218ec2f9e9"
+      "sha256": "994dbb8db19354632a7933242c67178076d67f999b9fd37951ba537978114fb4"
     },
     "kaykit-tools_x": {
       "bundle_bytes": 494475,
-      "bundle_sha256": "2260c9f08e306c4930c4f7db823e18e0db1c7ad7f962cd97c418117bf8bdc3cb",
+      "bundle_sha256": "5aa725f5cb20aafd6d68451544f7528ce544a14087e7b10241b300d83dc9ca4d",
       "dest": "assets/kaykit/tools_x",
-      "file": "bundles/kaykit-tools_x/kaykit-tools_x-b798f2e8341ba855.tar.zst.age",
+      "file": "bundles/kaykit-tools_x/kaykit-tools_x-3717fa5bffbc5a76.tar.zst.age",
       "files": 120,
       "plain_bytes": 1241459,
-      "sha256": "b798f2e8341ba8550e6ce1624e931ba9d4997592b06080d5090eb6186c7a083c"
+      "sha256": "3717fa5bffbc5a76a05f725413e7a28c69d52d94845ed4bce3e6e24f244784a8"
     },
     "kaykit-weapons": {
       "bundle_bytes": 407390,
-      "bundle_sha256": "bf6ad02b86bd76a862912f788e31beb74971d2c2e188166b10b439d9e84a1db3",
+      "bundle_sha256": "5517c1ec61ec68c509077c450f4019596cad01f8d2302122d9dfd299cf290804",
       "dest": "assets/kaykit/weapons",
-      "file": "bundles/kaykit-weapons/kaykit-weapons-dda074a30b438977.tar.zst.age",
+      "file": "bundles/kaykit-weapons/kaykit-weapons-961d47a5da57fdd4.tar.zst.age",
       "files": 96,
       "plain_bytes": 1282372,
-      "sha256": "dda074a30b438977f85e9b7155734487c51b36d4707756c0390b30962910d77a"
+      "sha256": "961d47a5da57fdd405704fcdc205008e6af42087b5912c3303ee0b22d57b81c9"
     },
     "kaykit-weapons_x": {
       "bundle_bytes": 697191,
-      "bundle_sha256": "73cc55011381624706b14257e7aebb8806282f45e2f6b0979748e71b8f81e9e6",
+      "bundle_sha256": "43f7986a8e505f698bcd3782e4c9c4381969049f465b7fe046524533aeea1b1e",
       "dest": "assets/kaykit/weapons_x",
-      "file": "bundles/kaykit-weapons_x/kaykit-weapons_x-18d2a46dd4b34f30.tar.zst.age",
+      "file": "bundles/kaykit-weapons_x/kaykit-weapons_x-60d0f7be75655664.tar.zst.age",
       "files": 147,
       "plain_bytes": 2137305,
-      "sha256": "18d2a46dd4b34f30a5e85ec9592c67cc7d3f250de24ee87319910d453d5647b4"
+      "sha256": "60d0f7be75655664ed87f343c377ae024b8fd25d2d98a124a9f6e05b1b4a48f5"
     },
     "music": {
       "bundle_bytes": 18672527,
-      "bundle_sha256": "3edb30688979d1f6a6fd8dd4ce31704849a85a4a5b6cc8638861a5c3a03009a1",
+      "bundle_sha256": "c513aa19e3b652e6f9536c47886dbba78f47540dd570c1411b7c3b2fa146f065",
       "dest": "assets/audio/music",
-      "file": "bundles/music/music-5c3b0144650074b6.tar.zst.age",
+      "file": "bundles/music/music-cfd0c5b9a191749e.tar.zst.age",
       "files": 18,
       "plain_bytes": 18834189,
-      "sha256": "5c3b0144650074b6313a49891276b90ec5f4bb9df0111fd9270c019a53c6e449"
+      "sha256": "cfd0c5b9a191749ea2a3d09212569d65c378fad957d03b278bcdd3622b6acd18"
     },
     "sfx-casino-audio": {
       "bundle_bytes": 323160,
-      "bundle_sha256": "ee76c1e34ef9596a735b24a441b081f87a224b7bb5f9c7b3a43bb431d3570bc2",
+      "bundle_sha256": "c87cd7df89568540f130e22222a838656ea76b6452ac2d747210ea207f0513aa",
       "dest": "assets/audio/sfx/casino-audio",
-      "file": "bundles/sfx-casino-audio/sfx-casino-audio-4afd104929a651fe.tar.zst.age",
+      "file": "bundles/sfx-casino-audio/sfx-casino-audio-6fdea01ea3153e06.tar.zst.age",
       "files": 109,
       "plain_bytes": 553794,
-      "sha256": "4afd104929a651fe3dcc056493ad93f0ff23ae077a2ca2a0e271840b453320dc"
+      "sha256": "6fdea01ea3153e0644b8919b57aa669038f76367a781980defb11f120034fa19"
     },
     "sfx-digital-audio": {
       "bundle_bytes": 18061,
-      "bundle_sha256": "d64b40cc0ec20d207f118f326f54f1f8fafc1a4cb42f44b84e1d9353da263f92",
+      "bundle_sha256": "1aac65eaebd5b77c528c1dc425b5198c21a757de3d176785225fb991bee4a553",
       "dest": "assets/audio/sfx/digital-audio",
-      "file": "bundles/sfx-digital-audio/sfx-digital-audio-62647e05505fefd4.tar.zst.age",
+      "file": "bundles/sfx-digital-audio/sfx-digital-audio-a67fb3af9aa7f6da.tar.zst.age",
       "files": 9,
       "plain_bytes": 29896,
-      "sha256": "62647e05505fefd446839f9eb33102b78699d7e41ed145941d77a8ba524bb1be"
+      "sha256": "a67fb3af9aa7f6da022c2781f755eccffa8826f37db78ab7a7607daa9495a877"
     },
     "sfx-impact-sounds": {
       "bundle_bytes": 429440,
-      "bundle_sha256": "69e706c54e4af33dca4276fbfec58c690b761afc027063de8846f876cfdc4fbf",
+      "bundle_sha256": "993fa2b5549d92b1b702d7445f641a31fc6fab98d98a6ff1c876aa2c95e8b7ff",
       "dest": "assets/audio/sfx/impact-sounds",
-      "file": "bundles/sfx-impact-sounds/sfx-impact-sounds-03ad5b8af3d918b5.tar.zst.age",
+      "file": "bundles/sfx-impact-sounds/sfx-impact-sounds-ab35582c75953e24.tar.zst.age",
       "files": 261,
       "plain_bytes": 1093135,
-      "sha256": "03ad5b8af3d918b5e412ce9ee06f4462643fe5950f2e68c381a1756af35bfb37"
+      "sha256": "ab35582c75953e241f54992fe9f179d9e8df6d0626238f407c99f005456dfd71"
     },
     "sfx-interface-sounds": {
       "bundle_bytes": 525660,
-      "bundle_sha256": "7991c069c66c7e523752409f4068136fb85251bcbd0be8fba0e872a8e33413b3",
+      "bundle_sha256": "a7265a22dbbd5f8039216a2a3e21a5c958a78b448d42e191de144f2415ed3b04",
       "dest": "assets/audio/sfx/interface-sounds",
-      "file": "bundles/sfx-interface-sounds/sfx-interface-sounds-185a028cde05ae64.tar.zst.age",
+      "file": "bundles/sfx-interface-sounds/sfx-interface-sounds-93a42cdd981d75ab.tar.zst.age",
       "files": 201,
       "plain_bytes": 1003190,
-      "sha256": "185a028cde05ae643a6cb6b6d6563ae69e790043c0334427877cbe76d672788f"
+      "sha256": "93a42cdd981d75ab68d1ec85ee31408528bc0328616fc0fa3f09ab8419fecd6d"
     },
     "sfx-music-jingles": {
       "bundle_bytes": 34209,
-      "bundle_sha256": "8e699c7c2ce7ff1a02fc280ba55b4e2b3b0206951713eac4fa46231cbffbec06",
+      "bundle_sha256": "c400eb59f812c73bc0a58d9c7fc08e221fa35b1bf6e0ee6408d6b3054da875b2",
       "dest": "assets/audio/sfx/music-jingles",
-      "file": "bundles/sfx-music-jingles/sfx-music-jingles-30bf1dad996ae683.tar.zst.age",
+      "file": "bundles/sfx-music-jingles/sfx-music-jingles-1cbaa82fe2494c23.tar.zst.age",
       "files": 9,
       "plain_bytes": 52047,
-      "sha256": "30bf1dad996ae6831fd18d1ff47738331762d6a37efd33832f71f2fa1318f082"
+      "sha256": "1cbaa82fe2494c23739a5d255269d4ff5d0175a513ac4d9262039a2b1bd6af8f"
     },
     "sfx-rpg-audio": {
       "bundle_bytes": 509393,
-      "bundle_sha256": "fbaef8931eb7b63fc859877a20393076d483ba3b6bc3611194f1be0159d4cb15",
+      "bundle_sha256": "2fc8137d7ee21078979d2fe93ff416801b31b96be71e08bcff0ac07f824e48cc",
       "dest": "assets/audio/sfx/rpg-audio",
-      "file": "bundles/sfx-rpg-audio/sfx-rpg-audio-3d31028177b841db.tar.zst.age",
+      "file": "bundles/sfx-rpg-audio/sfx-rpg-audio-07e092ff98330d8c.tar.zst.age",
       "files": 103,
       "plain_bytes": 748978,
-      "sha256": "3d31028177b841db3ece2095f08e238f23a24008eaea37447b3e5d7e3efdef20"
+      "sha256": "07e092ff98330d8c03e70526eea8db2fd1f1baf121d2b30fb981bb73d4f34f1d"
     }
   }
 }
