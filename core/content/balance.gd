@@ -14,8 +14,11 @@ const BIOME_LAPS := [1, 6, 11]
 ## Laps per biome (presentation: lap pips per act).
 const LAPS_PER_ACT := 5
 const ACTS := 3
-## The shop opens after completing a multiple of SHOP_EVERY laps, and at every biome change.
-const SHOP_EVERY := 3
+## The shop opens after completing these laps (2026-09-28 rebalance: shops are the main upgrade
+## source now that kills give no drafts): after lap 1, then every 2 laps, plus every biome change.
+const SHOP_LAPS := [1, 3, 5, 6, 8, 10, 12, 14]
+## Short Road (10 laps, biome change at 6).
+const SHOP_LAPS_SHORT := [1, 3, 5, 7, 9]
 ## The mini-boss appears when this lap starts and is gone when the next biome starts.
 const MINIBOSS_LAP := 7
 const BIOME_HEAL_PCT := 0.30
@@ -68,9 +71,12 @@ const THRONE_ELITE_BOSS_PASSIVE_CHANCE := 0.30
 const LAVA_PASS_PCT := 0.02
 const LAVA_LAND_PCT := 0.06
 
-# Enemy scaling by lap (1..15): mult = ENEMY_BASE_SCALE + ENEMY_LAP_STEP*(lap-1)
-const ENEMY_BASE_SCALE := 1.2
-const ENEMY_LAP_STEP := 0.105
+# Enemy scaling by lap (1..15): HP x (ENEMY_BASE_SCALE + ENEMY_LAP_STEP*(lap-1)), attack x
+# (ENEMY_BASE_SCALE + ENEMY_ATK_LAP_STEP*(lap-1)). 2026-09-28 rebalance: a gentle start (no
+# drafts, 2 dice), HP growing faster than attack late (long fights, fewer one-shots).
+const ENEMY_BASE_SCALE := 1.0
+const ENEMY_LAP_STEP := 0.33
+const ENEMY_ATK_LAP_STEP := 0.125
 const ELITE_HP_MULT := 1.3
 const ELITE_ATK_MULT := 1.15
 const ELITE_REWARD_MULT := 1.5
@@ -148,7 +154,7 @@ static func act_for_lap(lap: int) -> int:
 static func is_shop_lap(completed_lap: int) -> bool:
 	if tune_shop != "":
 		return Array(tune_shop.split(",")).has(str(completed_lap))
-	return completed_lap % SHOP_EVERY == 0 or BIOME_LAPS.has(completed_lap + 1)
+	return SHOP_LAPS.has(completed_lap)
 
 ## TEMP tuning dials (sim sweeps)
 static var tune_hp := 1.0
@@ -159,7 +165,7 @@ static var tune_step := ENEMY_LAP_STEP
 static var tune_gold := 1.0
 static var tune_shop := "" # "" = default cadence; else comma list of completed laps
 
-static var tune_atk_step := -1.0
+static var tune_atk_step := ENEMY_ATK_LAP_STEP
 
 ## Enemy HP multiplier at `lap`.
 static func enemy_scale(lap: int) -> float:
@@ -167,7 +173,7 @@ static func enemy_scale(lap: int) -> float:
 
 ## Enemy attack multiplier at `lap` (grows slower than HP late: long fights, fewer one-shots).
 static func enemy_atk_scale(lap: int) -> float:
-	return tune_base + (tune_step if tune_atk_step < 0.0 else tune_atk_step) * (lap - 1)
+	return tune_base + tune_atk_step * (lap - 1)
 
 static func gold_scale(lap: int) -> float:
 	return 1.0 + GOLD_LAP_STEP * (lap - 1)

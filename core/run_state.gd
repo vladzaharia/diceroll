@@ -163,7 +163,7 @@ func act_for_lap(l: int) -> int:
 func is_shop_lap(completed_lap: int) -> bool:
 	if Balance.tune_shop != "":
 		return Array(Balance.tune_shop.split(",")).has(str(completed_lap))
-	return completed_lap % Balance.SHOP_EVERY == 0 or biome_laps().has(completed_lap + 1)
+	return (Balance.SHOP_LAPS_SHORT if mode == "short" else Balance.SHOP_LAPS).has(completed_lap)
 
 ## The standard-run lap of equal difficulty (enemy scaling, pools, gold). == lap in standard.
 func eff_lap(l: int = -1) -> int:

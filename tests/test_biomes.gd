@@ -436,7 +436,7 @@ func test_new_enemy_patterns() -> void:
 	_fight(["wolf_bandit"])
 	c.enemies[0].step = 2
 	c.roll_intent(run.rng, 0)
-	assert_eq(c.enemies[0].intent, {"kind": "attack", "value": int(round(9 * Balance.enemy_scale(1)))}, "wolf pounce")
+	assert_eq(c.enemies[0].intent, {"kind": "attack", "value": int(round(9 * Balance.enemy_atk_scale(1)))}, "wolf pounce")
 	assert_eq(_cycle("hollow_wisp", 2), ["drain", "block"])
 	assert_eq(_cycle("frost_skeleton", 3), ["curse", "attack", "block"])
 	assert_eq(_cycle("ice_archer", 2), ["aim", "chill"])
@@ -514,7 +514,7 @@ func test_burn_ticks_and_decays() -> void:
 	# burn scales at half the attack rate
 	_fight(["ember_imp"], 15)
 	c.enemies[0].step = 0
-	var mult := Balance.enemy_scale(15)
+	var mult := Balance.enemy_atk_scale(15)
 	assert_near(float(c.enemies[0].atk_mult), mult)
 	var found := false
 	for k in 30:

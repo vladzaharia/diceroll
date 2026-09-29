@@ -683,15 +683,16 @@ func test_structure_constants() -> void:
 	for lap in range(1, 15):
 		if Balance.is_shop_lap(lap):
 			shops.append(lap)
-	assert_eq(shops, [3, 5, 6, 9, 10, 12], "every 3 laps plus biome changes")
+	assert_eq(shops, [1, 3, 5, 6, 8, 10, 12, 14], "after lap 1, every 2 laps, plus biome changes")
 
 func test_lap_completion_without_shop() -> void:
 	var f := GameFlow.new_run("knight", 3)
-	var ev := _cross(f, 1)
-	assert_eq(_first(ev, "lap_completed").lap, 1)
-	assert_eq(f.run.lap, 2)
+	f.run.lap = 2
+	var ev := _cross(f, 2)
+	assert_eq(_first(ev, "lap_completed").lap, 2)
+	assert_eq(f.run.lap, 3)
 	for e in ev:
-		assert_true(not (e.type == "offer_opened" and e.offer.kind == "shop"), "no shop after lap 1")
+		assert_true(not (e.type == "offer_opened" and e.offer.kind == "shop"), "no shop after lap 2")
 
 func test_biome_change_regenerates_board() -> void:
 	var f := GameFlow.new_run("knight", 4)

@@ -124,6 +124,9 @@ func _init() -> void:
 			Balance.tune_gold = arg.substr(12).to_float()
 		elif arg.begins_with("--tune-shop="):
 			Balance.tune_shop = arg.substr(12)
+		elif arg.begins_with("--danger="):
+			Bot.danger_lo = arg.substr(9).get_slice(",", 0).to_float()
+			Bot.danger_hi = arg.substr(9).get_slice(",", 1).to_float()
 		elif arg == "--items":
 			track_items = true
 		elif arg == "--verbose":

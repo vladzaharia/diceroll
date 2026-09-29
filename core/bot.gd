@@ -113,9 +113,27 @@ static func tile_score(f: GameFlow, idx: int, crossing: bool) -> float:
 			s = 3.0
 		"minigame":
 			s = 3.5
+	if not t.enemies.is_empty() and String(t.type) != "miniboss":
+		# a naive player still sees a pack of heavy hitters: about two enemy turns vs HP
+		var d := _danger(f, t)
+		if d > danger_hi:
+			s = minf(s, -4.0)
+		elif d > danger_lo:
+			s = minf(s, 0.5)
 	if crossing and f.run.lap < f.run.total_laps():
 		s += 3.0
 	return s
+
+static var danger_hi := 1.2
+static var danger_lo := 0.8
+
+## Rough share of current HP a fight on tile `t` costs in two enemy turns (greedy heuristic).
+static func _danger(f: GameFlow, t: Dictionary) -> float:
+	var am := Balance.enemy_atk_scale(f.run.eff_lap()) * (Balance.ELITE_ATK_MULT if bool(t.get("elite", false)) else 1.0)
+	var hit := 0.0
+	for id in t.enemies:
+		hit += _avg_attack(String(id), am, 0)
+	return hit * 2.0 / maxf(1.0, float(f.run.hp))
 
 ## The move is automatic; the only choice is reroll-or-go.
 static func _board(f: GameFlow) -> Array:
@@ -127,13 +145,29 @@ static func _board(f: GameFlow) -> Array:
 
 static func _combat(f: GameFlow) -> Array:
 	var c := f.combat
-	# focus the weakest living enemy
+	# kill the most dangerous enemy this hand can finish; else focus the weakest
 	var tgt := c.target
 	var low := 1 << 30
+	var cb := c.current_combo(f.run)
+	var est := 0
+	for v in cb.values:
+		est += int(v)
+	est = int(est * float(cb.mult)) + f.run.atk
+	var best_threat := -1
 	for i in c.enemies.size():
-		if c.alive(i) and int(c.enemies[i].hp) < low:
-			low = int(c.enemies[i].hp)
+		if not c.alive(i):
+			continue
+		var e: Dictionary = c.enemies[i]
+		var soak := int(e.hp) + int(e.block)
+		var threat := int(e.intent.value) if ["attack", "chill", "drain"].has(String(e.intent.kind)) else 0
+		if soak <= est and threat > best_threat:
+			best_threat = threat
 			tgt = i
+	if best_threat < 0:
+		for i in c.enemies.size():
+			if c.alive(i) and int(c.enemies[i].hp) < low:
+				low = int(c.enemies[i].hp)
+				tgt = i
 	if tgt != c.target:
 		return ["combat_set_target", tgt]
 	var want: Array[bool] = []

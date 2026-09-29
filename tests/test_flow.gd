@@ -308,12 +308,12 @@ func test_pass_start_lap_and_shop() -> void:
 func test_land_on_start_opens_shop() -> void:
 	var f := _flow()
 	_blank(f)
-	f.run.lap = 9
+	f.run.lap = 8
 	f.run.pos = 20
 	_force_roll(f, 4)
 	f.choose_move(0)
 	assert_eq(f.run.pos, 0)
-	assert_eq(f.run.lap, 10)
+	assert_eq(f.run.lap, 9)
 	assert_eq(f.phase, P.SHOP)
 	f.shop_leave()
 	assert_eq(f.phase, P.BOARD_READY)
