@@ -158,9 +158,13 @@ static func bank_reroll(run: RunState, item: String, effect: String, cap := Bala
 	run.banked_rerolls += 1
 	return [ev(run, item, effect, 1, {"banked": run.banked_rerolls})]
 
-## Ember / Thunder bonus damage (Mage Robe).
+## Ember bonus damage (Mage Robe).
 static func rune_dmg(run: RunState) -> int:
 	return ni(run, "mage_robe", "dmg")
+
+## Thunder bonus damage (Mage Robe III).
+static func thunder_dmg(run: RunState) -> int:
+	return ni(run, "mage_robe", "thunder")
 
 ## Venom rune poison bonus (Mage Robe + Shroud).
 static func venom_bonus(run: RunState) -> int:
@@ -258,9 +262,9 @@ static func turn_start(run: RunState, c: CombatState, prev_block: int) -> Array[
 		rr += 1
 		out.append(ev(run, "round_shield", "light", 1))
 	if t == 1 and sec(run, "shield_tower"):
-		rr -= 1
-	if sec(run, "axe_cleaver"):
-		rr -= 1
+		rr += int(ItemDefs.sec_num("shield_tower", "rerolls"))
+	if t == 1 and sec(run, "axe_cleaver"):
+		rr += int(ItemDefs.sec_num("axe_cleaver", "rerolls"))
 	c.rerolls_left = maxi(0, c.rerolls_left + rr)
 	# Block
 	if has(run, "round_shield"):
@@ -283,7 +287,7 @@ static func turn_start(run: RunState, c: CombatState, prev_block: int) -> Array[
 				c.item_state["bulwark_turn"] = 2
 				c.item_state["bulwark"] = carry
 				out.append_array(gain_block(run, c, carry, "round_shield", "rally"))
-	if t == 1:
+	if t == 1 and (c.elite or c.boss or c.miniboss):
 		var sb := std_block(run)
 		if not sb.is_empty():
 			# count-based Standards don't stack: one Block on turn 1 however many are equipped
@@ -493,8 +497,9 @@ static func attack_mods(run: RunState, c: CombatState, cid: String, pd: Array, e
 	if sec(run, "axe_twinbit") and cid == "two_pair":
 		r.flat += int(ItemDefs.sec_num("axe_twinbit", "flat"))
 		out.append(ev(run, "hand_axe", "double_chop", int(ItemDefs.sec_num("axe_twinbit", "flat"))))
-	if sec(run, "axe_cleaver"):
+	if sec(run, "axe_cleaver") and c.turn == 1:
 		r.flat += int(ItemDefs.sec_num("axe_cleaver", "flat"))
+		out.append(ev(run, "hand_axe", "butcher", int(ItemDefs.sec_num("axe_cleaver", "flat"))))
 	if sec(run, "dagger_bone") and not e.is_empty() and int(e.poison) > 0:
 		r.flat += int(ItemDefs.sec_num("dagger_bone", "flat"))
 		out.append(ev(run, "dagger", "shiv", int(ItemDefs.sec_num("dagger_bone", "flat"))))
@@ -651,9 +656,9 @@ static func after_hit(run: RunState, c: CombatState, tgt0: int, total: int, soak
 		for i in group:
 			if pd[int(i)].rune != "":
 				runed += 1
-		var hn := mini(runed, int(ItemDefs.sec_num("staff_sun", "max")) - int(c.item_state.get("radiant_turn", 0)))
+		var hn := mini(runed, int(ItemDefs.sec_num("staff_sun", "max")) - int(c.item_state.get("radiant", 0)))
 		if hn > 0:
-			c.item_state["radiant_turn"] = int(c.item_state.get("radiant_turn", 0)) + hn
+			c.item_state["radiant"] = int(c.item_state.get("radiant", 0)) + hn
 			out.append_array(heal(run, "arcane_staff", "radiant", hn))
 	# poisons
 	if sec(run, "dagger_venom") and PAIRISH.has(cid):
@@ -774,7 +779,7 @@ static func incoming(run: RunState, c: CombatState, _i: int, v: int, out: Array[
 	if not has(run, "smoke_bomb") or int(c.item_state.get("vanish", 0)) == 1 or v <= 0:
 		return v
 	c.item_state["vanish"] = 1
-	var cut := int(round(v * minf(0.9, n(run, "smoke_bomb", "pct"))))
+	var cut := mini(ni(run, "smoke_bomb", "max"), int(round(v * minf(0.9, n(run, "smoke_bomb", "pct")))))
 	out.append(ev(run, "smoke_bomb", "vanish", cut, {"enemy_idx": _i}))
 	return v - cut
 

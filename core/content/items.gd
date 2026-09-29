@@ -46,9 +46,9 @@ static var POUCH_TIER := 1
 ## Sim-only number overrides (tools/sim.gd --item=<item>.<key>=I/II/III or <variant>.<key>=v):
 ## "item.key" -> [I, II, III] rule numbers, "variant.key" -> a secondary number.
 static var TUNE := {}
-## The Standard variant of a count-based item: Block on turn 1 (one Block total however many such
-## Standards are equipped). The design's 2 per item measured far above the x1.2 of the other
-## Standards (docs/plans/balance.md, Armory).
+## The Standard variant of a count-based item: Block on turn 1 of elite, mini-boss and boss fights
+## (one Block total however many such Standards are equipped). The design's Block 2 on every
+## fight's turn 1 measured +2-3 pp per item, above every variant (docs/plans/balance.md, Armory).
 static var STD_BLOCK := 1
 ## Belt Pouch: the 2nd trinket slot.
 const POUCH_COST := 400
@@ -151,7 +151,7 @@ const ITEMS := {
 	"druid_staff": {"name": "Druid Staff", "slot": "weapon", "hands": 2, "style": "magic", "model": "druid_staff",
 		"affinity": ["druid"], "std": "block2",
 		"effect": {"rule": "grove", "name": "Grove", "desc": "At each biome change, raise the lowest face of {dice} dice by 1.",
-			"n": {"dice": [1, 1, 2]}, "scale": []}},
+			"n": {"dice": [1, 1, 1]}, "scale": []}},
 	"wand": {"name": "Wand", "slot": "weapon", "hands": 1, "style": "magic", "model": "wand",
 		"affinity": [], "std": "x1.2",
 		"effect": {"rule": "spark", "name": "Spark", "desc": "The first attack each fight with a multiplier of 2+: +{mult} multiplier.",
@@ -203,8 +203,8 @@ const ITEMS := {
 			"n": {"dmg": [1, 1, 2]}, "scale": ["dmg"]}},
 	"smoke_bomb": {"name": "Smoke Bomb", "slot": "offhand", "mount": "belt", "model": "smokebomb",
 		"affinity": [], "std": "x1.2",
-		"effect": {"rule": "vanish", "name": "Vanish", "desc": "The first enemy attack of each fight deals {pct%} less.",
-			"n": {"pct": [0.15, 0.2, 0.3]}, "scale": ["pct"]}},
+		"effect": {"rule": "vanish", "name": "Vanish", "desc": "The first enemy attack of each fight deals {pct%} less (max {max}).",
+			"n": {"pct": [0.2, 0.25, 0.3], "max": [1, 1, 1]}, "scale": ["pct"]}},
 	"shuriken": {"name": "Shuriken", "slot": "offhand", "mount": "belt", "model": "Ninja_Shuriken",
 		"affinity": ["ninja"], "std": "x1.2",
 		"effect": {"rule": "barrage", "name": "Barrage",
@@ -250,8 +250,8 @@ const ITEMS := {
 		"effect": {"rule": "brawn", "name": "Brawn", "desc": "Heavy dice in the attack: +{pips} damage each after the multiplier (max {dice}).",
 			"n": {"pips": [1, 1, 1], "dice": [2, 2, 2]}, "scale": []}},
 	"mage_robe": {"name": "Mage Robe", "slot": "body", "model": "Mage_Body", "affinity": ["mage"], "std": "",
-		"effect": {"rule": "rune_woven", "name": "Rune-woven", "desc": "Ember and Thunder deal +{dmg}; Venom poison +{poison}.",
-			"n": {"dmg": [1, 1, 1], "poison": [0, 0, 1]}, "scale": []}},
+		"effect": {"rule": "rune_woven", "name": "Rune-woven", "desc": "Ember deals +{dmg}; tier III: Thunder too.",
+			"n": {"dmg": [1, 1, 1], "thunder": [0, 0, 1], "poison": [0, 0, 0]}, "scale": []}},
 	"rogue_leathers": {"name": "Rogue Leathers", "slot": "body", "model": "Rogue_Body", "affinity": ["rogue"], "std": "",
 		"effect": {"rule": "nimble", "name": "Nimble", "desc": "Keep 2+ dice all turn: bank +1 reroll, {max} time(s) per fight.",
 			"n": {"max": [1, 1, 1]}, "scale": []}},
@@ -294,8 +294,8 @@ const ITEMS := {
 		"effect": {"rule": "haggle", "name": "Haggle", "desc": "Restocks cost 7; tier II: 1 free restock per shop; tier III: shops +1 item.",
 			"n": {"restock": [7, 7, 7], "free": [0, 1, 1], "items": [0, 0, 1]}, "scale": []}},
 	"healers_flask": {"name": "Healer's Flask", "slot": "trinket", "model": "potion_medium_red", "affinity": [], "std": "",
-		"effect": {"rule": "apothecary", "name": "Apothecary", "desc": "Every shop offers a potion; potions heal +{heal%}.",
-			"n": {"heal": [0.0, 0.05, 0.10]}, "scale": []}},
+		"effect": {"rule": "apothecary", "name": "Apothecary", "desc": "Every shop offers a potion; tier III: potions heal +{heal%}.",
+			"n": {"heal": [0.0, 0.0, 0.03]}, "scale": []}},
 	"skeleton_key": {"name": "Skeleton Key", "slot": "trinket", "model": "key_gold", "affinity": [], "std": "",
 		"effect": {"rule": "unlock", "name": "Unlock",
 			"desc": "Chest runes: 1 of 4; tier II: chest gold x1.25; tier III: the first chest per biome is a rune chest.",
@@ -351,12 +351,12 @@ const VARIANTS := {
 	"greatsword_plain": {"item": "greatsword", "name": "Steel Greatsword", "model": "sword_2handed", "sec": "steel", "sec_name": "Steel",
 		"desc": "+3 max HP; Great Arc -0.05.", "unlock": {"mastery": 15}, "n": {"max_hp": 3, "mult": -0.05}},
 	"greatsword_zwei": {"item": "greatsword", "name": "Zweihander", "model": "sword_E", "sec": "reach", "sec_name": "Reach",
-		"desc": "Three of a Kind or better also splashes 25% to the other enemies.", "unlock": {"mastery": 45}, "n": {"pct": 0.25}},
+		"desc": "Three of a Kind or better also splashes 10% to the other enemies.", "unlock": {"mastery": 45}, "n": {"pct": 0.1}},
 	# Hand Axe
 	"axe_twinbit": {"item": "hand_axe", "name": "Twinbit Axe", "model": "axe_A", "sec": "double_chop", "sec_name": "Double Chop",
 		"desc": "Two Pair: +3 damage after the multiplier.", "unlock": {"mastery": 15}, "n": {"flat": 3}},
 	"axe_cleaver": {"item": "hand_axe", "name": "Cleaver", "model": "axe_C", "sec": "butcher", "sec_name": "Butcher",
-		"desc": "-1 combat reroll each turn; +4 damage.", "unlock": {"mastery": 45}, "n": {"rerolls": -1, "flat": 4}},
+		"desc": "-1 combat reroll on turn 1; +2 damage on turn 1.", "unlock": {"mastery": 45}, "n": {"rerolls": -1, "flat": 2}},
 	"axe_bone": {"item": "hand_axe", "name": "Bone Axe", "model": "Skeleton_Axe", "sec": "grisly", "sec_name": "Grisly",
 		"desc": "Cleave's carried damage also applies 2 Poison.", "unlock": {"feat": "skeletons_300"}, "n": {"poison": 2}},
 	# Great Axe
@@ -365,7 +365,7 @@ const VARIANTS := {
 	"axe_jagged": {"item": "great_axe", "name": "Jagged Axe", "model": "axe_D", "sec": "bleed", "sec_name": "Bleed",
 		"desc": "Each Rampage stack also applies 1 Poison.", "unlock": {"mastery": 45}, "n": {"poison": 1}},
 	"axe_golem": {"item": "great_axe", "name": "Golem Axe", "model": "Skeleton_Golem_Axe", "sec": "crushing", "sec_name": "Crushing",
-		"desc": "Rampage resets only on a kill (not on a target change); -3 max HP.", "unlock": {"feat": "bone_golem_10"}, "n": {"max_hp": -3}},
+		"desc": "Rampage resets only on a kill (not on a target change); -1 max HP.", "unlock": {"feat": "bone_golem_10"}, "n": {"max_hp": -1}},
 	# Warhammer
 	"hammer_smith": {"item": "warhammer", "name": "Smith's Hammer", "model": "hammer_A", "sec": "tempered", "sec_name": "Tempered",
 		"desc": "A Crush die showing 6 counts +1 pip more.", "unlock": {"mastery": 15}, "n": {"pip": 1}},
@@ -398,7 +398,7 @@ const VARIANTS := {
 	"staff_frost": {"item": "arcane_staff", "name": "Frost Staff", "model": "staff_B", "sec": "rime", "sec_name": "Rime",
 		"desc": "A runed die showing 1 Freezes the target (once per fight).", "unlock": {"mastery": 45}, "n": {}},
 	"staff_sun": {"item": "arcane_staff", "name": "Sun Staff", "model": "staff_D", "sec": "radiant", "sec_name": "Radiant",
-		"desc": "Each runed die in the group heals 1 (max 2 per turn).", "unlock": {"feat": "lich_staff"}, "n": {"max": 2}},
+		"desc": "Each runed die in the group heals 1 (max 1 per fight).", "unlock": {"feat": "lich_staff"}, "n": {"max": 1}},
 	"staff_bone": {"item": "arcane_staff", "name": "Bone Staff", "model": "Skeleton_Staff", "sec": "soul", "sec_name": "Soul",
 		"desc": "Each kill adds +1 damage to your next attack (max +3).", "unlock": {"class": "necromancer", "or_mastery": 90},
 		"n": {"per": 1, "max": 3}},
@@ -433,7 +433,7 @@ const VARIANTS := {
 	"shield_heraldic": {"item": "round_shield", "name": "Heraldic Shield", "model": "shield_B", "sec": "rally", "sec_name": "Rally",
 		"desc": "Bulwark Block left after turn 1 carries into turn 2.", "unlock": {"mastery": 45}, "n": {}},
 	"shield_tower": {"item": "round_shield", "name": "Tower Shield", "model": "shield_C", "sec": "wall", "sec_name": "Wall",
-		"desc": "Bulwark also on turn 2 at half; -1 reroll on turn 1.", "unlock": {"mastery": 90}, "n": {"share": 0.5, "rerolls": -1}},
+		"desc": "Bulwark also on turn 2; -1 reroll on turn 1.", "unlock": {"mastery": 90}, "n": {"share": 1.0, "rerolls": -1}},
 	"shield_bone": {"item": "round_shield", "name": "Bone Buckler", "model": "Skeleton_Shield_Small_A", "sec": "rattle", "sec_name": "Rattle",
 		"desc": "Bulwark Block broken by an attack deals 2 back.", "unlock": {"feat": "skeletons_300"}, "n": {"dmg": 2}},
 	# Spiked Shield
@@ -639,7 +639,7 @@ static func _fmt(v: float) -> String:
 static func std_text(item: String) -> String:
 	match String(def(item).get("std", "")):
 		"x1.2": return "Standard: base numbers x1.2."
-		"block2": return "Standard: Block %d on turn 1 (doesn't stack)." % STD_BLOCK
+		"block2": return "Standard: Block %d on turn 1 of elite and boss fights (doesn't stack)." % STD_BLOCK
 	return ""
 
 ## How a variant is earned, as text (for locked chips).

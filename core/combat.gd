@@ -595,7 +595,7 @@ func attack(run: RunState) -> Array[Dictionary]:
 				if a.is_empty():
 					break
 				var j: int = run.rng.pick(a)
-				var thd := int(eff[i]) + (ItemLogic.rune_dmg(run) if int(eff[i]) > 0 else 0)
+				var thd := int(eff[i]) + (ItemLogic.thunder_dmg(run) if int(eff[i]) > 0 else 0)
 				ev.append(_rune(i, "thunder", "damage_random", thd))
 				ev.append_array(damage_enemy(j, thd, "thunder", run))
 	if run.has_passive("gold_tooth"):

@@ -478,7 +478,7 @@ func test_smoke_bomb_thorns_and_catch() -> void:
 	_dice([1, 3, 6])
 	c.target = 0
 	var ev := c.attack(run)
-	var cut := int(round(10 * ItemDefs.num("smoke_bomb", "pct", 3, "smoke_bomb")))
+	var cut := mini(int(ItemDefs.num("smoke_bomb", "max", 3, "smoke_bomb")), int(round(10 * ItemDefs.num("smoke_bomb", "pct", 3, "smoke_bomb"))))
 	assert_eq(hp0 - run.hp, 10 - cut, "Vanish cuts the first hit")
 	assert_eq(_all(ev, "item_triggered", "vanish").size(), 1)
 	_fight("knight", {"offhand": ["spiked_shield", "shield_dragon", 2]})
@@ -608,3 +608,23 @@ func test_compass_reroll_starts_with_the_second_biome() -> void:
 	assert_eq(int(f.run.meta.lap_rerolls), 1)
 	assert_eq(f.run.lap_rerolls, 0, "none in the first biome")
 	assert_eq(f.run.lap_reroll_refill(true), 1, "a new biome refills it")
+
+func test_old_saves_keep_their_traits_as_items() -> void:
+	var m := MetaRun.normalize({"asc": 0, "traits": ["blade_pair", "helm_last_stand", "boots_pair_pick", "charm_cheap_restock"]})
+	assert_eq(String(m.items.weapon.id), "sword")
+	assert_eq(String(m.items.offhand.id), "round_shield")
+	assert_eq(String(m.items.trinket.id), "traders_map")
+	assert_eq(MetaRun.normalize({"asc": 0}).items, {}, "no traits, no items")
+
+func test_bot_meta_loadouts() -> void:
+	var p := Profile.from_dict(MetaPresets.get_preset("max"))
+	var camp := Camp.new(p)
+	for cmd in BotMeta.equip_cmds(p, "knight"):
+		assert_eq(String(camp.apply(cmd)[0].type), "item_equipped", str(cmd))
+	var lo := p.loadout_for("knight")
+	assert_eq(String(lo.trinket), String(BotMeta.TRINKET_PREF[0]), "the campaign bot's favourite trinket")
+	assert_true(String(lo.trinket2) != "" and String(lo.trinket2) != String(lo.trinket), "the pouch gets the next one")
+	var best := BotMeta.best_loadout(p, "mage")
+	assert_true(String(best.weapon.id) != "", "a weapon")
+	var fresh := Profile.fresh()
+	assert_eq(BotMeta.equip_cmds(fresh, "knight"), [], "the Tankard is already on")
