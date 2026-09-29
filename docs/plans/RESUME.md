@@ -125,6 +125,10 @@ Remaining / to verify:
   - WP-F2: enemy variety. Real KayKit Skeletons, Adventurers EXTRA, Mystery Monthly characters; 2–4 variants per enemy id.
   - WP-F3: UI and board polish with the new assets, plus responsive layout. Fixes the matrix bugs (iPhone empty band, narrow tray at 1080p, HUD overlap at 150% zoom) and adds a UI-size setting.
 - **Classes, enemies and skins** (Vlad): a design agent is writing `docs/design/2026-09-28-classes-enemies-skins.md` covering 4–6 new classes (Ranger, Druid, Engineer, Paladin, Ninja, Necromancer…), 4–8 new enemies (Orc Raider, Werewolf, …), and milestone-earned skins from the alt textures. After Vlad reviews it, the order is: core rules and balance, then presentation (models, class select, Camp wardrobe). WP-F2 already uses the recolours for enemy variants.
+- **Also in progress:**
+  - **Core: classes, enemies, affixes, skins.** Follows docs/design/2026-09-28-classes-enemies-skins.md (final at 8a3a508/f512d8d): 7 new classes including the secret Monster Kid, the Paladin "Oathbound", 8 enemies, 10 affixes, skins (profile v2). It also adds 6 new pets (pebble_golem, frost_mote, wick, tinker_gear, grimoire, cauldron), for 12 in total.
+  - **WP-E4:** models for the 6 new pets.
+  - **WP-E1 additions:** a progressive camp (ruins → built, NPCs per unlocked class, roaming pets, milestone decor, reveal moments), an animated "camp life" (NPC schedules, walking, sparring, chatting, pets playing, ambient life), and a data-driven Pet Den and classes.
 - **Queued after WP-E2 merges: Minigames 2.0.** Bubble Shooter, Plinko, Shell Game, Memory Match, Fishing, Lucky Wheel and High-Low Ladder (core rules + UIs + Arcade unlocks), reusing E2's framework.
 - **Assets:** everything third-party lives in git-ignored `third_party/` (docs/ASSETS.md). A fresh worktree needs `THIRD_PARTY=/Users/vlad/Repos/diceroll/third_party tools/import_assets.sh`.
 - **Next:**
