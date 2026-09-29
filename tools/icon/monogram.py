@@ -382,6 +382,228 @@ CONCEPTS = {
 }
 
 
+# ---- D-die + looping board path (branch A) and "just the pips" + path (branch B) -----------------
+
+# Tile-type colours (game/world/tile_style.gd), sRGB hex
+T_START, T_ENEMY, T_CHEST, T_EVENT, T_CAMP, T_PORTAL = "#fad675", "#e6423d", "#478ffa", "#3dccc7", "#75d14d", "#9e66fa"
+T_CREAM, T_SAND = "#efe6cf", "#d9ccab"
+GAME_CYCLE = [T_ENEMY, T_CHEST, T_SAND, T_EVENT, T_ENEMY, T_CAMP, T_SAND, T_PORTAL]
+
+
+def _poly_len(poly):
+    return sum(math.dist(poly[i], poly[i + 1]) for i in range(len(poly) - 1))
+
+
+def _sample(poly, n, offset=0.0):
+    """n points evenly spaced by arc length along a closed polyline (first == last)."""
+    total = _poly_len(poly)
+    out = []
+    for k in range(n):
+        u = (offset + total * k / n) % total
+        for i in range(len(poly) - 1):
+            L = math.dist(poly[i], poly[i + 1])
+            if u <= L or i == len(poly) - 2:
+                t = u / L if L else 0
+                out.append((poly[i][0] + (poly[i + 1][0] - poly[i][0]) * t, poly[i][1] + (poly[i + 1][1] - poly[i][1]) * t))
+                break
+            u -= L
+    return out
+
+
+def ring_poly(shape, x0, y0, x1, y1, rc=0.0):
+    """Closed polyline of the ring's centre line. Starts at the bottom-left corner, runs up the left
+    side (clockwise on screen), like the game's board which starts bottom-left."""
+    if shape == "square":
+        return [(x0, y1), (x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+    if shape == "rounded":
+        p = []
+        cs = [((x0 + rc, y0 + rc), 180), ((x1 - rc, y0 + rc), 270), ((x1 - rc, y1 - rc), 0), ((x0 + rc, y1 - rc), 90)]
+        p.append((x0, y1 - rc))
+        for (cx, cy), a0 in cs:
+            for i in range(13):
+                a = math.radians(a0 + 90 * i / 12)
+                p.append((cx + rc * math.cos(a), cy + rc * math.sin(a)))
+        p.append((x0, y1 - rc))
+        return p
+    if shape == "circle":
+        cx, cy, r = (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2
+        return [(cx + r * math.cos(math.radians(135 + 360 * i / 96)), cy - r * math.sin(math.radians(135 + 360 * i / 96)))
+                for i in range(97)]
+    if shape == "d":
+        r = (y1 - y0) / 2
+        xr = x1 - r
+        p = [(x0, y1), (x0, y0), (xr, y0)]
+        for i in range(1, 36):
+            a = -math.pi / 2 + math.pi * i / 36
+            p.append((xr + r * math.cos(a), y0 + r + r * math.sin(a)))
+        p += [(xr, y1), (x0, y1)]
+        return p
+    raise ValueError(shape)
+
+
+def tile_svg(x, y, t, fill, glow=False, pip=None, rnd=0.24, round_tile=False):
+    o = []
+    if glow:
+        o.append('<circle cx="%.1f" cy="%.1f" r="%.1f" fill="url(#gg)"/>' % (x, y, t * 1.05))
+    lip = t * 0.13
+    sw = max(6.0, t * 0.085)
+    if round_tile:
+        o.append('<circle cx="%.1f" cy="%.1f" r="%.1f" fill="%s"/>' % (x, y + lip, t / 2, INK))
+        o.append('<circle cx="%.1f" cy="%.1f" r="%.1f" fill="%s" stroke="%s" stroke-width="%.1f"/>' % (x, y, t / 2, fill, INK, sw))
+    else:
+        o.append('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="%.1f" fill="%s"/>'
+                 % (x - t / 2, y - t / 2 + lip, t, t, t * rnd, INK))
+        o.append('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="%.1f" fill="%s" stroke="%s" stroke-width="%.1f"/>'
+                 % (x - t / 2, y - t / 2, t, t, t * rnd, fill, INK, sw))
+    if pip:
+        o.append('<circle cx="%.1f" cy="%.1f" r="%.1f" fill="%s"/>' % (x, y, t * 0.2, pip))
+    return "".join(o)
+
+
+def big_pip(x, y, r, col=GOLD, glow=False):
+    o = []
+    if glow:
+        o.append('<circle cx="%.1f" cy="%.1f" r="%.1f" fill="url(#gg)"/>' % (x, y, r * 1.9))
+    o.append('<circle cx="%.1f" cy="%.1f" r="%.1f" fill="%s"/>' % (x, y + r * 0.14, r + r * 0.16, INK))
+    o.append('<circle cx="%.1f" cy="%.1f" r="%.1f" fill="%s" stroke="%s" stroke-width="%.1f"/>' % (x, y, r, col, INK, r * 0.16))
+    o.append('<circle cx="%.1f" cy="%.1f" r="%.1f" fill="#ffffff" opacity="0.45"/>' % (x - r * 0.32, y - r * 0.32, r * 0.22))
+    return "".join(o)
+
+
+def hero_token(x, y, s):
+    """A tiny pawn standing on a tile (feet on the tile's top face)."""
+    return ('<g transform="translate(%.1f %.1f) scale(%.2f)">'
+            '<ellipse cx="0" cy="4" rx="34" ry="10" fill="%s" opacity="0.5"/>'
+            '<path d="M -30 4 C -30 -30 -16 -50 0 -50 C 16 -50 30 -30 30 4 Z" fill="%s" stroke="%s" stroke-width="9"/>'
+            '<circle cx="0" cy="-70" r="24" fill="%s" stroke="%s" stroke-width="9"/></g>'
+            % (x, y, s, INK, CREAM, INK, CREAM, INK))
+
+
+def colours(scheme, n, start=0):
+    if scheme == "gold":
+        return [T_START if i == start else (GOLD if i % 2 else T_CREAM) for i in range(n)]
+    if scheme == "cream":
+        return [T_START if i == start else T_CREAM for i in range(n)]
+    if scheme == "game":
+        return [T_START if i == start else GAME_CYCLE[(i - 1) % len(GAME_CYCLE)] for i in range(n)]
+    if scheme == "navy":
+        return [GOLD_BRIGHT if i == start else ("#2e357e" if i % 2 else NAVY_2) for i in range(n)]
+    raise ValueError(scheme)
+
+
+def d_tiles(x0, y0, x1, y1, n_stem=4):
+    """Tile centres on a D: a straight stem with a tile on each corner, top/bottom bars and the bowl,
+    all at (about) the stem's spacing, so corner tiles never collide. Starts bottom-left."""
+    h = y1 - y0
+    sp = h / (n_stem - 1)
+    r = h / 2
+    xr = x1 - r
+    out = [(x0, y1 - i * sp) for i in range(n_stem)]
+    bar = xr - x0
+    nb = max(1, round(bar / sp))
+    out += [(x0 + j * bar / nb, y0) for j in range(1, nb + 1)]
+    na = max(2, round(math.pi * r / sp))
+    out += [(xr + r * math.cos(-math.pi / 2 + math.pi * k / na), y0 + r + r * math.sin(-math.pi / 2 + math.pi * k / na))
+            for k in range(1, na)]
+    out += [(xr - j * bar / nb, y1) for j in range(0, nb)]
+    return out, sp
+
+
+def loop_page(shape="square", n=12, t=120, box=(150, 150, 874, 874), rc=90, scheme="gold", die=None,
+              pips=None, glow_tile=None, hero_tile=None, bg="gold", gap=None, arc=False, round_tiles=False,
+              tile_pips=None, offset=0.0, extra_front="", extra_back="", fills=None, tf=0.78):
+    defs, body = background(bg, "light")
+    defs += blur_filter("sh", 20)
+    defs += radial("gg", [(0, GOLD_BRIGHT, 0.95), (0.45, GOLD, 0.55), (1, GOLD, 0)], 0.5, 0.5, 0.5)
+    x0, y0, x1, y1 = box
+    poly = ring_poly(shape, x0, y0, x1, y1, rc)
+    m = n + (gap or 0)
+    if tf and m:  # tile size from the spacing along the path: tiles nearly touch, like the real board
+        t = _poly_len(poly) / m * tf
+    ptsl = _sample(poly, m, offset)[:n]
+    if shape == "d" and n == 0:  # explicit D layout (corner tiles on the stem)
+        ptsl, sp = d_tiles(x0, y0, x1, y1)
+        n = len(ptsl)
+        t = sp * (tf or 0.78)
+    cols = colours(scheme, max(n, 1))
+    for k, v in (fills or {}).items():
+        cols[k] = v
+    out = [body, extra_back]
+    if arc:
+        # the path opens: the missing tiles become a gold motion arc into the die
+        a, b = _sample(poly, m, offset)[n - 1], _sample(poly, m, offset)[0]
+        out.append('<path d="M %.1f %.1f Q %.1f %.1f %.1f %.1f" fill="none" stroke="%s" stroke-width="%.1f" '
+                   'stroke-linecap="round" stroke-dasharray="1 %.1f"/>'
+                   % (a[0], a[1], (a[0] + b[0]) / 2 + 60, (a[1] + b[1]) / 2 + 60, b[0], b[1], GOLD_BRIGHT, t * 0.28, t * 0.55))
+    for i, (x, y) in enumerate(ptsl):
+        pip = None
+        if tile_pips and i in tile_pips:
+            pip = tile_pips[i]
+        out.append(tile_svg(x, y, t, cols[i], glow=(glow_tile == i), pip=pip, round_tile=round_tiles))
+    ddefs = ""
+    if die is not None:
+        dd, ds = die.svg("soft")
+        ddefs += dd
+        out.append(ds)
+    if pips:
+        for (x, y, r, col, g) in pips:
+            out.append(big_pip(x, y, r, col, g))
+    if hero_tile is not None:
+        hx, hy = ptsl[hero_tile]
+        out.append(hero_token(hx, hy + t * 0.12, t / 150))
+    out.append(extra_front)
+    return svg_doc("".join(out), defs + ddefs)
+
+
+def g10_die(scale, cx=512, cy=512, rot=-6, colour="gold"):
+    return DDie(cx, cy, scale, rot, colour, "slab")
+
+
+DIAG = lambda c, s, r, col=GOLD, g=False: [(c[0] - s, c[1] - s, r, col, g), (c[0], c[1], r, col, g), (c[0] + s, c[1] + s, r, col, g)]
+
+COMBOS = {
+    # --- A: D-die + path
+    "A1_sq12_gold": lambda: loop_page("square", 12, 0, (190, 190, 834, 834), scheme="gold", die=g10_die(0.52)),
+    "A2_sq16_game": lambda: loop_page("square", 16, 0, (175, 175, 849, 849), scheme="game", die=g10_die(0.58)),
+    "A3_round12_glow": lambda: loop_page("rounded", 12, 0, (190, 190, 834, 834), rc=150, scheme="cream",
+                                         die=g10_die(0.52), glow_tile=0),
+    "A4_dpath14": lambda: loop_page("d", 14, 0, (180, 190, 860, 850), scheme="cream", die=g10_die(0.5, 490, 520),
+                                    glow_tile=0),
+    "A5_circle10_hero": lambda: loop_page("circle", 10, 0, (195, 195, 829, 829), scheme="game",
+                                          die=g10_die(0.52), hero_tile=0),
+    "A6_sq8_overlap": lambda: loop_page("square", 8, 0, (225, 225, 799, 799), scheme="gold",
+                                        die=g10_die(0.8, 570, 570)),
+    "A7_open_arc": lambda: loop_page("rounded", 10, 0, (190, 190, 834, 834), rc=150, scheme="game", gap=2,
+                                     arc=True, die=g10_die(0.52), offset=40),
+    "A8_inverse_sq12": lambda: loop_page("square", 12, 0, (190, 190, 834, 834), scheme="navy", bg="inverse",
+                                         die=g10_die(0.52, colour="inverse")),
+    # --- B: just the pips
+    "B1_pips_in_ring": lambda: loop_page("square", 12, 0, (190, 190, 834, 834), scheme="cream",
+                                         pips=DIAG((512, 512), 115, 62)),
+    "B2_pip_ring": lambda: loop_page("rounded", 12, 0, (190, 190, 834, 834), rc=170, scheme="cream", round_tiles=True,
+                                     glow_tile=0, pips=[(512, 512, 120, GOLD, False)]),
+    "B3_one_pip_sq8": lambda: loop_page("square", 8, 0, (225, 225, 799, 799), scheme="gold",
+                                        pips=[(512, 512, 118, GOLD, True)]),
+    "B4_travelling_pip": lambda: loop_page("square", 12, 0, (190, 190, 834, 834), scheme="cream", glow_tile=0,
+                                           tile_pips={0: NAVY}, pips=DIAG((512, 512), 112, 54, CREAM)),
+    "B5_start_target": lambda: loop_page("square", 12, 0, (190, 190, 834, 834), scheme="cream",
+                                         tile_pips={0: NAVY, 5: CREAM}, fills={5: T_ENEMY},
+                                         extra_front=('<path d="M 300 690 Q 380 400 620 330" fill="none" stroke="%s" '
+                                                      'stroke-width="30" stroke-linecap="round" stroke-dasharray="2 56"/>'
+                                                      % GOLD_BRIGHT)),
+    "B6_dpath_pips": lambda: loop_page("d", 14, 0, (180, 190, 860, 850), scheme="cream", glow_tile=0,
+                                       pips=DIAG((490, 520), 100, 52)),
+    # --- refinements of the top 3 (fewer, bigger tiles for 29 px; one glowing start tile)
+    "R1_dpath_pips": lambda: loop_page("d", 0, 0, (215, 210, 845, 830), scheme="gold", glow_tile=0, tf=0.76,
+                                       pips=DIAG((490, 520), 96, 58)),
+    "R2_dpath_die": lambda: loop_page("d", 0, 0, (215, 210, 845, 830), scheme="gold", glow_tile=0, tf=0.76,
+                                      die=g10_die(0.5, 500, 522)),
+    "R3_sq8_overlap": lambda: loop_page("square", 8, 0, (240, 240, 784, 784), scheme="gold", glow_tile=0, tf=0.7,
+                                        die=g10_die(0.66, 590, 590)),
+}
+CONCEPTS.update(COMBOS)
+
+
 def to_png(svg, out, size=1024):
     if out.endswith(".svg"):
         open(out, "w").write(svg)
