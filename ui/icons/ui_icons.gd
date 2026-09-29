@@ -40,6 +40,10 @@ static func default_color(icon: String) -> Color:
 		var tk := icon.substr(6)
 		if UiPalette.TRAIT.has(tk):
 			return UiPalette.TRAIT[tk][1]
+	if icon.begins_with("class_"):
+		return UiPalette.class_color(icon.substr(6))
+	if icon.begins_with("mech_"):
+		return ClassInfo.mechanic_color(icon.substr(5))
 	if icon.begins_with("intent_"):
 		var k := icon.substr(7)
 		if UiPalette.INTENT.has(k):
@@ -108,4 +112,11 @@ static func biome_icon(id: String) -> String:
 
 
 static func class_icon(class_id: String) -> String:
+	if exists("class_" + class_id):
+		return "class_" + class_id
 	return {"knight": "shield", "barbarian": "axe", "mage": "staff", "rogue": "dagger"}.get(class_id, "sword")
+
+
+## Icon of a class mechanic (HeroDefs mechanic id; "" = the class has none).
+static func mechanic_icon(mechanic: String) -> String:
+	return "mech_" + mechanic if exists("mech_" + mechanic) else "star"

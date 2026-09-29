@@ -7,12 +7,7 @@ extends Control
 signal class_chosen(class_id: String)
 signal back_pressed
 
-const TAGLINES := {
-	"knight": "Sturdy and steady. His Guard die blocks every turn.",
-	"barbarian": "Hits hard: a Heavy die and +2 ATK on every attack.",
-	"mage": "Ember scorches every foe, Echo boosts combos.",
-	"rogue": "Venom stacks poison, Lucky banks extra rerolls.",
-}
+const TAGLINES := ClassInfo.TAGLINES
 
 var selected := "knight"
 var start_btn: GameButton

@@ -43,7 +43,7 @@ static func of(p: Profile) -> Dictionary:
 	return {
 		"stage": stage,
 		"stations": {"armory": _armory(p), "workshop": _workshop(p), "pet_den": _pet_den(p), "arcade": _arcade(p)},
-		"hero": hero, "classes": classes, "locked_classes": locked,
+		"hero": hero, "classes": classes, "locked_classes": locked, "skins": _skins(p, classes),
 		"pets": (p.unlocks.get("pets", []) as Array).duplicate(), "pet": String(p.loadout.get("pet", "")),
 		"pet_levels": _pet_levels(p),
 		"bosses": (f.get("boss", []) as Array).duplicate(), "minibosses": (f.get("miniboss", []) as Array).duplicate(),
@@ -161,4 +161,12 @@ static func diff(a: Dictionary, b: Dictionary) -> Array:
 	for id in b.bosses:
 		if not (a.bosses as Array).has(id):
 			out.append({"kind": "boss", "id": id, "text": "A trophy: %s" % CampInfo.name_of("bosses", String(id))})
+	return out
+
+
+## Worn look per owned class: {class: [skin, prestige]} (the Wardrobe's choice).
+static func _skins(p: Profile, classes: Array) -> Dictionary:
+	var out := {}
+	for id in classes:
+		out[String(id)] = [p.equipped_skin(String(id)), p.prestige_on(String(id))]
 	return out

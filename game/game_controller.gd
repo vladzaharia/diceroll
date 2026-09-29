@@ -143,7 +143,11 @@ func show_title() -> void:
 	tray.visible = false
 	var rng := Rng.new(int(Time.get_unix_time_from_system()) % 100000 + 7)
 	var b := Board.generate(rng, 1)
-	board.hero_class = HeroDefs.IDS[randi() % HeroDefs.IDS.size()]
+	# never the secret class on the title (it would spoil the Monster Kid)
+	var shown := HeroDefs.IDS.filter(func(id: String) -> bool: return not bool(HeroDefs.DATA[id].get("secret", false)))
+	board.hero_class = String(shown[randi() % shown.size()])
+	board.hero_skin = "default"
+	board.hero_prestige = false
 	board.hero_idx = 0
 	board.variant_seed = randi()
 	board.build(1, b.to_dict().tiles)
@@ -199,6 +203,8 @@ func start(f: GameFlow) -> void:
 	ui.combat_hud.modulate.a = 1.0
 	overlay.vignette(0.0, 0.01)
 	board.hero_class = f.run.class_id
+	board.hero_skin = f.run.skin
+	board.hero_prestige = f.run.skin_prestige
 
 	board.hero_idx = f.run.pos
 	EnemyLooks.run_seed = f.run.seed  # per-run enemy variants
