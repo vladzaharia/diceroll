@@ -255,3 +255,4 @@ Principles: no premium currency, no paid or random rolls for power. Every upgrad
   - rewards on par with each other;
   - Arcade unlocks.
 - **New boards (Vlad):** Orc Warcamp, Deep Mines, Moonlit Woods and Sunscorched Ruins join the six biomes (design: docs/design/2026-09-29-new-biomes.md). **Boards with elevation** (terraces, ramps, bridges from the Forest hill kits) follow as a later pass.
+- **No AUTO in minigames (Vlad):** minigames can't be auto-played. There is no AUTO button, and the AUTO pilot pauses at every minigame ("Your turn: play the minigame") so the player always plays it by hand. `minigame_auto` stays for the sim and tests only.
