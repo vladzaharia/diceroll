@@ -18,6 +18,7 @@ cd "$ROOT"
 version="$1"
 out="$2"
 mkdir -p "$out"
+out="$(cd "$out" && pwd)" # absolute: the zips below run from other directories
 tmp="$(mktemp -d "${RUNNER_TEMP:-/tmp}/iosbuild.XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT
 
@@ -38,7 +39,7 @@ if [ $signed = 1 ]; then
 	xcodebuild -project "$proj" -scheme Diceroll -configuration Release -destination generic/platform=iOS \
 		-archivePath "$tmp/Diceroll.xcarchive" "${auth[@]}" CODE_SIGN_STYLE=Automatic \
 		DEVELOPMENT_TEAM="$APPLE_TEAM_ID" archive >"$tmp/archive.log" 2>&1 \
-		|| { grep -E "error:|warning: .*sign" "$tmp/archive.log" | head -30 >&2; exit 1; }
+		|| { grep -E "error:|ld: |Undefined symbols|warning: .*sign" "$tmp/archive.log" | head -40 >&2; exit 1; }
 	cat >"$tmp/ExportOptions.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -59,7 +60,7 @@ fi
 echo "==> unsigned device build (sideload IPA)"
 xcodebuild -project "$proj" -scheme Diceroll -configuration Release -destination generic/platform=iOS \
 	-derivedDataPath "$tmp/dd" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build >"$tmp/device.log" 2>&1 \
-	|| { grep -E "error:" "$tmp/device.log" | head -30 >&2; exit 1; }
+	|| { grep -E "error:|ld: |Undefined symbols|referenced from" "$tmp/device.log" | head -40 >&2; exit 1; }
 mkdir -p "$tmp/Payload"
 cp -R "$tmp/dd/Build/Products/Release-iphoneos/Diceroll.app" "$tmp/Payload/"
 (cd "$tmp" && zip -qry "$out/Diceroll-$version-ios-sideload.ipa" Payload)

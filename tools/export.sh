@@ -72,7 +72,7 @@ command -v "$GODOT" >/dev/null || die "godot not found (set GODOT=/path/to/godot
 # Runs a headless Godot export; fails loudly on "ERROR:" lines (Godot often exits 0 anyway).
 godot_export() {
 	local preset="$1" out="$2" log
-	log="$(mktemp -t diceroll_export).log"
+	log="$(mktemp -t diceroll_export.XXXXXX).log"
 	mkdir -p "$(dirname "$out")"
 	step "godot --export-$MODE \"$preset\" -> $out"
 	if ! "$GODOT" --headless --path "$ROOT" "--export-$MODE" "$preset" "$out" >"$log" 2>&1 \
@@ -101,7 +101,7 @@ do_macos() {
 	echo "    $app ($(lipo -archs "$app/Contents/MacOS/Diceroll"), $(codesign -dv "$app" 2>&1 | grep -o 'Signature=.*'))"
 	[ $RUN = 1 ] || return 0
 	local log
-	log="$(mktemp -t diceroll_macos).log"
+	log="$(mktemp -t diceroll_macos.XXXXXX).log"
 	local user=()
 	[ -n "$SCENARIO" ] && user+=("--scenario=$SCENARIO")
 	[ -n "$SHOT" ] && user+=("--shot=$SHOT" "--wait=$((WAIT > 2 ? 2 : WAIT))")
@@ -127,7 +127,7 @@ trap restore_presets EXIT INT TERM
 do_ios() {
 	local proj="$ROOT/build/ios/Diceroll.xcodeproj" team="${DICEROLL_TEAM_ID:-SIMULATOR0}"
 	command -v xcodebuild >/dev/null || die "xcodebuild not found (install Xcode)"
-	PRESETS_BAK="$(mktemp -t diceroll_presets)"
+	PRESETS_BAK="$(mktemp -t diceroll_presets.XXXXXX)"
 	/bin/cp -f "$ROOT/export_presets.cfg" "$PRESETS_BAK"
 	sed -i '' "s/^application\/app_store_team_id=\"\"/application\/app_store_team_id=\"$team\"/" "$ROOT/export_presets.cfg"
 	godot_export iOS "$proj"
@@ -226,7 +226,7 @@ do_pck() {
 	# (S3TC/BPTC textures work on every desktop GPU incl. Apple Silicon).
 	local out="$ROOT/build/pck/Diceroll-desktop.pck" log
 	mkdir -p "$(dirname "$out")"
-	log="$(mktemp -t diceroll_export).log"
+	log="$(mktemp -t diceroll_export.XXXXXX).log"
 	step "godot --export-pack Linux -> $out"
 	if ! "$GODOT" --headless --path "$ROOT" --export-pack Linux "$out" >"$log" 2>&1 || grep -q "^ERROR:" "$log"; then
 		grep -A3 "^ERROR:" "$log" >&2 || tail -30 "$log" >&2

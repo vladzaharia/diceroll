@@ -150,7 +150,6 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-          cache: gradle
       - uses: ./.github/actions/setup-diceroll
         id: setup
         with:
@@ -201,12 +200,17 @@ jobs:
   apple:
     name: macOS + iOS/iPadOS
     needs: prepare
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - name: Select the newest Xcode (Godot's iOS templates need a current SDK)
+        run: |
+          x="$(find /Applications -maxdepth 1 -name "Xcode_*.app" | sort -V | tail -1)"
+          sudo xcode-select -s "$x/Contents/Developer"
+          xcodebuild -version
       - uses: ./.github/actions/setup-diceroll
         id: setup
         with:
