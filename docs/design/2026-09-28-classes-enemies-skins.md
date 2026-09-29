@@ -1,7 +1,7 @@
 # Diceroll: new classes, enemies, affixes and skins
 
-Date: 2026-09-28 · Author: senior game design pass · Status: proposal. Numbers are starting values
-for the sim, not final.
+Date: 2026-09-28 · Author: senior game design pass · Status: **decisions resolved (§6)**. Numbers
+are starting values for the sim, not final.
 Reads with: docs/specs/2026-09-28-diceroll-design.md (§5–7, §15, §16 and "§16 decisions"),
 docs/plans/balance.md ("Current balance" is authoritative) and
 docs/reviews/2026-09-28-meta-design-review.md.
@@ -21,12 +21,16 @@ Constraints this design keeps:
 
 ## 0. Summary
 
-- **6 new classes in two waves.**
+- **7 new classes in two waves (all approved).**
   - Wave 1: **Paladin, Ranger, Ninja, Druid** (S/M complexity).
-  - Wave 2: **Necromancer, Engineer** (M/L).
+  - Wave 2: **Necromancer, Engineer**, and the secret **Monster Kid** (Monster Costume model,
+    §1.2.7) (M/L).
   - Each one owns a build archetype that no current class covers, through one mechanic built on
     the dice.
-- **Unlocks run across ~32 runs** (10 classes in total).
+  - The Paladin is a **set-builder**: it swears an Oath to the first set value it scores in
+    each fight.
+- **Unlocks run across ~32 runs** (10 regular classes, plus the secret 11th from a hidden
+  milestone around run 20–25).
   - At most one new class every ~3–5 runs.
   - Each class has a thematic milestone plus a fallback of "or play N runs".
   - Sigil prices rise to 10/12 for the late classes, and Sigils can only buy the *next two*
@@ -48,14 +52,16 @@ Constraints this design keeps:
   - You equip them in a Camp **Wardrobe** (a mannequin stand).
   - One A10 prestige variant per class can never be bought.
 - **Off-tone models are excluded:** Survivalist, Robot, Space Ranger, Driver, Action Figure,
-  Clown, Animatronic and Monster Costume. Modern clothes, props and "Barry's Funhouse" shirts
-  break the crypt/hollow fantasy.
+  Clown and Animatronic. Modern clothes, props and "Barry's Funhouse" shirts break the
+  crypt/hollow fantasy.
+  - **Exception:** the **Monster Costume** becomes the secret, playful 11th hero, the game's
+    wink. It is never used as an enemy.
 
 ---
 
 ## 1. New hero classes
 
-### 1.1 Archetype map (why these six)
+### 1.1 Archetype map (why these seven)
 
 | class | core archetype | what it wants from the run | who it overlaps with (and why it's still distinct) |
 |---|---|---|---|
@@ -63,12 +69,13 @@ Constraints this design keeps:
 | Barbarian (existing) | Big pips, flat ATK | Heavy, Giant, High | – |
 | Mage (existing) | AoE + multiplier | Ember, Echo, sixes | – |
 | Rogue (existing) | Poison + banked rerolls | Venom, Lucky, board rerolls | – |
-| **Paladin** | **Sustain: surplus Block becomes healing, then damage** | Twin dice, Guard, Iron Skin, Guard Die pet | Knight blocks to *prevent*; the Paladin over-blocks on turns when enemies don't attack, and converts the surplus |
+| **Paladin** | **Sets: swear an Oath to one value and build uniform dice** | Twin/Even dice, Forge Mirror, Pair Master, Triple Threat, Full House Party | The Knight *prevents* damage with Block and the Barbarian wants *big* pips. The Paladin wants *the same* pips: small values are fine if they match |
 | **Ranger** | **"Take what you roll": no-reroll precision, overkill carry** | Loaded/High/Even, Forge raises, Steady Hand, Opening Salvo | The exact opposite of the Ninja. It wants few rerolls, where the Rogue banks them |
 | **Ninja** | **Reroll engine: rerolls that make matches are free** | Thunder, Encore, Crystal Wisp, Reroll Tonic | The Rogue banks rerolls for later; the Ninja spends them all turn long for Thunder procs |
 | **Druid** | **Late scaling: dice grow every lap** | Low/Odd dice, Forge, Face Raise, Blacksmith, pets | The only class that is weak at lap 1 and strong at lap 15 |
 | **Necromancer** | **Kill-chaining: kills add temporary Bone dice** | Ember/Thunder/Venom AoE, multi-enemy fights | It is a multi-enemy specialist; its single-target weakness is covered by the boss rules below |
 | **Engineer** | **Out-of-combo damage: a Turret die** | SIX/ONE/ALWAYS runes (Ember, Frost, Guard, Heavy) on the turret, Forge | The only class whose extra damage never passes through combos |
+| **Monster Kid** (secret) | **Control through fear: a "pretend" face that joins any combo, and BOO! makes enemies cower or flee** | 3+ enemy tiles, rerolls to chase the ★ face, Frost and Lucky | The only class that *removes* enemy actions as its main plan. Frost does it by rune; the Kid does it by class die, capped once per enemy |
 
 Dropped or not used as a hero:
 - **Necromancer skeleton model:** a skeleton hero reads as an enemy on Crypt and Throne boards.
@@ -81,22 +88,29 @@ Dropped or not used as a hero:
 Stats sit next to the current K60 / B60 (+2 ATK) / M60 / R58 (+1 board reroll). The base is 2
 combat rerolls and 1 board reroll.
 
-#### 1.2.1 Paladin: "Dawnguard"
+#### 1.2.1 Paladin: "Oathbound" (redesigned per the user decision: Twin dice / sets)
 
-*Fantasy: a holy warrior whose shield glows brighter every time a blow doesn't land.*
+*Fantasy: a sworn knight of one holy number. Every die that keeps the Oath strikes truer.*
 
 | field | value |
 |---|---|
-| HP / ATK | **64 / 0** · combat rerolls 2 · board rerolls 1 |
-| Starting pool | **Twin die (3 3 3 4 4 4) + Guard**, **Standard (plain)** |
-| Mechanic | **Aegis of Dawn.** Block left over after the enemy phase heals you for **50%** of it (rounded down, **max 8 per turn**). **Radiance:** the amount healed by Aegis is added as **flat damage to your next main attack** (after the multiplier, before ATK), then cleared. |
-| Interactions | Reading intents matters: on block, buff, curse or aim turns, stack Guard and Block for heal plus damage. Twin dice make Pairs likely (50% for 2 Twins) and make the board move steady at 6–8, which leads to frequent doubles (Treasury, Coin Mimic). Guard Die pet, Iron Skin and the Stoneskin potion all feed Aegis. |
-| Build archetype | Block stacking, set dice (Twin/Even), Full House Party |
-| Attack style | **Melee 1H**: hammer overhead chop (`Melee_1H_Attack_Chop`). Shield raise on block gain. |
+| HP / ATK | **60 / 0** · combat rerolls 2 · board rerolls 1 |
+| Starting pool | **Twin die (3 3 3 4 4 4)**, **Twin die (3 3 3 4 4 4)**, both plain. With two Twins, a Pair shows on 50% of first rolls. |
+| Mechanic 1: **Oath** | At the start of each fight, the Paladin swears an **Oath value**: the face value that appears on the **most faces across your whole pool** (ties go to the higher value; blanks never count). The starter pool has six 3s and six 4s, so the Oath is **4**. The Oath shows as a badge on the HUD and in the dice tray, so it is known before you roll. |
+| Mechanic 2: **Oath bonus** | When your combo is a **set** (Pair, Two Pair, Three, Full House, Four/Five/Six of a Kind) and a scoring set is of the Oath value: **+0.5 combo multiplier** (once per attack), and **+1 pip for each Oath-valued die in the scoring group**. For Two Pair and Full House, either sub-set qualifies. A Wild counts as the value it takes. Straights and High Roller never qualify. |
+| Mechanic 3: **Sanctify** | At each **biome change** (2 per run), the die with the fewest Oath faces has its **lowest non-Oath face set to the Oath value**. This is a free Mirror-style edit with the gold rim, allowed only if the Oath is within the die's raise cap. |
+| Shop bias | Paladin shops weight the **Twin and Even** die kinds ×2 (only if unlocked in the pool). Forge offers show "→ Oath" hints on Mirror. |
+| Worked example | A Pair of 4s (the Oath): (4+4 +2) × (1.5+0.5) = **20**. A normal Pair of 4s scores 8 × 1.5 = 12. A Three of 3s (not the Oath) is a plain 9 × 2.5 = 22.5. Your dice choices should shape the pool so the Oath value is also the value you roll most. |
+| Interactions | Build decisions all push the same way: Forge Mirror toward the Oath beats Raise, Twin and Even kinds, Pair Master, Triple Threat, Crowd Pleaser and Full House Party. Uniform dice also make board **doubles** frequent (Twins move 6–8, pairs half the time), which feeds the Treasury, Coin Mimic, Fast Feet and Double Trouble. |
+| Distinct from | **Knight:** Block prevention; the Paladin has no Block tools. **Barbarian:** big pips and Heavy; the Paladin gets its value from *matching*, and a Pair of 3s is fine. **Mage:** Echo adds multiplier to any combo; the Oath rewards one value. |
+| Build archetype | Sets of a kind and uniform dice |
+| Attack style | **Melee 1H**: hammer overhead chop (`Melee_1H_Attack_Chop`). A golden flash on dice showing the Oath value. |
 | Model / gear | `Paladin.glb` (Mystery S4 #10), `paladin_hammer.gltf` in the right hand, `paladin_shield.gltf` in the left. The helmet variant is a skin. |
-| Core hooks | `CombatState._enemy_phase` end: read the leftover `run.block` and heal before the Block reset in `start_turn`. Store `radiance` on CombatState (serialised) and add it in `attack()`. |
+| Core hooks | `ClassLogic.on_fight_start` computes `CombatState.oath` (serialised) and emits `class_triggered {id: "oath", value}`. In `attack()`, after `Combo.evaluate`, check the sub-group values against the Oath, add pips and multiplier, and emit `class_triggered {id: "oath_kept", value: bonus}`. `ClassLogic.on_biome` does Sanctify and emits `face_changed {source: "sanctify"}`. Shop kind weighting goes through a `ShopDefs` hook. |
 | Complexity | **S** |
-| Tuning knobs | `PALADIN_AEGIS_PCT 0.5`, `PALADIN_AEGIS_CAP 8`, Radiance on/off |
+| Tuning knobs | `PALADIN_OATH_MULT 0.5`, `PALADIN_OATH_PIP 1`, Sanctify count (2 per run; 0–3), starter (Twin+Twin vs Twin+Standard), HP 60 |
+| Anti-degenerate | The Oath multiplier is added once per attack, not per die, and is not doubled by Resonance or Rune Echo. Watch Crowd Pleaser (Pair ×2.5 → 3.0 on an Oath Pair) + Pair Master. If Oath Pairs dominate `--items`, the Oath bonus applies to **Three of a Kind and up only** for Pairs past act 1. |
+| Bot awareness | Reroll EV must include the Oath bonus, so keeping Oath-valued dice is worth more. Forge policy: Mirror toward the Oath beats Raise, unless Raise makes a new Oath. Shop valuation: Twin/Even ×1.3 and Mirror sources. Board: no change. |
 
 #### 1.2.2 Ranger: "Deadeye"
 
@@ -183,16 +197,42 @@ combat rerolls and 1 board reroll.
 | Complexity | **L** (new entity across offers, forge, tray UI, bot valuation) |
 | Tuning knobs | T per tier (1/2/3), allowed turret runes, starting turret faces |
 
+#### 1.2.7 Monster Kid: "BOO!" (secret 11th class, wave 2)
+
+*Fantasy: a village kid in a homemade dino suit tagged along onto the board. The skeletons
+aren't sure whether to laugh or run. This is the game's one wink, and everything around it
+stays fantasy.*
+
+| field | value |
+|---|---|
+| id / name | `monster_kid` / **Monster Kid** |
+| HP / ATK | **56 / 0** · combat rerolls 2 · board rerolls 1 |
+| Starting pool | **Pretend die** (new class-only kind `pretend`: faces **1 2 3 4 5 ★**), **Standard (plain)** |
+| ★ "Pretend" face | **In combat**, it counts as a Wild (it becomes the best value 1–6 for combos). It shares the `WILD_MAX_DICE` (1) cap with the Wild rune, so only one wild acts per roll. **On the board**, it copies the most common value among the other dice, so it always joins a double (move = 2 × that value); with no other die showing a value, it counts as 3. It adds pips as the value it pretends to be. SIX/ONE runes never trigger on it. The ★ face can't be edited; the other faces raise to 6 as usual. The kind never appears in shops or drops. |
+| Mechanic: **BOO!** | When you attack with the ★ face showing, the **targeted enemy is Scared** (once per enemy per fight; afterwards it gets a "Brave" badge). **Regular and elite enemies:** the next action becomes **"cower"** (does nothing). **Flee:** if a scared *regular* (not elite) enemy is at **≤25% max HP** after your attack, it **runs off the board**. It is removed from the fight with **50% of its gold, no XP**, and it doesn't count as a kill (no Bloodthirst, Vampire or Bone dice). **Mini-bosses and final bosses** never skip: their next attack deals **−30%**. |
+| Interactions | Rerolls get a second goal: chase ★ for control, or build the combo. BOO! stacks with Frost (Frozen and Scared are separate, and each skip is used in turn). It shines on 3-enemy tiles and against telegraphed big hits (the Bone Golem's 16, the Werewolf's transform). Board: ★ makes doubles frequent (Treasury, Coin Mimic, Fast Feet, Double Trouble). A kill-light playstyle is its trade-off. |
+| Build archetype | Control and tempo: Frost, Lucky, Loaded Hands, rerolls, and multi-enemy fights |
+| Attack style | **Melee unarmed**: claw and tail swipe (`Melee_Unarmed_Attack_Punch_A`). For **BOO!** the kid pulls the dino hood down: presentation shows **`Monster_Head`** from `Monster.glb` (the same body meshes with a closed monster head), plays the `taunt` alias (`Skeletons_Taunt`) with a roar sting, then swaps back to the kid's face. |
+| Model / rig | `MonsterCostume.glb` + `Monster.glb` (Mystery S4 #3). I checked both: **Rig_Medium**, with the same bone names as `Knight.glb` (root/hips/spine/chest/head, upper/lower arms, wrists, hands, `handslot.r/l`, legs, feet, toes). The existing Rig_Medium clip retargeting in `Character` should work unchanged; verify with `tools/shoot.sh`. Add a `MODELS` entry `"monster_kid": [..MonsterCostume.glb, "medium", "unarmed", {}]` plus an `alt_head` part from Monster.glb. |
+| Skins | `monstercostume_texture_A`–`D` (green, orange, pink, blue in `contents.png`; match the letters on the model). Only A ships next to the glb; B–D are in `textures/`. |
+| Unlock | **Secret milestone `trick_or_treat`:** "Finish 13 events in The Hollow" (new counter `hollow_events`) **and own 6 classes**. Fallback: or play 40 runs. On the class shelf it shows as a "???" silhouette with the hint *"Something in the Hollow wants to play dress-up."* It **can't be bought with Sigils** and sits outside the next-two rule. Target: median run 20–25. |
+| Core hooks | `DiceKinds.pretend` with a **sentinel face value `Die.PRETEND = 10`**. `Die.value()` returns 10, and callers resolve it: `Combo.evaluate` gets a wild mask from the face, `Board`'s move pick treats it as the mode value, and rune triggers skip it. `CombatState.scared: Array[bool]` and a `cower` intent override (serialised). Flee reuses the enemy-removal path. Events: `class_triggered {id: "boo", enemy_idx}`, `enemy_scared {enemy_idx, effect: "cower"|"flee"|"weaken"}`, `enemy_fled {enemy_idx, gold}`. |
+| Complexity | **M.** The sentinel face touches combo, board, rune triggers, Forge and the tray UI. Not trivial, so it ships in **wave 2**. |
+| Tuning knobs | ★ faces per die (1), flee threshold (25%), boss weaken (−30%), once per enemy (on), HP 56 |
+| Bot awareness | Reroll EV includes P(★) × the value of cancelling the target's next intent (its attack value) or of a flee. Target selection points BOO! at the biggest pending attack. Don't chase ★ when every enemy is Brave. |
+| Considered and dropped | **"Each costume colour = a different rule per run":** it would make skins non-cosmetic, which breaks §4.1. It could come back later as an optional "costume episode" with no link to the skin. **"Copy the last killed enemy's trait":** combinatorial with the 10 affixes and new traits, so it is too much to test. |
+
 ### 1.3 Balance expectations and "none dominates"
 
 | class | early (laps 1–5) | late (11–15) | vs final bosses | main risk | first knob to turn |
 |---|---|---|---|---|---|
-| Paladin | strong (64 HP, Twin pairs) | medium | good (long fights) | Iron Skin + Guard Die making Aegis a free 8/turn | Aegis cap 8 → 6 |
+| Paladin | strong (Twin pairs + Oath ×2.0 on a Pair) | medium–strong (Mirror-built uniform dice) | good (long fights, sets every turn) | Oath Pair + Crowd Pleaser + Pair Master | Oath mult 0.5 → 0.4, or Oath bonus on Three+ only after act 1 |
 | Ranger | strong (Aim ×1.3 on 2 dice) | medium | good (pierce useless, Aim good) | Aim + Opening Salvo + Glass Cannon stacking | Aim 1.3 → 1.25 |
 | Ninja | weak–medium (52 HP) | strong | medium | Encore + Wisp + 3 rerolls = Thunder machine gun | base rerolls 3 → 2 |
 | Druid | weak (Low die) | strong | strong | deaths in act 1 with a Low starter | Low → Odd starter; HP 62 → 64 |
 | Necromancer | medium | strong on 3-enemy tiles | weak–medium | boss fights | lone-foe bone turns (3, 6) → (2, 4) |
 | Engineer | medium | medium–strong (T=3) | good | Turret + Ember/Heavy | T tier 3 → 2.5 |
+| Monster Kid | medium (the ★ face makes early Pairs) | medium | medium (−30% only) | BOO! chaining on 3-enemy tiles with Frost | flee threshold 25% → 15%; ★ counts as a Pair only (not a set of 3+) |
 
 Rules for every class:
 - **Pass criterion:** realistic win% within **±5 pp of the class average** at fresh, mid and max,
@@ -206,7 +246,8 @@ Rules for every class:
   - Necromancer: target the lowest effective HP first.
   - Engineer: turret rune valuation.
   - Druid: shop valuation of Face Raise ×1.3.
-  - Paladin: prefer Guard dice in keeps on non-attack intents.
+  - Paladin: keep Oath-valued dice; Forge Mirror toward the Oath; Twin/Even shop valuation.
+  - Monster Kid: P(★) × the cancelled intent's value in reroll EV; aim BOO! at the biggest pending attack.
 
 ### 1.4 Shared core additions
 
@@ -215,7 +256,8 @@ Rules for every class:
   - `tags` (per die, e.g. `["seed", ""]`)
   - `combat_rerolls` (default `Balance.COMBAT_REROLLS`)
   - `mechanic` (id)
-  - `style` (melee_1h / ranged / magic / dual) for presentation.
+  - `style` (melee_1h / ranged / magic / dual / unarmed) for presentation
+  - `secret` (bool; the Monster Kid) for the class shelf.
 - **`core/class_logic.gd`** (static, like `PetLogic`) holds every hook, keyed by `run.class_id`:
   - `on_turn_start`, `on_reroll(before, after)`, `on_attack(dmg ctx)`, `on_enemy_killed`,
     `on_enemy_phase_end`, `on_fight_end`, `on_lap`, `on_biome`, `on_board_reroll`.
@@ -223,10 +265,11 @@ Rules for every class:
     can pulse the class badge.
 - `Die.tags` (serialised; old saves → empty).
 - `RunState.turret` (Engineer).
-- `CombatState.extra_dice`, `radiance`, `refunds_this_turn`, `rerolls_used_this_turn` (all
-  serialised).
+- `CombatState.extra_dice`, `oath`, `scared`, `refunds_this_turn`, `rerolls_used_this_turn`
+  (all serialised).
+- `Die.PRETEND = 10` sentinel face and the class-only `pretend` die kind (Monster Kid).
 - `HeroDefs.IDS` order = unlock order: knight, barbarian, paladin, mage, ranger, rogue, ninja,
-  druid, engineer, necromancer.
+  druid, engineer, necromancer, monster_kid (secret; excluded from the next-two Sigil rule).
 
 ---
 
@@ -237,7 +280,7 @@ Rules for every class:
 1. Knight only on run 1. At most **one new class every ~3–5 runs**, and never two class unlocks
    from the same run's milestones.
 2. The simpler classes come first:
-   - Paladin: no decisions added.
+   - Paladin: one readable rule, "match the Oath number", shown before you roll.
    - Ranger: one decision.
    - The Ninja, Druid, Engineer and Necromancer change how you evaluate dice, so they come after
      the player knows the rune and kind pools (after Rogue at ~15).
@@ -246,8 +289,8 @@ Rules for every class:
 4. **Sigils can buy only the next two locked classes** in `HeroDefs.IDS` order (the Camp class
    shelf shows the rest as silhouettes with their milestone). This keeps the early Sigil burst
    (about 6.2 on run 1) from skipping onboarding.
-5. New Sigil supply: **class_win first = 2 Sigils** for each new class (+12 in total), so the
-   late prices are payable.
+5. New Sigil supply: **class_win first = 2 Sigils** for each new class (+14 in total with the
+   Monster Kid), so the late prices are payable.
 
 ### 2.2 Extended class table (target = median run, realistic campaign bot, fresh profile)
 
@@ -263,6 +306,7 @@ Rules for every class:
 | 8 | **Druid** | `long_road` | **Complete 250 laps in total** | or play 26 runs | 10 | **23** |
 | 9 | **Engineer** | `tinker_bench` | **Edit 60 die faces** (Forge edits + Face Raises, new counter `face_edits`) | or play 30 runs | 12 | **27** |
 | 10 | **Necromancer** | `grave_calling` | **Defeat the Bone Warden twice**, or **defeat 1,000 enemies** (new counter `kills`) | or play 36 runs | 12 | **32** |
+| secret | **Monster Kid** | `trick_or_treat` (hidden) | **Finish 13 events in The Hollow** (counter `hollow_events`) **and own 6 classes** | or play 40 runs | not for sale | **20–25** |
 
 Notes:
 - Estimates come from today's campaign rates:
@@ -276,11 +320,12 @@ Notes:
   (target 22) and **`rune_lord`** (24) so no run unlocks a class *and* 2+ other things. The rule
   is at most one "major" toast (class/pet/biome) plus one minor (pack/gear/potion) per run.
 - **Pass criteria (campaign sim):**
-  - All 10 classes by a median of **run ≤ 32**.
+  - All 10 regular classes by a median of **run ≤ 32**; the secret Monster Kid by a median of
+    **run ≤ 26**.
   - 90% of profiles have every class by **run 40**.
   - No run in the median campaign unlocks 2 classes.
 - `core/meta/presets.gd` **mid** (run 10) becomes Knight, Barbarian, Paladin and Mage. **Max**
-  has all 10.
+  has all 11.
 - New `Profile.COUNTERS`: `face_edits`, `kills`, `classes_at_boss` (derived from the new
   `records.bosses_reached_by_class`), plus `wins_by_class` conditions. `_cond` gains the forms
   `{class_wins: id, min}` and `{boss_kills: id, min}` (backed by
@@ -328,7 +373,7 @@ Balance notes:
 - Expected effect per biome is ±1 pp. Check the route table (`--route=...`): every route should
   stay within ±3 pp of the all-route mean.
 - Frenzy punishes chip damage and rewards burst (Ranger, Barbarian). Pierce punishes pure Block
-  (Knight, Paladin). Rally and heal create kill-priority decisions (Necromancer, Ranger pierce).
+  (Knight). Rally and heal create kill-priority decisions (Necromancer, Ranger pierce).
   Transform punishes slow finishing (a drain spike at half HP).
 - Mini-boss candidates: Hollow goes from 2 to 3 and Frost from 2 to 3. `UnlockDefs.all_ids
   ("minibosses")` gains both. They unlock with `warden_slayer` (run ~22), not on fresh profiles.
@@ -474,8 +519,9 @@ Rules for skin_rules.gd:
 - **Biome clash rule:** if an affix colour matches the biome's key colour (frostbound in Frost,
   or thorned or regenerating in the Glade), the prop carries the read and the rim colour is
   brightened +30%.
-- **Excluded from enemies:** Monster Costume A–D, Clown and Animatronic (off-tone modern
-  costume/toy looks), and Ninja A–D (reserved for the Ninja hero).
+- **Excluded from enemies:** Clown and Animatronic (off-tone modern costume/toy looks), Monster
+  Costume A–D (reserved for the secret Monster Kid hero) and Ninja A–D (reserved for the Ninja
+  hero).
 - Proposed data shape:
 
 ```gdscript
@@ -556,13 +602,14 @@ The unlock condition slots are the same for every class:
 | Druid | default | alt_A | alt_B (autumn orange) | alt_C (teal) | crown + gold trim |
 | Engineer | default | alt_A (green) | alt_B (blue) | alt_C (brass) | gold turret |
 | Necromancer | Rogue_Hooded + rogue alt_C | + rogue alt_A | + rogue alt_B | + rogue default | crown + gold trim |
+| Monster Kid | costume tex A (green) | tex B | tex C | tex D | **"Full Suit"**: the hood stays up (`Monster_Head` always on), plus a tiny paper crown |
 
 Palette names come from inspecting the atlases in
 `third_party/kaykit/KayKit_Adventurers_2.0_EXTRA/Textures`. Verify each on the model with
 `tools/shoot.sh` before naming them in UI.
 
-Skins count: 10 classes × 4 = 40 wearable skins, plus 10 prestige overlays and 2 alternate
-prestige meshes.
+Skins count: 11 classes × 4 = 44 wearable skins, plus 11 prestige variants (overlays, plus the
+Chieftain, Shade and Full Suit meshes).
 
 Pacing check: the Knight's Victor skin arrives at the first win (about run 5). That is the first
 cosmetic, landing early and on the starter class. Ascendant needs A3 (mid-game), and Bossbane
@@ -598,7 +645,7 @@ records.bosses_by_class:   {class_id: [boss_id]}    # final bosses beaten with t
 records.bosses_reached_by_class: {class_id: int}    # for the Ranger milestone
 records.boss_kills:        {boss_id: int}           # for the Necromancer milestone
 records.seen:              {enemies: [id], affixes: [id]}
-records.counters += face_edits, kills
+records.counters += face_edits, kills, hollow_events
 loadout.skin is NOT stored; RunState gets `skin: String` (presentation-only, serialised for Continue)
 ```
 
@@ -613,7 +660,7 @@ loadout.skin is NOT stored; RunState gets `skin: String` (presentation-only, ser
   - `Character.create(model_id, skin := "")` swaps the albedo texture on the single atlased
     material. All KayKit characters use one atlas, so it is a single `material_override` or
     surface texture swap.
-  - The mesh swaps (Paladin helmet, Chieftain, Shade) are MODELS entries.
+  - The mesh swaps (Paladin helmet, Chieftain, Shade, Monster Kid Full Suit) are MODELS entries.
 
 ---
 
@@ -622,8 +669,8 @@ loadout.skin is NOT stored; RunState gets `skin: String` (presentation-only, ser
 | step | work | layer | size | depends on | gate to pass before the next step |
 |---|---|---|---|---|---|
 | 1 | `ClassLogic` hook module, `Die.tags`, HeroDefs fields (`kinds`, `tags`, `combat_rerolls`, `mechanic`, `style`), `class_triggered` event | core | S | – | all tests green; the 4 old classes unchanged in the sim (±1 pp) |
-| 2 | **Paladin + Ranger** mechanics + bot awareness (Aim EV, Guard keeps) + tests | core | S | 1 | sim rows within ±5 pp (see §5.1) |
-| 3 | Paladin/Ranger models, attack styles, class-select cards, class badge UI | presentation | S | 2 | device-matrix screenshots |
+| 2 | **Paladin (Oath/Sanctify, the Twin/sets redesign) + Ranger** mechanics + bot awareness (Oath-aware keeps and Forge Mirror, Aim EV) + tests | core | S | 1 | sim rows within ±5 pp (see §5.1); `--items` shows no Oath + Crowd Pleaser outlier |
+| 3 | Paladin/Ranger models, attack styles, class-select cards, class badge UI, Oath badge + gold flash on Oath dice | presentation | S | 2 | device-matrix screenshots |
 | 4 | **Ninja + Druid** mechanics + bot (refund-aware reroll EV, Face Raise valuation) | core | M | 1 | sim ±5 pp |
 | 5 | Ninja/Druid presentation (seed leaf badge, growth pulse, shuriken proc) | presentation | S | 4 | screenshots |
 | 6 | Unlock table (§2): milestones, counters, `_cond` forms, per-id Sigil prices, next-two rule, presets mid/max | core/meta | S | 2, 4 | campaign sim: medians within ±2 runs of target |
@@ -635,9 +682,11 @@ loadout.skin is NOT stored; RunState gets `skin: String` (presentation-only, ser
 | 12 | Wardrobe station + texture swap + toasts | presentation | M | 11 | screenshots |
 | 13 | **Necromancer** (combat-local `extra_dice`) + bot kill-order | core | M/L | 1 | sim ±5 pp; replay determinism tests |
 | 14 | **Engineer** (turret entity, offer targets, tray 6th slot) + bot turret valuation | core + presentation | L | 1 | sim ±5 pp |
+| 14b | **Monster Kid** core: `pretend` kind + `Die.PRETEND` sentinel (combo wild mask, board mode pick, rune-trigger skip), BOO!/scared/flee, `trick_or_treat` + `hollow_events`, secret shelf entry, bot ★ EV | core | M | 1, 6 | sim ±5 pp; combo/board tests for ★; replay determinism |
+| 14c | Monster Kid presentation: MonsterCostume model + Monster_Head swap for BOO!, ★ face art (dino footprint), flee animation (the enemy runs off the tile), "???" shelf silhouette, skins A–D | presentation | S | 14b | screenshots (rig check first) |
 | 15 | Final full sweep (§5.1) + update `docs/plans/balance.md` "Current balance" | sim/docs | S | all | – |
 
-Steps 7–10 and 11–12 can run in parallel with the class work. Steps 13–14 are wave 2 and can
+Steps 7–10 and 11–12 can run in parallel with the class work. Steps 13–14c are wave 2 and can
 ship later without blocking anything, since the unlock table simply shows them as "coming" until
 they exist.
 
@@ -656,7 +705,7 @@ classes.
 
 | check | target |
 |---|---|
-| each class, realistic, fresh / mid / max | within **±5 pp of the 10-class average** at each profile |
+| each class, realistic, fresh / mid / max | within **±5 pp of the 11-class average** at each profile (the Monster Kid included) |
 | class average, realistic | fresh 30–40%, mid 45–50%, max 55–65% (unchanged) |
 | each class, expert, fresh | ≤ 80% |
 | each class, realistic, max A10 | 15–30% (the all-class mean stays 20–30%) |
@@ -664,26 +713,28 @@ classes.
 | deaths by act, per class | no class with more than 20% of its runs dying in act 1 (watch the Druid and Ninja) |
 | routes | every route within ±3 pp of the mean after the new enemies |
 | affixes | each forced affix costs ≤ 4 pp; overall bands hold with affixes on |
-| campaign | all classes by a median run ≤ 32; 90% of profiles by run 40; no run unlocks 2 classes |
+| campaign | regular classes by a median run ≤ 32 and the Monster Kid ≤ 26; 90% of profiles have every class by run 40; no run unlocks 2 classes |
 | Short Road | the same ±5 pp per-class rule |
 
 ---
 
-## 6. Open questions for Vlad
+## 6. Decisions (resolved, Vlad via the tech lead, 2026-09-28)
 
-1. **Class count:** is it all 6 (10 classes in total), or wave 1 only (8 classes) for now, with
-   the Engineer and Necromancer later? The Engineer is the most expensive (L).
-2. **Necromancer look:** it is a living hooded human (Rogue_Hooded + skull staff) for
-   readability, and the skeleton Necromancer model goes to the Grave Mage enemy. Or do you want
-   the skeleton model as the hero anyway?
-3. **Paladin vs Knight:** both are defensive. Is "surplus Block heals, then smites" different
-   enough, or should the Paladin lean to sets/Twin dice only?
-4. **Class unlock fallbacks ("or play N runs"):** keep them (no one is stuck), or make classes
-   pure achievements?
-5. **Affix onboarding:** turn them on at run ~3 (`brawler`), or later (first win, ~run 5)?
-6. **Off-tone models:** this doc excludes the Monster Costume, Clown, Animatronic, Survivalist,
-   Robot, Space Ranger, Driver and Action Figure entirely, and reserves Ninja A–D for the hero
-   instead of enemy affix skins. Is that OK, or do you want any of them as joke or secret
-   cosmetics?
-7. **Crowns-after-caps skin price** (250) and whether the prestige (A10) skins should stay
-   impossible to buy.
+1. **Class count:** ship **all 6** proposed classes. Wave 1: Paladin, Ranger, Ninja, Druid.
+   Wave 2: Necromancer, Engineer. **Plus** the secret 11th class, the Monster Kid (§1.2.7), in
+   wave 2.
+2. **Necromancer look:** the **living hooded human** (Rogue_Hooded + skull staff). The skeleton
+   Necromancer model goes to the Grave Mage mini-boss.
+3. **Paladin:** redesigned to lean fully into **Twin dice and sets**. It swears an Oath to its
+   pool's most common value; Oath sets get +0.5× and +1 pip per Oath die; Sanctify mirrors
+   faces to the Oath at biome changes (§1.2.1). The old "surplus Block heals + smites" design is
+   dropped.
+4. **Accepted defaults:**
+   - Keep the "or play N runs" unlock fallbacks.
+   - Affixes turn on at run ~3 (`brawler`).
+   - Off-tone models stay excluded (Survivalist, Robot, Space Ranger, Driver, Action Figure,
+     Clown, Animatronic), and Ninja A–D stay hero-only.
+   - Skins cost 250 Crowns after the caps; the A10 prestige skins can't be bought.
+5. **Monster Costume:** it becomes a **playful secret hero**, the Monster Kid: a ★ "pretend"
+   face plus BOO!, unlocked by the hidden `trick_or_treat` milestone, with skins from textures
+   A–D (§1.2.7, §2.2, §4.2). It is never used as an enemy.
