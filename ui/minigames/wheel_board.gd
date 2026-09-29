@@ -441,8 +441,8 @@ func _layout() -> void:
 		for k in n:
 			_slots[k] = Rect2(Vector2(x0 + k * (sw + 10.0), h - strip + 6.0), Vector2(sw, sh))
 	var area := Vector2(w, h - strip)
-	_R = maxf(40.0, minf(area.x / 2.34, area.y / 2.42))
-	_c = Vector2(w * 0.5, area.y * 0.5 + _R * 0.06)
+	_R = maxf(40.0, minf(area.x / 2.34, area.y / 2.5))
+	_c = Vector2(w * 0.5, area.y * 0.5 + _R * 0.03)
 	_btn = Rect2(Vector2(w * 0.5 - bw * 0.5, sy - bh * 0.5), Vector2(bw, bh))
 
 
@@ -469,12 +469,11 @@ func _draw_board() -> void:
 			c + Vector2(cos(a0 + TAU / rays * 0.5), sin(a0 + TAU / rays * 0.5)) * rl])
 		draw_colored_polygon(pts, Color(game_col.r, game_col.g, game_col.b, 0.08))
 	# the stand: a post and a foot behind the wheel
-	var foot_y := minf(_btn.position.y - 8.0 - R * 0.07, c.y + R * 1.5)
+	var foot_y := _btn.position.y + 6.0
 	if foot_y > c.y + R * 1.3:
 		var post := PackedVector2Array([c + Vector2(-R * 0.1, 0), c + Vector2(R * 0.1, 0), Vector2(c.x + R * 0.2, foot_y), Vector2(c.x - R * 0.2, foot_y)])
 		draw_colored_polygon(post, UiPalette.OUTLINE)
 		draw_colored_polygon(PackedVector2Array([post[0] + Vector2(4, 0), post[1] - Vector2(4, 0), post[2] - Vector2(5, 3), post[3] + Vector2(5, -3)]), Color("8a2a3a"))
-		rrect(Rect2(Vector2(c.x - R * 0.42, foot_y - R * 0.08), Vector2(R * 0.84, R * 0.14)), Color("6a1e30"), R * 0.06, 3, UiPalette.OUTLINE)
 	# outer frame with the chasing bulbs
 	draw_circle(c + Vector2(0, R * 0.06), R * 1.2, Color(0, 0, 0, 0.4))
 	draw_circle(c, R * 1.17, UiPalette.OUTLINE)
