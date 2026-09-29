@@ -154,6 +154,7 @@ static var _full_lap := -1
 static func full_moon(c: GameController, lap: int) -> void:
 	_full_lap = lap
 	c.board.set_moon_phase("full", true)
+	c.ui.board_hud.top._show_twist("moon:full:0", true)
 	Audio.play_sfx("portal")
 	Fx.flash(c, Color(0.75, 0.82, 1.0, 0.35), 0.6)
 	c.overlay.announce("FULL MOON", "Wolves changed  ·  2× elites  ·  ×1.5 gold",
@@ -231,7 +232,7 @@ static func moon_meter(c: GameController, ev: Dictionary) -> void:
 				c.tray.highlight_group(ones, MOON)
 			Audio.play_sfx("block")
 			if i >= 0:
-				Fx.popup_text(c.stage, at, "CLOUDS %d" % int(ev.get("delta", 0)), MOON.lightened(0.2), 0.55)
+				Fx.popup_text(c.stage, at - Vector3.UP * 0.45, "CLOUDS %d" % int(ev.get("delta", 0)), MOON.lightened(0.2), 0.55)
 				Fx.burst(c.stage, at - Vector3.UP * 0.3, {"amount": 14, "lifetime": 0.8, "speed": Vector2(0.4, 1.2),
 					"size": 0.5, "color": Color(0.7, 0.74, 0.9, 0.7), "tex": "dot", "additive": false, "gravity": Vector3(0, 0.5, 0)})
 			c.overlay.popup(c.hero_screen(2.2), "Your 1s cloud the moon", MOON, "biome_moonlit", 28)
@@ -277,10 +278,10 @@ static func bury(c: GameController, ev: Dictionary) -> void:
 static func _above(c: GameController, i: int) -> Vector3:
 	if i < 0 or i >= c.stage.enemy_count():
 		return c.hero_pos() + Vector3.UP * 2.0
-	# over the boss HUD, toward its moon meter (right of the HP bar), still on a phone screen
+	# just under the boss HUD, toward its moon meter (above it the top HUD covers it on phones)
 	var right := Vector3.RIGHT
 	var cam := c.get_viewport().get_camera_3d()
 	if cam:
 		right = cam.global_basis.x
-	return c.stage.enemy_position(i) + Vector3.UP * (EnemyLooks.hud_height(String(c.stage.data[i].get("id", ""))) * CombatStage.UNIT_SCALE + 1.4) \
+	return c.stage.enemy_position(i) + Vector3.UP * (EnemyLooks.hud_height(String(c.stage.data[i].get("id", ""))) * CombatStage.UNIT_SCALE - 0.4) \
 		+ right * 0.35
