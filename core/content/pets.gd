@@ -35,11 +35,11 @@ const LEVEL_COSTS := [40, 60, 80, 100, 120]
 
 const DEFS := {
 	"pumpkin_sprite": {"name": "Pumpkin Sprite", "role": "heal", "charge_on": "pair_plus", "size": 6, "model": "pumpkin",
-		"fires": "Heal 2% of max HP (+0.4% per level).",
+		"fires": "Heal 2% of max HP (+0.6% per level).",
 		"perk": "Campfires heal +5%.",
 		"l5": "Also removes Burn.", "l10": "Overheal becomes Block."},
 	"skull_buddy": {"name": "Skull Buddy", "role": "attack", "charge_on": "low_die", "size": 4, "model": "skull",
-		"fires": "Before your attack, bite the target for 30% (+4% per level) of the hand's combo damage.",
+		"fires": "Before your attack, bite the target for 30% (+5% per level) of the hand's combo damage.",
 		"perk": "Traps: +1 to the dodge roll.",
 		"l5": "Bites every enemy at half damage.", "l10": "Blanks count as 1 for its bite and charge x2."},
 	"lantern_ghost": {"name": "Lantern Ghost", "role": "burn", "charge_on": "six", "size": 5, "model": "lantern",
@@ -47,40 +47,40 @@ const DEFS := {
 		"perk": "Lava damage -50%.",
 		"l5": "Poison doesn't decay on bosses.", "l10": "Poisoned enemies take +1 from Thunder and Ember."},
 	"crystal_wisp": {"name": "Crystal Wisp", "role": "tempo", "charge_on": "kept", "size": 8, "model": "crystal",
-		"fires": "At turn start: +1 combat reroll, and this turn's combo multiplier +0.1 (+0.03 per level).",
+		"fires": "At turn start: +1 combat reroll, and this turn's combo multiplier +0.1 (+0.01 per level).",
 		"perk": "+1 board reroll on the first board turn of each lap.",
 		"l5": "Also +1 banked reroll and frees a cursed die.", "l10": "Its first reroll each fight doesn't count as rerolled."},
 	"guard_die": {"name": "Guard Die", "role": "defense", "charge_on": "attack_intent", "size": 6, "model": "die",
-		"fires": "Roll a d6: gain pips Block (+1 per 2 levels above 1).",
+		"fires": "Roll a d6: gain pips Block (+1 per 3 levels above 1).",
 		"perk": "Each new biome: +1 Healing Draught if the belt is empty.",
 		"l5": "Half its Block lands again next turn.", "l10": "On a 6, also freezes the target."},
 	"coin_mimic": {"name": "Coin Mimic", "role": "economy", "charge_on": "board_double", "size": 3, "model": "chest",
-		"fires": "+8 gold (+3 per level) and bite the target for gold/20 (max 10).",
+		"fires": "+8 gold (+2 per level) and bite the target for gold/20 (max 10).",
 		"perk": "Treasury banks +2 per double.",
 		"l5": "One free shop restock per shop.", "l10": "Chest gold rolls twice and keeps the better."},
 	# --- 2026-09-29: six more familiars
-	"pebble_golem": {"name": "Pebble", "role": "armor", "charge_on": "block", "size": 5, "model": "pebble",
-		"fires": "Block 3 (+1 per 2 levels) and Thorns 2 (+1 per 3 levels) this turn: attackers that hurt you take it.",
+	"pebble_golem": {"name": "Pebble", "role": "armor", "charge_on": "block", "size": 4, "model": "pebble",
+		"fires": "Block 3 (+1 per 2 levels) and Thorns 3 (+1 per 2 levels) this turn: attackers that hurt you take it.",
 		"perk": "Traps deal half damage.",
 		"l5": "Thorns hit every attacker, even when your Block stops the hit.", "l10": "Its Block is doubled."},
-	"frost_mote": {"name": "Frost Mote", "role": "control", "charge_on": "one", "size": 4, "model": "frost",
-		"fires": "Freeze the target (it skips its next action) and chill it for 2 (+1 per level) damage.",
+	"frost_mote": {"name": "Frost Mote", "role": "control", "charge_on": "one", "size": 3, "model": "frost",
+		"fires": "Freeze the target (it skips its next action) and chill it for 3 (+2 per level) damage.",
 		"perk": "Ice tiles never freeze your dice.",
 		"l5": "Also freezes the enemy with the biggest attack.", "l10": "Frozen enemies lose their Block."},
 	"wick": {"name": "Wick", "role": "burst", "charge_on": "set3", "size": 3, "model": "candle",
 		"fires": "Burn every enemy for 3 (+2 per level) damage.",
 		"perk": "Burn on you ticks 1 lower.",
 		"l5": "Two Pair charges it too.", "l10": "Its fire ignores Block."},
-	"tinker_gear": {"name": "Tinker", "role": "fixing", "charge_on": "reroll", "size": 6, "model": "gear",
-		"fires": "Before your attack, set your lowest die to its highest face; combo multiplier +0.05 per level this attack.",
+	"tinker_gear": {"name": "Tinker", "role": "fixing", "charge_on": "reroll", "size": 7, "model": "gear",
+		"fires": "Before your attack, set your lowest die to its highest face; combo multiplier +0.02 per level this attack.",
 		"perk": "Shop restocks cost 3 less.",
 		"l5": "Fixes your two lowest dice.", "l10": "Also banks 1 reroll."},
-	"grimoire": {"name": "Grimoire", "role": "runes", "charge_on": "rune", "size": 6, "model": "book",
-		"fires": "Before your attack, re-fire the last rune that triggered (+10% per level above 1).",
+	"grimoire": {"name": "Grimoire", "role": "runes", "charge_on": "rune", "size": 8, "model": "book",
+		"fires": "Before your attack, re-fire the last rune that triggered (+5% per level above 1).",
 		"perk": "Chests offer 4 runes instead of 3.",
 		"l5": "Re-fires the last two different runes.", "l10": "Re-fires at +50% more."},
 	"cauldron": {"name": "Bubbles", "role": "sustain", "charge_on": "win", "size": 4, "model": "cauldron",
-		"fires": "After a fight, brew a Healing Draught into the belt (heals 15% when the belt is full) and heal 1% of max HP per level.",
+		"fires": "After a fight, brew a Healing Draught into the belt (heals 15% when the belt is full) and heal 1.5% of max HP per level.",
 		"perk": "Shop potions cost 5 less.",
 		"l5": "Brews any unlocked potion type.", "l10": "Brews two potions."},
 }
@@ -119,12 +119,12 @@ static func level_cost(level: int) -> Dictionary:
 ## Pet numbers (2026-09-28 pass: every pet worth about +4-8 pp at L10 in the realistic sim, and
 ## most of that power comes from levels, so a pet grows with the profile).
 static func heal_pct(level: int) -> float:
-	return 0.02 + 0.004 * (clampi(level, 1, MAX_LEVEL) - 1)
+	return 0.02 + 0.006 * (clampi(level, 1, MAX_LEVEL) - 1)
 
 ## Skull Buddy bite: bite_pct(level) x the hand's combo damage (pips x combo multiplier), at
 ## least BITE_MIN.
 static func bite_pct(level: int) -> float:
-	return 0.30 + 0.04 * (clampi(level, 1, MAX_LEVEL) - 1)
+	return 0.30 + 0.05 * (clampi(level, 1, MAX_LEVEL) - 1)
 
 const BITE_MIN := 8
 ## Low-die charge threshold (dice showing this or less charge Skull Buddy).
@@ -132,7 +132,7 @@ const LOW_DIE_MAX := 2
 ## Crystal Wisp: rerolls per firing, and the combo multiplier bonus for that turn's attack.
 const WISP_REROLLS := 1
 const WISP_MULT := 0.1
-const WISP_MULT_PER_LEVEL := 0.03
+const WISP_MULT_PER_LEVEL := 0.01
 
 static func wisp_mult(level: int) -> float:
 	return WISP_MULT + WISP_MULT_PER_LEVEL * (clampi(level, 1, MAX_LEVEL) - 1)
@@ -142,37 +142,37 @@ static func poison(level: int) -> int:
 
 ## Guard Die Block = d6 + block_bonus.
 static func block_bonus(level: int) -> int:
-	return (clampi(level, 1, MAX_LEVEL) - 1) / 2
+	return (clampi(level, 1, MAX_LEVEL) - 1) / 3
 
 static func mimic_gold(level: int) -> int:
-	return 8 + 3 * (clampi(level, 1, MAX_LEVEL) - 1)
+	return 8 + 2 * (clampi(level, 1, MAX_LEVEL) - 1)
 
 ## Pebble: Block per pip of charge, and its firing numbers.
-const BLOCK_PER_CHARGE := 5
+const BLOCK_PER_CHARGE := 3
 
 static func pebble_block(level: int) -> int:
 	var b := 3 + (clampi(level, 1, MAX_LEVEL) - 1) / 2
 	return b * 2 if level >= 10 else b
 
 static func pebble_thorns(level: int) -> int:
-	return 2 + (clampi(level, 1, MAX_LEVEL) - 1) / 3
+	return 3 + (clampi(level, 1, MAX_LEVEL) - 1) / 2
 
 static func frost_damage(level: int) -> int:
-	return 2 + (clampi(level, 1, MAX_LEVEL) - 1)
+	return 3 + 2 * (clampi(level, 1, MAX_LEVEL) - 1)
 
 static func wick_damage(level: int) -> int:
 	return 3 + 2 * (clampi(level, 1, MAX_LEVEL) - 1)
 
 static func tinker_mult(level: int) -> float:
-	return 0.05 * clampi(level, 1, MAX_LEVEL)
+	return 0.02 * clampi(level, 1, MAX_LEVEL)
 
 static func grimoire_mult(level: int) -> float:
-	var m := 1.0 + 0.1 * (clampi(level, 1, MAX_LEVEL) - 1)
+	var m := 1.0 + 0.05 * (clampi(level, 1, MAX_LEVEL) - 1)
 	return m * 1.5 if level >= 10 else m
 
 ## Bubbles: heal % of max HP when brewing, and the heal when the belt is full.
 static func cauldron_heal_pct(level: int) -> float:
-	return 0.01 * clampi(level, 1, MAX_LEVEL)
+	return 0.015 * clampi(level, 1, MAX_LEVEL)
 
 const CAULDRON_FULL_HEAL := 0.15
 ## Pet perks: trap damage (Pebble), restock discount (Tinker), potion discount (Bubbles).
