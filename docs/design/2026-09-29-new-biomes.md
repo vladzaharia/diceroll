@@ -1,7 +1,7 @@
 # Diceroll: four new biomes
 
-Date: 2026-09-29 · Status: proposal (the user approved the four boards; numbers are starting
-values for the sim).
+Date: 2026-09-29 · Status: **decisions resolved (§11)**; the user approved the four boards. Numbers are starting
+values for the sim.
 Reads with: `core/content/biomes.gd`, docs/plans/balance.md ("Biomes and routes", "Current
 balance") and docs/design/2026-09-28-classes-enemies-skins.md, which has the new enemy ids,
 affixes (§3A), the class unlock table (§2) and the Monster Kid.
@@ -16,40 +16,46 @@ affixes (§3A), the class unlock table (§2) and the Monster Kid.
 |---|---|---|---|---|---|---|
 | `mines` | Deep Mines | **1** | Ore veins pay 15 gold or a Face Raise, then cave in and become traps | `ore` | **`rock_golem`** (new) | (tier 1: none used) |
 | `warcamp` | Orc Warcamp | **2** | Each standing war drum Rallies every enemy +2 attack at fight start; landing smashes a drum | `drum` | brute (as an orc) | mini_orc_warchief, mini_cinder_brute |
-| `moonlit` | Moonlit Woods | **2** | Moon phases by lap; at the Full Moon, werewolves start transformed and elites double (and fights pay ×1.5 gold) | – | werewolf | mini_moonfang, mini_briar_beast |
-| `ruins` | Sunscorched Ruins | **3** | Heat costs 5% max HP at each lap end unless you **landed** on an oasis that lap; oases heal 8% | `oasis` | bone_golem | **`boss_sand_colossus`** (new), boss_lich |
+| `ruins` | Sunscorched Ruins | **3** | Heat costs 5% max HP at each lap end unless you **landed** on an oasis that lap; oases heal 8% | `oasis` | bone_golem | **`boss_sand_colossus`** (new), boss_bone_warden |
+| `moonlit` | Moonlit Woods | **3** | Moon phases over laps 11–15. On the Full lap (13), werewolves start transformed, elites double, fights pay ×1.5 gold, and a moon rune chest appears | – | werewolf | **`boss_moon_king`** (new), boss_lich |
 
 **Tiers and routes:**
-- Tier 1 has 3 biomes (glade, crypt, mines), tier 2 has 4 (hollow, frost, warcamp, moonlit) and
-  tier 3 has 3 (throne, magma, ruins).
-- Routes go from **8 to 36** standard (3×4×3), and on the Short Road (tier 1 × tier 3) from
-  **4 to 9**.
-- With the mini-boss and final-boss draws, standard runs go from 32 to **144** combinations.
+- Tier 1 has 3 biomes (glade, crypt, mines), tier 2 has 3 (hollow, frost, warcamp) and tier 3
+  has 4 (throne, magma, ruins, moonlit).
+- Standard routes go from **8 to 36** (3×3×4).
+- The **Short Road** second biome is drawn from tier 2 ∪ tier 3 (7 biomes), so it has **21**
+  routes (was 4).
+- Standard combinations (route × mini-boss × final boss) go from 32 to **168** (§6).
+
+**Two new final bosses:**
+- **Sand Colossus** (Ruins): buries your dice.
+- **The Moon King** (Moonlit): a moon meter that your **1s** push back. A full moon forces its
+  transformation (Moonrise), then drops a piercing **Moonfall**.
+- There are 6 final bosses in total, and each tier-3 biome has 2 candidates. Each existing
+  Throne boss now appears in exactly 2 biomes: the Lich in Throne and Moonlit, the Bone Warden
+  in Throne and Ruins.
+
+**Moonfang** becomes a **Hollow mini-boss candidate**. This is the one exception to "home
+biomes only" (§4.4). It is unlocked by the Moonlit milestone and also appears as Moonlit's
+Short Road mini-boss.
 
 **New content:**
-- **2 new ids:** `rock_golem` (Mines elite) and `boss_sand_colossus` (Ruins final boss).
-- **1 new intent:** `bury`.
+- **3 new ids:** `rock_golem`, `boss_sand_colossus`, `boss_moon_king`.
+- **2 new intents:** `bury`, `moonfall`.
 - **3 new tile types:** `ore`, `drum`, `oasis`.
-- Everything else reuses existing mechanics: rally, transform, traps, the lava-style "never lethal"
-  damage and lap-mutation refills.
-
-**Mini-boss homes:** Moonfang and the Orc Warchief move to their home biomes (Moonlit, Warcamp).
-This supersedes the earlier doc, which added them to Hollow and Frost as third candidates. Every
-tier-2 biome now has 2 candidates.
+- Everything else reuses existing mechanics.
 
 **Unlocks:** each biome has a milestone, plus a fallback of "or play N runs". Targets are runs
-**8 / 12 / 17 / 21**, placed between the class unlocks (runs 6, 10, 13, 15, 19, 23, …) under the
-one-major-unlock-per-run rule.
+**8 / 12 / 17 / 21**, placed between the class unlocks under the one-major-unlock-per-run rule.
 
-**Elevation** is a later, **cosmetic** pass (see the Elevation section). Good fits: Moonlit
-Woods, Deep Mines, Warcamp.
+**Elevation** is a later, **cosmetic** pass (see the Elevation section).
 
 ---
 
 ## 1. Shared core additions
 
-1. **`BiomeDefs.TIERS`** = `[["glade", "crypt", "mines"], ["hollow", "frost", "warcamp",
-   "moonlit"], ["throne", "magma", "ruins"]]`.
+1. **`BiomeDefs.TIERS`** = `[["glade", "crypt", "mines"], ["hollow", "frost", "warcamp"],
+   ["throne", "magma", "ruins", "moonlit"]]`.
    - `pick_route` and `all_routes` already work on any tier size.
    - The meta route pick already filters by unlocked biomes.
    - `valid_route` is unchanged.
@@ -140,7 +146,7 @@ Balance:
   standing-drum count is about 1.2, since you land on a drum about 25% of laps per drum.
 - Tuning order: +2 → +1 per drum, then 2 drums → 1 drum + a stronger rally.
 - The Orc Drummer's own `rally 2` stacks on top, which makes it a kill-priority target.
-- Target: the Warcamp is within ±3 pp of the tier-2 average (hollow, frost, moonlit).
+- Target: the Warcamp is within ±3 pp of the tier-2 average (hollow, frost).
 
 **Set piece and dressing:**
 - **Centre:** a giant war drum (`Orc_Wardrum` at 3×) on a log platform (`Wood_Log_Stack`,
@@ -160,42 +166,89 @@ Balance:
 
 ---
 
-## 4. Moonlit Woods (`moonlit`, tier 2)
+## 4. Moonlit Woods (`moonlit`, tier 3)
 
-*"The moon waxes as you walk. When it's full, the woods stop pretending to be quiet."*
+*"The moon waxes as you walk the last road. When it's full, the woods stop pretending to be
+quiet, and their king wakes."*
+
+### 4.1 Biome
 
 | field | value |
 |---|---|
-| Name / desc | **Moonlit Woods**: "The moon grows each lap. Under the full moon, werewolves are already changed, twice as many elites stalk the woods, and every fight pays 1.5× gold." |
-| Twist (`moon`) | **Phase = the lap's position in the biome:** 1 Crescent · 2 Half · **3 Full** · 4 Half · 5 Crescent (laps 6–10 on the standard road). **Half:** `transform` enemies change at **≤65% HP** instead of ≤50%. **Full:** `transform` enemies (werewolf, Moonfang) **start the fight in their second form**. The lap mutation *into* the Full lap spawns **+1 Elite** (2 in total). Fights on the Full lap pay **gold ×1.5**. **Crescent:** no effect. The HUD shows a moon icon with "Full moon in N laps". |
+| Name / desc | **Moonlit Woods**: "The moon grows each lap. Under the full moon, werewolves are already changed, twice as many elites stalk the woods, fights pay 1.5× gold, and a moonlit rune chest appears." |
+| Twist (`moon`) | **Phase = the lap's position in the biome:** 1 Crescent · 2 Half · **3 Full** · 4 Half · 5 Crescent. On the standard road that is **lap 11 Crescent, 12 Half, 13 Full, 14 Half, 15 Crescent**; the final boss follows lap 15. On the Short Road, the biome's laps 6–10 map the same way, so the Full lap is lap 8. **Half:** `transform` enemies change at **≤65% HP** instead of ≤50%. **Full:** see §4.2. **Crescent:** no effect. The HUD shows a moon icon with "Full moon in N laps". |
 | Tile mix (28) | `{"event": 1, "trap": -1}` (fairy-ring events; no traps in the woods) |
-| Early pool | wolf_bandit, thorn_sprite, werewolf, hollow_wisp |
-| Late pool | werewolf ×2, wolf_bandit, bandit |
-| Elite leader | **werewolf** (elite; uses the "Silverback" texture B via skin_rules) |
+| Early pool (laps 11–13) | werewolf, wolf_bandit, hollow_wisp, orc_raider |
+| Late pool (laps 14–15) | werewolf ×2, brute, wolf_bandit |
+| Elite leader | **werewolf** (elite; the "Silverback" texture B via skin_rules). This is now a tier-3 elite, with the lap-11+ scaling doing the work. |
 | Affixes | vampiric, regenerating, frenzied, warded (+gilded) |
-| Mini-boss candidates | **mini_moonfang** (home; on the Full lap it spawns already transformed if it is still up), **mini_briar_beast** (unused until now; the woods suit it) |
-| Core hooks | `RunState.moon_phase()` is derived from lap and biome (no new state). `CombatState.begin`: if transform and Full, start in phase 2 (emit `enemy_transformed {form: "wolf", source: "moon"}`). Transform threshold from phase. `Board.mutate`: extra elite when the next lap is Full. Gold mult in `_win`. |
+| Mini-boss candidates | `minibosses: ["mini_moonfang"]`. It is only drawn on the **Short Road** when Moonlit is the second biome (see §6.2); on the standard road the mini-boss always comes from tier 2. |
+| Final-boss candidates | **`boss_moon_king`** (new, §4.3) and **`boss_lich`** (the night's sorcerer; it now appears in Throne and Moonlit) |
+| Core hooks | `RunState.moon_phase()` is derived from lap and biome (no new state). `CombatState.begin`: if the enemy transforms and the phase is Full, start in phase 2 (emit `enemy_transformed {form: "wolf", source: "moon"}`). The transform threshold comes from the phase. `Board.mutate`: an extra elite and the moon chest when the next lap is Full. The gold mult is applied in `_win`. |
 
-Balance:
-- The Full lap is a spike (2 elites plus pre-transformed wolves) paid back by gold ×1.5 and more
-  elite passive drops. That is a push-your-luck lap: board rerolls to dodge elite tiles matter.
-- The tier-2 check is within ±3 pp. Watch deaths on lap 8 specifically: they should be at most
-  1.5× the tier-2 average per lap.
-- Tuning order: remove the +1 elite first, then the Half threshold.
+### 4.2 The Full lap (lap 13 standard, lap 8 Short Road)
 
-**Set piece and dressing:**
+At the **lap mutation into the Full lap** (on completing lap 12), in this order:
+1. **Double elites:** the mutation spawns **+1 Elite** (2 in total).
+2. **Moon rune chest:** the first Empty tile **3 to 8 tiles ahead** of the hero becomes a
+   `chest` with `moon: true`. If there is none in range, use the nearest Empty tile anywhere
+   ahead; if there are no Empty tiles, convert the nearest Event tile ahead.
+   - Landing on it always offers a **1-of-3 rune choice** (never the gold roll), and **at least
+     one of the three is Rare or Epic**. The draw uses the run Rng, restricted to the unlocked
+     rune pool.
+   - It is consumed on landing like any chest, and it persists until the biome ends.
+   - Event `tile_changed {idx, type: "chest", moon: true, source: "full_moon"}`. The tile gets a
+     silver moon glyph.
+3. **Transformed:** werewolves (and Moonfang, if met on a Short Road) start their fights in wolf
+   form.
+4. **Payout:** fights on the Full lap pay **gold ×1.5**.
+
+### 4.3 New final boss: `boss_moon_king`, "The Moon King"
+
+| field | value |
+|---|---|
+| Model | Phase 1: **`Werewolf_Man` (texture B, grey/blue)** at **1.9×**, with a crown extra (reusing the `crown` procedural piece from the Cinder King), a dark cape tint and silver eyes. Phase 2: it swaps to **`Werewolf_Wolf` (texture B)** at 1.9× (the same transform presentation as the regular werewolf), with a red-silver rim light and a blood-moon sky tint. |
+| HP | **1300** (Lich 1650, Colossus 1250, Cinder King 1200, Bone Warden 1150, Magma Golem 800) |
+| Unique mechanic: **Moon meter** | The meter runs **0 → 4** and shows as a moon icon filling on the boss HUD. It gains **+1 at the end of every enemy phase** ("the tide"). **Clouds:** in your attack, each die showing **exactly 1** pushes it back **−1** (max −2 per turn, and not below 0). A Wild or ★ never counts as 1. Low/Odd dice and the Frost rune (which triggers on 1s) become counterplay. |
+| Phase 1: "Lord of the Hunt" | attack 20 / block 24 / summon 1 (`wolf_bandit`, lap-scaled). **Moonrise:** if the meter reaches 4 in phase 1, it **immediately enters phase 2 regardless of HP** (its HP is unchanged), and the meter resets to 0. Otherwise phase 2 starts at ≤50% HP as usual. |
+| Phase 2: "Blood Moon" | drain 18 / attack 24 / attack 20. The meter keeps rising. At 4 its next intent is replaced by **Moonfall: attack 40 with pierce**, and the meter resets to 0. |
+| Why it's not a stat copy | The fight is a race between the tide and your dice: pushing the meter back with 1s delays the more dangerous wolf form and prevents Moonfall. It rewards a different build (low faces, Frost) from every other boss, which reward high damage (Lich), AoE (Warden), Cleanse (Cinder) or burst (Golem). |
+| Ascension | **A9** (the final boss starts with its phase-2 traits and +5% HP): the Moon King has no traits, so instead **its meter starts at 2**. **A10** double final: the other candidate (the Lich) at 40% HP. |
+| Core hooks | `CombatState.moon` (int, serialised; −1 = none). `_enemy_phase` end → +1 and `moon_meter {value, delta: +1, source: "tide"}`. `attack()` → count 1s → `moon_meter {delta, source: "clouds"}`. `boss_phase {forced: true, source: "moonrise"}` reuses the phase-switch code. New intent **`moonfall`** (attack N + pierce for that hit; icon: a falling moon). Summon id `wolf_bandit`. Short Road HP ×0.75 applies as for every boss. |
+| Bot awareness | Keep 1s when the meter is ≥ 2 (their value = the Moonrise or Moonfall damage avoided). Don't reroll a 1 away in phase 2 when the meter is 3. Pour damage in when a Moonrise is imminent and the boss HP is just above 50%. |
+| Target | boss-win% within **±5 pp** of the other five final bosses (`--boss=` table). Knobs: tide +1 per turn → +1 every other turn; Moonfall 40 → 34; clouds cap 2 → 3; HP 1300. |
+
+### 4.4 Moonfang resolution
+
+Moonfang (`mini_moonfang`, the werewolf mini-boss) can't be a lap-7 mini-boss from a tier-3 home.
+I considered three options:
+
+| option | verdict |
+|---|---|
+| A guaranteed elite on Moonlit's Full lap | Rejected. The Full lap already has double elites plus pre-transformed wolves; a 105-HP transformer on top would spike lap 13 deaths past the ≤1.5× per-lap cap. |
+| A phase-2 summon of the Moon King | Rejected. A mini-boss-sized add in a final boss fight is a stat wall, and it dilutes the meter mechanic, which should be the fight's identity. |
+| **A Hollow mini-boss candidate** (the one exception to "home biomes only") | **Chosen.** The Hollow is the Halloween biome, where a werewolf is canonical. Its lap-7 design (transform at half HP) is intact. The Hollow goes to 3 candidates (pumpkin_knight, grave_mage, moonfang), and it keeps the standard road's mini-boss variety up. Moonlit's `minibosses` list also names it, so on the **Short Road** (§6.2), a Moonlit second biome draws Moonfang as its mini-boss. It unlocks with the Moonlit milestone (`night_walker`), so meeting Moonfang foreshadows the woods. |
+
+Cross-link: if the run's route has **Hollow + Moonlit** and you killed Moonfang, the Moon King's
+meter **starts at −1**. It then needs 5 tides to rise, and the HUD says "Moonfang's fang dims the
+moon". The effect is small (about 1 extra turn before the tide), deterministic and flavourful.
+It can be cut if it complicates the sim.
+
+### 4.5 Set piece and dressing
+
 - **Centre:** a ring of tall standing stones (Forest `Rock_3_*` tall variants) around a huge
-  gnarled `Tree_Bare`, with a woodcutter's stump + `axe` and `log_stacks` (Werewolf set) nearby.
-- **Foliage:** Forest Nature trees and bushes in their **cool colour variants** (the teal, blue
-  and violet Color sets) for moonlit hues, grass tufts and some `Rock_1_*` boulders.
+  gnarled `Tree_Bare` turned into a **throne of roots** (the Moon King's seat; empty until the
+  final fight). Nearby: a woodcutter's stump with `axe` and `log_stacks` (Werewolf set).
+- **Foliage:** Forest Nature trees and bushes in their **cool colour variants** (teal, blue,
+  violet), plus grass tufts and `Rock_1_*` boulders.
 - **Sky:** a big moon disc behind the island. Its fill and size animate by phase (crescent →
-  full).
-- **Palette:** deep indigo, silver-blue moonlight, teal foliage, warm firefly pinpoints. At Full,
-  the moon tints slightly red-silver.
-- **Light:** a cool directional moon key, strong rim. Brightness rises by phase; at Full, a
-  subtle bloom and red rim on enemies.
-- **Particles:** fireflies, drifting leaves, low ground mist. A howl sting on Full.
-- **Music:** soft celesta and strings, distant howls; a swelling layer on the Full lap.
+  full), and it turns blood-red in the Moon King's phase 2.
+- **Palette:** deep indigo, silver-blue moonlight, teal foliage, warm firefly pinpoints.
+- **Light:** a cool directional moon key, strong rim. Brightness rises by phase.
+- **Particles:** fireflies, drifting leaves, low ground mist. A howl sting on Full and on
+  Moonrise.
+- **Music:** soft celesta and strings, distant howls, a swelling layer on the Full lap, and a
+  boss theme with a heartbeat pulse that quickens as the meter fills.
 
 ---
 
@@ -213,7 +266,7 @@ back."*
 | Late pool | bone_cutthroat, bone_golem, bone_knight, cultist |
 | Elite leader | **bone_golem** (Ruins look: a sandstone tint) |
 | Affixes | piercing, hexing, armored, frenzied (+gilded) |
-| Final-boss candidates | **boss_sand_colossus** (new), **boss_lich** (the tomb-lich reading; it also stays in the Throne) |
+| Final-boss candidates | **boss_sand_colossus** (new), **boss_bone_warden** (the tomb guardian and its bone legion; it also stays in the Throne). The Lich moved to Moonlit, so each existing Throne boss appears in exactly 2 biomes. |
 | Core hooks | `GameFlow` lap completion → the heat check (before the heal, after `lap_completed`); `oasis` landing handler. Both reuse the lava damage path (`never lethal`, Phoenix and Second Wind don't trigger). |
 
 **Heat maths:**
@@ -229,12 +282,12 @@ back."*
 | field | value |
 |---|---|
 | Model | Skeletons `Skeleton_Golem` (Rig_Large) at 1.8×, sandstone tint, with a buried-sarcophagus plinth. Phase 2 adds a swirling sand-storm aura. |
-| HP | **1250** (Lich 1650, Bone Warden 1150, Cinder King 1200, Magma Golem 800) |
+| HP | **1250** (Lich 1650, Moon King 1300, Cinder King 1200, Bone Warden 1150, Magma Golem 800) |
 | Phase 1 | attack 20 / block 26 / summon 1 (`bone_cutthroat`, lap-scaled) |
 | Phase 2 ("Sandstorm") | **bury 2** / attack 24 / attack 20; trait **pierce** |
 | Unique mechanic | **Bury** (new intent): locks **N** of your dice for your next turn (as curse N) **and** gains **10 Block per die buried**. Burying dice limits your combos just as the Colossus raises its guard. Pierce in phase 2 punishes Block builds. |
 | Core | `bury` = curse N + block (10·N), scaled like block. Intent icon: a die sinking into sand. |
-| Target | its boss-win% within ±5 pp of the other four final bosses (the `--boss=` table) |
+| Target | its boss-win% within ±5 pp of the other five final bosses (the `--boss=` table) |
 
 **Set piece and dressing:**
 - **Centre:** a half-buried tomb gate: Dungeon EXTRA `wall_archedwindow_open`, `wall_broken`,
@@ -256,22 +309,59 @@ back."*
 
 ## 6. Routes, tiers and Short Road
 
+### 6.1 Tiers (standard road)
+
 | tier | biomes | difficulty notes |
 |---|---|---|
 | 1 (laps 1–5) | glade (easy: heals), crypt (traps), **mines** (economy + traps) | all within ±3 pp of the tier mean |
-| 2 (laps 6–10) | hollow (events), frost (ice locks), **warcamp** (rally), **moonlit** (Full-moon spike) | warcamp and moonlit are the "aggressive" pair, and hollow and frost the "attrition" pair. Watch that the tier-2 spread stays ≤ 6 pp |
-| 3 (laps 11–15) | throne (elites), magma (lava), **ruins** (heat) | final bosses: lich (throne, ruins), bone_warden (throne), cinder_king and magma_golem (magma), **sand_colossus** (ruins) |
+| 2 (laps 6–10) | hollow (events), frost (ice locks), **warcamp** (rally) | mini-boss candidates: hollow 3 (pumpkin_knight, grave_mage, **moonfang**), frost 2 (frost_warden, bone_champion), warcamp 2 (orc_warchief, cinder_brute) |
+| 3 (laps 11–15) | throne (elites), magma (lava), **ruins** (heat), **moonlit** (moon spike) | final bosses: throne [lich, bone_warden] · magma [cinder_king, magma_golem] · ruins [**sand_colossus**, bone_warden] · moonlit [**moon_king**, lich] |
 
 Counts:
-- Standard routes: **36** (was 8). Mini-boss candidates: **8** (2 per tier-2 biome). Final
-  bosses: **5**.
-- Standard combinations: 36 × 2 × 2 = **144**.
-- **Short Road** (tier 1 + tier 3; it has no tier-2 biome, so the Warcamp and Moonlit never
-  appear): **9** routes. Its mini-boss still comes from the tier-2 list, as today.
+- Standard routes: **3 × 3 × 4 = 36**.
+- Combinations (route × mini-boss × final boss): 3 (tier 1) × (3 + 2 + 2 mini-boss choices over
+  the tier-2 biomes) × 4 (tier 3) × 2 (bosses per tier-3 biome) = **168** (was 32).
+- Unique final bosses: **6**. Unique mini-bosses in standard runs: **7**.
 - **Default new-profile route:** unchanged (Glade → Hollow → Throne).
-- `firsts.route_win` Sigils: 36 possible route wins (was 8). That is still a first-per-route
-  reward of 1 Sigil, and no Sigil inflation risk, because each route is a one-time first.
-  Watch the Sigil total in the campaign sim anyway.
+- `firsts.route_win` Sigils: 36 possible route wins, still a one-time first each (1 Sigil). Watch
+  the Sigil total in the campaign sim.
+
+### 6.2 Short Road (10 laps, 2 biomes): the second biome comes from tier 2 ∪ tier 3
+
+Today the Short Road route is [tier-1 biome, tier-3 biome], the mini-boss comes from the second
+biome's `minibosses` list, and the boss comes from its `bosses` list. It uses the effective laps
+`SHORT_EFF_LAPS` = [1, 2, 3, 4, 5, 7, 8, 9, 10, 11] (the second biome plays at standard-difficulty
+laps 7–11), with the mini-boss at lap 6 and the boss at 75% HP.
+
+**New rule:**
+1. **Draws:**
+   - `RunState.create` still draws the 3 standard tier picks (to keep the stream shape).
+   - In short mode it then makes **one extra draw**: `second = rng.pick(unlocked(TIERS[1] +
+     TIERS[2]))`, uniform over the 7 biomes (or the unlocked subset).
+   - `route = [tier1_pick, second]`.
+   - Short-mode seeds shift by one draw compared with today. Rebaseline the Short Road sim once.
+2. **Mini-boss (lap 6):** drawn from `second.minibosses`.
+   - Tier-2 biomes use their normal lists.
+   - Tier-3 lists: throne [bone_champion], magma [cinder_brute], ruins [bone_champion], moonlit
+     [**moonfang**].
+3. **Final boss (after lap 10, 75% HP):**
+   - Tier-3 second biome: its `bosses`.
+   - Tier-2 second biome: a new field **`short_bosses`**, used only here:
+     - hollow → [boss_lich, boss_bone_warden] (the spooky pair)
+     - frost → [boss_bone_warden, boss_lich]
+     - warcamp → [**boss_cinder_king**, boss_magma_golem] (the warlord's forge; the Cinder King
+       reads as an orc warlord).
+4. **Lap mapping and scaling:** unchanged. Whatever its tier, the second biome occupies laps
+   6–10 at effective laps 7–11. Its pools switch early → late after 3 laps, as today. Twists run
+   on the biome's own laps: Moonlit's Full lap is lap 8, and the Warcamp drums and Ruins heat
+   work per lap as described.
+5. **Short Road routes:** 3 × 7 = **21** (was 4). The fixed Short Road for a fresh profile
+   (Short Road unlocks later) is unchanged in content, since the tiers only offer unlocked
+   biomes.
+
+Check: the Short Road's 21 routes within ±3 pp of their mean. In particular, a tier-2 finale
+(Hollow, Frost, Warcamp) must not be easier than a tier-3 finale by more than 3 pp. If it is,
+the tier-2 `short_bosses` keep 75% HP while tier-3 bosses go to 70%.
 
 ---
 
@@ -285,12 +375,12 @@ Biomes are "major" unlocks, so no run gets a biome and a class.
 |---|---|---|---|---|---|---|
 | mines | `prospector` | **Cash out the Treasury 17 times** (existing `cashouts` counter; about 2.2 per run) | or play 12 runs | 5 | **8** | between Paladin (6) and Mage (10) |
 | warcamp | `warpath` | **Defeat 380 enemies** (the `kills` counter from the classes doc; about 32 per run) | or play 16 runs | 5 | **12** | between Mage (10) and Ranger (13) |
-| moonlit | `night_walker` | **Reach the second biome 16 times** (existing `act2_runs`) | or play 22 runs | 5 | **17** | between Rogue (15) and Ninja (19) |
+| moonlit | `night_walker` | **Reach the third biome 16 times** (existing `act3_runs`; realistic runs reach act 3 about 90% of the time) | or play 22 runs | 5 | **17** | between Rogue (15) and Ninja (19) |
 | ruins | `sun_seeker` | **Defeat 3 different final bosses** (`firsts.boss` size ≥ 3) | or play 26 runs | 5 | **21** | between Ninja (19) and Druid (23) |
 
 The new mini-bosses and final boss follow their biome:
 - mini_orc_warchief with `warpath`
-- mini_moonfang with `night_walker`
+- mini_moonfang (a Hollow candidate) and boss_moon_king with `night_walker`
 - boss_sand_colossus with `sun_seeker`.
 
 mini_cinder_brute and mini_briar_beast keep their existing `warden_slayer` unlock (they become
@@ -319,10 +409,10 @@ godot --headless --path . -s tools/sim.gd -- --campaign=40 --campaigns=5 --polic
 | every route (36) | win% within **±3 pp of the all-route mean** (realistic, mid and max). Use ≥ 150 runs per route; the table needs about 5,400 runs, so shard by seed. |
 | each biome's marginal (routes containing it) | within ±3 pp of its tier mean |
 | each twist alone (`--twist=off` delta) | costs or gives at most 4 pp (Mines should be about +1 to +2, Warcamp about −2, Moonlit about −1 to −2, Ruins about −2) |
-| deaths by lap | no single lap with more than 1.5× the average deaths per lap (watch Moonlit lap 8 and Warcamp lap 6) |
-| final bosses | Sand Colossus boss-win% within ±5 pp of the other four |
+| deaths by lap | no single lap with more than 1.5× the average deaths per lap (watch Moonlit lap 13 and Warcamp lap 6) |
+| final bosses | Sand Colossus and Moon King boss-win% each within ±5 pp of the mean of all 6 |
 | profile bands (unchanged) | realistic fresh 30–40% (the fresh route is unchanged), mid 45–50%, max 55–65%, max A10 20–30% |
-| Short Road | the 9 routes within ±3 pp |
+| Short Road | the 21 routes within ±3 pp; tier-2 finales vs tier-3 finales ≤ 3 pp apart |
 | campaign | biome unlock medians within ±2 runs of target; no run with 2 majors |
 
 Interactions to watch:
@@ -336,6 +426,9 @@ Interactions to watch:
   routes (≤ +5 pp over its mean).
 - **Moonlit × Necromancer:** the double elite on the Full lap feeds Bone dice (good), and the
   transformed wolves start with drain.
+- **Moon King × Druid:** the Druid's growing faces lose their 1s by lap 15, so it has less
+  counterplay against the meter. Check the Druid's Moon King boss-win% is within ±8 pp of its
+  mean vs other bosses; if not, raise the clouds cap to 3.
 
 ---
 
@@ -385,27 +478,31 @@ and bridges. **Proposal: purely cosmetic height per tile.** The rules stay a fla
 | 2 | Mines (ore offer, cave-in, `rock_golem`) + tests | core | S |
 | 3 | Ruins (heat, oasis) + `boss_sand_colossus` + `bury` intent | core | M |
 | 4 | Warcamp (drums → rally at fight start; rebuild) — needs `rally` from the classes/enemies doc step 7 | core | S |
-| 5 | Moonlit (phases, pre-transformed wolves, Full-lap elite) — needs `transform` | core | S |
-| 6 | Mini-boss home moves; milestones and pacing (§7); presets mid/max biomes | core/meta | S |
+| 5 | Moonlit (phases over laps 11–15, pre-transformed wolves, Full-lap elite and moon rune chest) — needs `transform` | core | S |
+| 5b | **`boss_moon_king`** (moon meter, clouds, Moonrise forced phase, `moonfall` intent, A9 rule, Moonfang cross-link) + bot awareness | core | M |
+| 5c | Short Road second-biome draw (tier 2 ∪ tier 3), `short_bosses`, tier-3 `minibosses` lists | core | S |
+| 6 | Mini-boss homes (Warchief → Warcamp; Moonfang → Hollow candidate); milestones and pacing (§7); presets mid/max biomes | core/meta | S |
 | 7 | Sim sweep (§8), then update `docs/plans/balance.md` "Biomes and routes" | sim/docs | M |
 | 8 | Visuals per biome (set pieces, tiles, light, particles, music), in the order Mines, Ruins, Warcamp, Moonlit | presentation | L (4 × M) |
 | 9 | Elevation (cosmetic) for Moonlit, Mines, Warcamp and Glade | presentation | M |
 
 ---
 
-## 11. Open questions for the user
+## 11. Decisions (resolved, user via the tech lead, 2026-09-29)
 
-1. **Tier placement:** is 3/4/3 (Mines in tier 1, Warcamp and Moonlit in tier 2, Ruins in tier
-   3) right? Or should Moonlit be tier 3 with its own new final boss, which would give
-   3/3/4 and a 6th boss?
-2. **Short Road:** tier-2 biomes never appear there (it is tier 1 + tier 3). Should the Short
-   Road instead draw its second biome from tiers 2 and 3 so the Warcamp and Moonlit show up?
-3. **Moonfang and the Orc Warchief** move to their home biomes (removed from Hollow and Frost).
-   OK, or do you want them in both?
-4. **Full-moon upside:** is gold ×1.5 enough of a reward for the double-elite lap, or should the
-   Full lap also guarantee a rune chest?
-5. **Heat is landing-only** (you pass every tile each lap, so "pass an oasis" would be free).
-   Is steering with the board reroll the fantasy you want, or do you prefer a softer version
-   where landing on an oasis cools you for 2 laps?
-6. **Elevation** stays cosmetic, with "high ground scouting" as the only rule idea. Is that
-   acceptable?
+1. **Tiers are 3/3/4.** Moonlit Woods is **tier 3** (laps 11–15, Full lap = lap 13) with its own
+   new final boss, **The Moon King** (§4.3), plus the Lich as its second candidate. The Ruins'
+   second candidate becomes the Bone Warden, so each existing Throne boss appears in 2 biomes.
+   Standard routes: 3×3×4 = **36**; combinations: **168**.
+2. **Moonfang:** it is a **Hollow mini-boss candidate** (the single exception to "home biomes
+   only"), plus Moonlit's Short Road mini-boss. The Full-lap elite and the phase-2 summon were
+   rejected (§4.4).
+3. **Short Road:** the second biome is drawn uniformly from the unlocked **tier 2 ∪ tier 3** set.
+   Tier-2 finales use the new `short_bosses` lists, and lap mapping and scaling are unchanged.
+   That gives **21** routes (§6.2).
+4. **The Full-moon lap** also guarantees a **moon rune chest** (§4.2) on top of the 1.5× gold and
+   the double elites.
+5. **Accepted as proposed:** mini-bosses in their home biomes only (except Moonfang); heat is
+   landing-only on oases; elevation stays cosmetic, with high-ground scouting as the only rule
+   idea to revisit later.
+
