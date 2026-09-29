@@ -8,6 +8,9 @@ extends Node3D
 ##   pet.set_charge(2, 3)                # charge pips orbiting it (size = PetDefs.size)
 ##   await pet.act("bite", enemy_pos)    # per-effect action (heal/bite/poison/reroll/block/gold/potion)
 ##
+## The six newer pets (pebble_golem, frost_mote, wick, tinker_gear, grimoire, cauldron) are
+## built and animated by PetViewExt; their acts take `opts` (targets, die_idx, face, color).
+##
 ## Node layout:  PetView (ground anchor; `home` is where it drifts to when `follow` is on)
 ##                 Shadow (blob on the ground)
 ##                 Float (hover height + bob)  > Body (yaw toward the camera, squash, spins)
@@ -28,7 +31,19 @@ const LOOKS := {
 	"crystal_wisp": [Color(0.55, 0.85, 1.0), 1.7],
 	"guard_die": [Color(0.5, 0.75, 1.0), 1.0],
 	"coin_mimic": [Color(1.0, 0.82, 0.3), 1.0],
+	"pebble_golem": [Color(1.0, 0.72, 0.5), 1.0],
+	"frost_mote": [Color(0.72, 0.92, 1.0), 1.5],
+	"wick": [Color(1.0, 0.55, 0.22), 1.8],
+	"tinker_gear": [Color(0.45, 1.0, 0.8), 1.0],
+	"grimoire": [Color(0.75, 0.52, 1.0), 1.4],
+	"cauldron": [Color(1.0, 0.5, 0.78), 1.3],
 }
+## Every pet with a model, in gallery order (the rules' PetDefs.IDS may not list them all yet).
+const ALL_IDS := ["pumpkin_sprite", "skull_buddy", "lantern_ghost", "crystal_wisp", "guard_die", "coin_mimic",
+	"pebble_golem", "frost_mote", "wick", "tinker_gear", "grimoire", "cauldron"]
+
+## Tinker's "fix" act reached the tray: the die to spin to `face` (-1 when unknown).
+signal fixed_die(die_idx: int, face: int)
 
 var pet_id := ""
 var level := 1
@@ -68,12 +83,24 @@ var _eyes: Array[Node3D] = []
 var _blink := 2.0
 var _scale := 1.0
 var _look_at := Vector3.INF
+## Moving parts of the PetViewExt pets.
+var parts := {}
 
 
 static func create(id: String, lvl := 1) -> PetView:
 	var p := PetView.new()
 	p.setup(id, lvl)
 	return p
+
+
+## Display name (PetDefs, else the model's own name for pets the rules don't know yet).
+static func display_name(id: String) -> String:
+	return PetDefs.name_of(id) if PetDefs.has(id) else String(PetViewExt.NAMES.get(id, id.capitalize()))
+
+
+## Charge meter size (PetDefs, else a placeholder).
+static func pips_for(id: String) -> int:
+	return PetDefs.size(id) if PetDefs.has(id) else int(PetViewExt.SIZES.get(id, 4))
 
 
 func _init() -> void:
@@ -110,6 +137,7 @@ func setup(id: String, lvl: int) -> void:
 	light.light_energy = float(look[1]) * (1.0 + 0.04 * (level - 1))
 	UiTheme.clear(model)
 	_eyes.clear()
+	parts.clear()
 	match id:
 		"pumpkin_sprite": _build_pumpkin()
 		"skull_buddy": _build_skull()
@@ -117,7 +145,11 @@ func setup(id: String, lvl: int) -> void:
 		"crystal_wisp": _build_crystal()
 		"guard_die": _build_die()
 		"coin_mimic": _build_mimic()
-		_: _build_crystal()
+		_:
+			if PetViewExt.has(id):
+				PetViewExt.build(self)
+			else:
+				_build_crystal()
 	# levels: a little bigger, and a golden aura at L10 (L5+ a faint sparkle)
 	_scale = 0.82 + 0.02 * (level - 1)
 	body.scale = Vector3.ONE * _scale
@@ -127,7 +159,7 @@ func setup(id: String, lvl: int) -> void:
 		var sp := Fx.elite_sparkle(float_root, Vector3(0, -0.25, 0), 0.3, 0.5)
 		sp.amount = 5
 		(sp.process_material as ParticleProcessMaterial).color = accent.lightened(0.3)
-	_build_pips(PetDefs.size(id) if PetDefs.has(id) else 4)
+	_build_pips(pips_for(id))
 	set_charge(0, size_pips)
 	Props.set_shadows(model, false)
 
@@ -618,6 +650,8 @@ func _process(dt: float) -> void:
 		_orbiters.rotation.y = _t * 1.6
 	if _jaw and not _acting:
 		_jaw.rotation.x = maxf(0.0, sin(_t * 3.1)) * 0.18
+	if not parts.is_empty():
+		PetViewExt.idle(self, dt)
 	if _glint:
 		var g := fmod(_t, 2.6)
 		_glint.scale = Vector3.ONE * (sin(clampf(g / 0.35, 0.0, 1.0) * PI) * 1.0 + 0.01)
@@ -721,7 +755,11 @@ func body_position() -> Vector3:
 
 ## Plays the action for a pet_acted effect. `target` is a world point (bite target, heal
 ## target) or Vector3.INF. Resolves at the impact moment; the pet drifts home on its own.
-func act(effect: String, target := Vector3.INF) -> void:
+## opts (PetViewExt pets): targets (Array of world points), die_idx, face, color.
+func act(effect: String, target := Vector3.INF, opts := {}) -> void:
+	if PetViewExt.has(pet_id):
+		await PetViewExt.act(self, effect, target, opts)
+		return
 	match effect:
 		"bite":
 			if target == Vector3.INF:

@@ -46,7 +46,7 @@ func _process(dt: float) -> void:
 	if not c.busy and f:
 		var ch := int(f.run.pet_state.get("charge", 0))
 		if ch != view.charge:
-			view.set_charge(ch, PetDefs.size(id), false)
+			view.set_charge(ch, view.size_pips, false)
 
 
 func _rebuild(f: GameFlow, id: String, key: String) -> void:
@@ -60,7 +60,7 @@ func _rebuild(f: GameFlow, id: String, key: String) -> void:
 	view = PetView.create(id, f.run.pet_level())
 	view.name = "PetFamiliar"
 	c.world.add_child(view)
-	view.set_charge(int(f.run.pet_state.get("charge", 0)), PetDefs.size(id))
+	view.set_charge(int(f.run.pet_state.get("charge", 0)), PetView.pips_for(id))
 	view.follow = true
 	view.scale = Vector3.ONE * (COMBAT_SCALE if c.in_combat else BOARD_SCALE)
 	if c.board and c.board.hero:
