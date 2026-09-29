@@ -52,6 +52,7 @@ func _init() -> void:
 func begin(p_hero: Character, anchor: Dictionary, enemy_list: Array) -> void:
 	clear()
 	hero = p_hero
+	hero.in_combat = true
 	hero_home = anchor.get("hero", p_hero.global_position)
 	facing = (anchor.get("facing", Vector3.FORWARD) as Vector3).normalized()
 	side = (anchor.get("side", facing.cross(Vector3.UP)) as Vector3).normalized()
@@ -497,7 +498,7 @@ func hero_attack(target_i: int, style := "") -> void:
 	if target_i >= enemies.size() or hero == null:
 		return
 	if style == "":
-		style = "magic" if hero.model_id == "mage" else ("ranged" if hero.model_id == "ranger" else "melee")
+		style = hero.style()
 	var ch := enemies[target_i]
 	var home := hero_home
 	_face(hero, ch.global_position, 0.12)
@@ -590,6 +591,7 @@ func clear() -> void:
 		_arena_mi.queue_free()
 		_arena_mi = null
 	if hero and is_instance_valid(hero):
+		hero.in_combat = false
 		hero.global_position = hero_home if hero_home != Vector3.ZERO else hero.global_position
 
 

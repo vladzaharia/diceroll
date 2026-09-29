@@ -196,8 +196,9 @@ sync "$MMS/10 - April 2024 - Paladin/assets/gltf" "$FOES/monthly/paladin/weapons
 	--include='paladin_hammer.*' --include='paladin_shield.*' --include='paladin_texture_A.png' --exclude='*'
 sync "$MMS/8 - February 2024 - Ninja/character" "$FOES/monthly/ninja" --include='Ninja.glb' --exclude='*'
 sync "$MMS/8 - February 2024 - Ninja/texture" "$FOES/monthly/ninja/textures"
-sync "$MMS/8 - February 2024 - Ninja/assets/gltf" "$FOES/monthly/ninja/weapons" --include='Ninja_Katana.*' --include='ninja_texture_A.png' --exclude='*'
-sync "$MMS/3 - September 2023 - Monster Costume/character/gltf" "$FOES/monthly/monster" --include='Monster.glb' --exclude='*'
+sync "$MMS/8 - February 2024 - Ninja/assets/gltf" "$FOES/monthly/ninja/weapons" --include='Ninja_Katana.*' --include='Ninja_Shuriken.*' --include='ninja_texture_A.png' --exclude='*'
+sync "$MMS/3 - September 2023 - Monster Costume/character/gltf" "$FOES/monthly/monster" --include='Monster.glb' \
+	--include='MonsterCostume.glb' --exclude='*'
 sync "$MMS/3 - September 2023 - Monster Costume/textures" "$FOES/monthly/monster/textures" --include='monstercostume_texture_*.png' --exclude='*'
 cp -f "$MMS/License.txt" "$FOES/monthly/License.txt"
 FWX="KayKit_FantasyWeaponsBits_1.0_EXTRA"
