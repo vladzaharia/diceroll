@@ -303,7 +303,8 @@ func _hit(row: int, x2: int, gold: Array) -> void:
 	_peg_flash[Vector2i(row, x2)] = time
 	_ball_sq = 1.0
 	_ball_face = randi_range(1, 6)
-	MgBoard.sfx("plink", 0.2, -3.0)
+	# the plinks climb in pitch as the ball goes down (a little random on top)
+	MgBoard.sfx("plink", 0.06, -3.0, 0.9 + row * 0.06)
 	burst(p, PEG, 4, "spark", 120.0, 30.0, 4.0)
 	if gold.size() == 2 and row == int(gold[0]) and x2 == int(gold[1]):
 		_ball_gold = true
