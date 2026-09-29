@@ -153,6 +153,8 @@ func _init() -> void:
 	_tip.z_index = 5
 	add_child(_tip)
 	resized.connect(_layout)
+	# the row's natural width changes with its content (lap pips, counters): re-fit
+	_row.minimum_size_changed.connect(_queue_layout)
 
 
 func _ready() -> void:
@@ -187,6 +189,18 @@ func _layout() -> void:
 	var extra := passives.size.y + 8.0 if not _passive_ids.is_empty() else 0.0
 	_scrim.position = Vector2.ZERO
 	_scrim.size = Vector2(view.x, safe.top + rh + extra + 90.0)
+
+
+var _layout_queued := false
+
+
+func _queue_layout() -> void:
+	if _layout_queued:
+		return
+	_layout_queued = true
+	(func() -> void:
+		_layout_queued = false
+		_layout()).call_deferred()
 
 
 ## True when a `w`-wide cluster fits on the HUD row's line (landscape, with a usable row).

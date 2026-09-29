@@ -20,7 +20,7 @@ var _frame: VBoxContainer
 ## Panel scale when its content is wider / taller than the screen allows (1 = natural size).
 var _fit := 1.0
 ## Narrowest layout width; narrower screens shrink the panel instead of squeezing it.
-const MIN_W := 560.0
+const MIN_W := 620.0
 var _center: Control
 var _scroll: ScrollContainer
 var _inner: MarginContainer
