@@ -279,7 +279,7 @@ static func _boo(c: GameController, i: int) -> void:
 
 ## A big comic "BOO!" in world space that punches in and wobbles.
 static func _boo_word(c: GameController, pos: Vector3) -> void:
-	var l := Fx.popup_text(c.world_parent(), pos, "BOO!", SCARE.lightened(0.15), 2.1, true)
+	var l := Fx.popup_text(c.world_parent(), pos, "BOO!", SCARE.lightened(0.15), 1.5, true)
 	l.outline_modulate = Color(0.1, 0.2, 0.05, 1.0)
 
 

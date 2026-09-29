@@ -239,7 +239,13 @@ func set_badge(text: String, color := Color(1.0, 0.82, 0.3), icon := "") -> void
 	l.add_theme_constant_override("outline_size", 6)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(l)
-	_badge.reset_size()
+	_fit_badge.call_deferred()
+
+
+func _fit_badge() -> void:
+	if _badge == null:
+		return
+	_badge.size = _badge.get_combined_minimum_size()
 	_badge.position = Vector2(FRAME_PX + 8.0, FRAME_PX + 6.0)
 
 

@@ -17,11 +17,21 @@ extends RefCounted
 ##                    monster_kid: boo (★ attack scares the target), cower (it skips its turn),
 ##                      flee (a weak scared foe runs off), star_board (★ on a board roll)
 ##                    any class: idle (a fight mid-turn: class badge, tray, preview)
+##  elite_affixed   an affixed elite line-up (game_combat): Gilded+Hexing Bone Golem leader, a
+##                  Warded warrior, with affix badge K of enemy I's tooltip open (--tip=I:K, 0:0)
+##  elite_affix_card  a fresh profile meets the Fallen Paladin (Frenzied + Vampiric) and a Thorned
+##                  Werewolf: the first-encounter card over the fight
 
 const ARM := preload("res://game/actors/armory_scenarios.gd")
 const ACT := preload("res://game/actors/scenarios.gd")
 
-const NAMES := ["class_looks", "class_moment"]
+const NAMES := ["class_looks", "class_moment", "elite_affixed", "elite_affix_card"]
+## game_combat args behind the affix scenarios (explicit command-line args win).
+const ELITES := {
+	"elite_affixed": {"elite": "1", "enemies": "bone_golem,skeleton_warrior,skeleton_minion", "affixes": "gilded+hexing,warded,-",
+		"cards": "0", "tip": "0:0"},
+	"elite_affix_card": {"elite": "1", "enemies": "fallen_paladin,werewolf", "affixes": "frenzied+vampiric,thorned"},
+}
 
 
 static func names() -> PackedStringArray:
@@ -35,6 +45,12 @@ static func build(name: String) -> Node:
 	match name:
 		"class_looks":
 			return _looks(args)
+		"elite_affixed", "elite_affix_card":
+			if Shot:
+				for k in ELITES[name]:
+					if not Shot.args.has(k):
+						Shot.args[k] = ELITES[name][k]
+			return load("res://game/scenarios.gd").build("game_combat")
 		"class_moment":
 			var d := _Moment.new()
 			d.name = "ClassMoment"
