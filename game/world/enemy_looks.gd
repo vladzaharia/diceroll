@@ -90,7 +90,8 @@ static func spawn_context(d: Variant, tile: int, prior: Array = [], biome := "",
 	var form := String(d.get("form", "")) if d is Dictionary else ""
 	return {"variant": variant_for(id, tile, prior), "tier": SkinRules.tier_for(biome),
 		"elite": elite or (bool(d.get("elite", false)) if d is Dictionary else false), "traits": traits.duplicate(),
-		"affixes": affixes, "biome": biome, "form": form if forms_of(id).has(form) else ""}
+		"affixes": affixes, "biome": biome, "form": form if forms_of(id).has(form) else "",
+		"phase": int(d.get("phase", 1)) if d is Dictionary else 1}
 
 
 static func _core_has(id: String) -> bool:
@@ -100,6 +101,16 @@ static func _core_has(id: String) -> bool:
 ## The final look for a spawn: variant + tier colourway + elite (regular enemies only).
 static func look(id: String, ctx: Dictionary = {}) -> Dictionary:
 	var L := def(id, int(ctx.get("variant", 0)), String(ctx.get("form", "")))
+	var by_biome: Dictionary = (EnemyRoster.BIOME_LOOKS.get(String(ctx.get("biome", "")), {}) as Dictionary).get(id, {})
+	if not by_biome.is_empty():
+		# gear merges slot by slot: the biome swaps one hand, the variant keeps the rest
+		var bl := by_biome.duplicate(true)
+		for key in ["gear", "gear_xf"]:
+			if bl.has(key):
+				var g: Dictionary = (L.get(key, {}) as Dictionary).duplicate()
+				g.merge(bl[key], true)
+				bl[key] = g
+		_merge(L, bl)
 	L["id"] = id
 	var unique := bool(L.get("boss", false)) or bool(L.get("miniboss", false))
 	var tier := clampi(int(ctx.get("tier", 1)), 1, 3)
@@ -112,7 +123,7 @@ static func look(id: String, ctx: Dictionary = {}) -> Dictionary:
 		if tex != null:
 			L["texture"] = tex
 		L["eye_glow"] = SkinRules.TIER_EYES[tier]
-		if tier == 3:
+		if tier == 3 and not bool(L.get("sandstone", false)):
 			var s := float(L.get("strength", 0.0))
 			var t: Color = L.get("tint", SkinRules.LATE_TINT)
 			L["tint"] = t.lerp(SkinRules.LATE_TINT, SkinRules.LATE_TINT_STRENGTH) if s > 0.0 else SkinRules.LATE_TINT
@@ -231,6 +242,10 @@ static func create(id: String, full := true, ctx: Dictionary = {}) -> Character:
 		_eyes(ch, L.eyes, L.get("eyes_offset", Vector3.ZERO) + (L.get("eyes_at", Vector3.ZERO) as Vector3))
 	for e in L.get("extras", []):
 		_extra(ch, L, String(e), full)
+	# a boss spawned already in phase 2 (a loaded fight) shows its phase-2 extras (the Colossus' sandstorm)
+	if int(ctx.get("phase", 1)) >= 2:
+		for e in L.get("phase2", []):
+			_extra(ch, L, String(e), full)
 	if bool(L.get("elite", false)):
 		ch.model.scale *= float(SkinRules.ELITE.scale)
 		if full:
@@ -745,18 +760,41 @@ static func _extra(ch: Character, L: Dictionary, kind: String, full: bool) -> vo
 					_cone(c, Vector3(0.4 + 0.2 * j, 1.62, -0.45) * k, 0.07 * k, 0.16 * k, cloth, Vector3(PI, 0, 0))
 				_dome(c, Vector3(0.3, 2.28, -0.45) * k, 0.07 * k, _mat(Color(0.9, 0.85, 0.7)))
 		"crown":
-			_crown(ch)
+			_crown(ch, L.get("crown_gem", Color(1.0, 0.3, 0.05)), L.get("crown_metal", Color(1.0, 0.72, 0.2)))
 		"rock_shell":
-			_rock_shell(ch)
+			_rock_shell(ch, L.get("rock", Color(0.52, 0.47, 0.46)))
+		"gem_crystals":
+			_gem_crystals(ch, L.get("gem", Color(0.3, 0.95, 0.88)), full)
+		"usekh":
+			_usekh(ch)
+		"sand_tomb":
+			if full:
+				_sand_tomb(ch)
+		"sandstorm":
+			if full:
+				sandstorm(ch)
+		"fur_mantle":
+			var fur: Color = L.get("fur", Color(0.78, 0.8, 0.88))
+			for b in ["upperarm.l", "upperarm.r"]:
+				var sk := _socket(ch, b)
+				if sk:
+					_blob(sk, Vector3(0, 0.12, -0.02) * k, 0.24 * k, fur.darkened(0.08), b.length(), Vector3(1.1, 0.75, 1.1))
+					_blob(sk, Vector3(0.06, 0.22, -0.08) * k, 0.16 * k, fur, b.length() + 3)
+		"moon_cloak":
+			_cloak(ch, Color(0.12, 0.13, 0.3), Color(0.55, 0.65, 1.0))
+		"blood_motes":
+			if full:
+				var p := Fx.elite_sparkle(ch, Vector3(0, 0.3, 0), 0.8, 2.4)
+				(p.process_material as ParticleProcessMaterial).color = Color(1.0, 0.45, 0.4)
 
 
 ## A gold crown with glowing ember gems (Cinder King, the Lich).
-static func _crown(ch: Character) -> void:
+static func _crown(ch: Character, gem_color := Color(1.0, 0.3, 0.05), metal := Color(1.0, 0.72, 0.2)) -> void:
 	var h := _socket(ch, "head")
 	h.name = "Crown"
 	var k := _rig_k(ch)
-	var y := {"skel_mage": 0.78, "barbarian_large": 0.62}.get(ch.model_id, 0.8) as float
-	var gold := _mat(Color(1.0, 0.72, 0.2), Color(0.4, 0.18, 0.0), 0.3)
+	var y := {"skel_mage": 0.78, "barbarian_large": 0.62, "werewolf_man": 0.98, "werewolf": 0.8}.get(ch.model_id, 0.8) as float
+	var gold := _mat(metal, metal * Color(0.4, 0.25, 0.0) if metal.b < 0.5 else metal * 0.18, 0.3)
 	gold.metallic = 0.8
 	var band := MeshInstance3D.new()
 	var cm := CylinderMesh.new()
@@ -769,7 +807,7 @@ static func _crown(ch: Character) -> void:
 	band.material_override = gold
 	band.position = Vector3(0, y, 0)
 	h.add_child(band)
-	var gem := _mat(Color(1.0, 0.3, 0.05), Color(1.0, 0.35, 0.05))
+	var gem := _mat(gem_color, gem_color * Color(1.0, 1.15, 1.0))
 	for i in 7:
 		var a := TAU * i / 7.0
 		_cone(h, Vector3(cos(a) * 0.37, y + 0.18, sin(a) * 0.37), 0.08, 0.26 if i % 2 == 0 else 0.18, gold)
@@ -788,8 +826,7 @@ static func _crown(ch: Character) -> void:
 
 ## Grey faceted rock plates over the Golem's glowing body; each piece is tagged so shatter()
 ## can throw them off.
-static func _rock_shell(ch: Character) -> void:
-	var rock := Color(0.52, 0.47, 0.46)
+static func _rock_shell(ch: Character, rock := Color(0.52, 0.47, 0.46)) -> void:
 	# sized for the Large rig (its chest is ~2 units wide): plates sit proud of the body so the
 	# lava glow shows only in the gaps between them
 	var pieces := {
@@ -815,6 +852,189 @@ static func _rock_shell(ch: Character) -> void:
 				mi.add_to_group("golem_shell")
 				mi.set_meta("shell", true)
 			k += 1
+
+
+## Ore crystals (the Rock Golem): glowing gem clusters bursting out of the shoulders and the back,
+## with a faint glint light in combat.
+static func _gem_crystals(ch: Character, gem: Color, full: bool) -> void:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = gem.lightened(0.15)
+	m.roughness = 0.15
+	m.metallic = 0.2
+	m.emission_enabled = true
+	m.emission = gem
+	m.emission_energy_multiplier = 1.1
+	m.rim_enabled = true
+	m.rim = 0.7
+	var spots := {"upperarm.l": [Vector3(0.1, 0.36, -0.05), 0.85, Vector3(0, 0, 0.5)],
+		"upperarm.r": [Vector3(-0.1, 0.36, -0.05), 0.75, Vector3(0, 0, -0.5)],
+		"chest": [Vector3(0.0, 0.8, -0.45), 1.0, Vector3(-0.6, 0, 0)],
+		"spine": [Vector3(0.35, 0.3, -0.45), 0.7, Vector3(-0.9, 0, -0.4)],
+		"lowerarm.l": [Vector3(0.12, 0.35, 0.2), 0.5, Vector3(0.9, 0, 0.4)],
+		"upperleg.r": [Vector3(-0.2, -0.1, 0.25), 0.45, Vector3(1.0, 0, -0.3)]}
+	var seed := 71
+	for b in spots:
+		var s := _socket(ch, String(b))
+		if s == null:
+			continue
+		var sp: Array = spots[b]
+		var cl := BiomeBlocks.crystal_cluster(s, sp[0], float(sp[1]), 4, seed, false, m)
+		cl.rotation = sp[2]
+		seed += 13
+	if full:
+		var l := OmniLight3D.new()
+		l.name = "GemGlint"
+		l.light_color = gem
+		l.light_energy = 0.12
+		l.omni_range = 1.8
+		l.position = Vector3(0, 2.4, -0.8)
+		ch.add_child(l)
+
+
+## The Sand Colossus' regalia: a broad usekh collar of gold and lapis rings over the chest and
+## gold caps on its horns, with a turquoise gem at the brow.
+static func _usekh(ch: Character) -> void:
+	var gold := _mat(Color(1.0, 0.76, 0.28), Color(0.25, 0.12, 0.0), 0.35)
+	gold.metallic = 0.7
+	var lapis := _mat(Color(0.12, 0.32, 0.78), Color(0.0, 0.04, 0.12), 0.5)
+	var c := _socket(ch, "chest")
+	if c:
+		c.name = "Usekh"
+		for i in 3:
+			var ring := MeshInstance3D.new()
+			var tm := TorusMesh.new()
+			tm.inner_radius = 0.5 + 0.1 * i
+			tm.outer_radius = 0.64 + 0.1 * i
+			tm.rings = 16
+			tm.ring_segments = 6
+			ring.mesh = tm
+			ring.material_override = gold if i != 1 else lapis
+			ring.position = Vector3(0, USEKH_Y - 0.06 * i, 0.22 + 0.02 * i)
+			ring.rotation.x = deg_to_rad(38.0)
+			ring.scale = Vector3(1.0, 1.0, 0.8)
+			c.add_child(ring)
+	var h := _socket(ch, "head")
+	if h:
+		var gem := MeshInstance3D.new()
+		var sm := SphereMesh.new()
+		sm.radius = 0.08
+		sm.height = 0.12
+		gem.mesh = sm
+		gem.material_override = _mat(Color(0.3, 0.9, 1.0), Color(0.2, 0.8, 1.0))
+		gem.position = Vector3(0, 0.62, 0.42)
+		h.add_child(gem)
+		gem.name = "BrowGem"
+
+
+## Collar height on the Large rig's chest bone.
+const USEKH_Y := 0.8
+
+
+## The Colossus' tomb (combat only): a sand drift around its feet and its sarcophagus half-buried,
+## tilted, behind it.
+static func _sand_tomb(ch: Character) -> void:
+	var sand := Color(0.9, 0.76, 0.52)
+	var sarc := Props.put(ch, Props.HAL + "coffin_decorated.gltf", Vector3(-1.05, -0.12, -1.25), 35.0, 0.62)
+	sarc.name = "Sarcophagus"
+	sarc.rotation.z = deg_to_rad(-8.0)
+	Props.tint(sarc, Color(0.92, 0.72, 0.42), 0.75, Color(0.08, 0.05, 0.0))
+	for j in 4:
+		var a := 2.2 + 0.55 * j
+		var m := _blob(ch, Vector3(cos(a) * 1.25, -0.05, sin(a) * 0.9 - 0.2), 0.34 + 0.06 * (j % 2), sand.darkened(0.04 * j),
+			90 + j, Vector3(1.6, 0.4, 1.0))
+		m.name = "SandMound%d" % j
+
+
+## Phase 2 of the Sand Colossus: a swirling sand-storm aura (a spiralling particle column, a
+## churning ground ring and a warm glow). Safe to call twice.
+static func sandstorm(ch: Character) -> void:
+	if not is_instance_valid(ch) or ch.get_node_or_null("Sandstorm"):
+		return
+	var root := Node3D.new()
+	root.name = "Sandstorm"
+	ch.add_child(root)
+	var p := GPUParticles3D.new()
+	p.amount = 90
+	p.lifetime = 2.2
+	p.preprocess = 2.0
+	var pm := ParticleProcessMaterial.new()
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_RING
+	pm.emission_ring_axis = Vector3.UP
+	pm.emission_ring_radius = 1.4
+	pm.emission_ring_inner_radius = 0.9
+	pm.emission_ring_height = 0.2
+	pm.direction = Vector3.UP
+	pm.spread = 10.0
+	pm.initial_velocity_min = 0.8
+	pm.initial_velocity_max = 1.6
+	pm.gravity = Vector3.ZERO
+	pm.orbit_velocity_min = 0.45
+	pm.orbit_velocity_max = 0.7
+	pm.radial_velocity_min = -0.15
+	pm.radial_velocity_max = 0.05
+	pm.scale_min = 0.6
+	pm.scale_max = 1.4
+	var grad := Gradient.new()
+	grad.offsets = PackedFloat32Array([0.0, 0.2, 0.75, 1.0])
+	var sc := Color(0.95, 0.78, 0.5, 0.75)
+	grad.colors = PackedColorArray([Color(sc, 0.0), sc, Color(sc, 0.5), Color(sc, 0.0)])
+	var gt := GradientTexture1D.new()
+	gt.gradient = grad
+	pm.color_ramp = gt
+	p.process_material = pm
+	var q := QuadMesh.new()
+	q.size = Vector2(0.55, 0.55)
+	q.material = Props.particle_material("dot", false)
+	p.draw_pass_1 = q
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	p.visibility_aabb = AABB(Vector3(-3, -1, -3), Vector3(6, 6, 6))
+	root.add_child(p)
+	var grit := Fx.elite_sparkle(root, Vector3(0, 0.2, 0), 1.3, 3.0)
+	(grit.process_material as ParticleProcessMaterial).color = Color(1.0, 0.86, 0.55)
+	var ring := Biome._rune_circle(Color(1.0, 0.72, 0.35), 1.6)
+	ring.name = "StormRing"
+	ring.position.y = 0.05
+	(ring.material_override as ShaderMaterial).set_shader_parameter("intensity", 0.6)
+	root.add_child(ring)
+	var l := OmniLight3D.new()
+	l.light_color = Color(1.0, 0.7, 0.35)
+	l.light_energy = 1.4
+	l.omni_range = 3.4
+	l.position = Vector3(0, 1.4, 1.0)
+	root.add_child(l)
+
+
+## A cloak hanging from the shoulders down the back (a bent, faceted sheet) with a clasp.
+static func _cloak(ch: Character, cloth: Color, trim: Color) -> void:
+	var c := _socket(ch, "chest")
+	if c == null:
+		return
+	c.name = "Cloak"
+	var m := _mat(cloth, cloth * 0.15, 0.85)
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var t := _mat(trim, trim * 0.35, 0.4)
+	for i in 3:
+		var sheet := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(0.78 + 0.1 * i, 0.42, 0.05)
+		sheet.mesh = bm
+		sheet.material_override = m
+		sheet.position = Vector3(0, 0.42 - 0.38 * i, -0.3 - 0.07 * i)
+		sheet.rotation.x = deg_to_rad(8.0 + 6.0 * i)
+		c.add_child(sheet)
+	for i in 8:
+		var a := PI * 0.9 + TAU * 0.6 * float(i) / 7.0
+		_blob(c, Vector3(cos(a) * 0.3, 0.6 + 0.03 * (i % 2), sin(a) * 0.24 - 0.04), 0.13, Color(0.78, 0.8, 0.88).lightened(0.06 * (i % 3)),
+			120 + i, Vector3(1.0, 0.8, 1.0))
+	for sx in [-1.0, 1.0]:
+		var clasp := MeshInstance3D.new()
+		var sm := SphereMesh.new()
+		sm.radius = 0.07
+		sm.height = 0.1
+		clasp.mesh = sm
+		clasp.material_override = t
+		clasp.position = Vector3(sx * 0.3, 0.55, -0.12)
+		c.add_child(clasp)
 
 
 ## Magma Golem phase 2: the rock shell cracks off (pieces fly out and fall), the body flares.

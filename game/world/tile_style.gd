@@ -3,7 +3,7 @@ extends RefCounted
 ## Tile colours and the small 3D prop that identifies each tile type.
 
 const TYPES := ["start", "forge", "treasury", "portal", "enemy", "elite", "miniboss", "chest", "event", "campfire",
-	"trap", "ice", "lava", "minigame", "empty"]
+	"trap", "ice", "lava", "minigame", "ore", "drum", "oasis", "empty"]
 
 ## Inset top colour per type (sRGB).
 const COLORS := {
@@ -21,8 +21,15 @@ const COLORS := {
 	"ice": Color(0.66, 0.88, 1.0),
 	"lava": Color(1.0, 0.4, 0.12),
 	"minigame": Color(0.98, 0.42, 0.74),
+	# 2026-09-29 biomes: Deep Mines ore vein (raw gold in slate), Orc Warcamp war drum (hide and
+	# war paint), Sunscorched Ruins oasis (turquoise water)
+	"ore": Color(0.78, 0.6, 0.2),
+	"drum": Color(0.62, 0.3, 0.16),
+	"oasis": Color(0.1, 0.72, 0.86),
 	"empty": Color(0.7, 0.66, 0.6),
 }
+## Moonlit Woods: the moon rune chest's silver top (a chest tile with `moon`).
+const MOON_CHEST := Color(0.74, 0.78, 1.0)
 
 ## Plinth (base) colour per biome (BlockBits biomes take theirs from BiomeBlocks.LOOKS).
 const BASE := {"crypt": Color(0.46, 0.42, 0.42), "hollow": Color(0.42, 0.34, 0.3), "throne": Color(0.34, 0.33, 0.42)}
@@ -46,6 +53,13 @@ static func color(type: String) -> Color:
 	return COLORS.get(type, COLORS["empty"])
 
 
+## Top colour of a tile dict (the moon rune chest is silver).
+static func tile_color(t: Dictionary) -> Color:
+	if String(t.get("type", "")) == "chest" and bool(t.get("moon", false)):
+		return MOON_CHEST
+	return color(String(t.get("type", "empty")))
+
+
 static func glyph(type: String) -> String:
 	match type:
 		"event":
@@ -55,7 +69,9 @@ static func glyph(type: String) -> String:
 
 ## Builds the identifying prop for a tile type. Props sit around y = 0 (the tile top) and
 ## fit inside ~1.4 x 1.4. Enemy figures are not included (BoardView adds Characters).
-static func make_prop(type: String, game := "") -> Node3D:
+## `opts`: {biome (the board's biome id: its own trap / tile looks), moon (a Moonlit rune chest),
+## smashed (an Empty Warcamp tile keeps a smashed drum's staves)}.
+static func make_prop(type: String, game := "", opts := {}) -> Node3D:
 	var root := Node3D.new()
 	root.name = "Prop_" + type
 	match type:
@@ -95,7 +111,9 @@ static func make_prop(type: String, game := "") -> Node3D:
 			var swirl := Fx.portal_swirl(root, Vector3(0, 0.72, -0.25), 0.62, false)
 			swirl.name = "Swirl"
 		"chest":
-			if Props.has(RES + "Gems_Chest.gltf"):
+			if bool(opts.get("moon", false)):
+				root.add_child(_moon_chest())
+			elif Props.has(RES + "Gems_Chest.gltf"):
 				# an open chest spilling gems, with a gold key in front
 				Props.put(root, RES + "Gems_Chest.gltf", Vector3(0, 0, -0.18), -12.0, 0.5)
 				var k := Props.put(root, DUN_X + "key_gold.gltf", Vector3(0.38, 0.05, 0.42), -35.0, 0.42)
@@ -117,14 +135,26 @@ static func make_prop(type: String, game := "") -> Node3D:
 				Props.put(root, RES + "Wood_Log_Stack.gltf", Vector3(-0.5, 0, -0.5), 35.0, 0.26)
 				Props.put(root, RES + "Food_Basket_A_Berries.gltf", Vector3(0.52, 0, -0.5), 0.0, 0.34)
 		"trap":
-			var spikes := Props.put(root, Props.DUN + "floor_tile_big_spikes.gltf", Vector3(0, -0.03, 0), 0.0, 0.34)
-			spikes.scale = Vector3(0.36, 0.3, 0.36)
+			if String(opts.get("biome", "")) == "mines":
+				root.add_child(_cave_in())
+			else:
+				var spikes := Props.put(root, Props.DUN + "floor_tile_big_spikes.gltf", Vector3(0, -0.03, 0), 0.0, 0.34)
+				spikes.scale = Vector3(0.36, 0.3, 0.36)
 		"ice":
 			root.add_child(_ice_slab())
 		"lava":
 			root.add_child(_lava_vent())
 		"minigame":
 			root.add_child(MinigameProps.make(game))
+		"ore":
+			root.add_child(_ore_vein())
+		"drum":
+			root.add_child(_war_drum())
+		"oasis":
+			root.add_child(_oasis())
+		"empty":
+			if bool(opts.get("smashed", false)):
+				root.add_child(_smashed_drum())
 		"enemy":
 			pass
 		"elite":
@@ -333,4 +363,275 @@ static func _campfire() -> Node3D:
 	n.add_child(ember)
 	Biome.flame(n, Vector3(0, 0.25, 0), Color(1.0, 0.5, 0.15), 0.5, 14)
 	Biome.flicker_light(n, Vector3(0, 0.8, 0), Color(1.0, 0.55, 0.2), 1.4, 3.2)
+	return n
+
+
+# --- 2026-09-29 biome tiles (docs/design/2026-09-29-new-biomes.md) ----------------------------
+
+static var _gems: Dictionary = {}
+
+
+## Glassy gem material (ore veins, crystals): `color` with an inner glow.
+static func gem_material(color: Color, glow := 0.9) -> StandardMaterial3D:
+	var key := "%s|%.2f" % [color.to_html(), glow]
+	if _gems.has(key):
+		return _gems[key]
+	var m := StandardMaterial3D.new()
+	m.albedo_color = color
+	m.roughness = 0.15
+	m.metallic = 0.3
+	m.emission_enabled = true
+	m.emission = color
+	m.emission_energy_multiplier = glow
+	m.rim_enabled = true
+	m.rim = 0.7
+	m.rim_tint = 0.3
+	_gems[key] = m
+	return m
+
+
+## Deep Mines ore vein: a slate outcrop split by glowing gold crystals, a heap of nuggets and a
+## pickaxe leaning on it, a warm glint.
+static func _ore_vein() -> Node3D:
+	var n := Node3D.new()
+	n.name = "OreVein"
+	var slate := Color(0.66, 0.63, 0.7)
+	var r := BiomeBlocks.rock(n, Vector3(-0.2, -0.05, -0.22), 0.36, slate, 71, true)
+	r.name = "Outcrop"
+	r.scale = Vector3(0.44, 0.5, 0.36)
+	var r2 := BiomeBlocks.rock(n, Vector3(0.28, -0.05, -0.38), 0.22, slate.darkened(0.1), 72, true)
+	r2.scale.y *= 0.8
+	var gold := gem_material(Color(1.0, 0.72, 0.22), 1.1)
+	var c := BiomeBlocks.crystal_cluster(n, Vector3(-0.2, 0.2, -0.12), 0.34, 5, 73, false, gold)
+	c.name = "GoldVein"
+	var c2 := BiomeBlocks.crystal_cluster(n, Vector3(0.3, 0.08, -0.28), 0.2, 3, 74, false, gem_material(Color(0.3, 0.95, 0.9), 1.0))
+	c2.rotation.z = -0.5
+	if Props.has(RES + "Gold_Nuggets.gltf"):
+		Props.put(n, RES + "Gold_Nuggets.gltf", Vector3(0.36, 0, 0.3), 30.0, 0.5)
+	if Props.has(TOOLS_X + "pickaxe.gltf"):
+		var pk := Props.put(n, TOOLS_X + "pickaxe.gltf", Vector3(-0.45, 0.28, 0.32), 70.0, 0.42)
+		pk.rotation.z = deg_to_rad(-60.0)
+	var l := OmniLight3D.new()
+	l.name = "Glow"
+	l.light_color = Color(1.0, 0.72, 0.3)
+	l.light_energy = 0.8
+	l.omni_range = 1.8
+	l.position = Vector3(-0.1, 0.7, 0.2)
+	n.add_child(l)
+	var gl := Fx.elite_sparkle(n, Vector3(-0.15, 0.25, -0.1), 0.35, 0.5)
+	gl.name = "Glint"
+	(gl.process_material as ParticleProcessMaterial).color = Color(1.0, 0.85, 0.4)
+	return n
+
+
+## Deep Mines trap: the cave-in. Fallen rubble, a snapped prop beam and loose stones.
+static func _cave_in() -> Node3D:
+	var n := Node3D.new()
+	n.name = "CaveIn"
+	var rb := Props.put(n, Props.DUN + "rubble_half.gltf", Vector3(-0.05, -0.02, -0.08), 25.0, 0.3)
+	rb.name = "Rubble"
+	var slate := Color(0.62, 0.6, 0.66)
+	for i in 4:
+		var at := [Vector3(0.45, 0, 0.38), Vector3(-0.5, 0, 0.4), Vector3(0.52, 0, -0.35), Vector3(0.05, 0, 0.5)][i] as Vector3
+		var r := BiomeBlocks.rock(n, at, 0.1 + 0.03 * (i % 2), slate.lightened(0.05 * i), 90 + i, true)
+		r.scale.y *= 0.7
+	var beam := MeshInstance3D.new()
+	beam.name = "Beam"
+	var bx := BoxMesh.new()
+	bx.size = Vector3(0.14, 0.14, 1.15)
+	beam.mesh = BiomeBlocks.solid(bx, Color(0.46, 0.3, 0.18), 0.01, 5)
+	beam.position = Vector3(0.12, 0.28, -0.02)
+	beam.rotation = Vector3(deg_to_rad(24.0), deg_to_rad(38.0), 0.0)
+	n.add_child(beam)
+	return n
+
+
+## Orc Warcamp drum tile: a war drum on a low log stand, the beater across it, a red war-paint
+## streamer on a short stake.
+static func _war_drum() -> Node3D:
+	var n := Node3D.new()
+	n.name = "WarDrum"
+	var orc := Dressing.ORC
+	if Props.has(RES + "Wood_Log_A.gltf"):
+		for sx in [-1.0, 1.0]:
+			var lg := Props.put(n, RES + "Wood_Log_A.gltf", Vector3(sx * 0.3, 0.06, -0.05), 90.0, 0.34)
+			lg.name = "Stand"
+	var drum := Props.put(n, orc + "Orc_Wardrum.gltf.glb", Vector3(0, 0.12, -0.05), 20.0, 0.62)
+	drum.name = "Drum"
+	var stick := Props.put(n, orc + "Orc_WardrumStick.gltf.glb", Vector3(0.28, 0.72, 0.12), 0.0, 0.62)
+	stick.rotation = Vector3(deg_to_rad(10.0), deg_to_rad(-30.0), deg_to_rad(-70.0))
+	var stake := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.025
+	cm.bottom_radius = 0.035
+	cm.height = 0.95
+	cm.radial_segments = 5
+	stake.mesh = BiomeBlocks.solid(cm, Color(0.42, 0.28, 0.18))
+	stake.position = Vector3(-0.5, 0.47, -0.45)
+	n.add_child(stake)
+	var flag := MeshInstance3D.new()
+	flag.name = "Streamer"
+	var pm := PrismMesh.new()
+	pm.size = Vector3(0.3, 0.42, 0.02)
+	flag.mesh = pm
+	flag.material_override = Props.flat_material(Color(0.72, 0.1, 0.08), 0.8)
+	flag.position = Vector3(-0.36, 0.72, -0.45)
+	flag.rotation.z = deg_to_rad(-90.0)
+	n.add_child(flag)
+	var ft := flag.create_tween().set_loops()
+	ft.tween_property(flag, "rotation:y", deg_to_rad(18.0), 0.9).set_trans(Tween.TRANS_SINE)
+	ft.tween_property(flag, "rotation:y", deg_to_rad(-12.0), 0.9).set_trans(Tween.TRANS_SINE)
+	return n
+
+
+## A smashed drum's remains on an Empty Warcamp tile: split staves, the torn hide, the beater.
+static func _smashed_drum() -> Node3D:
+	var n := Node3D.new()
+	n.name = "SmashedDrum"
+	var wood := Color(0.55, 0.36, 0.2)
+	for i in 5:
+		var st := MeshInstance3D.new()
+		var bx := BoxMesh.new()
+		bx.size = Vector3(0.11, 0.03, 0.46 - 0.05 * (i % 3))
+		st.mesh = BiomeBlocks.solid(bx, wood.lightened(0.06 * (i % 2)), 0.008, 30 + i)
+		var a := TAU * float(i) / 5.0 + 0.3
+		st.position = Vector3(cos(a) * 0.32, 0.03 + 0.02 * (i % 2), sin(a) * 0.3)
+		st.rotation = Vector3(deg_to_rad(8.0 * (i % 3)), a + 0.6, deg_to_rad(12.0 * ((i % 2) * 2 - 1)))
+		n.add_child(st)
+	var hide := MeshInstance3D.new()
+	hide.name = "Hide"
+	var cyl := CylinderMesh.new()
+	cyl.top_radius = 0.26
+	cyl.bottom_radius = 0.26
+	cyl.height = 0.02
+	cyl.radial_segments = 9
+	hide.mesh = BiomeBlocks.solid(cyl, Color(0.86, 0.74, 0.55), 0.03, 12)
+	hide.position = Vector3(0.02, 0.03, -0.05)
+	hide.rotation = Vector3(deg_to_rad(10.0), 0.4, deg_to_rad(-6.0))
+	n.add_child(hide)
+	Dressing.lying(n, Dressing.ORC + "Orc_WardrumStick.gltf.glb", Vector3(-0.2, 0.0, 0.3), 60.0, 0.55)
+	return n
+
+
+static var _water_mat: StandardMaterial3D
+
+
+## Clear turquoise water (oasis tiles and pools).
+static func water_material() -> StandardMaterial3D:
+	if _water_mat:
+		return _water_mat
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(0.16, 0.72, 0.8, 0.9)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.roughness = 0.05
+	m.metallic_specular = 0.9
+	m.emission_enabled = true
+	m.emission = Color(0.1, 0.55, 0.65)
+	m.emission_energy_multiplier = 0.6
+	m.rim_enabled = true
+	m.rim = 0.5
+	_water_mat = m
+	return m
+
+
+## Sunscorched Ruins oasis: a turquoise pool ringed by grassy sand, a small green tree and a bush,
+## reeds and a sparkle on the water.
+static func _oasis() -> Node3D:
+	var n := Node3D.new()
+	n.name = "Oasis"
+	var rim := MeshInstance3D.new()
+	rim.name = "Rim"
+	var rc := CylinderMesh.new()
+	rc.top_radius = 0.6
+	rc.bottom_radius = 0.66
+	rc.height = 0.06
+	rc.radial_segments = 12
+	rim.mesh = BiomeBlocks.solid(rc, Color(0.86, 0.74, 0.5), 0.02, 3)
+	rim.position = Vector3(0.0, 0.01, 0.05)
+	n.add_child(rim)
+	var pool := MeshInstance3D.new()
+	pool.name = "Water"
+	var wc := CylinderMesh.new()
+	wc.top_radius = 0.52
+	wc.bottom_radius = 0.52
+	wc.height = 0.02
+	wc.radial_segments = 14
+	pool.mesh = wc
+	pool.material_override = water_material()
+	pool.position = Vector3(0.05, 0.05, 0.12)
+	pool.scale = Vector3(1.0, 1.0, 0.82)
+	pool.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	n.add_child(pool)
+	# grass tufts and reeds around the water
+	var tufts := MultiMesh.new()
+	tufts.transform_format = MultiMesh.TRANSFORM_3D
+	tufts.use_colors = true
+	tufts.mesh = BiomeBlocks.tuft_mesh()
+	tufts.instance_count = 11
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 19
+	for k in 11:
+		var a := PI * (0.95 + 1.1 * float(k) / 10.0) + rng.randf_range(-0.1, 0.1)
+		var rr := 0.58 + rng.randf_range(-0.03, 0.04)
+		var sc := rng.randf_range(0.55, 0.8) * (1.3 if k % 4 == 0 else 1.0)
+		tufts.set_instance_transform(k, Transform3D(Basis().rotated(Vector3.UP, rng.randf() * TAU).scaled(Vector3(sc, sc * 1.3, sc)),
+			Vector3(cos(a) * rr + 0.05, 0.03, sin(a) * rr * 0.86 + 0.12)))
+		tufts.set_instance_color(k, Color(0.36, 0.66, 0.24).lightened(rng.randf_range(-0.1, 0.12)))
+	var tm := MultiMeshInstance3D.new()
+	tm.name = "Reeds"
+	tm.multimesh = tufts
+	tm.material_override = BiomeBlocks._grass_material(Color.WHITE)
+	tm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	n.add_child(tm)
+	var tree := BiomeBlocks.round_tree(n, Vector3(-0.52, 0.0, -0.5), 0.24, Color(0.36, 0.68, 0.26), 41, true)
+	tree.name = "Tree"
+	var b := BiomeBlocks.bush(n, Vector3(0.55, 0.0, -0.5), 0.3, Color(0.4, 0.7, 0.3), 42, true)
+	b.name = "Bush"
+	var sp := Fx.elite_sparkle(n, Vector3(0.05, 0.08, 0.12), 0.35, 0.25)
+	sp.name = "Sparkle"
+	(sp.process_material as ParticleProcessMaterial).color = Color(0.7, 1.0, 1.0)
+	return n
+
+
+## A moon glyph quad (the moon shader): `fill` lit fraction, billboarded when `face_camera`.
+static func moon_quad(size: float, fill := 0.3, face_camera := true, glow := 0.55) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.name = "MoonGlyph"
+	mi.mesh = Props.quad(size)
+	var m := ShaderMaterial.new()
+	m.shader = preload("res://game/world/shaders/moon.gdshader")
+	m.set_shader_parameter("fill", fill)
+	m.set_shader_parameter("billboard", face_camera)
+	m.set_shader_parameter("glow", glow)
+	mi.material_override = m
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return mi
+
+
+## Moonlit Woods moon rune chest: a silvered chest with a glowing crescent hovering over it and
+## silver motes.
+static func _moon_chest() -> Node3D:
+	var n := Node3D.new()
+	n.name = "MoonChest"
+	var path := DUN_X + "chest_large.gltf" if Props.has(DUN_X + "chest_large.gltf") else Props.DUN + "chest.gltf"
+	var ch := Props.put(n, path, Vector3(0, 0, -0.15), -12.0, 0.46)
+	ch.name = "Chest"
+	Props.tint(ch, Color(0.62, 0.7, 0.95), 0.5, Color(0.04, 0.06, 0.16))
+	var glyph := Node3D.new()
+	glyph.name = "Glyph"
+	glyph.position = Vector3(0.0, 1.05, -0.1)
+	n.add_child(glyph)
+	glyph.add_child(moon_quad(0.9, 0.3, true, 0.9))
+	var t := glyph.create_tween().set_loops()
+	t.tween_property(glyph, "position:y", 1.2, 1.2).set_trans(Tween.TRANS_SINE)
+	t.tween_property(glyph, "position:y", 1.02, 1.2).set_trans(Tween.TRANS_SINE)
+	var l := OmniLight3D.new()
+	l.light_color = Color(0.7, 0.8, 1.0)
+	l.light_energy = 1.1
+	l.omni_range = 2.2
+	l.position = Vector3(0, 0.9, 0.2)
+	n.add_child(l)
+	var sp := Fx.elite_sparkle(n, Vector3(0, 0.15, -0.1), 0.5, 1.0)
+	sp.name = "Motes"
+	(sp.process_material as ParticleProcessMaterial).color = Color(0.8, 0.88, 1.0)
 	return n

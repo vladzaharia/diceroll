@@ -8,7 +8,10 @@ signal event_chosen(index: int)
 const ART := {
 	"shrine": ["star", Color("ffd86a")], "duel": ["dice", UiPalette.DIE_BODY], "outbreak": ["skull", Color("efe6d4")],
 	"garden": ["rune_lucky", Color("7ad35a")], "merchant": ["coin", UiPalette.COIN], "idol": ["curse", UiPalette.CURSE],
+	"ore": ["ore", Color("c4bcd4")],
 }
+## Frame colour per event id (default violet); the Deep Mines ore vein is teal.
+const RIM := {"ore": Color("3fb8aa")}
 const CHOICE_ICONS := {
 	"atk": "sword", "max_hp": "heart", "gold": "3d:coins", "face": "anvil",
 }
@@ -33,10 +36,11 @@ func _build() -> void:
 func refresh(flow: GameFlow) -> void:
 	var o := flow.offer
 	var id := String(o.get("id", ""))
-	set_title(String(o.get("title", "Event")).to_upper(), Color("9a7ae0"))
+	var rim: Color = RIM.get(id, Color("9a7ae0"))
+	set_title(String(o.get("title", "Event")).to_upper(), rim)
 	UiTheme.clear(_art)
 	var art: Array = ART.get(id, ["star", UiPalette.GOLD])
-	_art.add_child(OptionCard.Medallion.make(art[0], 132, art[1], Color("9a7ae0")))
+	_art.add_child(OptionCard.Medallion.make(art[0], 132, art[1], rim))
 	_text.text = String(o.get("text", ""))
 	UiTheme.clear(_choices)
 	var choices: Array = o.get("choices", [])
@@ -46,7 +50,7 @@ func refresh(flow: GameFlow) -> void:
 		var icon := _choice_icon(id, ch, i)
 		if icon != "":
 			c.set_icon(icon)
-		c.set_tag("", Color("9a7ae0"))
+		c.set_tag("", rim)
 		c.set_enabled(bool(ch.get("enabled", true)))
 		if not bool(ch.get("enabled", true)):
 			c.set_tag("LOCKED", UiPalette.TEXT_MUTED)
@@ -58,6 +62,8 @@ func refresh(flow: GameFlow) -> void:
 static func _choice_icon(id: String, ch: Dictionary, i: int) -> String:
 	if ch.has("blessing"):
 		return CHOICE_ICONS.get(String(ch.blessing), "star")
+	if ch.has("ore"):
+		return "3d:coins" if String(ch.ore) == "gold" else "anvil"
 	match id:
 		"duel":
 			return "coin" if int(ch.get("bet", 0)) > 0 else "arrow_right"

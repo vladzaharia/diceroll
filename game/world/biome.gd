@@ -6,9 +6,10 @@ extends RefCounted
 ##   var world := Biome.build("frost", board.ring_extent())
 ##   add_child(world)
 ##
-## Biomes are picked by id (BiomeDefs ids: crypt, hollow, throne, glade, frost, magma). An int
-## is still accepted and read as a legacy act number (1 crypt, 2 hollow, 3 throne). The three
-## BlockBits biomes (glade, frost, magma) are dressed in BiomeBlocks.
+## Biomes are picked by id (BiomeDefs ids: crypt, hollow, throne, glade, frost, magma, mines,
+## warcamp, ruins, moonlit). An int is still accepted and read as a legacy act number (1 crypt,
+## 2 hollow, 3 throne). The BlockBits biomes (glade, frost, magma and the four 2026-09-29 biomes)
+## are dressed in BiomeBlocks.
 ##
 ## Each biome keeps a fixed frame (floor / terrain, walls, sky); the rest is seeded dressing
 ## (game/world/dressing/: set piece, side / front kits, moat corners, palettes, MultiMesh
@@ -23,13 +24,15 @@ extends RefCounted
 
 ## Legacy act number -> biome id (old saves, act-only callers).
 const NAMES := {1: "crypt", 2: "hollow", 3: "throne"}
-const IDS := ["glade", "crypt", "hollow", "frost", "throne", "magma"]
+const IDS := ["glade", "crypt", "hollow", "frost", "throne", "magma", "mines", "warcamp", "ruins", "moonlit"]
 const ISLAND_HALF := 11.0
 ## Outer ring edge the dressing layout was authored for (7x7 ring, PITCH 2.1).
 const BASE_EXTENT := 7.35
 
 ## Layout scale for the biome being built (see build()).
 static var _s := 1.0
+## build() options for the biome being built (see build()).
+static var _opts := {}
 
 ## Per-biome look. Colours are sRGB.
 const LOOKS := {
@@ -99,8 +102,10 @@ static func seed_of(id: String) -> int:
 ## `variant_seed` picks the seeded dressing (set piece, kits, palettes, scatter; see
 ## Dressing): the same seed always builds the same board, the game passes one derived from
 ## the run seed so every run looks different.
-static func build(b: Variant, extent := BASE_EXTENT, variant_seed := 0) -> Node3D:
+## `opts`: {moon_phase} (Moonlit Woods: the phase the sky moon starts in).
+static func build(b: Variant, extent := BASE_EXTENT, variant_seed := 0, opts := {}) -> Node3D:
 	var id := id_of(b)
+	_opts = opts
 	_s = maxf(extent / BASE_EXTENT, 0.6)
 	var root := Node3D.new()
 	root.name = "Biome_" + id
@@ -144,6 +149,11 @@ static func build(b: Variant, extent := BASE_EXTENT, variant_seed := 0) -> Node3
 ## Current layout scale (dressing spreads by it; see build()).
 static func layout_scale() -> float:
 	return _s
+
+
+## build() option of the biome being built (e.g. "moon_phase").
+static func opt(key: String, default: Variant = null) -> Variant:
+	return _opts.get(key, default)
 
 
 ## Spreads authored dressing out to the real ring size: positions scale by _s in x/z and
@@ -560,6 +570,37 @@ static func ambient_particles(kind: String) -> GPUParticles3D:
 			col = Color(1.0, 0.55, 0.15, 1.0)
 			size = 0.1
 			tex = "hard"
+		"ash":
+			# Orc Warcamp: grey ash and a few sparks drifting up from the fires
+			p.amount = 80
+			p.lifetime = 8.0
+			p.position = Vector3(0, 0.8, 0)
+			pm.direction = Vector3.UP
+			pm.spread = 35.0
+			pm.initial_velocity_min = 0.15
+			pm.initial_velocity_max = 0.45
+			pm.gravity = Vector3(0.12, 0.08, 0.04)
+			pm.turbulence_enabled = true
+			pm.turbulence_noise_strength = 0.7
+			pm.turbulence_noise_scale = 2.6
+			col = Color(0.72, 0.66, 0.62, 0.7)
+			size = 0.08
+		"sand":
+			# Sunscorched Ruins: sand streaming low across the island on the wind
+			p.amount = 140
+			p.lifetime = 5.0
+			p.position = Vector3(0, 0.6, 0)
+			pm.emission_box_extents = Vector3(13.0, 0.6, 12.0)
+			pm.direction = Vector3(1.0, 0.05, 0.25)
+			pm.spread = 10.0
+			pm.initial_velocity_min = 1.4
+			pm.initial_velocity_max = 2.6
+			pm.gravity = Vector3(0.2, -0.05, 0.0)
+			pm.turbulence_enabled = true
+			pm.turbulence_noise_strength = 0.35
+			pm.turbulence_noise_scale = 3.5
+			col = Color(1.0, 0.88, 0.62, 0.55)
+			size = 0.07
 		"wisps":
 			p.amount = 70
 			p.lifetime = 8.0
@@ -577,6 +618,9 @@ static func ambient_particles(kind: String) -> GPUParticles3D:
 	if kind == "embers":
 		grad.colors = PackedColorArray([Color(1.0, 0.9, 0.5, 0.0), Color(1.0, 0.75, 0.3, 1.0),
 			Color(1.0, 0.35, 0.08, 0.9), Color(0.6, 0.1, 0.05, 0.0)])
+	if kind == "ash":
+		grad.colors = PackedColorArray([Color(0.7, 0.66, 0.62, 0.0), Color(0.72, 0.66, 0.62, 0.7),
+			Color(0.95, 0.55, 0.3, 0.5), Color(0.4, 0.36, 0.34, 0.0)])
 	if kind == "wisps":
 		grad.colors = PackedColorArray([Color(0.6, 0.4, 1.0, 0.0), Color(0.6, 0.45, 1.0, 0.9),
 			Color(0.4, 1.0, 0.9, 0.8), Color(0.4, 1.0, 0.9, 0.0)])

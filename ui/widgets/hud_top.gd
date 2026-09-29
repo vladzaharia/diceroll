@@ -1,8 +1,10 @@
 class_name HudTop
 extends Control
 ## Shared top HUD: level/XP medallion, HP bar (+ hero block shield), gold, treasury,
-## lap chip ("LAP 6/15" + this biome's lap pips, tinted per biome) and the pause button,
-## with the passives bar (tap / hover an icon for its name and effect) underneath.
+## the biome twist chip (the 2026-09-29 biomes only: Moonlit moon phase, Ruins heat / oasis
+## cool, Warcamp standing drums, Mines ore veins), lap chip ("LAP 6/15" + this biome's lap
+## pips, tinted per biome) and the pause button, with the passives bar (tap / hover an icon
+## for its name and effect) underneath.
 ## Anchored to the top edge inside the safe area; centred and width-capped in landscape.
 ##
 ## Counters only move on refresh() (a full sync once playback ends) and on the events
@@ -46,6 +48,12 @@ var _block := 0
 var burn_badge: Control
 var _burn_label: Label
 var _burn := 0
+## Biome twist chip (see set_twist()): glyph + short label, hidden outside the new biomes.
+var twist_chip: PanelContainer
+var _twist_icon: TextureRect
+var _twist_moon: _MoonGlyph
+var _twist_label: Label
+var _twist_key := ""
 ## Landscape: width reserved right of the HUD row for the AUTO / speed cluster, so the row
 ## and the cluster form one centred group inside the layout column (0 = none).
 var side_reserve := 0.0
@@ -132,9 +140,27 @@ func _init() -> void:
 	act.add_theme_stylebox_override("panel", UiTheme.panel_box("pill"))
 	act.mouse_filter = Control.MOUSE_FILTER_PASS
 	_act_chip = act
-	# lap chip lives on the chips row, right aligned
+	# lap chip lives on the chips row, right aligned (the twist chip just before it)
 	var fill := UiTheme.spacer(0, true)
 	chips.add_child(fill)
+	twist_chip = PanelContainer.new()
+	twist_chip.name = "TwistChip"
+	twist_chip.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.panel_box("pill"), 10, 2))
+	twist_chip.mouse_filter = Control.MOUSE_FILTER_PASS
+	twist_chip.visible = false
+	chips.add_child(twist_chip)
+	var tr := UiTheme.hbox(4)
+	tr.alignment = BoxContainer.ALIGNMENT_CENTER
+	twist_chip.add_child(tr)
+	_twist_icon = UiIcons.rect("sun", 32)
+	_twist_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	tr.add_child(_twist_icon)
+	_twist_moon = _MoonGlyph.new()
+	_twist_moon.custom_minimum_size = Vector2(30, 30)
+	_twist_moon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	tr.add_child(_twist_moon)
+	_twist_label = UiTheme.label("", 20, UiPalette.TEXT, true, 5)
+	tr.add_child(_twist_label)
 	chips.add_child(act)
 	var ar := UiTheme.hbox(8)
 	act.add_child(ar)
@@ -295,6 +321,7 @@ func refresh(flow: GameFlow, animate := false) -> void:
 	set_block(run.block if flow.phase == GameFlow.Phase.COMBAT else 0, animate)
 	set_burn(flow.combat.hero_burn if flow.phase == GameFlow.Phase.COMBAT and flow.combat else 0)
 	set_passives(Array(run.passives))
+	set_twist(flow)
 	sync_class(flow)
 
 
@@ -322,6 +349,10 @@ func copy_from(o: HudTop) -> void:
 	route = o.route
 	set_lap(o._act, o._lap)
 	set_passives(o._passive_ids)
+	if o._twist_key != "":
+		_show_twist(o._twist_key)
+	else:
+		twist_chip.visible = false
 	if o.class_badge.class_id != "":
 		class_badge.set_class(o.class_badge.class_id)
 		class_badge.visible = o.class_badge.visible
@@ -483,6 +514,80 @@ func _set_laps(act: int, lap: int) -> void:
 		lap_pips.add_child(dot)
 
 
+const MOON_FILL := {"crescent": 0.3, "half": 0.55, "full": 1.0}
+const TWIST_COLORS := {"moon": Color("c8d4ff"), "heat": Color("ffb340"), "cool": Color("6ae0f0"),
+	"drums": Color("ff7a5a"), "ore": Color("6ae8d8")}
+
+
+## The biome twist chip from the run's current state (hidden outside the new biomes).
+func set_twist(flow: GameFlow, animate := false) -> void:
+	var run := flow.run
+	var key := ""
+	match run.twist():
+		"moon":
+			var ph := run.moon_phase()
+			key = "moon:%s:%d" % [ph, run.laps_to_full_moon()]
+		"heat":
+			key = "heat:%s" % ("cool" if run.cooled_lap == run.lap else "hot")
+		"drums":
+			key = "drums:%d" % run.board.count("drum")
+		"ore":
+			key = "ore:%d" % run.board.count("ore")
+	_show_twist(key, animate)
+
+
+## Shows a twist state key ("moon:<phase>:<laps to full>", "heat:hot|cool", "drums:<n>",
+## "ore:<n>"; "" hides the chip).
+func _show_twist(key: String, animate := false) -> void:
+	var changed := key != _twist_key
+	_twist_key = key
+	twist_chip.visible = key != ""
+	if key == "":
+		return
+	var parts := key.split(":")
+	var kind := parts[0]
+	var col: Color = TWIST_COLORS.get(kind, UiPalette.TEXT)
+	_twist_moon.visible = kind == "moon"
+	_twist_icon.visible = kind != "moon"
+	var text := ""
+	var tip := ""
+	match kind:
+		"moon":
+			var ph := parts[1]
+			var n := int(parts[2])
+			_twist_moon.fill = float(MOON_FILL.get(ph, 0.3))
+			_twist_moon.queue_redraw()
+			text = "FULL MOON" if ph == "full" else ("FULL IN %d" % n if n > 0 else "WANING")
+			tip = "Moonlit Woods: %s. Half moon: werewolves turn at 65%% HP. Full moon: they start changed, twice the elites, fights pay ×1.5 gold and a moon rune chest appears." % ph.capitalize()
+		"heat":
+			var cool := parts[1] == "cool"
+			col = TWIST_COLORS.cool if cool else TWIST_COLORS.heat
+			_twist_icon.texture = UiIcons.tex("oasis" if cool else "sun", 64)
+			text = "COOL" if cool else "HOT"
+			tip = "Sunscorched Ruins: the heat costs %d%% max HP at this lap's end unless you land on an oasis. %s" % [
+				int(round(BiomeDefs.HEAT_PCT * 100.0)), "You're cooled for this lap." if cool else "Land on an oasis to cool off."]
+		"drums":
+			var d := int(parts[1])
+			_twist_icon.texture = UiIcons.tex("drum", 64)
+			text = "+%d ATK" % (d * BiomeDefs.DRUM_RALLY) if d > 0 else "SILENT"
+			col = col if d > 0 else UiPalette.TEXT_DIM
+			tip = "Orc Warcamp: %d war drum%s standing; every foe gets +%d ATK per drum at fight start. Land on a drum to smash it." % [
+				d, "" if d == 1 else "s", BiomeDefs.DRUM_RALLY]
+		"ore":
+			var o := int(parts[1])
+			_twist_icon.texture = UiIcons.tex("ore", 64)
+			text = "%d ORE" % o
+			tip = "Deep Mines: land on an ore vein for gold or a Face Raise; the vein then caves in and becomes a trap."
+	_twist_label.text = text
+	_twist_label.label_settings = UiTheme.label_settings(20, col.lerp(Color.WHITE, 0.15), true, 5)
+	twist_chip.tooltip_text = tip
+	var sb := UiTheme.pad(UiTheme.panel_box("pill"), 10, 2).duplicate() as StyleBoxFlat
+	sb.border_color = Color(col, 0.75)
+	twist_chip.add_theme_stylebox_override("panel", sb)
+	if animate and changed and is_inside_tree():
+		UiTheme.pop(twist_chip, 1.3, 0.35)
+
+
 ## Animation hooks for gameplay events.
 func on_event(ev: Dictionary, flow: GameFlow) -> void:
 	match String(ev.get("type", "")):
@@ -532,6 +637,43 @@ func on_event(ev: Dictionary, flow: GameFlow) -> void:
 		"act_started":
 			set_lap(int(ev.get("act", _act)), int(ev.get("lap", _lap)))
 			treasury.set_value(int(ev.get("treasury", flow.run.treasury)), false)
+			set_twist(flow)
+		"moon_phase":
+			_show_twist("moon:%s:%d" % [String(ev.get("phase", "")), int(ev.get("laps_to_full", -1))], true)
+		"heat":
+			_show_twist("heat:hot", false)
+		"oasis":
+			_show_twist("heat:cool", true)
+		"drum_smashed":
+			_show_twist("drums:%d" % int(ev.get("drums", 0)), true)
+		"board_mutated", "tile_changed":
+			if flow.run.twist() in ["drums", "ore"]:
+				set_twist(flow, true)
+
+
+## A small moon, lit from the right by `fill` (0 new .. 1 full), in the HUD's outlined style.
+class _MoonGlyph:
+	extends Control
+	var fill := 0.3
+
+	func _draw() -> void:
+		var c := size * 0.5
+		var r := minf(size.x, size.y) * 0.5
+		draw_circle(c, r, UiPalette.OUTLINE)
+		var mr := r - 2.5
+		draw_circle(c, mr, Color("2c3458"))
+		var pts := PackedVector2Array()
+		var n := 24
+		for i in n + 1:
+			var t := -1.0 + 2.0 * float(i) / float(n)
+			pts.append(c + Vector2(mr * sqrt(maxf(1.0 - t * t, 0.0)), mr * t))
+		var k := cos(PI * clampf(fill, 0.0, 1.0))
+		for i in range(n - 1, 0, -1):
+			var t := -1.0 + 2.0 * float(i) / float(n)
+			pts.append(c + Vector2(mr * k * sqrt(maxf(1.0 - t * t, 0.0)), mr * t))
+		if fill > 0.02:
+			draw_colored_polygon(pts, Color("eef2ff"))
+		draw_circle(c + Vector2(mr * 0.3, -mr * 0.25), mr * 0.14, Color(0.6, 0.66, 0.85, 0.5 if fill > 0.5 else 0.0))
 
 
 class _Pip:

@@ -12,6 +12,8 @@ var _combo_mult := 1.0
 var _combo_group: Array[int] = []
 var _swung := false          # hero already swung at the target for this attack
 var _pending_curse := false
+var _moon_turned := false    # a Full-moon transform beat already played this fight
+var _drum_gain := 0          # attack each enemy gains from the Warcamp drums this fight
 
 
 func _init(controller: GameController) -> void:
@@ -123,6 +125,28 @@ func _one(ev: Dictionary) -> void:
 			await BiomeBeats.lava(c, ev)
 		"enemy_healed":
 			await BiomeBeats.enemy_healed(c, ev)
+		# --- 2026-09-29 biome twists (game/flow/twist_beats.gd) ------------------------------
+		"ore_mined":
+			await TwistBeats.ore_mined(c, ev)
+		"tile_changed":
+			match String(ev.get("source", "")):
+				"cave_in":
+					await TwistBeats.cave_in(c, ev)
+				"full_moon":
+					await TwistBeats.moon_chest(c, ev)
+		"drum_smashed":
+			await TwistBeats.drum_smashed(c, ev)
+		"rally":
+			_drum_gain = int(ev.get("value", 0))
+			await TwistBeats.drum_rally(c, ev)
+		"heat":
+			await TwistBeats.heat(c, ev)
+		"oasis":
+			await TwistBeats.oasis(c, ev)
+		"moon_phase":
+			await TwistBeats.moon_phase(c, ev)
+		"moon_meter":
+			await TwistBeats.moon_meter(c, ev)
 		"duel":
 			var mine: Array = ev.player
 			var theirs: Array = ev.npc
@@ -215,12 +239,17 @@ func _one(ev: Dictionary) -> void:
 			await _game_over(ev)
 		# --- combat --------------------------------------------------------------------
 		"combat_started":
+			_moon_turned = false
 			await c.begin_combat(ev)
 			await EncounterCards.after_combat_started(c, ev)
 		"affix_triggered":
 			await AffixBeats.affix_triggered(c, ev)
 		"enemy_transformed":
-			await AffixBeats.transformed(c, ev)
+			if String(ev.get("source", "")) == "moon":
+				await TwistBeats.moon_transformed(c, ev, not _moon_turned)
+				_moon_turned = true
+			else:
+				await AffixBeats.transformed(c, ev)
 		"combat_turn_started":
 			_swung = false
 			c.tray.clear_highlight()
@@ -259,13 +288,8 @@ func _one(ev: Dictionary) -> void:
 			c.overlay.toast("A minion rises!", "skull", UiPalette.TEXT)
 			await _wait(0.7)
 		"boss_phase":
-			if int(ev.enemy_idx) < c.stage.enemy_count():
-				c.stage.set_enemy(int(ev.enemy_idx), {"traits": ev.get("traits", []), "phase": int(ev.phase)})
-			c.rig.shake(0.9, 0.6)
-			Fx.flash(c, Color(0.8, 0.2, 0.3, 0.45), 0.5)
-			var nm := String(c.stage.data[int(ev.enemy_idx)].get("name", "The boss")) if int(ev.enemy_idx) < c.stage.data.size() else "The boss"
-			c.overlay.announce("PHASE %d" % int(ev.phase), "%s grows furious!" % nm, UiPalette.DANGER, 1.0)
-			await _wait(1.1)
+			# phase-2 beats per boss (the Moon King's wolf form and blood moon, the Colossus' sandstorm)
+			await BossBeats.boss_phase(c, ev)
 		"combat_won":
 			await c.end_combat(ev)
 		# --- minigames (game/minigames/minigame_beats.gd) ---------------------------------
@@ -421,6 +445,8 @@ func _board_mutated(ev: Dictionary) -> void:
 		var same := String(cur.type) == String(ch.type) and Array(cur.enemies) == Array(ch.enemies)
 		if same:
 			continue
+		if String(cur.type) == "drum" and String(ch.type) == "empty":
+			continue  # the drum_smashed beat that follows breaks it (TwistBeats.drum_smashed)
 		if String(ch.type) == "miniboss":
 			mini = idx
 			continue
@@ -495,6 +521,10 @@ func _tile_triggered(ev: Dictionary) -> void:
 			Fx.portal_swirl(c.board, c.board.tile_position(idx) + Vector3.UP * 0.7, 0.8, true)
 		"enemy", "elite", "miniboss":
 			Audio.play_sfx("swing")
+		"ore":
+			Audio.play_sfx("tin")
+		"oasis":
+			Audio.play_sfx("heal")
 	await _wait(0.3)
 
 
@@ -590,8 +620,12 @@ func _damage(ev: Dictionary) -> void:
 		var attacker := int(ev.get("attacker", -1))
 		if BiomeBeats.hero_damage(c, ev):
 			attacker = -1
+		var moonfall := attacker >= 0 and attacker < c.stage.data.size() \
+			and String((c.stage.data[attacker].get("intent", {}) as Dictionary).get("kind", "")) == "moonfall"
 		if attacker >= 0:
 			await c.stage.enemy_attack(attacker)
+		if moonfall:
+			await TwistBeats.moonfall_strike(c)
 		await c.stage.hero_hit(amount, blocked)
 		if bool(ev.get("lethal", false)):
 			c.board.hero.play_once("death", "")
@@ -661,7 +695,9 @@ func _status(ev: Dictionary) -> void:
 			return
 		match st:
 			"curse":
-				if bool(ev.get("pending", false)):
+				if bool(ev.get("bury", false)):
+					await TwistBeats.bury(c, ev)
+				elif bool(ev.get("pending", false)):
 					var src := int(ev.get("source", -1))
 					if src >= 0 and src < c.stage.enemy_count():
 						var ch: Character = c.stage.enemies[src]
@@ -695,7 +731,10 @@ func _status(ev: Dictionary) -> void:
 		await AffixBeats.frenzy(c, ev)
 		return
 	if bool(ev.get("rally", false)):
-		await AffixBeats.rally(c, ev)
+		if str(ev.get("source", "")) == "drum":
+			await TwistBeats.drum_rally_enemy(c, ev, _drum_gain)
+		else:
+			await AffixBeats.rally(c, ev)
 		return
 	match st:
 		"poison":

@@ -5,7 +5,8 @@ render_mode unshaded, depth_test_disabled, depth_draw_never, cull_disabled, shad
 // 5 unknown (dot) 6 aim (crosshair: the archer takes aim, no attack this turn) 7 chaos (spiral)
 // 8 heal (plus) 9 drain (fang over a heart) 10 burn (flame) 11 chill (sword + snowflake)
 // 12 scorch (flame on a die) 13 armor (plated shield) 14 thorns (bramble ring) 15 ward (dome)
-// 16 pierce (cracked shield)
+// 16 pierce (cracked shield) 17 bury (a die sinking into sand) 18 moonfall (a crescent falling
+// with streaks)
 
 uniform int kind = 0;
 uniform vec4 bg_color : source_color = vec4(0.85, 0.2, 0.2, 1.0);
@@ -152,6 +153,27 @@ float icon(vec2 p) {
 		float crack = abs(q.x + 0.14 * sin(q.y * 9.0)) - 0.045;
 		crack = max(crack, abs(q.y) - 0.42);
 		return max(s, -crack);
+	} else if (kind == 17) {
+		// a tilted die half under a sand wave
+		vec2 q = rot(p - vec2(0.0, 0.12), 0.22);
+		float die_b = box(q, vec2(0.27, 0.27)) - 0.06;
+		float pips = min(min(circle(q - vec2(-0.13, 0.13), 0.055), circle(q, 0.055)), circle(q - vec2(0.13, -0.13), 0.055));
+		float d = max(die_b, -pips);
+		float wave = p.y - (-0.08 + 0.06 * sin(p.x * 7.0));
+		d = max(d, -wave);
+		float sand = max(abs(p.y + 0.3 - 0.05 * sin(p.x * 7.0)) - 0.09, abs(p.x) - 0.5);
+		return min(d, sand);
+	} else if (kind == 18) {
+		// crescent (a disc minus an offset disc) diving down-left, with three streaks
+		vec2 q = p - vec2(-0.08, -0.1);
+		float cres = max(circle(q, 0.3), -circle(q - vec2(0.14, 0.1), 0.25));
+		float streaks = 8.0;
+		for (int i = 0; i < 3; i++) {
+			vec2 o = vec2(0.18 + 0.12 * float(i), 0.26 + 0.1 * float(i) - 0.12 * float(i == 2));
+			vec2 r = rot(p - o, 0.8);
+			streaks = min(streaks, box(r, vec2(0.035, 0.12 - 0.02 * float(i))));
+		}
+		return min(cres, streaks);
 	}
 	return circle(p, 0.18);
 }

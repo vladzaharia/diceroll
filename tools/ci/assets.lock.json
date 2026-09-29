@@ -1,5 +1,5 @@
 {
-  "lock_hash": "d211e4633f880331",
+  "lock_hash": "33d628826ebacbba",
   "schema": 1,
   "units": {
     "fonts": {
@@ -102,13 +102,13 @@
       "sha256": "a88a78be7bfee13d12942abcbb25e38ad79378036b83a50ef22a2600b1b25e72"
     },
     "kaykit-mystery": {
-      "bundle_bytes": 765756,
-      "bundle_sha256": "0cb4c0a8c4bcc2810eb0a1631720e25d050fc028451e62c0c31ab3d5b96ce322",
+      "bundle_bytes": 765544,
+      "bundle_sha256": "03eaa4ed24ef5d6a95a06881a8e33ad0037044347f94b6a0d2a05381d3fd071a",
       "dest": "assets/kaykit/mystery",
-      "file": "bundles/kaykit-mystery/kaykit-mystery-4b73e95ed45f82c7.tar.zst.age",
-      "files": 130,
-      "plain_bytes": 2279580,
-      "sha256": "4b73e95ed45f82c757587f9c84fd2ec5c7844cbf8f641e9a1b84b67379210263"
+      "file": "bundles/kaykit-mystery/kaykit-mystery-f805111b534093ba.tar.zst.age",
+      "files": 136,
+      "plain_bytes": 2364168,
+      "sha256": "f805111b534093ba17d94048087606f5acd77e2a04cadeefaa8cd60c22ef45ad"
     },
     "kaykit-platformer": {
       "bundle_bytes": 46462,

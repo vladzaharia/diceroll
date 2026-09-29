@@ -90,6 +90,12 @@ const MUSIC := {
 	"frost": M + "rising-moon.mp3",
 	"throne": M + "medieval-battle.mp3",
 	"magma": M + "battle-theme-b.mp3",
+	# the 2026-09-29 biomes reuse the beds (no new audio): the mines' low lament, the camp's
+	# battle drums, the ruins' sparse harvest strings, the woods' dark forest
+	"mines": M + "lament-for-a-warriors-soul.mp3",
+	"warcamp": M + "medieval-battle.mp3",
+	"ruins": M + "harvest-season.mp3",
+	"moonlit": M + "rising-moon.mp3",
 	# legacy act ids (default route: crypt -> hollow -> throne)
 	"act1": M + "lament-for-a-warriors-soul.mp3",
 	"act2": M + "dark-forest.mp3",

@@ -102,6 +102,9 @@ const INTENT := {
 	"burn": ["intent_burn", Color("ff8a3a")],
 	"chill": ["intent_chill", Color("8fd8ff")],
 	"scorch": ["intent_scorch", Color("ff6a2a")],
+	"rally": ["intent_rally", Color("e0582e")],
+	"bury": ["intent_bury", Color("e8b860")],
+	"moonfall": ["intent_moonfall", Color("c8d4ff")],
 }
 
 ## Enemy trait -> [icon, colour, name, one-line rule]
@@ -116,6 +119,7 @@ const TRAIT := {
 const BIOME := {
 	"glade": Color("8fdc5a"), "crypt": Color("ffb36a"), "hollow": Color("ff8a3a"),
 	"frost": Color("8fd8ff"), "throne": Color("b58aff"), "magma": Color("ff6a2a"),
+	"mines": Color("5fe0d0"), "warcamp": Color("e8564a"), "ruins": Color("ffd24a"), "moonlit": Color("9fb4ff"),
 }
 
 

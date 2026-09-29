@@ -21,6 +21,7 @@ const DEFAULT := {
 	"potion": UiPalette.HP_BRIGHT, "anvil": Color("aab4c8"), "portal": Color("a56bff"), "chest": UiPalette.GOLD,
 	"campfire": Color("ff9a3a"), "flag": UiPalette.GOLD, "axe": Color("d8d2e2"), "staff": Color("8fd0ff"),
 	"dagger": Color("d8d2e2"), "mirror": Color("9ad8f0"), "up": UiPalette.HEAL,
+	"sun": Color("ffb340"), "oasis": Color("5fd8f0"), "ore": Color("8a8494"), "drum": Color("c88a58"),
 }
 
 static var _cache: Dictionary = {}
