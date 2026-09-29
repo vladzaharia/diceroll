@@ -185,6 +185,47 @@ done
 sync "$SRC/$FWX/Assets/gltf" "$FOES/weapons" $fwx_keep --include='*.png' --exclude='*'
 lic "$FWX" "$FOES/weapons"
 
+echo "== KayKit Forest Nature (EXTRA): trees, bare trees, bushes, rocks, grass (biome dressing)"
+# All colours share one atlas (forest_texture.png), so the kept colours go into one folder.
+# Colour1 green, 2 deep green, 3 lime, 4 teal, 5 gold, 6 orange (7 red / 8 pink unused).
+FOR="$SRC/KayKit_Forest_Nature_Pack_1.0_EXTRA/Assets/gltf"
+mkdir -p "$KK/forest"
+rsync -a --delete --filter="P *.import" --filter="P *.uid" \
+	--include='Tree_[1-7]_*' --include='Tree_Bare_*' --include='Bush_[1-4]_*' --include='Rock_[1-6]_*' \
+	--include='Grass_[12]_[A-D]_Color?.*' --include='forest_texture.png' --exclude='*' \
+	"$FOR/Color1/" "$FOR/Color2/" "$FOR/Color3/" "$FOR/Color4/" "$FOR/Color5/" "$FOR/Color6/" "$KK/forest/"
+lic "KayKit_Forest_Nature_Pack_1.0_EXTRA" "$KK/forest"
+
+echo "== KayKit Dungeon (EXTRA): banners, furniture, props (no walls / floors / stairs)"
+sync "$SRC/KayKit_Dungeon_Pack_1.1_EXTRA/Assets/gltf" "$KK/dungeon_x" \
+	--exclude='wall*' --exclude='floor_*' --exclude='stairs*' --exclude='ceiling*' --exclude='bar_*' \
+	--exclude='bartop_*' --exclude='bed_*' --exclude='scaffold_beam*'
+lic "KayKit_Dungeon_Pack_1.1_EXTRA" "$KK/dungeon_x"
+
+echo "== KayKit ResourceBits (EXTRA): crates, piles, ores, bars, food, logs"
+sync "$SRC/KayKit_ResourceBits_1.0_EXTRA/Assets/gltf" "$KK/resources" \
+	--exclude='Money_Bill*' --exclude='Pallet_Plastic_*' --exclude='Fuel_*' --exclude='Money_Coins_Stack_Single*'
+lic "KayKit_ResourceBits_1.0_EXTRA" "$KK/resources"
+
+echo "== KayKit RPG Tools (EXTRA), Fantasy Weapons (EXTRA), Skeleton props (EXTRA)"
+sync "$SRC/KayKit_RPGToolsBits_1.0_EXTRA/Assets/gltf" "$KK/tools_x" \
+	--exclude='fishing_*' --exclude='pencil_*' --exclude='screw*' --exclude='blueprint*' --exclude='*blueprint.png' \
+	--exclude='drafting_*' --exclude='compass_*' --exclude='lockpick_*' --exclude='nail*' --exclude='journal_*'
+lic "KayKit_RPGToolsBits_1.0_EXTRA" "$KK/tools_x"
+sync "$SRC/KayKit_FantasyWeaponsBits_1.0_EXTRA/Assets/gltf" "$KK/weapons_x"
+lic "KayKit_FantasyWeaponsBits_1.0_EXTRA" "$KK/weapons_x"
+sync "$SRC/KayKit_Skeletons_1.1_EXTRA/assets/gltf" "$KK/skeleton_props"
+lic "KayKit_Skeletons_1.1_EXTRA" "$KK/skeleton_props"
+
+echo "== KayKit Mystery Monthly S4 set pieces (orc war drum, woodcutter logs, paladin statue)"
+MYS="$SRC/KayKit_Mystery_Monthly_Series_4"
+sync "$MYS/1 - July 2023 - Orc Raider/assets/gltf" "$KK/mystery/orc" --include='Orc_Wardrum*' --include='Orc_Axe*' \
+	--include='Orc_Club*' --include='Orc_Backpack*' --include='Orc_DrinkingHorn*' --exclude='*'
+sync "$MYS/4 - October 2023 - Werewolf/assets/gltf" "$KK/mystery/woodcutter"
+sync "$MYS/10 - April 2024 - Paladin/assets/gltf" "$KK/mystery/paladin" --include='paladin_statue*' \
+	--include='paladin_texture_A.png' --exclude='*'
+cp -f "$MYS/License.txt" "$KK/mystery/License.txt" 2>/dev/null || true
+
 echo "== Music beds (mixkit, re-encoded to 96 kbps mp3 to keep the repo lean)"
 MUS="$DST/audio/music"
 mkdir -p "$MUS"
