@@ -75,15 +75,14 @@ func test_bubble_cluster_matches_core() -> void:
 			assert_eq(mine, Array(m.cluster(x, y)))
 
 
-## The claw's aim highlight uses the same "closest centre whose hitbox contains x" rule.
+## The claw's scoop highlight uses the core's rule on public data.
 func test_claw_aim_matches_core() -> void:
 	for s in 20:
 		var m := Minigames.create("claw_machine", 900 + s, 1) as ClawMachine
 		var st := m.public_state()
 		for k in 101:
 			var x := k / 100.0
-			for c in ClawMachine.CLAWS:
-				assert_eq(MgLogic.claw_target(st.prizes, x, c), m.prize_at(x, c), "seed %d x %.2f %s" % [s, x, c])
+			assert_eq(MgLogic.claw_scoop(st.balls, x), ClawMachine.scoop(m.balls, x), "seed %d x %.2f" % [s, x])
 
 
 ## The claw sweep is deterministic: a constant-speed triangle wave from the left edge.
@@ -186,39 +185,43 @@ func test_scripted_play_reaches_reward_then_board() -> void:
 		assert_true(f.phase != P.MINIGAME, game)
 
 
-## Claw Machine (fluff heap, two claws): the claw choice is free and public; depth shrinks
-## the grip zone (a lot for the wide grabber, little for the narrow picker); a hit outside the
-## grip slips; a slip or miss brings up a puffball; deterministic and saves mid-game.
-func test_claw_fluff_rules() -> void:
-	for s in 30:
+## Claw Machine (capsule pile): contents stay hidden until won (no leak in the public state),
+## a grab scoops at most 3 capsules, slips are deterministic from the seed, and saves resume.
+func test_claw_capsule_rules() -> void:
+	var slipped_any := false
+	var multi := false
+	for s in 40:
 		var m := Minigames.create("claw_machine", 2000 + s * 17, 1) as ClawMachine
-		assert_eq(m.prizes.size(), 7)
-		assert_eq(String(m.public_state().claw), "wide")
+		var st := m.public_state()
+		assert_eq((st.balls as Array).size(), ClawMachine.BALLS)
+		for b: Dictionary in st.balls:
+			assert_true(not b.has("kind") and not b.has("points"), "contents hidden")
+		assert_eq((st.won as Array).size(), 0)
 		var legend := -1
-		for i in m.prizes.size():
-			if String(m.prizes[i].kind) == "legendary":
+		for i in m.balls.size():
+			if String(m.balls[i].tier) == "legendary":
 				legend = i
-		for i in m.prizes.size():
-			assert_true(float(m.prizes[legend].depth) >= float(m.prizes[i].depth), "legendary sits deepest")
-		var p: Dictionary = m.prizes[legend]
-		assert_true(ClawMachine.grip_half(p, "narrow") > ClawMachine.grip_half(p, "wide"), "narrow grips buried prizes better")
-		var copy := Minigames.from_dict(JSON.parse_string(JSON.stringify(m.to_dict()))) as ClawMachine
-		# a claw choice uses no grab
-		var r0 := m.action(["claw", "narrow"])
-		assert_eq(String(r0.info.claw), "narrow")
-		assert_eq(m.actions_left, ClawMachine.GRABS)
-		assert_true(m.action(["claw", "tiny"]).has("error"))
-		# just outside the narrow grip, inside the hitbox: slips, puffball consolation
-		var g := ClawMachine.grip_half(p, "narrow")
-		var edge := float(p.pos) + (g + float(p.width) / 2.0) / 2.0
-		var r := m.action([edge])
-		if int(r.info.prize) == legend:
-			assert_eq(r.info.slipped, true)
-			assert_eq(r.info.fluff, true)
-			assert_eq(int(m.score()), ClawMachine.FLUFF_POINTS)
-		var r2 := m.action([float(p.pos)])
-		assert_eq(r2.info.grabbed, true)
-		copy.action(["claw", "narrow"])
-		copy.action([edge])
-		copy.action([float(p.pos)])
-		assert_eq(JSON.stringify(copy.public_state()), JSON.stringify(m.public_state()))
+		for i in m.balls.size():
+			assert_true(float(m.balls[legend].depth) >= float(m.balls[i].depth) - 0.001 or String(m.balls[i].tier) == "legendary")
+		var copy := Minigames.from_dict(JSON.parse_string(JSON.stringify(m.to_dict())))
+		var r := m.action([float(m.balls[legend].pos)])
+		var held: Array = r.info.held
+		assert_true(held.size() <= ClawMachine.MAX_HOLD)
+		assert_eq((r.info.won as Array).size() + (r.info.slipped as Array).size(), held.size())
+		multi = multi or held.size() >= 2
+		slipped_any = slipped_any or not (r.info.slipped as Array).is_empty()
+		var pts := 0
+		for w: Dictionary in r.info.won:
+			pts += int(w.points)
+		assert_eq(int(m.score()), pts)
+		# only won capsules show their contents
+		var pub := m.public_state()
+		for i in (pub.balls as Array).size():
+			assert_true(not (pub.balls[i] as Dictionary).has("kind"))
+		assert_eq((pub.won as Array).size(), (r.info.won as Array).size())
+		m.action([0.5])
+		copy.action([float(copy.public_state().balls[legend].pos)])
+		copy.action([0.5])
+		assert_eq(JSON.stringify(copy.public_state()), JSON.stringify(m.public_state()), "save resumes identically")
+	assert_true(multi, "some grabs scoop several capsules")
+	assert_true(slipped_any, "some capsules slip")

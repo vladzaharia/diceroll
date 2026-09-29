@@ -14,6 +14,7 @@ extends RefCounted
 ##                      and quits (exit 0 / 1).
 ##      --state=resume  two actions, then the run is JSON round-tripped and presented again
 ##                      (Continue mid-minigame); prints MG_RESUME
+##      --aim=cluster   (claw) drop where the most capsules are in reach (multi-scoop shots)
 ##      --rig=three     (scratch) scratch three alike (harness peek, for the jackpot shots)
 ##      --auto=1        (fresh) press the screen's AUTO button (par result)
 ##      --state=anim    --actions=N actions after --delay=S seconds (frame sequences: pair it
@@ -208,25 +209,16 @@ class _Driver extends Node:
 				await _drag(pts)
 			"claw_machine":
 				var cb := b as ClawBoard
-				if args.get("claw", "") == "wide":
-					# keep the wide grabber and go for the best exposed prize
-					var bi := -1
-					for i in st.prizes.size():
-						var pz: Dictionary = st.prizes[i]
-						if not bool(pz.taken) and float(pz.depth) < 0.35 and (bi < 0 or int(pz.points) > int(st.prizes[bi].points)):
-							bi = i
-					a = [float(st.prizes[bi].pos)] if bi >= 0 else [0.5]
-				elif a[0] is String:
-					# the claw choice: tap its selector on the cabinet
-					var want := String(a[1])
-					_click(o + (cb.selector_rects()[ClawMachine.CLAWS.find(want)] as Rect2).get_center())
-					for k in 40:
-						if f.commands.size() > n:
-							return true
-						await _pause(0.05)
-					return false
-				if a[0] is String:
-					return false
+				if args.get("aim", "") == "cluster":
+					# screenshot aid: the drop that scoops the most capsules (public data)
+					var bx := 0.5
+					var bn := -1
+					for k in 101:
+						var n2 := MgLogic.claw_scoop(st.balls, k / 100.0).size()
+						if n2 > bn:
+							bn = n2
+							bx = k / 100.0
+					a = [bx]
 				var target := float(a[0]) + float(args.get("claw-offset", "0"))
 				# wait for the sweep to pass over the target, then tap
 				var guard := 0

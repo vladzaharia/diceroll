@@ -33,14 +33,14 @@ const DEFS := {
 		"desc": "Scratch 3 of 9 die faces. A pair pays, three of a kind pays well, three 6s is the jackpot.",
 		"signature_desc": "Gold: 60 gold."},
 	"claw_machine": {"name": "Claw Machine", "skill": "70:30", "signature": "passive_common",
-		"desc": "Two grabs into a cabinet of plush fluff and prizes. Pick the wide grabber (big reach, weak grip) or the narrow picker (precise, pulls buried prizes). A miss still brings up a puffball.",
+		"desc": "Two grabs into a pile of prize capsules. The colour hints the tier; the deep rare ones need a centred drop. One grab can scoop up to 3 capsules, but a full claw may drop some.",
 		"signature_desc": "Gold: pick a common passive."},
 }
 
 const IDS := ["fossil_hunter", "bubble_breaker", "scratch_off", "claw_machine"]
 
 ## Median score per game (calibrated: see balance.md "Minigame calibration").
-const MEDIAN := {"fossil_hunter": 8.0, "bubble_breaker": 17.0, "scratch_off": 10.0, "claw_machine": 11.0}
+const MEDIAN := {"fossil_hunter": 8.0, "bubble_breaker": 17.0, "scratch_off": 10.0, "claw_machine": 10.0}
 
 ## Reward options by tier (the player picks one). Gold amounts are x gold_scale(lap) x skill
 ## mult x mastery bonus.

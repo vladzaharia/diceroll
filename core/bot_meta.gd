@@ -125,15 +125,13 @@ static func minigame_command(f: GameFlow) -> Array:
 		"scratch_off":
 			return ["minigame_action", [scratch_pick(st, f.run.seed)]]
 		"claw_machine":
+			# aim at the richest-looking capsule (its tier colour is public)
 			var best := -1
-			for i in st.prizes.size():
-				var p: Dictionary = st.prizes[i]
-				if not bool(p.taken) and (best < 0 or int(p.points) > int(st.prizes[best].points)):
+			for i in st.balls.size():
+				var b: Dictionary = st.balls[i]
+				if not bool(b.taken) and (best < 0 or ClawMachine.TIERS.find(String(b.tier)) > ClawMachine.TIERS.find(String(st.balls[best].tier))):
 					best = i
-			# perfect aim: the narrow picker pulls anything out of the fluff
-			if String(st.get("claw", "wide")) != "narrow":
-				return ["minigame_action", ["claw", "narrow"]]
-			return ["minigame_action", [float(st.prizes[best].pos) if best >= 0 else 0.5]]
+			return ["minigame_action", [float(st.balls[best].pos) if best >= 0 else 0.5]]
 	return ["minigame_finish"]
 
 static func _untouched(st: Dictionary) -> bool:

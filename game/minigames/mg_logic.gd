@@ -12,8 +12,9 @@ const CLAW_SWEEP := 1.45
 
 ## Bubble colours (4) and the claw prize looks by kind.
 const BUBBLE_COLORS := [Color("ff5a6e"), Color("3fa9ff"), Color("5fdc6a"), Color("ffc93d")]
-const PRIZE_COLORS := {"coins": Color("ffd34a"), "nugget": Color("ffc24a"), "potion": Color("7dff9a"), "gem": Color("7fe8ff"), "figure": Color("ff9a5a"), "legendary": Color("ffcf4a")}
-const PRIZE_NAMES := {"coins": "Coin Bag", "nugget": "Gold Nugget", "potion": "Potion", "gem": "Gem", "figure": "Action Figure", "legendary": "Gem Chest"}
+const PRIZE_COLORS := {"coins": Color("ffd34a"), "potion": Color("7dff9a"), "nugget": Color("ffc24a"), "gem": Color("7fe8ff"), "figure": Color("ff9a5a"), "robot": Color("c8d4e8"), "chest": Color("ffcf4a")}
+const TIER_TINTS := {"common": Color("8fd0ff"), "rare": Color("6fe07a"), "epic": Color("c070ff"), "legendary": Color("ffc93d")}
+const PRIZE_NAMES := {"coins": "Coins", "potion": "Potion", "nugget": "Gold Nugget", "gem": "Gem", "figure": "Action Figure", "robot": "Robot", "chest": "Gem Chest"}
 
 const TIER_COLORS := {"bronze": Color("d98b4f"), "silver": Color("cfd9ea"), "gold": Color("ffcf4a")}
 const GAME_COLORS := {"fossil_hunter": Color("e0a15a"), "bubble_breaker": Color("5ab8ff"),
@@ -22,7 +23,7 @@ const HINTS := {
 	"fossil_hunter": "Dig for 3 fossils and hidden treasure. Hit a bone? Dig beside it!",
 	"bubble_breaker": "Tap a group of 3+ to pop it. Big pops and chains score more.",
 	"scratch_off": "Scratch 3 faces. A pair pays, three alike pays big, three 6s: JACKPOT!",
-	"claw_machine": "Pick a claw, then tap to drop. Wide reaches far; Narrow digs out buried prizes.",
+	"claw_machine": "Tap to drop. Every capsule hides a prize: gold ones are rare and deep!",
 }
 const UNITS := {"fossil_hunter": "DIGS", "bubble_breaker": "TAPS", "scratch_off": "SCRATCHES", "claw_machine": "GRABS"}
 const ICONS := {"fossil_hunter": "shovel", "bubble_breaker": "bubble", "scratch_off": "ticket", "claw_machine": "claw"}
@@ -34,22 +35,10 @@ static func claw_x(t: float) -> float:
 	return lerpf(CLAW_MIN, CLAW_MAX, k)
 
 
-## Index of the prize a drop at x would touch (public prizes: pos, width, taken), or -1.
-## Same rule as the core: the closest centre whose hitbox contains x. Aim highlight only;
-## the grab result always comes from the minigame_update event.
-static func claw_target(prizes: Array, x: float, claw := "narrow") -> int:
-	var reach := float(ClawMachine.REACH.get(claw, 0.0))
-	var best := -1
-	var best_d := INF
-	for i in prizes.size():
-		var p: Dictionary = prizes[i]
-		if bool(p.get("taken", false)):
-			continue
-		var d := absf(float(p.pos) - x)
-		if d <= float(p.width) / 2.0 + reach and d < best_d:
-			best_d = d
-			best = i
-	return best
+## The capsules a drop at x would scoop (public positions and depths; the same rule as the
+## core). Aim highlight only: what is won comes from the minigame_update event.
+static func claw_scoop(balls: Array, x: float) -> Array:
+	return ClawMachine.scoop(balls, x)
 
 
 static func bubble_at(grid: Array, x: int, y: int, w: int, h: int) -> int:

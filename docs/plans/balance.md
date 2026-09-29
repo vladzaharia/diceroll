@@ -162,13 +162,13 @@ Upgrades are the whole growth curve now: the old level-up drafts gave about 17 p
   MEDIAN 8 = the follow-the-bone bot's median (3,000 boards: q25 6, q75 10; tiers 32% bronze /
   36% silver / 31% gold; random digging medians 3). Its gold rewards move only ±5% with the
   score (`MinigameDefs.SKILL_BAND_BY_ID`), the others ±15%.
-- **Claw Machine is a fluff heap with two claws (user direction):** 7 prizes nestled in plush
-  at a depth each (2x coins 3, potion 4, nugget 4, gem 5, figure 8, legendary chest 12, deepest);
-  hitbox 0.10 .. 0.07 wide. Before a grab the player picks the WIDE grabber (+0.03 reach each side,
-  grip x (1 - depth): buried prizes slip) or the NARROW picker (no extra reach, grip x
-  (1 - 0.45 x depth)). A hit outside the grip slips; a slip or a miss brings up a puffball (+1).
-  No hidden roll. MEDIAN 11: a human-ish aimer (timing error sigma 0.045 of the sweep) choosing
-  the best claw per prize means 11.1 (median 13; wide-only means 10.2); perfect aim scores 20.
+- **Claw Machine is a capsule pile (user direction, supersedes the fluff/two-claw drafts):**
+  18 capsules (10 common, 5 rare, 2 epic, 1 legendary, deeper by tier); the tier colour is
+  public, the prize inside is hidden until won (common coins/potion 2-3, rare nugget/gem 3-4,
+  epic figure/robot 6, legendary chest 10). A drop scoops up to 3 capsules whose reach
+  (0.075 x (1 - 0.8 x depth)) contains it; each held capsule slips out with 0.14 per extra
+  capsule held + 0.22 x depth (minigame Rng). 2 grabs. MEDIAN 10: a human-ish aimer (sigma 0.045)
+  medians 10 (mean 10.6, q25 6, q75 15); perfect aim medians 17.
 
 ### Ascension (global, 10 levels, max profile, realistic bot, standard mode)
 
