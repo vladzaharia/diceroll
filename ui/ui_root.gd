@@ -217,7 +217,7 @@ func sync(flow: GameFlow) -> void:
 	if want:
 
 		want.call("refresh", flow)
-		if not want.visible:
+		if not want.is_open():
 			want.open()
 
 
