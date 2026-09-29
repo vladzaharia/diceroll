@@ -784,6 +784,7 @@ class CombatModel:
 	var it_crush := 0.0
 	var it_kept := 0
 	var it_rer := 0
+	var it_rer_flat := 0.0
 	var it_low := 0.0
 	var it_ones := 0.0
 	var it_rune_pip := 0.0
@@ -1046,7 +1047,7 @@ class CombatModel:
 					if ((gm >> i) & 1) == 1 and rune[i] != Bot.R_HEAVY and (hi < 0 or eff[i] > eff[hi]):
 						hi = i
 				if hi >= 0:
-					bonus += roundf(eff[hi] * it_crush)
+					flat += floorf(eff[hi] * it_crush + 0.0001)
 			var kept := 0
 			var rr := 0
 			var lows := 0
@@ -1063,8 +1064,15 @@ class CombatModel:
 					ones += 1
 				if ((gm >> i) & 1) == 1 and rune[i] != 0:
 					runed += 1
-			bonus += mini(kept, it_kept) + mini(rr, it_rer) + ones * it_ones + mini(runed, it_rune_max) * it_rune_pip + it_bonus
-			flat += lows * it_low + it_flat
+			if it_kept > 0 and kept >= it_kept:
+				flat += 1.0
+			if it_rer > 0 and rr >= it_rer:
+				flat += it_rer_flat
+			if ones > 0:
+				flat += it_ones
+			flat += mini(runed, it_rune_max) * it_rune_pip + it_bonus + it_flat
+			if lows >= 2:
+				flat += it_low
 			ifac = it_factor
 		var fac := factor * ifac * (aim if (aim_ok and rer == 0) else 1.0)
 		var total := int(floor(((sum + bonus) * mult + flat) * fac)) + atk
@@ -1274,7 +1282,9 @@ static func _item_model(cm: CombatModel, run: RunState, c: CombatState) -> void:
 		return
 	cm.it_on = true
 	var first := c == null or int(c.item_state.get("attacks", 0)) == 0
-	cm.it_pair_flat = ItemLogic.n(run, "sword", "flat")
+	var live := func(item: String) -> bool:
+		return c == null or ItemLogic.use_left(run, c, item)
+	cm.it_pair_flat = ItemLogic.n(run, "sword", "flat") if live.call("sword") else 0.0
 	cm.it_high_flat = ItemLogic.n(run, "crossbow", "flat") * (1.5 if ItemLogic.sec(run, "crossbow_arbalest") else 1.0)
 	if ItemLogic.sec(run, "sword_rapier"):
 		cm.it_high_flat += floorf(cm.it_pair_flat * 0.5)
@@ -1287,15 +1297,21 @@ static func _item_model(cm: CombatModel, run: RunState, c: CombatState) -> void:
 		cm.it_mult = ItemLogic.n(run, "spellbook", "mult")
 	elif c == null:
 		cm.it_mult = ItemLogic.n(run, "spellbook", "mult") * 0.3
-	if ItemLogic.has(run, "warhammer"):
+	if ItemLogic.has(run, "warhammer") and live.call("warhammer"):
 		cm.it_crush = ItemLogic.crush_mult(run) - 1.0
-	cm.it_kept = ItemLogic.ni(run, "parrying_dagger", "dice")
-	cm.it_rer = ItemLogic.ni(run, "katana", "dice")
-	cm.it_low = ItemLogic.n(run, "claws", "per")
+	if live.call("parrying_dagger"):
+		cm.it_kept = ItemLogic.ni(run, "parrying_dagger", "dice")
+	if live.call("katana"):
+		cm.it_rer = ItemLogic.ni(run, "katana", "dice")
+		cm.it_rer_flat = ItemLogic.n(run, "katana", "flat")
+	if live.call("claws"):
+		cm.it_low = ItemLogic.n(run, "claws", "per")
 	cm.it_ones = 1.0 if ItemLogic.sec(run, "claws_knuckles") else 0.0
-	cm.it_rune_pip = ItemLogic.n(run, "arcane_staff", "pip")
-	cm.it_rune_max = ItemLogic.ni(run, "arcane_staff", "max")
-	cm.it_aegis = ItemLogic.n(run, "oath_shield", "x")
+	if live.call("arcane_staff"):
+		cm.it_rune_pip = ItemLogic.n(run, "arcane_staff", "pip")
+		cm.it_rune_max = ItemLogic.ni(run, "arcane_staff", "max")
+	if live.call("oath_shield"):
+		cm.it_aegis = ItemLogic.n(run, "oath_shield", "x")
 	cm.it_flat = 4.0 if ItemLogic.sec(run, "axe_cleaver") else 0.0
 	if run.hp * 2 < run.max_hp:
 		cm.it_flat += ItemLogic.n(run, "bear_hat", "flat")

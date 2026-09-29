@@ -320,9 +320,10 @@ func gold_bonus(amount: int) -> int:
 		return amount
 	return int(round(amount * (1.0 + p)))
 
-## Board reroll pool refill when a lap starts. Boots (meta.lap_rerolls) refill only when a new
-## biome starts (and at run start); unused Boots rerolls carry over within the biome. The
-## Crystal Wisp perk adds +1 for each lap (lost if unused).
+## Board reroll pool refill when a lap starts. The Compass's reroll (meta.lap_rerolls) refills
+## only when a new biome starts (from the 2nd biome: MetaRun.apply_start starts the pool empty);
+## unused Compass rerolls carry over within the biome. The Crystal Wisp perk adds +1 for each lap
+## (lost if unused).
 func lap_reroll_refill(new_biome := true) -> int:
 	var boots := int(meta.get("lap_rerolls", 0))
 	var kept := boots if new_biome else mini(lap_rerolls, boots)
@@ -377,7 +378,7 @@ func max_dice() -> int:
 	return Balance.MAX_DICE + (1 if has_passive("extra_hand") else 0)
 
 ## Called when a hit would drop HP to 0 or below: Phoenix Feather (once per act) then Second
-## Wind (once per run) leave the hero at 1 HP, then the Helm's Last Stand trait (once per run,
+## Wind (once per run) leave the hero at 1 HP, then the Round Shield III's Last Stand (once per run,
 ## only if HP before the hit was above 50%: pass it as `hp_before`). Returns the passive or
 ## trait that saved them, or "".
 func survive_lethal(hp_before := -1) -> String:

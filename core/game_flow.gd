@@ -77,6 +77,24 @@ func route_info() -> Dictionary:
 		"mode": run.mode, "laps": run.total_laps(),
 	}
 
+## The run's Armory loadout for presentation (fixed for the run): {items: {slot: {id, variant,
+## tier, name, variant_name, rule, text, style, hands}}, back: id, appearance: {head, body},
+## style: the weapon's attack style ("" = the class default)}. Empty items in legacy runs.
+func loadout_info() -> Dictionary:
+	var out := {}
+	var its: Dictionary = run.meta.get("items", {})
+	for slot in its:
+		var e: Dictionary = its[slot]
+		var id := String(e.id)
+		var v := String(e.get("variant", id))
+		out[slot] = {"id": id, "variant": v, "tier": int(e.tier), "name": ItemDefs.name_of(id), "variant_name": ItemDefs.name_of(v),
+			"rule": String((ItemDefs.def(id).get("effect", {}) as Dictionary).get("name", "")),
+			"text": ItemDefs.rule_text(id, int(e.tier), v), "secondary": ItemDefs.sec_of(v),
+			"style": ItemDefs.style(id, v), "hands": ItemDefs.hands(id, v)}
+	var w: Dictionary = out.get("weapon", {})
+	return {"items": out, "back": String(run.meta.get("back", "")), "appearance": (run.meta.get("appearance", {}) as Dictionary).duplicate(),
+		"style": String(w.get("style", ""))}
+
 static func phase_name(p: int) -> String:
 	return Phase.keys()[p]
 
@@ -142,7 +160,7 @@ func _do_board_roll() -> Array[Dictionary]:
 ## Sets the current board roll and auto-selects the two moving dice (see pick_move_dice).
 func _select_move(values: Array[int]) -> void:
 	board_roll = values.duplicate()
-	board_choice = pick_move_dice(values, run.rng, ItemLogic.pair_pick(run))
+	board_choice = pick_move_dice(values, run.rng, ItemLogic.pair_pick(run) > 0, ItemLogic.pair_pick(run) < 0)
 	board_move = 0
 	for i in board_choice:
 		board_move += board_roll[i]
@@ -155,7 +173,7 @@ func _select_move(values: Array[int]) -> void:
 ## Examples: [2,2,2,5,6,6] -> 2 + 6 = 8 · [2,2,5,6] -> 2 + (5 or 6) · [1,3,4,5,6] -> two random
 ## values · [4,4,4] -> 4 + 4 · [0,0,3] -> 3 + 0. Returns the two dice indices, ascending (the
 ## first die showing each picked value). The Rng is only used when a tie decides the pick.
-static func pick_move_dice(values: Array[int], rng: Rng, prefer_high := false) -> Array[int]:
+static func pick_move_dice(values: Array[int], rng: Rng, prefer_high := false, prefer_low := false) -> Array[int]:
 	var n := values.size()
 	var out: Array[int] = []
 	if n <= 2:
@@ -205,6 +223,8 @@ static func pick_move_dice(values: Array[int], rng: Rng, prefer_high := false) -
 			picked.append_array(tied)
 		elif prefer_high:
 			picked.append_array(tied.slice(tied.size() - need))
+		elif prefer_low:
+			picked.append_array(tied.slice(0, need))
 		elif need == 1:
 			picked.append(rng.pick(tied))
 		else:
@@ -1070,7 +1090,7 @@ func _shop_item(id: String, used: Dictionary) -> Dictionary:
 			item.label = String(pd.name)
 			item.desc = String(pd.desc)
 			item.price = int(Balance.PASSIVE_PRICE[pd.rarity])
-	if (id == "die" or id == "face_raise") and ItemLogic.appraise(run) < 1.0:
+	if id == "die" and ItemLogic.appraise(run) < 1.0:
 		item.price = int(round(item.price * ItemLogic.appraise(run)))
 	if run.has_passive("haggler"):
 		item.price = int(round(item.price * Balance.PASSIVE_HAGGLE))

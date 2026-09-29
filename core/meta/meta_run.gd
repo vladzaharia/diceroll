@@ -152,7 +152,8 @@ static func apply_start(r: RunState) -> void:
 	for k in mini(int(m.potions), r.potion_cap):
 		r.belt.append("healing")
 	r.potions = r.belt.size()
-	r.lap_rerolls = r.lap_reroll_refill()
+	# the Compass's board reroll starts with the 2nd biome (the pets' per-lap perk starts at once)
+	r.lap_rerolls = r.lap_reroll_refill(false)
 	r.skin = String(m.get("skin", "default"))
 	r.skin_prestige = bool(m.get("prestige", false))
 	var sk := String(m.starter_kind)

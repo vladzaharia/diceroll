@@ -106,9 +106,9 @@ func test_camp_rank_levels_costs_and_caps() -> void:
 	assert_eq(camp.rank_up("armor")[0].type, "error", "max rank")
 	var st := ItemDefs.base_stats({"weapon": 8, "armor": 8})
 	assert_eq(st.max_hp, ItemDefs.HP_CAP)
-	assert_eq(st.atk, 1)
+	assert_eq(st.atk, ItemDefs.ATK_BONUS)
 	assert_eq(ItemDefs.base_stats({"weapon": 7, "armor": 3}).atk, 0)
-	assert_eq(ItemDefs.base_stats({"armor": 3}).max_hp, 1)
+	assert_eq(ItemDefs.base_stats({"armor": 4}).max_hp, mini(ItemDefs.HP_CAP, int(floor(4 * ItemDefs.HP_PER_RANK))))
 
 func test_camp_traits_are_gone() -> void:
 	var p := Profile.fresh()

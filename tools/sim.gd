@@ -15,6 +15,7 @@ extends SceneTree
 ##           [--armory=<slot>:<item>[:<variant>],...] equip an item (owned for the sim) for every class
 ##           [--variant=<item>:<variant>] every class holding <item> uses that variant (crafted for the sim)
 ##           [--kit=default|best] the loadout picker: the profile's (default) or BotMeta.best_loadout
+##           [--item=<item>.<key>=I/II/III | <variant>.<key>=v,...] override item numbers (analysis)
 ##           [--affixes=off|on|force:<id>] [--force] [--hero=<class>.<field>=<v>] [--cl=<KNOB>=<v>]
 ##           [--tune-hp= --tune-atk= --tune-boss= --tune-base= --tune-step= --tune-atk-step=
 ##            --tune-gold= --tune-shop=1,3,5] [--danger=lo,hi] [--real-heur=p|scope:p,...] [--items]
@@ -191,6 +192,15 @@ func _init() -> void:
 			armory_specs.append_array(Array(arg.substr(9).split(",", false)))
 		elif arg.begins_with("--variant="):
 			variant_specs.append_array(Array(arg.substr(10).split(",", false)))
+		elif arg.begins_with("--item="):
+			# --item=sword.flat=1/2/3 (rule numbers I/II/III) or --item=sword_saber.pct=0.2 (a secondary)
+			for part in arg.substr(7).split(",", false):
+				var ik := part.get_slice("=", 0)
+				var iv := part.get_slice("=", 1)
+				if iv.contains("/"):
+					ItemDefs.TUNE[ik] = Array(iv.split("/")).map(func(x): return float(x))
+				else:
+					ItemDefs.TUNE[ik] = iv.to_float()
 		elif arg.begins_with("--kit="):
 			kit_mode = arg.substr(6)
 		elif arg == "--items":

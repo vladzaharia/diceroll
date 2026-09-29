@@ -96,8 +96,7 @@ static func gain_block(run: RunState, c: CombatState, amount: int, item: String,
 	if amount <= 0:
 		return out
 	var extra := 0
-	if c != null and has(run, "knight_helm") and int(c.item_state.get("steadfast", 0)) != c.turn:
-		c.item_state["steadfast"] = c.turn
+	if c != null and _steadfast_ok(run, c):
 		extra = ni(run, "knight_helm", "extra")
 	run.block += amount + extra
 	run.stats.block_gained = int(run.stats.get("block_gained", 0)) + amount + extra
@@ -110,13 +109,21 @@ static func gain_block(run: RunState, c: CombatState, amount: int, item: String,
 
 ## Steadfast for Block that a rune already added (the Guard rune): extra Block once per turn.
 static func steadfast(run: RunState, c: CombatState) -> Array[Dictionary]:
-	if c == null or not has(run, "knight_helm") or int(c.item_state.get("steadfast", 0)) == c.turn:
+	if c == null or not _steadfast_ok(run, c):
 		return []
-	c.item_state["steadfast"] = c.turn
 	var x := ni(run, "knight_helm", "extra")
 	run.block += x
 	run.stats.block_gained = int(run.stats.get("block_gained", 0)) + x
 	return [ev(run, "knight_helm", "steadfast", x), {"type": "block_gained", "target": "hero", "amount": x, "total": run.block, "source": "item"}]
+
+## Steadfast: once per turn, `uses` turns per fight. Consumes a use when it returns true.
+static func _steadfast_ok(run: RunState, c: CombatState) -> bool:
+	if not has(run, "knight_helm") or int(c.item_state.get("steadfast_turn", 0)) == c.turn \
+			or int(c.item_state.get("steadfast", 0)) >= ni(run, "knight_helm", "uses"):
+		return false
+	c.item_state["steadfast_turn"] = c.turn
+	c.item_state["steadfast"] = int(c.item_state.get("steadfast", 0)) + 1
+	return true
 
 static func heal(run: RunState, item: String, effect: String, amount: int) -> Array[Dictionary]:
 	if amount <= 0:
@@ -277,11 +284,13 @@ static func turn_start(run: RunState, c: CombatState, prev_block: int) -> Array[
 				c.item_state["bulwark"] = carry
 				out.append_array(gain_block(run, c, carry, "round_shield", "rally"))
 	if t == 1:
-		for id in std_block(run):
-			out.append_array(gain_block(run, c, 2, String(id), "standard"))
-	if has(run, "knight_plate"):
+		var sb := std_block(run)
+		if not sb.is_empty():
+			# count-based Standards don't stack: one Block on turn 1 however many are equipped
+			out.append_array(gain_block(run, c, ItemDefs.STD_BLOCK, String(sb[0]), "standard"))
+	if has(run, "knight_plate") and t <= ni(run, "knight_plate", "turns"):
 		out.append_array(gain_block(run, c, ni(run, "knight_plate", "block"), "knight_plate", "plated"))
-	if has(run, "dino_suit"):
+	if has(run, "dino_suit") and t <= ni(run, "dino_suit", "turns"):
 		out.append_array(gain_block(run, c, ni(run, "dino_suit", "block"), "dino_suit", "thick_hide"))
 	return out
 
@@ -333,15 +342,15 @@ static func on_reroll(run: RunState, c: CombatState, idx: Array[int]) -> Array[D
 		var cap := ni(run, "shuriken", "max")
 		var dmg := ni(run, "shuriken", "dmg")
 		for i in idx:
-			if int(c.item_state.get("shuriken_turn", 0)) >= cap or c.all_dead():
+			if int(c.item_state.get("shuriken", 0)) >= cap or c.all_dead():
 				break
-			c.item_state["shuriken_turn"] = int(c.item_state.get("shuriken_turn", 0)) + 1
+			c.item_state["shuriken"] = int(c.item_state.get("shuriken", 0)) + 1
 			var t := int(run.rng.pick(c.alive_indices()))
 			out.append(ev(run, "shuriken", "barrage", dmg, {"enemy_idx": t, "die_idx": i}))
 			out.append_array(c.damage_enemy(t, dmg, "item", run))
-	if has(run, "ninja_gi") and int(c.item_state.get("poise_turn", 0)) < ni(run, "ninja_gi", "max") \
+	if has(run, "ninja_gi") and int(c.item_state.get("poise", 0)) < ni(run, "ninja_gi", "max") \
 			and ClassLogic.rerolled_match(c.dice_values, idx):
-		c.item_state["poise_turn"] = int(c.item_state.get("poise_turn", 0)) + 1
+		c.item_state["poise"] = int(c.item_state.get("poise", 0)) + 1
 		out.append_array(heal(run, "ninja_gi", "poise", 1))
 	return out
 
@@ -363,9 +372,12 @@ static func arcana(run: RunState, c: CombatState, pd: Array, act: Array, times: 
 			out.append_array(heal(run, "wizard_hat", "grave_magic", int(ItemDefs.sec_num("hat_grave", "heal"))))
 		return
 
-## The attack's item bonuses: {mult, bonus (pips, before the multiplier), flat (after it),
-## factor, crush (die index or -1), spark, first}. Called before the total is computed; records
-## what fired in c.item_state for after_hit().
+## The attack's item bonuses: {mult, bonus (pips before the multiplier; unused, kept for the
+## contract), flat (after the multiplier), factor}. Item "pips" (Crush, Flow, Channel, Steady,
+## Dominion, Brawn, Brawl, Light, Silent) add after the multiplier: a pre-multiplier pip is worth
+## the whole combo multiplier (x2-4 at max), far beyond every slot budget (docs/plans/balance.md,
+## Armory). Rules marked "uses" fire that many times per fight. Called before the total is
+## computed; records what fired in c.item_state for after_hit().
 static func attack_mods(run: RunState, c: CombatState, cid: String, pd: Array, eff: Array, group: Array, act: Array,
 		mult: float, out: Array[Dictionary]) -> Dictionary:
 	var r := {"mult": 0.0, "bonus": 0, "flat": 0, "factor": 1.0}
@@ -380,20 +392,29 @@ static func attack_mods(run: RunState, c: CombatState, cid: String, pd: Array, e
 	c.item_state["ambush_now"] = 0
 	c.item_state["deadshot_now"] = 0
 	c.item_state["rampage_now"] = 0
+	var kept := 0
+	var rerolled := 0
+	for i in c.rerolled.size():
+		if c.rerolled[i]:
+			rerolled += 1
+		else:
+			kept += 1
 	# weapon
-	if has(run, "sword"):
+	if has(run, "sword") and use_left(run, c, "sword"):
 		var f := 0
 		if PAIRISH.has(cid):
 			f = ni(run, "sword", "flat")
 		elif cid == "high_roller" and sec(run, "sword_rapier"):
-			f = int(floor(n(run, "sword", "flat") * ItemDefs.sec_num("sword_rapier", "share")))
+			f = maxi(1, int(floor(n(run, "sword", "flat") * ItemDefs.sec_num("sword_rapier", "share"))))
 		if f > 0:
+			use(c, "sword")
 			r.flat += f
 			out.append(ev(run, "sword", "twin_edge", f))
 	if has(run, "greatsword") and SETS3.has(cid):
-		var m := n(run, "greatsword", "mult") + (ItemDefs.sec_num("greatsword_plain", "mult") if sec(run, "greatsword_plain") else 0.0)
-		r.mult += m
-		out.append(ev(run, "greatsword", "great_arc", m))
+		var m := maxf(0.0, n(run, "greatsword", "mult") + (ItemDefs.sec_num("greatsword_plain", "mult") if sec(run, "greatsword_plain") else 0.0))
+		if m > 0.0:
+			r.mult += m
+			out.append(ev(run, "greatsword", "great_arc", m))
 	if has(run, "great_axe") and c.alive(t):
 		var same := int(c.item_state.get("rampage_t", -1)) == t or sec(run, "axe_golem")
 		var st := int(c.item_state.get("rampage", 0)) if same else 0
@@ -402,31 +423,27 @@ static func attack_mods(run: RunState, c: CombatState, cid: String, pd: Array, e
 			r.flat += f2
 			c.item_state["rampage_now"] = st
 			out.append(ev(run, "great_axe", "rampage", f2, {"stacks": st, "enemy_idx": t}))
-	if has(run, "warhammer"):
+	if has(run, "warhammer") and use_left(run, c, "warhammer"):
 		var k := crush_die(pd, eff, group, act)
 		if k >= 0:
 			var pips := int(eff[k])
-			var extra := int(round(pips * (crush_mult(run) - 1.0)))
+			var extra := int(floor(pips * (crush_mult(run) - 1.0) + 0.0001))
 			if pips == 6 and sec(run, "hammer_smith"):
 				extra += int(ItemDefs.sec_num("hammer_smith", "pip"))
 			if extra > 0:
-				r.bonus += extra
+				use(c, "warhammer")
+				r.flat += extra
 				c.item_state["crush"] = k
 				out.append(ev(run, "warhammer", "crush", extra, {"die_idx": k}))
 	if has(run, "spear") and first:
 		var fac := n(run, "spear", "factor") + (n(run, "spear", "boss") if c.boss else 0.0)
 		r.factor *= fac
 		out.append(ev(run, "spear", "first_strike", int(round(fac * 100.0))))
-	if has(run, "katana"):
-		var rn := 0
-		for i in c.rerolled.size():
-			if c.rerolled[i]:
-				rn += 1
-		rn = mini(rn, ni(run, "katana", "dice"))
-		if rn > 0:
-			r.bonus += rn
-			out.append(ev(run, "katana", "flow", rn))
-	if has(run, "arcane_staff"):
+	if has(run, "katana") and rerolled >= ni(run, "katana", "dice") and use_left(run, c, "katana"):
+		use(c, "katana")
+		r.flat += ni(run, "katana", "flat")
+		out.append(ev(run, "katana", "flow", ni(run, "katana", "flat"), {"dice": rerolled}))
+	if has(run, "arcane_staff") and use_left(run, c, "arcane_staff"):
 		var runed := 0
 		var plain := false
 		for i in group:
@@ -434,12 +451,12 @@ static func attack_mods(run: RunState, c: CombatState, cid: String, pd: Array, e
 				runed += 1
 			else:
 				plain = true
-		runed = mini(runed, ni(run, "arcane_staff", "max"))
-		var b := runed * ni(run, "arcane_staff", "pip")
+		var b := mini(runed, ni(run, "arcane_staff", "max")) * ni(run, "arcane_staff", "pip")
 		if runed > 0 and plain and sec(run, "staff_quarter"):
 			b += int(ItemDefs.sec_num("staff_quarter", "pip"))
 		if b > 0:
-			r.bonus += b
+			use(c, "arcane_staff")
+			r.flat += b
 			out.append(ev(run, "arcane_staff", "channel", b))
 	if has(run, "wand") and int(c.item_state.get("spark", 0)) == 0 and mult >= 2.0:
 		c.item_state["spark"] = 1
@@ -465,13 +482,14 @@ static func attack_mods(run: RunState, c: CombatState, cid: String, pd: Array, e
 				lows += 1
 			if v == 1:
 				ones += 1
-		if lows > 0:
-			var f4 := lows * ni(run, "claws", "per")
+		if lows >= ni(run, "claws", "dice") and use_left(run, c, "claws"):
+			use(c, "claws")
+			var f4 := ni(run, "claws", "per")
 			r.flat += f4
 			out.append(ev(run, "claws", "scrap", f4, {"dice": lows}))
 		if ones > 0 and sec(run, "claws_knuckles"):
-			r.bonus += ones
-			out.append(ev(run, "claws", "brawl", ones))
+			r.flat += 1
+			out.append(ev(run, "claws", "brawl", 1))
 	if sec(run, "axe_twinbit") and cid == "two_pair":
 		r.flat += int(ItemDefs.sec_num("axe_twinbit", "flat"))
 		out.append(ev(run, "hand_axe", "double_chop", int(ItemDefs.sec_num("axe_twinbit", "flat"))))
@@ -486,20 +504,13 @@ static func attack_mods(run: RunState, c: CombatState, cid: String, pd: Array, e
 		r.flat += s
 		out.append(ev(run, "arcane_staff", "soul", s))
 	# off-hand
-	var kept := 0
-	for i in c.rerolled.size():
-		if not c.rerolled[i]:
-			kept += 1
-	if has(run, "parrying_dagger"):
-		var k2 := mini(kept, ni(run, "parrying_dagger", "dice"))
-		if k2 > 0:
-			r.bonus += k2
-			out.append(ev(run, "parrying_dagger", "steady", k2))
-	if sec(run, "dagger_leaf") and c.turn == 1:
-		var k3 := mini(kept, int(ItemDefs.sec_num("dagger_leaf", "dice")))
-		if k3 > 0:
-			r.bonus += k3
-			out.append(ev(run, "dagger", "light", k3))
+	if has(run, "parrying_dagger") and kept >= ni(run, "parrying_dagger", "dice") and use_left(run, c, "parrying_dagger"):
+		use(c, "parrying_dagger")
+		r.flat += 1
+		out.append(ev(run, "parrying_dagger", "steady", 1, {"kept": kept}))
+	if sec(run, "dagger_leaf") and c.turn == 1 and kept >= int(ItemDefs.sec_num("dagger_leaf", "dice")):
+		r.flat += 1
+		out.append(ev(run, "dagger", "light", 1))
 	if has(run, "spellbook") and int(c.item_state.get("attacks", 0)) == 2:
 		var m3 := n(run, "spellbook", "mult")
 		r.mult += m3
@@ -517,10 +528,10 @@ static func attack_mods(run: RunState, c: CombatState, cid: String, pd: Array, e
 	if has(run, "bone_crown") and int(run.item_state.get("dominion", 0)) > 0:
 		var dm := int(run.item_state.dominion)
 		run.item_state["dominion"] = 0
-		r.bonus += dm
+		r.flat += dm
 		out.append(ev(run, "bone_crown", "dominion", dm))
 	if int(c.item_state.get("focus_pip", 0)) > 0:
-		r.bonus += int(c.item_state.focus_pip)
+		r.flat += int(c.item_state.focus_pip)
 		c.item_state["focus_pip"] = 0
 	# body
 	if has(run, "barbarian_harness"):
@@ -528,14 +539,22 @@ static func attack_mods(run: RunState, c: CombatState, cid: String, pd: Array, e
 		for i in pd.size():
 			if pd[i].rune == "heavy" and bool(act[i]):
 				hv += 1
-		hv = mini(hv, 2)
+		hv = mini(hv, ni(run, "barbarian_harness", "dice"))
 		if hv > 0:
-			r.bonus += hv * ni(run, "barbarian_harness", "pips")
+			r.flat += hv * ni(run, "barbarian_harness", "pips")
 			out.append(ev(run, "barbarian_harness", "brawn", hv * ni(run, "barbarian_harness", "pips")))
 	if has(run, "ranger_tunic") and not e.is_empty() and int(e.hp) >= int(e.max_hp):
 		r.flat += ni(run, "ranger_tunic", "flat")
 		out.append(ev(run, "ranger_tunic", "hunter", ni(run, "ranger_tunic", "flat"), {"enemy_idx": t}))
 	return r
+
+## Per-fight uses of a rule with a "uses" number (0 = unlimited).
+static func use_left(run: RunState, c: CombatState, item: String) -> bool:
+	var u := ni(run, item, "uses")
+	return u <= 0 or int(c.item_state.get("uses_" + item, 0)) < u
+
+static func use(c: CombatState, item: String) -> void:
+	c.item_state["uses_" + item] = int(c.item_state.get("uses_" + item, 0)) + 1
 
 ## Before the main hit lands: the Bone Mace's Bonebreak strips half the target's Block.
 static func pre_hit(run: RunState, c: CombatState) -> Array[Dictionary]:
@@ -646,9 +665,11 @@ static func after_hit(run: RunState, c: CombatState, tgt0: int, total: int, soak
 	if sec(run, "axe_jagged") and int(c.item_state.get("rampage_now", 0)) > 0:
 		out.append_array(poison(run, c, tgt0, int(c.item_state.rampage_now) * int(ItemDefs.sec_num("axe_jagged", "poison")), "great_axe", "bleed"))
 	# Block
-	if has(run, "oath_shield") and ClassLogic.SET_COMBOS.has(cid):
-		var b := int(floor(set_value(eff, group) * n(run, "oath_shield", "x")))
-		out.append_array(gain_block(run, c, b, "oath_shield", "aegis"))
+	if has(run, "oath_shield") and ClassLogic.SET_COMBOS.has(cid) and use_left(run, c, "oath_shield"):
+		var b := int(floor(set_value(eff, group) * n(run, "oath_shield", "x") + 0.0001))
+		if b > 0:
+			use(c, "oath_shield")
+			out.append_array(gain_block(run, c, b, "oath_shield", "aegis"))
 	if sec(run, "claws_gauntlet"):
 		var lows := 0
 		for i in eff.size():
@@ -656,18 +677,22 @@ static func after_hit(run: RunState, c: CombatState, tgt0: int, total: int, soak
 				lows += 1
 		out.append_array(gain_block(run, c, lows * int(ItemDefs.sec_num("claws_gauntlet", "block")), "claws", "guard"))
 	# heals
-	if has(run, "paladin_helm") and SETS3.has(cid):
+	if has(run, "paladin_helm") and SETS3.has(cid) and int(c.item_state.get("vow", 0)) < ni(run, "paladin_helm", "uses"):
+		c.item_state["vow"] = int(c.item_state.get("vow", 0)) + 1
 		out.append_array(heal(run, "paladin_helm", "vow", ni(run, "paladin_helm", "heal")))
-	if has(run, "paladin_cuirass") and ClassLogic.SET_COMBOS.has(cid) and int(c.item_state.get("blessed_turn", 0)) == 0:
-		c.item_state["blessed_turn"] = 1
+	if has(run, "paladin_cuirass") and ClassLogic.SET_COMBOS.has(cid) and cid != "pair" and int(c.item_state.get("blessed", 0)) < ni(run, "paladin_cuirass", "uses"):
+		c.item_state["blessed"] = int(c.item_state.get("blessed", 0)) + 1
 		out.append_array(heal(run, "paladin_cuirass", "blessed", ni(run, "paladin_cuirass", "heal")))
 	# banked rerolls
 	var kept := 0
 	for i in c.rerolled.size():
 		if not c.rerolled[i]:
 			kept += 1
-	if has(run, "rogue_leathers") and kept >= 2:
-		out.append_array(bank_reroll(run, "rogue_leathers", "nimble", ni(run, "rogue_leathers", "max")))
+	if has(run, "rogue_leathers") and kept >= 2 and int(c.item_state.get("nimble", 0)) < ni(run, "rogue_leathers", "max"):
+		var nb := bank_reroll(run, "rogue_leathers", "nimble")
+		if not nb.is_empty():
+			c.item_state["nimble"] = int(c.item_state.get("nimble", 0)) + 1
+		out.append_array(nb)
 	if sec(run, "wand_sapphire") and int(c.item_state.get("spark_now", 0)) == 1:
 		out.append_array(bank_reroll(run, "wand", "wand_focus"))
 	if sec(run, "crossbow_bone") and int(c.item_state.get("deadshot_now", 0)) == 1 and killed:
@@ -715,7 +740,8 @@ static func on_kill(run: RunState, c: CombatState, i: int) -> Array[Dictionary]:
 		run.stats.skeleton_kills = int(run.stats.get("skeleton_kills", 0)) + 1
 	if items(run).is_empty():
 		return out
-	if has(run, "scythe"):
+	if has(run, "scythe") and use_left(run, c, "scythe"):
+		use(c, "scythe")
 		out.append_array(heal(run, "scythe", "reap", ni(run, "scythe", "heal")))
 		if sec(run, "scythe_bone"):
 			var ch := PetLogic.add_charge(run, int(ItemDefs.sec_num("scythe_bone", "charge")))
@@ -792,8 +818,9 @@ static func campfire_pct(run: RunState) -> float:
 static func portal_bonus(run: RunState) -> int:
 	return ni(run, "compass", "portal")
 
-static func pair_pick(run: RunState) -> bool:
-	return ni(run, "compass", "pair_pick") > 0
+## Compass II tie-break on the board move: 1 = the higher value, -1 = the lower one, 0 = random.
+static func pair_pick(run: RunState) -> int:
+	return ni(run, "compass", "pair_pick")
 
 ## Trap / ice dodge target (Lantern III: 3+), 0 = no change.
 static func dodge_min(run: RunState) -> int:

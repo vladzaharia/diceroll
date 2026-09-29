@@ -199,6 +199,23 @@ func set_appearance(class_id: String, slot: String, value: String) -> Array[Dict
 	profile.armory["appearance"] = ap
 	return [{"type": "appearance_set", "class": class_id, "slot": slot, "value": value}]
 
+## The Armory's variant picker for an item: [{id, name, secondary, desc, state: "owned" | "craftable"
+## | "locked", unlock (text), cost (craft cost, {} unless craftable), mastery: [fights, needed]
+## (needed 0 = not a mastery blueprint)}], the Standard first.
+func variant_chips(item: String) -> Array:
+	var out: Array = []
+	for v in ItemDefs.variants_of(item):
+		var vid := String(v)
+		var st := "owned" if profile.owns_variant(item, vid) else ("craftable" if profile.has_blueprint(item, vid) else "locked")
+		var u: Dictionary = ItemDefs.VARIANTS.get(vid, {}).get("unlock", {})
+		var need := int(u.get("mastery", u.get("or_mastery", 0)))
+		out.append({"id": vid, "name": ItemDefs.name_of(vid), "secondary": ItemDefs.sec_of(vid),
+			"desc": String(ItemDefs.VARIANTS.get(vid, {}).get("desc", ItemDefs.std_text(item))),
+			"state": st, "unlock": ItemDefs.unlock_text(vid),
+			"cost": ItemDefs.craft_cost(vid) if st == "craftable" else {},
+			"mastery": [mini(profile.item_mastery(item), need), need]})
+	return out
+
 func mark_items_seen() -> Array[Dictionary]:
 	profile.armory["seen_new"] = []
 	return [{"type": "items_seen"}]

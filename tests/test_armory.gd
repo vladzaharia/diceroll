@@ -137,11 +137,17 @@ func test_tiers_affinity_and_the_pouch() -> void:
 	assert_eq(ItemDefs.tier_for("compass", "trinket2", "knight", 5), 1, "pouch: min I")
 	assert_eq(ItemDefs.tier_for("knight_cape", "back", "knight", 8), 0, "Back: no stats")
 	# the Standard variant's x1.2
-	assert_near(ItemDefs.num("greatsword", "mult", 1, "greatsword"), 0.24)
-	assert_near(ItemDefs.num("greatsword", "mult", 1, "greatsword_zwei"), 0.2, 0.0001, "variants keep the base numbers")
-	assert_near(ItemDefs.num("spear", "factor", 3, "spear"), 1.0 + (1.35 - 1.0) * 1.2)
-	assert_near(ItemDefs.num("dagger", "turns", 3, "dagger"), 3.0, 0.0001, "count rules: Block 2 instead")
-	assert_eq(ItemDefs.rule_text("sword", 3, "sword_saber"), "Pair or Two Pair: +%d damage after the multiplier." % int(ItemDefs.num("sword", "flat", 3, "sword_saber")))
+	var gm: float = ItemDefs.ITEMS.greatsword.effect.n.mult[0]
+	assert_near(ItemDefs.num("greatsword", "mult", 1, "greatsword"), gm * 1.2)
+	assert_near(ItemDefs.num("greatsword", "mult", 1, "greatsword_zwei"), gm, 0.0001, "variants keep the base numbers")
+	var sf: float = ItemDefs.ITEMS.spear.effect.n.factor[2]
+	assert_near(ItemDefs.num("spear", "factor", 3, "spear"), 1.0 + (sf - 1.0) * 1.2, 0.0001, "a factor scales its bonus")
+	assert_near(ItemDefs.num("dagger", "turns", 3, "dagger"), float(ItemDefs.ITEMS.dagger.effect.n.turns[2]), 0.0001,
+		"count rules keep their numbers (the Standard gives Block instead)")
+	assert_true(ItemDefs.std_text("dagger").begins_with("Standard: Block %d on turn 1" % ItemDefs.STD_BLOCK))
+	assert_true(ItemDefs.rule_text("sword", 3, "sword_saber").begins_with("Pair or Two Pair: +%d damage" % int(ItemDefs.num("sword", "flat", 3, "sword_saber"))),
+		"rule text carries the tier's numbers")
+	assert_true(not ItemDefs.rule_text("sword", 3).contains("{"), "no placeholder left")
 	assert_eq(ItemDefs.rule_text("knight_cape", 3), "Style")
 
 # ================================================================ profile
@@ -202,7 +208,7 @@ func test_v2_gear_migrates_to_ranks_and_items() -> void:
 	assert_true(p.owns_item("wizard_hat") and p.owns_item("mage_robe"), "owned classes -> kits")
 	var m := MetaRun.build(p.to_dict(), "knight")
 	assert_eq(int(m.lap_rerolls), 1, "the board reroll survives migration day")
-	assert_eq(int(m.atk), 1)
+	assert_eq(int(m.atk), ItemDefs.ATK_BONUS)
 	# idempotent: the migrated profile saves as v3 and reloads unchanged
 	var q := Profile.from_dict(JSON.parse_string(JSON.stringify(p.to_dict())))
 	assert_eq(JSON.stringify(q.to_dict()), JSON.stringify(p.to_dict()))
@@ -338,13 +344,15 @@ func test_catalog_lists_ranks_items_and_crafts() -> void:
 
 func test_build_resolves_items_and_stats() -> void:
 	var m := MetaRun.build(MetaPresets.get_preset("max"), "knight")
-	assert_eq(int(m.atk), 1)
+	assert_eq(int(m.atk), ItemDefs.ATK_BONUS)
 	assert_eq(int(m.hp), ItemDefs.HP_CAP)
 	assert_eq(String(m.items.weapon.id), "sword")
 	assert_eq(int(m.items.weapon.tier), 3)
-	assert_eq(String(m.items.trinket.id), "compass")
-	assert_eq(int(m.items.trinket2.tier), 2, "the pouch works a tier lower")
-	assert_eq(int(m.lap_rerolls), 1, "Compass R6+ in slot 1")
+	assert_eq(String(m.items.trinket.id), "tankard", "the realistic max: the default kit")
+	assert_true(not m.items.has("trinket2"), "the Belt Pouch starts empty")
+	var s1 := MetaRun.armory_stats({"trinket": 6}, {"trinket": {"id": "compass", "variant": "compass", "tier": 2}})
+	assert_eq(int(s1.lap_rerolls), 1, "Compass R6+ in slot 1")
+	assert_eq(ItemDefs.tier_for("compass", "trinket2", "knight", 8), 2, "the pouch works a tier lower")
 	var s2 := MetaRun.armory_stats({"trinket": 8}, {"trinket2": {"id": "compass", "variant": "compass", "tier": 2}})
 	assert_eq(int(s2.lap_rerolls), 0, "never from slot 2")
 	var s3 := MetaRun.armory_stats({"weapon": 1}, {"weapon": {"id": "greatsword", "variant": "greatsword_plain", "tier": 1}})
@@ -392,7 +400,8 @@ func test_bulwark_plated_and_steadfast() -> void:
 	_dice([1, 3, 6])
 	c.target = 0
 	c.attack(run)
-	assert_eq(run.block, pl + sf, "turn 2: Plated (+ Steadfast)")
+	var pl2 := pl if 2 <= int(ItemDefs.num("knight_plate", "turns", 3)) else 0
+	assert_eq(run.block, pl2 + (sf if pl2 > 0 else 0), "turn 2: Plated only on its turns")
 
 func test_last_stand_at_tier_three() -> void:
 	run = _run("knight", {"offhand": ["round_shield", "round_shield", 3]})
@@ -439,7 +448,8 @@ func test_rampage_stacks_and_resets() -> void:
 		var ev := c.attack(run)
 		var r := _all(ev, "item_triggered", "rampage")
 		flats.append(int(r[0].value) if not r.is_empty() else 0)
-	assert_eq(flats, [0, per, 2 * per], "consecutive hits stack")
+	var cap := int(ItemDefs.num("great_axe", "stacks", 1, "great_axe"))
+	assert_eq(flats, [0, per, mini(2, cap) * per], "consecutive hits stack (to the cap)")
 	_dice([1, 3, 6])
 	c.target = 1
 	var ev3 := c.attack(run)
@@ -516,8 +526,8 @@ func test_trinkets_on_the_board_and_in_shops() -> void:
 	f.debug_open("shop")
 	assert_eq(int(f.offer.restock_price), int(ItemDefs.num("traders_map", "restock", 3)))
 	assert_eq(int(f.offer.free_restocks), 1)
-	assert_true(ItemLogic.pair_pick(f.run), "Compass II: ties move the higher value")
-	assert_eq(ItemLogic.portal_bonus(f.run), 2)
+	assert_eq(ItemLogic.pair_pick(f.run), 0, "the move tie-break stays random (see balance.md)")
+	assert_eq(ItemLogic.portal_bonus(f.run), int(ItemDefs.num("compass", "portal", 2)))
 	f.run = _run("knight", {"trinket": ["tankard", "tankard", 3], "body": ["druid_robe", "druid_robe", 2]}, 11)
 	assert_near(f.run.lap_heal_pct(), Balance.LAP_HEAL_PCT + ItemDefs.num("tankard", "lap", 3))
 	assert_eq(ItemLogic.lap_heal_flat(f.run), int(ItemDefs.num("druid_robe", "heal", 2)))
@@ -525,7 +535,9 @@ func test_trinkets_on_the_board_and_in_shops() -> void:
 	f.debug_open("shop")
 	for it in f.offer.items:
 		if String(it.id) == "face_raise":
-			assert_true(int(it.price) <= int(round(18 * ItemLogic.appraise(f.run))), "Tinker II + Appraise")
+			assert_eq(int(it.price), int(ItemDefs.num("wrench", "raise_price", 2)), "Tinker")
+		if String(it.id) == "die":
+			assert_true(int(it.price) < int(DiceKinds.DEFS[String(it.kind)].price), "Appraise")
 
 func test_grove_raises_faces_on_a_new_biome() -> void:
 	run = _run("druid", {"weapon": ["druid_staff", "staff_living", 3]})
@@ -569,3 +581,30 @@ func test_game_over_stats_carry_the_loadout() -> void:
 	var st: Dictionary = ev.back().stats
 	assert_eq(String(st.loadout.weapon.id), "sword")
 	assert_eq(int(st.item_fights), 7)
+
+func test_presentation_views() -> void:
+	var f := GameFlow.new_run("necromancer", 5, Balance.BOARD_SIZE, {"profile": MetaPresets.get_preset("max")})
+	var li := f.loadout_info()
+	assert_eq(String(li.items.weapon.variant), "staff_bone")
+	assert_eq(String(li.style), "magic")
+	assert_true(String(li.items.weapon.text).contains("uned dice"), "rule text with numbers")
+	assert_eq(String(li.back), "hooded_cape")
+	assert_eq(GameFlow.new_run("knight", 5).loadout_info().items, {}, "legacy run")
+	var p := Profile.fresh()
+	var camp := Camp.new(p)
+	var chips := camp.variant_chips("sword")
+	assert_eq(chips.size(), ItemDefs.variants_of("sword").size())
+	assert_eq(String(chips[0].state), "owned", "the Standard")
+	assert_eq(String(chips[1].state), "locked")
+	assert_eq(chips[1].mastery, [0, 15])
+	p.add_blueprint("sword", "sword_training")
+	assert_eq(String(camp.variant_chips("sword")[1].state), "craftable")
+	assert_eq(int(camp.variant_chips("sword")[1].cost.crowns), ItemDefs.CRAFT_COSTS[0])
+
+func test_compass_reroll_starts_with_the_second_biome() -> void:
+	var p := Profile.from_dict(MetaPresets.get_preset("max"))
+	Camp.new(p).equip_item("knight", "trinket", "compass")
+	var f := GameFlow.new_run("knight", 9, Balance.BOARD_SIZE, {"profile": p.to_dict()})
+	assert_eq(int(f.run.meta.lap_rerolls), 1)
+	assert_eq(f.run.lap_rerolls, 0, "none in the first biome")
+	assert_eq(f.run.lap_reroll_refill(true), 1, "a new biome refills it")

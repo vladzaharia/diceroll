@@ -12,8 +12,8 @@ extends RefCounted
 ##          Pumpkin Sprite at XP level 5 (155 XP: the combined-game campaign median at run 10 is 154,
 ##          about 70% of profiles at 150+), 7 minigames owned (2 equipped)
 ##   max    everything unlocked and maxed: all packs/classes/biomes/bosses, every Armory rank R8 +
-##          the Belt Pouch, every item and variant owned, each class's kit equipped (signature
-##          variants) with MAX_TRINKETS in the two trinket slots,
+##          the Belt Pouch, every item and variant owned, each class's default kit equipped
+##          (signature variants, the Tankard, the Belt Pouch empty: the realistic loadout),
 ##          every pet L10, every minigame mastered, all Crowns upgrades, 3 minigame slots
 ## Ascension is 0 in every preset; pass the level separately (profile.ascension.selected).
 
@@ -21,7 +21,7 @@ extends RefCounted
 const MID_RANKS := {"weapon": 4, "offhand": 4, "armor": 4, "trinket": 4}
 const MID_ITEMS := ["hand_axe", "coin_purse", "compass", "lantern", "crossbow", "healers_flask"]
 const MID_TRINKET := "tankard"
-const MAX_TRINKETS := ["compass", "coin_purse"]
+const MAX_TRINKETS := ["tankard"]
 
 static func names() -> Array:
 	return ["fresh", "mid", "max"]
