@@ -81,8 +81,11 @@ func test_lock_parsing() -> void:
 func test_screen_builds_without_theme() -> void:
 	var s := AssetCheck.screen()
 	assert_true(s.find_child("Quit", true, false) is Button, "quit button")
-	assert_true(s.find_child("Readme", true, false) is LinkButton, "readme link")
-	assert_eq((s.find_child("Readme", true, false) as LinkButton).text, AssetCheck.README_URL)
+	assert_true(s.find_child("Readme", true, false) is Button, "build guide button")
+	var link := s.find_child("ReadmeLink", true, false) as LinkButton
+	assert_true(link != null and link.uri == AssetCheck.README_URL, "readme link opens the README")
+	assert_true(s.find_child("Logo", true, false) != null, "logo (or drawn fallback)")
+	assert_true(ResourceLoader.exists(MissingAssetsScreen.LOGO_PATH), "tracked logo present")
 	s.free()
 
 

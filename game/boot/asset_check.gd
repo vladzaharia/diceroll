@@ -7,7 +7,7 @@ extends RefCounted
 ## No hashing: this runs before the title screen.
 ##
 ## Skipped for exported builds (assets are baked into the PCK and the lock isn't exported),
-## headless runs and when the lock file is absent. main.gd shows `screen()` instead of the
+## headless runs and when the lock file is absent. main.gd shows `screen()` (MissingAssetsScreen) instead of the
 ## game when units are missing; the screenshot harness (tools/shot.gd) fails loudly instead.
 
 const LOCK_PATH := "res://tools/ci/assets.lock.json"
@@ -83,55 +83,6 @@ static func run(headless_too := false) -> PackedStringArray:
 	return missing
 
 
-## Plain, theme-independent "assets missing" screen (engine fallback font only).
+## The "assets missing" screen (theme- and asset-independent, see MissingAssetsScreen).
 static func screen() -> Control:
-	var font := ThemeDB.fallback_font
-	var root := Control.new()
-	root.name = "MissingAssets"
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var bg := ColorRect.new()
-	bg.color = Color(0.08, 0.07, 0.09)
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.add_child(bg)
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.add_child(center)
-	var box := VBoxContainer.new()
-	box.custom_minimum_size = Vector2(560, 0)
-	box.add_theme_constant_override("separation", 28)
-	center.add_child(box)
-
-	var label := func(text: String, size: int, color: Color) -> Label:
-		var l := Label.new()
-		l.text = text
-		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		l.add_theme_font_override("font", font)
-		l.add_theme_font_size_override("font_size", size)
-		l.add_theme_color_override("font_color", color)
-		box.add_child(l)
-		return l
-	label.call("Required game assets are missing", 40, Color(1, 0.85, 0.5))
-	label.call("The third-party KayKit packs (FREE and EXTRA), Kenney SFX, mixkit music and fonts "
-		+ "are not in the repository; obtain them and run tools/import_assets.sh, then "
-		+ "godot --headless --import. See the README.", 24, Color(0.9, 0.9, 0.9))
-
-	var link := LinkButton.new()
-	link.text = README_URL
-	link.name = "Readme"
-	link.add_theme_font_override("font", font)
-	link.add_theme_font_size_override("font_size", 22)
-	link.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	link.pressed.connect(func() -> void: OS.shell_open(README_URL))
-	box.add_child(link)
-
-	var quit := Button.new()
-	quit.text = "Quit"
-	quit.name = "Quit"
-	quit.custom_minimum_size = Vector2(220, 72)
-	quit.add_theme_font_override("font", font)
-	quit.add_theme_font_size_override("font_size", 28)
-	quit.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	quit.pressed.connect(func() -> void: root.get_tree().quit())
-	box.add_child(quit)
-	return root
+	return MissingAssetsScreen.new()
