@@ -630,6 +630,7 @@ func attack(run: RunState) -> Array[Dictionary]:
 					if run.banked_rerolls < Balance.MAX_BANKED_REROLLS:
 						run.banked_rerolls += 1
 						ev.append(_rune(i, rune, "bank_reroll", 1))
+	ev.append_array(ClassLogic.after_attack(run, self))
 	ev.append_array(PetLogic.on_attack_resolved(run, self, cid, eff))
 	if all_dead():
 		ev.append_array(_win(run))

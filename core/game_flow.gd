@@ -8,6 +8,8 @@ extends RefCounted
 enum Phase { BOARD_READY, BOARD_ROLLED, COMBAT, DRAFT, SHOP, FORGE, EVENT, PORTAL, GAME_OVER, VICTORY, MINIGAME }
 
 const SAVE_VERSION := 1
+## Die index that addresses the Engineer's Turret die in rune_assign, shop_buy and forge_apply.
+const TURRET := -2
 
 var run: RunState
 var phase: Phase = Phase.BOARD_READY
@@ -256,6 +258,12 @@ func confirm_move() -> Array[Dictionary]:
 		if run.dice[i].rune == "gilded" and board_roll[i] > 0:
 			ev.append({"type": "rune_fired", "die_idx": i, "rune": "gilded", "effect": "gold", "value": board_roll[i]})
 			_gold(ev, board_roll[i], "gilded")
+	if run.turret != null and run.turret.rune == "gilded":
+		# the Turret's MOVE trigger: it rolls with the board move
+		var tv := run.turret.value(run.turret.roll(run.rng))
+		if tv > 0:
+			ev.append({"type": "rune_fired", "die_idx": TURRET, "rune": "gilded", "effect": "gold", "value": tv, "turret": true})
+			_gold(ev, tv, "gilded")
 	var hop := board_pair_value()
 	var doubles := hop > 0
 	if doubles:
@@ -835,9 +843,9 @@ func _collector_hp(runes: int, ev: Array[Dictionary]) -> void:
 
 ## Puts `rune` on a die (replacing any rune). Collector adds max HP when a blank die gains one.
 func _assign_rune(die_idx: int, rune: String, ev: Array[Dictionary]) -> void:
-	var old := run.dice[die_idx].rune
-	run.dice[die_idx].rune = rune
-	ev.append({"type": "rune_assigned", "die_idx": die_idx, "rune": rune, "replaced": old})
+	var old := _die(die_idx).rune
+	_die(die_idx).rune = rune
+	ev.append({"type": "rune_assigned", "die_idx": die_idx, "rune": rune, "replaced": old, "turret": die_idx == TURRET})
 	if old == "" and run.has_passive("collector"):
 		_collector_hp(1, ev)
 
@@ -911,7 +919,7 @@ func _weakest_die() -> int:
 func rune_assign(die_idx: int) -> Array[Dictionary]:
 	if phase != Phase.DRAFT or offer.get("kind", "") != "rune_assign":
 		return _err("rune_assign")
-	if die_idx < 0 or die_idx >= run.dice.size():
+	if not _valid_die(die_idx, String(offer.rune)):
 		return [_e("bad die index")]
 	_record(["rune_assign", die_idx])
 	var ev: Array[Dictionary] = []
@@ -1036,14 +1044,14 @@ func shop_buy(i: int, die_idx := -1) -> Array[Dictionary]:
 		return [_e("sold out")]
 	if run.gold < int(item.price):
 		return [_e("not enough gold")]
-	if item.needs_die and (die_idx < 0 or die_idx >= run.dice.size()):
+	if item.needs_die and not _valid_die(die_idx, String(item.get("rune", ""))):
 		return [_e("choose a die")]
 	match String(item.id):
 		"die":
 			if run.dice.size() >= run.max_dice():
 				return [_e("dice pool is full")]
 		"face_raise":
-			if not run.dice[die_idx].can_raise(run.dice[die_idx].lowest_face()):
+			if not _die(die_idx).can_raise(_die(die_idx).lowest_face()):
 				return [_e("die is maxed")]
 		"combat_reroll":
 			if run.combat_rerolls >= Balance.MAX_COMBAT_REROLLS or run.shop_reroll_bought:
@@ -1074,8 +1082,8 @@ func shop_buy(i: int, die_idx := -1) -> Array[Dictionary]:
 				var h := run.heal(run.pct_of_max(Balance.SHOP_POTION_PCT))
 				ev.append({"type": "hp_changed", "amount": h, "total": run.hp, "source": "potion", "max_hp": run.max_hp})
 		"face_raise":
-			var f := run.dice[die_idx].lowest_face()
-			run.dice[die_idx].raise_face(f)
+			var f := _die(die_idx).lowest_face()
+			_die(die_idx).raise_face(f)
 			run.stats.face_edits = int(run.stats.get("face_edits", 0)) + 1
 			ev.append(_face_ev(die_idx, f))
 		"combat_reroll":
@@ -1118,9 +1126,9 @@ func forge_apply(die_idx: int, face_idx: int, op: String, src_face := -1) -> Arr
 	if op != "skip":
 		if not Array(offer.get("ops", [])).has(op):
 			return [_e("operation not allowed: " + op)]
-		if die_idx < 0 or die_idx >= run.dice.size() or face_idx < 0 or face_idx > 5:
+		if not _valid_die(die_idx) or face_idx < 0 or face_idx > 5:
 			return [_e("bad die or face")]
-		var d := run.dice[die_idx]
+		var d := _die(die_idx)
 		if op == "raise" and not d.can_raise(face_idx):
 			return [_e("face is already at its cap (%d)" % d.raise_cap())]
 		if op == "mirror" and (src_face < 0 or src_face > 5 or src_face == face_idx or d.faces[src_face] == d.faces[face_idx]):
@@ -1132,10 +1140,10 @@ func forge_apply(die_idx: int, face_idx: int, op: String, src_face := -1) -> Arr
 		_upgrade("forge" if fs == "tile" else fs)
 		run.stats.face_edits = int(run.stats.get("face_edits", 0)) + 1
 	if op == "raise":
-		run.dice[die_idx].raise_face(face_idx)
+		_die(die_idx).raise_face(face_idx)
 		ev.append(_face_ev(die_idx, face_idx))
 	elif op == "mirror":
-		run.dice[die_idx].mirror_face(face_idx, src_face)
+		_die(die_idx).mirror_face(face_idx, src_face)
 		ev.append(_face_ev(die_idx, face_idx))
 	var uses := int(offer.get("uses", 1))
 	if op != "skip" and uses > 1:
@@ -1151,7 +1159,18 @@ func forge_apply(die_idx: int, face_idx: int, op: String, src_face := -1) -> Arr
 	return ev
 
 func _face_ev(die_idx: int, face_idx: int) -> Dictionary:
-	return {"type": "face_changed", "die_idx": die_idx, "face_idx": face_idx, "value": run.dice[die_idx].faces[face_idx], "faces": Array(run.dice[die_idx].faces)}
+	return {"type": "face_changed", "die_idx": die_idx, "face_idx": face_idx, "value": _die(die_idx).faces[face_idx], "faces": Array(_die(die_idx).faces)}
+
+## run.dice[idx], or the Engineer's Turret for GameFlow.TURRET.
+func _die(idx: int) -> Die:
+	return run.turret if idx == TURRET else run.dice[idx]
+
+## A die index offers may target: a pool die, or the Turret (only for its allowed runes:
+## ClassLogic.TURRET_RUNES; `rune` "" = a face edit).
+func _valid_die(idx: int, rune := "") -> bool:
+	if idx == TURRET:
+		return run.turret != null and (rune == "" or ClassLogic.TURRET_RUNES.has(rune))
+	return idx >= 0 and idx < run.dice.size()
 
 # ================================================================ events
 

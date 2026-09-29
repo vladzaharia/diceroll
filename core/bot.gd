@@ -221,6 +221,8 @@ static func _best_draft(f: GameFlow) -> int:
 	return best
 
 static func _die_for_rune(f: GameFlow, _rune: String) -> int:
+	if f.run.turret != null and f.run.turret.rune == "" and ClassLogic.TURRET_RUNES.has(_rune):
+		return GameFlow.TURRET # a free Turret slot takes any rune it can fire
 	var best := 0
 	var best_s := INF
 	for i in f.run.dice.size():
@@ -251,7 +253,7 @@ static func _shop(f: GameFlow) -> Array:
 			"rune":
 				var rs := float(RUNE_SCORE.get(String(it.rune), 4))
 				var target := _die_for_rune(f, String(it.rune))
-				var cur := f.run.dice[target].rune
+				var cur := f._die(target).rune
 				var cur_s := 0.0 if cur == "" else float(RUNE_SCORE.get(cur, 4))
 				s = rs - cur_s if (has_free or rs > cur_s) else 0.0
 			"combat_reroll":
@@ -271,7 +273,7 @@ static func _shop(f: GameFlow) -> Array:
 				die_idx = _die_for_rune(f, String(it.rune))
 			else:
 				die_idx = _lowest_die(f)
-			if die_idx < 0:
+			if die_idx < 0 and die_idx != GameFlow.TURRET:
 				return ["shop_leave"]
 		return ["shop_buy", best, die_idx]
 	return ["shop_leave"]
@@ -1577,7 +1579,29 @@ static func _best_rune_die(f: GameFlow, rules: AutoRules, r: String) -> Array:
 		if g > best_g + 1e-6:
 			best_g = g
 			best = i
+	if f.run.turret != null and ClassLogic.TURRET_RUNES.has(r):
+		var tg := _turret_rune_value(f, rules, r) - _turret_rune_value(f, rules, f.run.turret.rune)
+		if tg > best_g + 1e-6:
+			best_g = tg
+			best = GameFlow.TURRET
 	return [best, best_g]
+
+## PV worth per turn of rune `r` on the Engineer's Turret (the shot itself is always there).
+static func _turret_rune_value(f: GameFlow, rules: AutoRules, r: String) -> float:
+	var t := float(ClassLogic.TURRET_T[clampi(f.run.act, 1, 3) - 1])
+	var avg := f.run.turret.face_sum() / 6.0
+	match r:
+		"heavy":
+			return avg * t * float(_fw(rules).dmg)
+		"ember":
+			return 2.0 * float(_fw(rules).dmg)
+		"frost":
+			return 1.2 * float(_fw(rules).def)
+		"guard":
+			return avg * 0.7 * float(_fw(rules).def)
+		"gilded":
+			return avg * 0.3 * float(_fw(rules).econ)
+	return 0.0
 
 static func _new_die_gain(f: GameFlow, rules: AutoRules, kind: String) -> float:
 	if f.run.dice.size() >= f.run.max_dice():
@@ -1730,6 +1754,8 @@ static func _cat_why(rules: AutoRules, cat: String) -> String:
 	return {"dmg": "more damage", "def": "better defense", "econ": "more gold"}.get(cat, "best value")
 
 static func _rune_why(f: GameFlow, r: String, i: int) -> String:
+	if i == GameFlow.TURRET:
+		return "on the Turret"
 	var d := f.run.dice[i]
 	match r:
 		"heavy", "blade":
@@ -1784,7 +1810,7 @@ static func _decide_rune_assign(f: GameFlow, rules: AutoRules) -> Dictionary:
 	var i := int(bd[0])
 	if _build_lapse(f, rules, 12):
 		i = _die_for_rune(f, r)
-	var old := f.run.dice[i].rune
+	var old := f._die(i).rune
 	var msg := "%s Rune on die %d" % [Runes.DEFS[r].name, i + 1]
 	if old != "":
 		msg += " (replaces %s)" % Runes.DEFS[old].name
@@ -1825,7 +1851,7 @@ static func _decide_shop(f: GameFlow, rules: AutoRules) -> Dictionary:
 			continue
 		var die_idx := int(ov[2])
 		if bool(it.needs_die):
-			if die_idx < 0:
+			if die_idx < 0 and die_idx != GameFlow.TURRET:
 				continue
 			if String(it.id) == "face_raise" and not run.dice[die_idx].can_raise(run.dice[die_idx].lowest_face()):
 				continue

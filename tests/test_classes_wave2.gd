@@ -90,8 +90,73 @@ func test_necromancer_combat_serialises_bones() -> void:
 	assert_eq(back.bones_raised, 1)
 	assert_eq(back.dice_values.size(), 3)
 
+# ================================================================ Engineer
+
+func test_engineer_turret_exists_and_serialises() -> void:
+	var f := GameFlow.new_run("engineer", 3)
+	assert_true(f.run.turret != null)
+	assert_eq(f.run.dice.size(), 2, "the turret is outside the pool")
+	assert_eq(GameFlow.new_run("knight", 3).run.turret, null)
+	f.run.turret.rune = "heavy"
+	var back := GameFlow.from_dict(JSON.parse_string(JSON.stringify(f.to_dict())))
+	assert_eq(back.run.turret.rune, "heavy")
+	assert_true(back.run.turret.has_tag("turret"))
+
+func test_engineer_turret_fires_after_the_attack() -> void:
+	_setup("engineer", [["standard", ""], ["standard", ""]])
+	run.turret.faces = PackedInt32Array([4, 4, 4, 4, 4, 4])
+	_dice([1, 2])
+	var ev := c.attack(run)
+	var tf := _all(ev, "turret_fired")
+	assert_eq(tf.size(), 1)
+	assert_eq(int(tf[0].value), 4)
+	assert_eq(int(tf[0].damage), 4, "tier 1: pips x1")
+	run.turret.rune = "heavy"
+	run.act = 3
+	run.route = ["glade", "hollow", "magma"]
+	_dice([1, 2])
+	ev = c.attack(run)
+	assert_eq(int(_all(ev, "turret_fired")[0].damage), int(4 * 2 * ClassLogic.TURRET_T[2]), "tier 3, Heavy doubles")
+
+func test_engineer_turret_runes() -> void:
+	_setup("engineer", [["standard", ""]], ["skeleton_minion", "skeleton_minion"])
+	run.turret.faces = PackedInt32Array([1, 1, 1, 1, 1, 1])
+	run.turret.rune = "frost"
+	_dice([2])
+	c.attack(run)
+	assert_true(bool(c.enemies[c.target].frozen) or int(run.stats.get("freezes", 0)) == 1, "a 1 freezes")
+	run.turret.faces = PackedInt32Array([3, 3, 3, 3, 3, 3])
+	run.turret.rune = "guard"
+	_dice([2])
+	var ev := c.attack(run)
+	var bg := false
+	for e in ev:
+		if e.type == "block_gained" and String(e.get("source", "")) == "turret":
+			bg = true
+	assert_true(bg, "Guard: Block = pips")
+
+func test_engineer_offers_target_the_turret() -> void:
+	var f := GameFlow.new_run("engineer", 3)
+	f.debug_open("rune_assign", "blade")
+	assert_eq(f.rune_assign(GameFlow.TURRET)[0].type, "error", "combo runes never go on the turret")
+	f.debug_open("rune_assign", "ember")
+	var ev := f.rune_assign(GameFlow.TURRET)
+	assert_eq(f.run.turret.rune, "ember")
+	assert_true(bool(ev[1].turret) if ev.size() > 1 else true)
+	f.debug_open("forge")
+	f.forge_apply(GameFlow.TURRET, 0, "raise")
+	assert_eq(f.run.turret.faces[0], 2)
+	var k := GameFlow.new_run("knight", 3)
+	k.debug_open("rune_assign", "ember")
+	assert_eq(k.rune_assign(GameFlow.TURRET)[0].type, "error", "no turret, no target")
+
+func test_engineer_greedy_bot_fills_the_turret() -> void:
+	var f := GameFlow.new_run("engineer", 3)
+	f.debug_open("rune_assign", "frost")
+	assert_eq(Bot.next_command(f), ["rune_assign", GameFlow.TURRET])
+
 func test_wave2_full_runs_replay() -> void:
-	for cls in ["necromancer"]:
+	for cls in ["necromancer", "engineer"]:
 		for s in [5, 6]:
 			var f := GameFlow.new_run(cls, s)
 			var n := 0

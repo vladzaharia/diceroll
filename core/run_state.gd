@@ -52,6 +52,8 @@ var potions: int = 0
 var pet_state: Dictionary = {}
 ## Board rerolls left in this lap's pool (Boots, Crystal Wisp perk); refilled on every lap.
 var lap_rerolls: int = 0
+## The Engineer's Turret die (outside the pool, not counted toward the cap); null otherwise.
+var turret: Die = null
 ## Equipped skin (SkinDefs slot id) and the A10 prestige overlay: presentation only.
 var skin: String = "default"
 var skin_prestige: bool = false
@@ -82,6 +84,9 @@ static func create(p_class_id: String, p_seed: int, p_board_size: int = Balance.
 		var die := Die.make(String(def.runes[k]), String(kinds[k]))
 		die.add_tag(String(tags[k]))
 		r.dice.append(die)
+	if HeroDefs.mechanic(p_class_id) == "turret":
+		r.turret = Die.make("", "standard")
+		r.turret.add_tag("turret")
 	r.board_size = p_board_size
 	r.mode = "short" if String(opts.get("mode", "standard")) == "short" else "standard"
 	if opts.has("meta"):
@@ -365,7 +370,7 @@ func to_dict() -> Dictionary:
 		"route": Array(route), "miniboss_id": miniboss_id, "boss_id": boss_id, "chill": chill,
 		"meta": meta.duplicate(true), "mode": mode, "belt": Array(belt), "potions": potions, "potion_cap": potion_cap,
 		"pet_state": pet_state.duplicate(true), "lap_rerolls": lap_rerolls, "cursed_faces": cursed_faces.duplicate(true),
-		"skin": skin, "skin_prestige": skin_prestige,
+		"skin": skin, "skin_prestige": skin_prestige, "turret": turret.to_dict() if turret != null else null,
 	}
 
 static func from_dict(d: Dictionary) -> RunState:
@@ -414,6 +419,8 @@ static func from_dict(d: Dictionary) -> RunState:
 	r.potion_cap = int(d.get("potion_cap", 0))
 	r.lap_rerolls = int(d.get("lap_rerolls", 0))
 	r.skin = String(d.get("skin", "default"))
+	if d.get("turret") != null:
+		r.turret = Die.from_dict(d.turret)
 	r.skin_prestige = bool(d.get("skin_prestige", false))
 	for c in d.get("cursed_faces", []):
 		r.cursed_faces.append({"die": int(c.die), "face": int(c.face), "value": int(c.value)})

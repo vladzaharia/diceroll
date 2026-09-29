@@ -29,6 +29,13 @@ extends RefCounted
 ##                         when phase 2 starts. Bones crumble when the fight is won, healing
 ##                         BONE_HEAL each. Events: die_added {die_idx, temporary: true, tag: "bone",
 ##                         die} and die_removed {die_idx, temporary: true}.
+##   turret (Engineer)     RunState.turret, a die outside the pool: after each main attack it rolls
+##                         (no rerolls, no combos, ignores curses) and shoots the target for pips x
+##                         TURRET_T[biome tier - 1]. One rune, non-combo triggers only
+##                         (TURRET_RUNES): guard Block = pips, heavy x2 shot, ember 6 to all on a
+##                         6, frost freezes on a 1, gilded gold on the board move. Offers address
+##                         it as die_idx GameFlow.TURRET (-2). turret_fired {value, damage, rune,
+##                         target}.
 ##   overgrowth (Druid)    each lap completion raises the lowest face of every "seed" die by 1
 ##                         (face_changed {source: "growth"}); each biome change tags the
 ##                         untagged die with the lowest face sum as a seed (max DRUID_MAX_SEEDS);
@@ -48,6 +55,8 @@ static var NINJA_BOARD_REFUNDS := 1
 static var DRUID_GROWTH := 1
 static var DRUID_MAX_SEEDS := 3
 static var DRUID_PET_CHARGE := 1
+static var TURRET_T := [1.0, 2.0, 3.0]
+const TURRET_RUNES := ["guard", "heavy", "ember", "frost", "gilded"]
 static var BONE_MAX := 2
 static var BONE_POOL_MAX := 6
 static var BONE_HEAL := 2
@@ -68,6 +77,9 @@ static func tune_knob(knob: String, v: float) -> bool:
 		"DRUID_MAX_SEEDS": DRUID_MAX_SEEDS = int(v)
 		"DRUID_PET_CHARGE": DRUID_PET_CHARGE = int(v)
 		"BONE_MAX": BONE_MAX = int(v)
+		"TURRET_T3": TURRET_T = [TURRET_T[0], TURRET_T[1], v]
+		"TURRET_T2": TURRET_T = [TURRET_T[0], v, TURRET_T[2]]
+		"TURRET_T1": TURRET_T = [v, TURRET_T[1], TURRET_T[2]]
 		"BONE_HEAL": BONE_HEAL = int(v)
 		_: return false
 	return true
@@ -240,6 +252,39 @@ static func after_main_hit(run: RunState, c: CombatState, tgt: int, overkill: in
 				out.append_array(c.damage_enemy(nxt, carry, "pierce_shot", run))
 				carry = c.last_overkill
 				from = nxt
+	return out
+
+## After the main attack and its runes (enemies may be dead): the Engineer's Turret fires.
+static func after_attack(run: RunState, c: CombatState) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if mech(run) != "turret" or run.turret == null or c.all_dead():
+		return out
+	c._fix_target()
+	var t := c.target
+	var v := run.turret.value(run.turret.roll(run.rng))
+	var r := run.turret.rune
+	var tier := int(BiomeDefs.DEFS[run.biome()].tier) if BiomeDefs.has(run.biome()) else run.act
+	var mult := float(TURRET_T[clampi(tier, 1, 3) - 1]) * (2.0 if r == "heavy" else 1.0)
+	var dmg := int(round(v * mult))
+	out.append({"type": "turret_fired", "value": v, "damage": dmg, "rune": r, "target": t})
+	out.append_array(c.damage_enemy(t, dmg, "turret", run))
+	match r:
+		"guard":
+			if v > 0:
+				run.block += v
+				run.stats.block_gained = int(run.stats.get("block_gained", 0)) + v
+				out.append({"type": "block_gained", "target": "hero", "amount": v, "total": run.block, "source": "turret"})
+		"ember":
+			if v == 6:
+				for j in c.enemies.size():
+					if c.alive(j):
+						out.append_array(c.damage_enemy(j, 6, "ember", run))
+		"frost":
+			if v == 1 and c.alive(t):
+				if not bool(c.enemies[t].frozen):
+					run.stats.freezes = int(run.stats.get("freezes", 0)) + 1
+				c.enemies[t].frozen = true
+				out.append({"type": "status", "target": t, "status": "frozen", "value": 1, "source": "turret"})
 	return out
 
 ## An enemy died (any source).
