@@ -1,0 +1,154 @@
+{
+	"ascension": {
+		"selected": 0,
+		"unlocked": 1
+	},
+	"crowns": 29,
+	"disabled": {
+		"kinds": [],
+		"passives": [],
+		"runes": []
+	},
+	"flags": {
+		"lock_classes": true
+	},
+	"gear": {
+		"blade": 3,
+		"helm": 3
+	},
+	"gear_traits": {},
+	"loadout": {
+		"class": "knight",
+		"minigames": [
+			"claw_machine",
+			"scratch_off"
+		],
+		"mode": "standard",
+		"pet": "pumpkin_sprite"
+	},
+	"milestones": [
+		"first_steps",
+		"lap_five",
+		"wanderer",
+		"victor",
+		"brawler",
+		"frostbitten"
+	],
+	"minigame_plays": {
+		"claw_machine": 6,
+		"scratch_off": 4
+	},
+	"pet_bought": {},
+	"pet_xp": {
+		"pumpkin_sprite": 43
+	},
+	"records": {
+		"best_ascension_win": 0,
+		"best_lap": 15,
+		"counters": {
+			"act2_runs": 3,
+			"act3_runs": 3,
+			"block": 1278,
+			"bosses_reached": 3,
+			"cashouts": 4,
+			"fights": 53,
+			"frost_visits": 1,
+			"full_runes": 3,
+			"kept": 440,
+			"laps": 45,
+			"mage_wins": 0,
+			"minibosses_killed": 1,
+			"minibosses_reached": 1,
+			"minigames": 10,
+			"poison_kills": 6,
+			"rerolls": 342,
+			"runs": 3,
+			"straights": 11,
+			"throne_wins": 2,
+			"wins": 2
+		},
+		"crowns_earned": 229,
+		"firsts": {
+			"asc_clear": [],
+			"biome": [
+				"glade",
+				"hollow",
+				"throne",
+				"frost"
+			],
+			"boss": [
+				"boss_lich"
+			],
+			"class_win": [
+				"knight"
+			],
+			"miniboss": [
+				"mini_pumpkin_knight"
+			],
+			"route_win": [
+				"glade,hollow,throne",
+				"glade,frost,throne"
+			],
+			"short_win": []
+		},
+		"loss_streak": 0,
+		"runs": 3,
+		"runs_by_class": {
+			"knight": 3
+		},
+		"sigils_earned": 11,
+		"wins": 2,
+		"wins_by_class": {
+			"knight": 2
+		}
+	},
+	"sigils": 2,
+	"starter_kind": "",
+	"unlocks": {
+		"biomes": [
+			"glade",
+			"crypt",
+			"hollow",
+			"frost",
+			"throne",
+			"magma"
+		],
+		"bosses": [
+			"boss_lich",
+			"boss_cinder_king",
+			"boss_magma_golem"
+		],
+		"classes": [
+			"knight",
+			"barbarian"
+		],
+		"features": [],
+		"gear": [
+			"helm",
+			"blade"
+		],
+		"minibosses": [
+			"mini_pumpkin_knight"
+		],
+		"minigames": [
+			"scratch_off",
+			"claw_machine"
+		],
+		"packs": [
+			"starter",
+			"cold_steel",
+			"colossus"
+		],
+		"pets": [
+			"pumpkin_sprite"
+		],
+		"potions": [
+			"healing",
+			"stoneskin"
+		]
+	},
+	"upgrades": {
+		"starter_kit": 1
+	},
+	"version": 1
+}
