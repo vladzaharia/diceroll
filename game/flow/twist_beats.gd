@@ -219,7 +219,9 @@ static func moon_meter(c: GameController, ev: Dictionary) -> void:
 		"tide":
 			Audio.play_sfx("portal")
 			if i >= 0:
-				Fx.popup_text(c.stage, at, "TIDE %d/%d" % [maxi(v, 0), mx], MOON if not blood else BLOOD.lightened(0.3), 0.55)
+				# in the boss HUD's own frame, under the HP bar: a world popup rising from under the HUD
+				# crossed the intent number and the HP bar
+				c.stage.huds[i].flash_note("TIDE %d/%d" % [maxi(v, 0), mx], MOON if not blood else BLOOD.lightened(0.3))
 			if v == mx - 1:
 				c.overlay.toast("The moon is nearly full: roll 1s to push it back!", "biome_moonlit", MOON)
 			await c.wait(0.45)
@@ -232,7 +234,7 @@ static func moon_meter(c: GameController, ev: Dictionary) -> void:
 				c.tray.highlight_group(ones, MOON)
 			Audio.play_sfx("block")
 			if i >= 0:
-				Fx.popup_text(c.stage, at - Vector3.UP * 0.45, "CLOUDS %d" % int(ev.get("delta", 0)), MOON.lightened(0.2), 0.55)
+				c.stage.huds[i].flash_note("CLOUDS %d" % int(ev.get("delta", 0)), MOON.lightened(0.2))
 				Fx.burst(c.stage, at - Vector3.UP * 0.3, {"amount": 14, "lifetime": 0.8, "speed": Vector2(0.4, 1.2),
 					"size": 0.5, "color": Color(0.7, 0.74, 0.9, 0.7), "tex": "dot", "additive": false, "gravity": Vector3(0, 0.5, 0)})
 			c.overlay.popup(c.hero_screen(2.2), "Your 1s cloud the moon", MOON, "biome_moonlit", 28)

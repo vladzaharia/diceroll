@@ -435,13 +435,13 @@ func enemy_hit(i: int, amount: int, crit := false, blocked := 0) -> void:
 	var ch := enemies[i]
 	var id := String(data[i].get("id", ""))
 	var top := ch.global_position + Vector3.UP * (1.3 * UNIT_SCALE / 0.6 * EnemyLooks.scale_of(id))
-	var num_pos := top + _toward_camera(ch.global_position) * 0.6
+	var num_pos := _damage_number_pos(i, top)
 	if blocked > 0:
 		Fx.block_flash(self, ch.global_position + Vector3.UP * 0.8 * EnemyLooks.scale_of(id), 0.8 * EnemyLooks.scale_of(id))
 		Audio.play_sfx("block")
 	if amount > 0:
 		Fx.hit_sparks(self, top, Fx.CRIT_COLOR if crit else Color(1.0, 0.85, 0.6), 26 if crit else 16)
-		Fx.damage_number(self, num_pos, amount, crit)
+		Fx.damage_number(self, num_pos, amount, crit, Color(0, 0, 0, 0), DAMAGE_RISE)
 		Audio.play_sfx("crit" if crit else "hit")
 		_flash_white(ch, id)
 		var dir := (ch.global_position - hero_home)
@@ -565,6 +565,24 @@ func hero_attack(target_i: int, style := "") -> void:
 			var col := Color(0.5, 0.75, 1.0) if style == "magic" else Color(1.0, 0.9, 0.7)
 			await Fx.projectile(self, hero_home + Vector3.UP * 1.0 + facing * 0.4,
 				ch.global_position + Vector3.UP * 0.9, col, 0.3 / speed)
+
+
+## How far an enemy's damage number floats up (world units).
+const DAMAGE_RISE := 0.25
+
+
+## Where enemy i's damage number starts: under its HUD in the HUD's own (camera-aligned) frame, far
+## enough below the HP bar, status line and affix row that the number never reaches the intent badge
+## or the bar while it floats up (a second hit, like the Engineer's turret shot, used to land on the
+## intent number); pulled toward the camera along the view ray so it draws in front of the body.
+func _damage_number_pos(i: int, fallback: Vector3) -> Vector3:
+	var cam := get_viewport().get_camera_3d()
+	if i >= huds.size() or cam == null:
+		return fallback + _toward_camera(enemies[i].global_position if i < enemies.size() else fallback) * 0.6
+	var hud := huds[i]
+	var drop := 1.0 + (0.25 if not hud.affixes.is_empty() else 0.0)
+	var p := hud.global_position - cam.global_basis.y * drop * hud.scale.y
+	return p + (cam.global_position - p).normalized() * 0.6
 
 
 func _toward_camera(from: Vector3) -> Vector3:

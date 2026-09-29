@@ -45,6 +45,10 @@ var _moon := -99
 var _moon_fill := 0.0
 var _moon_tween: Tween
 const MOON_SIZE := 0.64
+## A short-lived note under the HP bar (the moon meter's "TIDE 2/4"): laid out in the HUD's own
+## frame, below the status line and affix row, so it never covers the intent, HP or the moon.
+var note_label: Label3D
+var _note_tween: Tween
 
 ## BOO! (Monster Kid): a cowering enemy's intent shows a scared face; a Brave chip after.
 var scare_badge: MeshInstance3D
@@ -124,6 +128,10 @@ func _init() -> void:
 	moon_badge.position = Vector3(BAR_SIZE.x * 0.5 + 0.12, 0.5, 0.0)
 	moon_badge.visible = false
 	add_child(moon_badge)
+	note_label = _label(72, Color.WHITE, 14)
+	note_label.name = "Note"
+	note_label.visible = false
+	add_child(note_label)
 
 
 func _process(_dt: float) -> void:
@@ -224,6 +232,25 @@ func set_moon(value: int, max_v: int, blood := false, animate := true) -> void:
 	else:
 		_set_moon_fill(f)
 	_moon = value
+
+
+## Pops `text` in under the HP bar (below the status line / affix row), holds, fades out.
+func flash_note(text: String, color: Color, hold := 0.9) -> void:
+	note_label.text = text
+	note_label.modulate = color
+	note_label.outline_modulate.a = 1.0
+	note_label.position = Vector3(0, -0.66 if not affixes.is_empty() else -0.44, 0.012)
+	note_label.visible = true
+	if _note_tween:
+		_note_tween.kill()
+	note_label.scale = Vector3.ONE * 0.3
+	_note_tween = create_tween()
+	_note_tween.tween_property(note_label, "scale", Vector3.ONE * 1.15, 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_note_tween.tween_property(note_label, "scale", Vector3.ONE, 0.12).set_trans(Tween.TRANS_SINE)
+	_note_tween.tween_interval(hold)
+	_note_tween.tween_property(note_label, "modulate:a", 0.0, 0.3)
+	_note_tween.parallel().tween_property(note_label, "outline_modulate:a", 0.0, 0.3)
+	_note_tween.tween_callback(func() -> void: note_label.visible = false)
 
 
 func _set_moon_fill(v: float) -> void:

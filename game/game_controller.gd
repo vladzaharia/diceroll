@@ -118,6 +118,8 @@ func _ready() -> void:
 	overlay = GameOverlay.new()
 	ov_layer.add_child(overlay)
 	overlay.modal_check = any_modal_open
+	overlay.framed_rect = func() -> Rect2:
+		return tray.get_global_rect() if is_instance_valid(tray) and tray.is_visible_in_tree() else Rect2()
 
 	player = EventPlayer.new(self)
 	pets = PetHost.new(self)
