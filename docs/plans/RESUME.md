@@ -124,7 +124,7 @@ Remaining / to verify:
   - WP-E3: potion belt, pet familiars, auto level-ups, remaining new events.
   - (merged) WP-F1: level scene variety. Seed-driven dressing kits per biome using the new packs; Magma keeps its tight framing.
   - (merged) WP-F2: enemy variety. Real KayKit Skeletons, Adventurers EXTRA, Mystery Monthly characters; 2–4 variants per enemy id.
-  - WP-F3: UI and board polish with the new assets, plus responsive layout. Fixes the matrix bugs (iPhone empty band, narrow tray at 1080p, HUD overlap at 150% zoom) and adds a UI-size setting.
+  - (merged) WP-F3: UI and board polish with the new assets, plus responsive layout. Fixes the matrix bugs (iPhone empty band, narrow tray at 1080p, HUD overlap at 150% zoom) and adds a UI-size setting.
 - **Classes, enemies and skins** (Vlad): a design agent is writing `docs/design/2026-09-28-classes-enemies-skins.md` covering 4–6 new classes (Ranger, Druid, Engineer, Paladin, Ninja, Necromancer…), 4–8 new enemies (Orc Raider, Werewolf, …), and milestone-earned skins from the alt textures. After Vlad reviews it, the order is: core rules and balance, then presentation (models, class select, Camp wardrobe). WP-F2 already uses the recolours for enemy variants.
 - **Also in progress:**
   - **Core: classes, enemies, affixes, skins.** Follows docs/design/2026-09-28-classes-enemies-skins.md (final at 8a3a508/f512d8d): 7 new classes including the secret Monster Kid, the Paladin "Oathbound", 8 enemies, 10 affixes, skins (profile v2). It also adds 6 new pets (pebble_golem, frost_mote, wick, tinker_gear, grimoire, cauldron), for 12 in total.
