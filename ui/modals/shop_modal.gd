@@ -8,7 +8,7 @@ signal shop_buy(index: int, die_idx: int)
 signal shop_reroll_pressed
 signal shop_leave_pressed
 
-const ICONS := {"die": "dice", "potion": "potion", "face_raise": "anvil", "combat_reroll": "reroll"}
+const ICONS := {"die": "dice", "potion": "3d:potion_red", "face_raise": "anvil", "combat_reroll": "reroll"}
 
 var gold: Counter
 var _restock: GameButton
@@ -29,7 +29,7 @@ func _build() -> void:
 	set_title("SHOP")
 	var head := UiTheme.hbox(12)
 	body.add_child(head)
-	gold = Counter.make("coin", 0, 34, UiPalette.TEXT, "pill")
+	gold = Counter.make("3d:coins", 0, 34, UiPalette.TEXT, "pill")
 	head.add_child(gold)
 	head.add_child(UiTheme.spacer(0, true))
 	_restock = GameButton.make("RESTOCK", "reroll", GameButton.Kind.SECONDARY, 26)

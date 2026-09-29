@@ -38,6 +38,9 @@ var _ground_y := 0.0
 var _distance := DISTANCE
 ## Sideways shift of the enemy line (world units along `side`) so it clears the hero on screen.
 var _lateral := 0.0
+## Footprint (x SPACING) of each enemy slot: big rigs and bosses get wider slots, so a boss
+## and its summons don't crowd each other.
+var _widths: Array[float] = []
 
 
 func _init() -> void:
@@ -60,6 +63,9 @@ func begin(p_hero: Character, anchor: Dictionary, enemy_list: Array) -> void:
 	_face(hero, hero_home + facing, 0.3)
 	_arena()
 	var n := enemy_list.size()
+	_widths.clear()
+	for d in enemy_list:
+		_widths.append(footprint(String((d as Dictionary).get("id", "skeleton_minion"))))
 	for i in n:
 		_add(enemy_list[i], i, n, 0.05 + 0.2 * i)
 	await get_tree().create_timer((0.2 * n + 0.75) / speed, false).timeout
@@ -142,6 +148,10 @@ func end_on_board(overview := false) -> void:
 ## Adds one enemy mid-fight (summons). Returns its index.
 func add_enemy(d: Dictionary) -> int:
 	var i := enemies.size()
+	while _widths.size() < i:
+		_widths.append(1.0)
+	_widths.resize(i)
+	_widths.append(footprint(String(d.get("id", "skeleton_minion"))))
 	_add(d, i, i + 1, 0.0)
 	_relayout()
 	refresh_wards()
@@ -173,10 +183,27 @@ func enemy_positions() -> Array[Vector3]:
 	return out
 
 
+## Slot width factor for an enemy id (1 = a regular figure; big rigs / bosses up to 1.8).
+static func footprint(id: String) -> float:
+	return clampf(EnemyLooks.hud_height(id) / 2.3, 1.0, 1.8)
+
+
 func _slot(i: int, n: int) -> Vector3:
 	var c := float(i) - float(n - 1) * 0.5
-	var along := _distance + (0.35 if n > 1 else 0.3) + absf(c) * -0.3
-	var base := hero_home + facing * along + side * (c * SPACING + _lateral * (1.0 if n > 1 else 0.5))
+	# lateral offset from the line's centre, from the cumulative slot widths
+	var off := c * SPACING
+	var wide := 1.0
+	if _widths.size() >= n and n > 0:
+		var total := 0.0
+		for k in n:
+			total += _widths[k]
+		var acc := 0.0
+		for k in i:
+			acc += _widths[k]
+		off = (acc + _widths[i] * 0.5 - total * 0.5) * SPACING
+		wide = _widths[i]
+	var along := _distance + (0.35 if n > 1 else 0.3) + absf(c) * -0.3 + (wide - 1.0) * 0.8
+	var base := hero_home + facing * along + side * (off + _lateral * (1.0 if n > 1 else 0.5))
 	return Vector3(base.x, _ground_y + _floor_offset(), base.z)
 
 
@@ -186,7 +213,7 @@ func _floor_offset() -> float:
 
 func _add(d: Dictionary, i: int, n: int, rise_delay := -1.0) -> void:
 	var id := String(d.get("id", "skeleton_minion"))
-	var ch := EnemyLooks.create(id)
+	var ch := EnemyLooks.create(id, true, EnemyLooks.spawn_context(d, _board_idx, data, _board.biome_id if _board else ""))
 	ch.anim_player.speed_scale = speed
 	var s := UNIT_SCALE * EnemyLooks.scale_of(id)
 	ch.scale = Vector3.ONE * s
@@ -207,6 +234,7 @@ func _add(d: Dictionary, i: int, n: int, rise_delay := -1.0) -> void:
 	huds.append(hud)
 	# shadow disc under the unit (grounds it on the moat floor)
 	var blob := _blob(0.55 * s / UNIT_SCALE)
+	blob.set_meta("stage_child", true)
 	ch.add_child(blob)
 	if rise_delay >= 0.0:
 		_rise(ch, id, hud, rise_delay)
@@ -261,6 +289,8 @@ func set_enemy(i: int, d: Dictionary) -> void:
 	for k in d:
 		data[i][k] = d[k]
 	huds[i].set_data(data[i], true)
+	if d.has("traits") and i < enemies.size():
+		EnemyLooks.set_traits(enemies[i], d.traits)
 	if d.has("traits") or d.has("hp"):
 		refresh_wards()
 
@@ -280,6 +310,7 @@ func refresh_wards() -> void:
 		var on := summons and "ward" in (data[k].get("traits", []) as Array) and int(data[k].get("hp", 0)) > 0
 		if on and not _wards.has(k) and k < enemies.size():
 			_wards[k] = _ward_dome(enemies[k], String(data[k].get("id", "")))
+			_wards[k].set_meta("stage_child", true)
 		elif not on and _wards.has(k):
 			var dome: MeshInstance3D = _wards[k]
 			_wards.erase(k)
@@ -288,6 +319,17 @@ func refresh_wards() -> void:
 				t.tween_property(dome, "scale", Vector3.ONE * 1.3, 0.25)
 				t.parallel().tween_property(dome, "transparency", 1.0, 0.25)
 				t.tween_callback(dome.queue_free)
+	AffixBeats.refresh_warded(self)
+
+
+## Transform (enemy_transformed): enemy i's model swaps in place (Werewolf_Man -> Werewolf_Wolf).
+func transform_enemy(i: int, form: String) -> void:
+	if i >= enemies.size():
+		return
+	data[i]["form"] = form
+	var old := enemies[i]
+	enemies[i] = EnemyLooks.swap_form(old, form)
+	AffixBeats.transform_fx(self, enemies[i], old.global_position)
 
 
 func flash_ward(i: int) -> void:
@@ -370,7 +412,7 @@ func enemy_attack(i: int) -> void:
 	var ch := enemies[i]
 	var id := String(data[i].get("id", ""))
 	var home := ch.global_position
-	var ranged := id in ["skeleton_archer", "cultist", "boss_lich", "mini_grave_mage"]
+	var ranged := EnemyLooks.ranged_kind(ch) != ""
 	var lunge := home + (hero_home - home).normalized() * (0.2 if ranged else 0.9)
 	var t := ch.create_tween().set_speed_scale(speed)
 	t.tween_property(ch, "global_position", lunge, 0.18).set_trans(Tween.TRANS_SINE)
@@ -379,7 +421,7 @@ func enemy_attack(i: int) -> void:
 	Audio.play_sfx("swing")
 	await get_tree().create_timer((0.32) / speed, false).timeout
 	if ranged:
-		var col := Color(0.7, 0.4, 1.0) if id != "skeleton_archer" else Color(1.0, 0.9, 0.7)
+		var col := EnemyLooks.shot_color(ch)
 		await Fx.projectile(self, ch.global_position + Vector3.UP * 1.1, hero_home + Vector3.UP * 0.8, col, 0.28 / speed)
 	var back := ch.create_tween().set_speed_scale(speed)
 	back.tween_property(ch, "global_position", home, 0.3).set_trans(Tween.TRANS_SINE).set_delay(0.1)
@@ -535,6 +577,7 @@ func clear() -> void:
 		h.queue_free()
 	enemies.clear()
 	huds.clear()
+	_widths.clear()
 	data.clear()
 	for k in _wards:
 		if is_instance_valid(_wards[k]):

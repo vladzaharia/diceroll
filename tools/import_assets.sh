@@ -73,17 +73,206 @@ for c in yellow red blue; do
 done
 lic "$PLAT" "$KK/platformer"
 
+echo "== KayKit Forest Nature EXTRA (Camp: trees, bushes, rocks, grass; greens, teal and autumn)"
+FOR="KayKit_Forest_Nature_Pack_1.0_EXTRA"
+for c in 1 2 4 6; do
+	sync "$SRC/$FOR/Assets/gltf/Color$c" "$KK/forest/color$c" \
+		--include='Tree_*' --include='Bush_*' --include='Rock_*' --include='Grass_*' --include='forest_texture.png' --exclude='*'
+done
+lic "$FOR" "$KK/forest"
+
+echo "== KayKit ResourceBits FREE (Camp: logs, planks, pallets, textiles, bars)"
+RES="KayKit_ResourceBits_1.0_FREE"
+res_keep=""
+for r in Wood_Log_A Wood_Log_B Wood_Log_Stack Wood_Planks_Stack_Small Wood_Planks_Stack_Medium Pallet_Wood \
+	Pallet_Wood_Covered_A Textiles_Stack_Large_Colored Textiles_A Iron_Bars_Stack_Small Gold_Bars_Stack_Small Parts_Pile_Small; do
+	res_keep="$res_keep --include=$r.gltf --include=$r.bin"
+done
+# shellcheck disable=SC2086
+sync "$SRC/$RES/Assets/gltf" "$KK/resources" $res_keep --include='*.png' --exclude='*'
+lic "$RES" "$KK/resources"
+
+echo "== Camp EXTRA packs (never committed): weapons, keepers, stores, dressing"
+sync "$SRC/KayKit_FantasyWeaponsBits_1.0_EXTRA/Assets/gltf" "$KK/weapons_x"
+lic "KayKit_FantasyWeaponsBits_1.0_EXTRA" "$KK/weapons_x"
+ADX="KayKit_Adventurers_2.0_EXTRA"
+sync "$SRC/$ADX/Characters/gltf" "$KK/adventurers_x/characters" \
+	--include='Druid.glb' --include='Engineer.glb' --include='Barbarian_Large.glb' --include='Rogue_Hooded.glb' --exclude='*'
+sync "$SRC/$ADX/Assets/gltf" "$KK/adventurers_x/assets"
+lic "$ADX" "$KK/adventurers_x"
+RX="KayKit_ResourceBits_1.0_EXTRA"
+rx_keep=""
+for r in Food_Basket_A_Berries Food_Basket_B_Berries Food_Crate_Large_Apples Food_Crate_Small_Berries Food_Barrel_Fish \
+	Containers_Crate_Medium_Wood Containers_Pile_Small Gems_Chest Gems_Pile_Small Gems_Sack Money_Pile_Small Money_Coins_Stack_Medium \
+	Gold_Bars_Stack_Medium Iron_Bars_Stack_Medium Copper_Bars_Stack_Small; do
+	rx_keep="$rx_keep --include=$r.gltf --include=$r.bin"
+done
+# shellcheck disable=SC2086
+sync "$SRC/$RX/Assets/gltf" "$KK/resources_x" $rx_keep --include='*.png' --exclude='*'
+lic "$RX" "$KK/resources_x"
+DX="KayKit_Dungeon_Pack_1.1_EXTRA"
+dx_keep=""
+for r in bench bucket_pickaxes chest_mimic crate_large_decorated rocks_gold bookcase_single_decoratedA keg_decorated \
+	barrel_large_decorated table_long_decorated_A banner_triple_red banner_triple_blue banner_thin_yellow banner_thin_green; do
+	dx_keep="$dx_keep --include=$r.gltf --include=$r.bin"
+done
+# shellcheck disable=SC2086
+sync "$SRC/$DX/Assets/gltf" "$KK/dungeon_x" $dx_keep --include='*.png' --exclude='*'
+lic "$DX" "$KK/dungeon_x"
+TX="KayKit_RPGToolsBits_1.0_EXTRA"
+sync "$SRC/$TX/Assets/gltf" "$KK/tools_x" --include='grindstone.*' --include='fishing_rod.*' --include='fishing_tacklebox.*' \
+	--include='map_rolled.*' --include='journal_open.*' --include='key_A.*' --include='*.png' --exclude='*'
+lic "$TX" "$KK/tools_x"
+MM="$SRC/KayKit_Mystery_Monthly_Series_4"
+sync "$MM/4 - October 2023 - Werewolf/assets/gltf" "$KK/mystery/werewolf"
+sync "$MM/11 - May 2024 - Clown/assets/gltf" "$KK/mystery/clown"
+sync "$MM/10 - April 2024 - Paladin/assets/gltf" "$KK/mystery/paladin"
+sync "$MM/1 - July 2023 - Orc Raider/assets/gltf" "$KK/mystery/orc" --include='Orc_Wardrum*' --include='*.png' --exclude='*'
+cp -f "$MM/License.txt" "$KK/mystery/License.txt"
+
+echo "== KayKit EXTRA props: tile props + rendered UI icons (paid packs; skipped when absent)"
+xsync() { # xsync <pack> <dst> <texture.png> <names...>: copies <name>.gltf/.bin + the texture
+	local pack="$1" d="$2" tex="$3"; shift 3
+	[ -d "$SRC/$pack" ] || { echo "   (no $pack, skipping)"; return 0; }
+	local keep="--include=$tex"
+	for n in "$@"; do keep="$keep --include=$n.gltf --include=$n.bin"; done
+	# shellcheck disable=SC2086
+	sync "$SRC/$pack/Assets/gltf" "$d" $keep --exclude='*'
+	lic "$pack" "$d"
+}
+xsync KayKit_ResourceBits_1.0_EXTRA "$KK/resources" resource_bits_texture.png \
+	Gold_Bars_Stack_Small Gold_Bars_Stack_Medium Gold_Nuggets Gold_Bar Money_Coins_Stack_Large \
+	Money_Coins_Stack_Medium Money_Coins_Stack_Small Money_Pile_Small Gem_Large Gem_Medium Gem_Small \
+	Gems_Pile_Small Gems_Chest Gems_Sack Iron_Bars_Stack_Small Wood_Log_Stack Wood_Log_A \
+	Food_Basket_A_Berries Food_Crate_Small_Berries Food_Cheese Food_Apple_Red Food_Apple_Green
+xsync KayKit_RPGToolsBits_1.0_EXTRA "$KK/tools_x" tools_bits_texture.png \
+	anvil grindstone tongs lantern key_A key_B lock_A lock_B map_rolled
+xsync KayKit_Dungeon_Pack_1.1_EXTRA "$KK/dungeon_x" dungeon_texture.png \
+	chest_large_gold chest_large key_gold candle_triple candle_lit rocks_gold pickaxe_gold
+xsync KayKit_Adventurers_2.0_EXTRA "$KK/potions" druid_texture.png \
+	potion_medium_red potion_medium_blue potion_medium_green potion_large_red
+
 echo "== KayKit Skeletons 1.1 (FREE): the minion's head/jaw/eyes make the Skull Buddy pet"
 SK="KayKit_Skeletons_1.1_FREE"
 sync "$SRC/$SK/characters/gltf" "$KK/skeletons" --include='Skeleton_Minion.glb' --include='*.png' --exclude='*'
 lic "$SK" "$KK/skeletons"
 
-echo "== KayKit ResourceBits EXTRA gems (Crystal Wisp pet; EXTRA = never committed, skipped if absent)"
+echo "== KayKit ResourceBits EXTRA gems, stone chunks, ore nuggets and cogs (Crystal Wisp, Pebble and Tinker pets; EXTRA = never committed, skipped if absent)"
 RB="KayKit_ResourceBits_1.0_EXTRA"
 if [ -d "$SRC/$RB/Assets/gltf" ]; then
-	sync "$SRC/$RB/Assets/gltf" "$KK/resource" --include='Gem_*' --include='resource_bits_texture.png' --exclude='*'
+	sync "$SRC/$RB/Assets/gltf" "$KK/resource" --include='Gem_*' --include='Stone_Chunks_*' \
+		--include='*_Nugget_*' --include='Parts_Cog.*' --include='resource_bits_texture.png' --exclude='*'
 	lic "$RB" "$KK/resource"
 fi
+
+echo "== Enemy roster (EXTRA + Mystery Monthly packs -> assets/kaykit/foes; see game/world/enemy_looks.gd)"
+FOES="$KK/foes"
+SKX="KayKit_Skeletons_1.1_EXTRA"
+sync "$SRC/$SKX/characters/gltf" "$FOES/skeletons" --include='*.glb' --exclude='*'
+sync "$SRC/$SKX/assets/gltf" "$FOES/skeletons/weapons" --exclude='Skeleton_Arrow*'
+sync "$SRC/$SKX/textures" "$FOES/skeletons/textures" --include='skeleton_texture_B.png' --exclude='*'
+lic "$SKX" "$FOES/skeletons"
+ADX="KayKit_Adventurers_2.0_EXTRA"
+sync "$SRC/$ADX/Characters/gltf" "$FOES/adventurers" --include='Barbarian_Large.glb' --include='Druid.glb' --exclude='*'
+sync "$SRC/$ADX/Textures" "$FOES/adventurers/textures" --include='*_alt_*.png' --exclude='*'
+adx_keep=""
+for w in axe_1handed_Large axe_2handed_Large shield_round_barbarian_Large druid_staff; do
+	adx_keep="$adx_keep --include=$w.gltf --include=$w.bin"
+done
+# shellcheck disable=SC2086
+sync "$SRC/$ADX/Assets/gltf" "$FOES/adventurers/weapons" $adx_keep --include='barbarian_texture.png' --include='druid_texture.png' --exclude='*'
+lic "$ADX" "$FOES/adventurers"
+MMS="$SRC/KayKit_Mystery_Monthly_Series_4"
+sync "$MMS/1 - July 2023 - Orc Raider/character" "$FOES/monthly/orc" --include='OrcRaider.glb' --exclude='*'
+sync "$MMS/1 - July 2023 - Orc Raider/textures" "$FOES/monthly/orc/textures"
+sync "$MMS/1 - July 2023 - Orc Raider/assets/gltf" "$FOES/monthly/orc/weapons" --include='Orc_Axe.gltf.glb' --include='Orc_Club.gltf.glb' \
+	--include='Orc_Wardrum.gltf.glb' --include='Orc_WardrumStick.gltf.glb' --include='Orc_Backpack.gltf.glb' --include='Orc_DrinkingHorn.gltf.glb' --exclude='*'
+sync "$MMS/4 - October 2023 - Werewolf/characters/gltf" "$FOES/monthly/werewolf" --include='Werewolf_Wolf.glb' --include='Werewolf_Man.glb' --exclude='*'
+sync "$MMS/4 - October 2023 - Werewolf/textures" "$FOES/monthly/werewolf/textures"
+sync "$MMS/4 - October 2023 - Werewolf/assets/gltf" "$FOES/monthly/werewolf/weapons" --include='axe.*' --include='werewolf_A.png' --exclude='*'
+sync "$MMS/10 - April 2024 - Paladin/characters/gltf" "$FOES/monthly/paladin" --include='*.glb' --exclude='*'
+sync "$MMS/10 - April 2024 - Paladin/textures" "$FOES/monthly/paladin/textures"
+sync "$MMS/10 - April 2024 - Paladin/assets/gltf" "$FOES/monthly/paladin/weapons" \
+	--include='paladin_hammer.*' --include='paladin_shield.*' --include='paladin_texture_A.png' --exclude='*'
+sync "$MMS/8 - February 2024 - Ninja/character" "$FOES/monthly/ninja" --include='Ninja.glb' --exclude='*'
+sync "$MMS/8 - February 2024 - Ninja/texture" "$FOES/monthly/ninja/textures"
+sync "$MMS/8 - February 2024 - Ninja/assets/gltf" "$FOES/monthly/ninja/weapons" --include='Ninja_Katana.*' --include='ninja_texture_A.png' --exclude='*'
+sync "$MMS/3 - September 2023 - Monster Costume/character/gltf" "$FOES/monthly/monster" --include='Monster.glb' --exclude='*'
+sync "$MMS/3 - September 2023 - Monster Costume/textures" "$FOES/monthly/monster/textures" --include='monstercostume_texture_*.png' --exclude='*'
+cp -f "$MMS/License.txt" "$FOES/monthly/License.txt"
+FWX="KayKit_FantasyWeaponsBits_1.0_EXTRA"
+fwx_keep=""
+for w in axe_D dagger_C hammer_D scythe shield_D spear_B staff_C staff_D sword_F sword_G wand_B; do
+	fwx_keep="$fwx_keep --include=$w.gltf --include=$w.bin"
+done
+# shellcheck disable=SC2086
+sync "$SRC/$FWX/Assets/gltf" "$FOES/weapons" $fwx_keep --include='*.png' --exclude='*'
+lic "$FWX" "$FOES/weapons"
+
+echo "== KayKit Forest Nature (EXTRA): trees, bare trees, bushes, rocks, grass (biome dressing)"
+# All colours share one atlas (forest_texture.png), so the kept colours go into one folder.
+# Colour1 green, 2 deep green, 3 lime, 4 teal, 5 gold, 6 orange (7 red / 8 pink unused).
+FOR="$SRC/KayKit_Forest_Nature_Pack_1.0_EXTRA/Assets/gltf"
+mkdir -p "$KK/forest"
+rsync -a --delete --filter="P *.import" --filter="P *.uid" \
+	--include='Tree_[1-7]_*' --include='Tree_Bare_*' --include='Bush_[1-4]_*' --include='Rock_[1-6]_*' \
+	--include='Grass_[12]_[A-D]_Color?.*' --include='forest_texture.png' --exclude='*' \
+	"$FOR/Color1/" "$FOR/Color2/" "$FOR/Color3/" "$FOR/Color4/" "$FOR/Color5/" "$FOR/Color6/" "$KK/forest/"
+lic "KayKit_Forest_Nature_Pack_1.0_EXTRA" "$KK/forest"
+
+echo "== KayKit Dungeon (EXTRA): banners, furniture, props (no walls / floors / stairs)"
+sync "$SRC/KayKit_Dungeon_Pack_1.1_EXTRA/Assets/gltf" "$KK/dungeon_x" \
+	--exclude='wall*' --exclude='floor_*' --exclude='stairs*' --exclude='ceiling*' --exclude='bar_*' \
+	--exclude='bartop_*' --exclude='bed_*' --exclude='scaffold_beam*'
+lic "KayKit_Dungeon_Pack_1.1_EXTRA" "$KK/dungeon_x"
+
+echo "== KayKit ResourceBits (EXTRA): crates, piles, ores, bars, food, logs"
+sync "$SRC/KayKit_ResourceBits_1.0_EXTRA/Assets/gltf" "$KK/resources" \
+	--exclude='Money_Bill*' --exclude='Pallet_Plastic_*' --exclude='Fuel_*' --exclude='Money_Coins_Stack_Single*'
+lic "KayKit_ResourceBits_1.0_EXTRA" "$KK/resources"
+
+echo "== KayKit RPG Tools (EXTRA), Fantasy Weapons (EXTRA), Skeleton props (EXTRA)"
+sync "$SRC/KayKit_RPGToolsBits_1.0_EXTRA/Assets/gltf" "$KK/tools_x" \
+	--exclude='fishing_*' --exclude='pencil_*' --exclude='screw*' --exclude='blueprint*' --exclude='*blueprint.png' \
+	--exclude='drafting_*' --exclude='compass_*' --exclude='lockpick_*' --exclude='nail*' --exclude='journal_*'
+lic "KayKit_RPGToolsBits_1.0_EXTRA" "$KK/tools_x"
+sync "$SRC/KayKit_FantasyWeaponsBits_1.0_EXTRA/Assets/gltf" "$KK/weapons_x"
+lic "KayKit_FantasyWeaponsBits_1.0_EXTRA" "$KK/weapons_x"
+sync "$SRC/KayKit_Skeletons_1.1_EXTRA/assets/gltf" "$KK/skeleton_props"
+lic "KayKit_Skeletons_1.1_EXTRA" "$KK/skeleton_props"
+
+echo "== KayKit Mystery Monthly S4 set pieces (orc war drum, woodcutter logs, paladin statue)"
+MYS="$SRC/KayKit_Mystery_Monthly_Series_4"
+sync "$MYS/1 - July 2023 - Orc Raider/assets/gltf" "$KK/mystery/orc" --include='Orc_Wardrum*' --include='Orc_Axe*' \
+	--include='Orc_Club*' --include='Orc_Backpack*' --include='Orc_DrinkingHorn*' --exclude='*'
+sync "$MYS/4 - October 2023 - Werewolf/assets/gltf" "$KK/mystery/woodcutter"
+sync "$MYS/10 - April 2024 - Paladin/assets/gltf" "$KK/mystery/paladin" --include='paladin_statue*' \
+	--include='paladin_texture_A.png' --exclude='*'
+cp -f "$MYS/License.txt" "$KK/mystery/License.txt" 2>/dev/null || true
+echo "== Minigames (WP-E2): dig treasures, claw prizes, dig tools (EXTRA packs: never commit these)"
+RB="KayKit_ResourceBits_1.0_EXTRA"
+rb_keep=""
+for f in Gem_Large Gem_Medium Gem_Small Gems_Pile_Small Gems_Chest Money_Pile_Small Money_Coins_Stack_Medium Gold_Nugget_Large; do
+	rb_keep="$rb_keep --include=$f.gltf --include=$f.bin"
+done
+# shellcheck disable=SC2086
+sync "$SRC/$RB/Assets/gltf" "$KK/resources" $rb_keep --include='resource_bits_texture.png' --exclude='*'
+lic "$RB" "$KK/resources"
+TX="KayKit_RPGToolsBits_1.0_EXTRA"
+tx_keep=""
+for f in pickaxe magnifying_glass map_rolled trowel lantern shovel; do
+	tx_keep="$tx_keep --include=$f.gltf --include=$f.bin"
+done
+# shellcheck disable=SC2086
+sync "$SRC/$TX/Assets/gltf" "$KK/tools_extra" $tx_keep --include='tools_bits_texture.png' --exclude='*'
+lic "$TX" "$KK/tools_extra"
+MM="KayKit_Mystery_Monthly_Series_4"
+sync "$SRC/$MM/11 - May 2024 - Clown/assets/gltf" "$KK/mystery/clown" --include='balloon_dog_*' --include='clown_ball.*' \
+	--include='clown_texture.png' --exclude='*'
+mkdir -p "$KK/mystery/figures"
+cp -f "$SRC/$MM/12 - June 2024 - Robot/characters/Robot_One.glb" "$KK/mystery/figures/Robot_One.glb"
+cp -f "$SRC/$MM/6 - December 2023 - Action Figure/character/gltf/ActionFigure.glb" "$KK/mystery/figures/ActionFigure.glb"
+lic "$MM" "$KK/mystery"
 
 echo "== Music beds (mixkit, re-encoded to 96 kbps mp3 to keep the repo lean)"
 MUS="$DST/audio/music"

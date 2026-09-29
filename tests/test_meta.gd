@@ -438,11 +438,7 @@ func test_minigame_medians_are_calibrated() -> void:
 					"scratch_off":
 						cmd = [BotMeta.scratch_pick(st, s)]
 					"claw_machine":
-						var best := 0
-						for i in st.prizes.size():
-							if not bool(st.prizes[i].taken) and int(st.prizes[i].points) > int(st.prizes[best].points):
-								best = i
-						cmd = [float(st.prizes[best].pos)]
+						cmd = [(m as ClawMachine).best_target()]
 				m.action(cmd)
 			scores.append(m.score())
 		scores.sort()

@@ -16,8 +16,13 @@ signal anim_finished(anim: String)
 
 const ADV := "res://assets/kaykit/adventurers/"
 const ANIM := "res://assets/kaykit/animations/"
+## Enemy roster models (EXTRA / Mystery Monthly packs, see tools/import_assets.sh).
+const FOE := "res://assets/kaykit/foes/"
 
-## model id -> [mesh glb, rig ("medium"|"large"), attack alias set, default gear {slot: scene}]
+## model id -> [mesh glb, rig ("medium"|"large"), attack alias set, default gear {slot: scene},
+## optional base texture (for GLBs shipped without one, e.g. the Orc Raider)].
+## Every model below uses the KayKit Rig_Medium / Rig_Large bone set (23 bones with handslots),
+## so the shared rig animation libraries drive them all.
 const MODELS := {
 	"knight": [ADV + "characters/Knight.glb", "medium", "melee_1h",
 		{"handslot.r": ADV + "weapons/sword_1handed.gltf", "handslot.l": ADV + "weapons/shield_badge_color.gltf"}],
@@ -33,6 +38,22 @@ const MODELS := {
 		{"handslot.l": ADV + "weapons/bow_withString.gltf"}],
 	"mannequin": [ANIM + "mannequins/Mannequin_Medium.glb", "medium", "unarmed", {}],
 	"mannequin_large": [ANIM + "mannequins/Mannequin_Large.glb", "large", "large", {}],
+	# --- enemy roster ------------------------------------------------------------------------
+	"skel_minion": [FOE + "skeletons/Skeleton_Minion.glb", "medium", "unarmed", {}],
+	"skel_warrior": [FOE + "skeletons/Skeleton_Warrior.glb", "medium", "melee_1h", {}],
+	"skel_rogue": [FOE + "skeletons/Skeleton_Rogue.glb", "medium", "dual", {}],
+	"skel_mage": [FOE + "skeletons/Skeleton_Mage.glb", "medium", "magic", {}],
+	"skel_golem": [FOE + "skeletons/Skeleton_Golem.glb", "large", "large", {}],
+	"necromancer": [FOE + "skeletons/Necromancer.glb", "medium", "magic", {}],
+	"barbarian_large": [FOE + "adventurers/Barbarian_Large.glb", "large", "large", {}],
+	"druid": [FOE + "adventurers/Druid.glb", "medium", "magic", {}],
+	"orc": [FOE + "monthly/orc/OrcRaider.glb", "medium", "melee_1h", {}, FOE + "monthly/orc/textures/orc_texture_A.png"],
+	"werewolf": [FOE + "monthly/werewolf/Werewolf_Wolf.glb", "medium", "melee_1h", {}],
+	"werewolf_man": [FOE + "monthly/werewolf/Werewolf_Man.glb", "medium", "melee_1h", {}],
+	"paladin": [FOE + "monthly/paladin/Paladin.glb", "medium", "melee_1h", {}],
+	"paladin_helm": [FOE + "monthly/paladin/Paladin_with_Helmet.glb", "medium", "melee_1h", {}],
+	"ninja": [FOE + "monthly/ninja/Ninja.glb", "medium", "dual", {}],
+	"monster": [FOE + "monthly/monster/Monster.glb", "medium", "unarmed", {}],
 }
 
 const RIG_FILES := {
@@ -47,7 +68,8 @@ const LOOPING := ["Idle_A", "Idle_B", "Walking_A", "Walking_B", "Walking_C", "Ru
 	"Ranged_Bow_Aiming_Idle", "Ranged_Magic_Spellcasting_Long", "Skeletons_Idle", "Skeletons_Walking",
 	"Cheering", "Waving", "Lockpicking", "Holding_A", "Holding_B", "Holding_C", "Sneaking", "Crouching",
 	"Crawling", "Running_HoldingBow", "Sit_Chair_Idle", "Sit_Floor_Idle", "Lie_Idle", "Flexing",
-	"Skeletons_Inactive_Floor_Pose", "Skeletons_Inactive_Standing_Pose", "Fishing_Idle"]
+	"Skeletons_Inactive_Floor_Pose", "Skeletons_Inactive_Standing_Pose", "Fishing_Idle", "Ranged_1H_Aiming",
+	"Ranged_2H_Aiming"]
 
 ## alias -> clip, per rig. Attack/cast/shoot depend on the model's attack set.
 const ALIASES := {
@@ -93,6 +115,10 @@ var tint_shader: Shader = null
 var tint_params: Dictionary = {}
 var _orig_materials: Dictionary = {}  # MeshInstance3D -> Array[Material]
 var _attachments: Dictionary = {}     # slot -> Array[Node3D]
+var _retextured: Dictionary = {}      # MeshInstance3D -> true (base materials are overrides)
+## Per-character alias -> clip (or Array of clips, one picked per play) overrides, checked
+## before the rig aliases: enemy looks set idle/attack/hit/death/spawn per weapon and body.
+var clip_overrides: Dictionary = {}
 
 
 static func create(id: String, with_gear := true) -> Character:
@@ -112,6 +138,8 @@ static func create(id: String, with_gear := true) -> Character:
 	c.anim_player.root_node = c.anim_player.get_path_to(c.model)
 	c.anim_player.add_animation_library("", _library_for(c._rig, c.skeleton, c.model.get_path_to(c.skeleton)))
 	c.anim_player.playback_default_blend_time = 0.15
+	if def.size() > 4:
+		c.set_texture(load(def[4]))
 	if with_gear:
 		var gear: Dictionary = def[3]
 		for slot in gear:
@@ -141,7 +169,14 @@ static func alias_names() -> PackedStringArray:
 ## Resolves an alias or clip name to a clip name present in the library ("" if none).
 func resolve(anim: String) -> String:
 	var clip := anim
-	if anim == "attack":
+	if clip_overrides.has(anim):
+		var o: Variant = clip_overrides[anim]
+		if o is Array:
+			# several clips: pick one that exists (attack variety between swings)
+			var ok := (o as Array).filter(func(x: String) -> bool: return anim_player.has_animation(x))
+			return String(ok.pick_random()) if not ok.is_empty() else ""
+		clip = String(o)
+	elif anim == "attack":
 		clip = _attack_clip
 	elif ALIASES[_rig].has(anim):
 		clip = ALIASES[_rig][anim]
@@ -208,7 +243,7 @@ func set_tint(color: Color, strength: float, emission := Color.BLACK) -> void:
 		var originals: Array = _orig_materials[mi]
 		for s in originals.size():
 			if strength <= 0.0 and emission == Color.BLACK:
-				mi.set_surface_override_material(s, null)
+				mi.set_surface_override_material(s, originals[s] if _retextured.has(mi) else null)
 				continue
 			var m := _tinted(originals[s], color, strength, emission)
 			if tint_shader:
@@ -216,6 +251,65 @@ func set_tint(color: Color, strength: float, emission := Color.BLACK) -> void:
 			for k in tint_params:
 				m.set_shader_parameter(k, tint_params[k])
 			mi.set_surface_override_material(s, m)
+
+
+## Re-tints only the meshes `filter` accepts (eyes, cloaks, gear) over their base materials,
+## on top of whatever set_tint() did. roughness / metallic < 0 keep the material's own.
+func tint_where(filter: Callable, color: Color, strength: float, emission := Color.BLACK,
+		roughness := -1.0, metallic := -1.0) -> void:
+	for mi in _meshes():
+		if not filter.call(mi):
+			continue
+		if not _orig_materials.has(mi):
+			var mats: Array[Material] = []
+			for s in mi.mesh.get_surface_count():
+				mats.append(mi.get_active_material(s))
+			_orig_materials[mi] = mats
+		var originals: Array = _orig_materials[mi]
+		for s in originals.size():
+			var m := _tinted(originals[s], color, strength, emission)
+			if tint_shader:
+				m.shader = tint_shader
+			for k in tint_params:
+				m.set_shader_parameter(k, tint_params[k])
+			if roughness >= 0.0:
+				m.set_shader_parameter("roughness", roughness)
+			if metallic >= 0.0:
+				m.set_shader_parameter("metallic", metallic)
+			mi.set_surface_override_material(s, m)
+
+
+## Swaps the body's texture (KayKit alt colourways / skins share one UV atlas layout).
+## Only the skinned body meshes change; attached weapons keep their own atlas. Call before
+## the first set_tint(), or it re-captures the base materials itself.
+func set_texture(tex: Texture2D) -> void:
+	if tex == null:
+		return
+	# only the main atlas: some bodies have a second one (the Paladin's metal parts)
+	var main: Texture2D = null
+	var found := false
+	for mi in _meshes():
+		if mi.get_parent() == skeleton and mi.mesh.get_surface_count() > 0:
+			var b := mi.get_active_material(0) as BaseMaterial3D
+			if b:
+				main = b.albedo_texture
+				found = true
+				break
+	if not found:
+		return
+	for mi in _meshes():
+		if mi.get_parent() != skeleton:
+			continue
+		for s in mi.mesh.get_surface_count():
+			var base := mi.get_active_material(s) as BaseMaterial3D
+			if base == null or base.albedo_texture != main:
+				continue
+			var m := base.duplicate() as BaseMaterial3D
+			m.albedo_texture = tex
+			m.albedo_color = Color.WHITE
+			mi.set_surface_override_material(s, m)
+		_retextured[mi] = true
+		_orig_materials.erase(mi)
 
 
 ## Attaches a scene to a bone slot ("handslot.r", "handslot.l", "head", or any bone).
@@ -267,7 +361,8 @@ static func _tinted(base: Material, color: Color, strength: float, emission: Col
 		m.set_shader_parameter("albedo_tex", sm.albedo_texture)
 		m.set_shader_parameter("albedo_color", sm.albedo_color)
 		m.set_shader_parameter("roughness", sm.roughness)
-		m.set_shader_parameter("metallic", sm.metallic)
+		# a strong tint repaints the surface: drop most of its metal sheen (dark without reflections)
+		m.set_shader_parameter("metallic", sm.metallic * (1.0 - 0.8 * clampf(strength, 0.0, 1.0)))
 	m.set_shader_parameter("tint", color)
 	m.set_shader_parameter("strength", clampf(strength, 0.0, 1.0))
 	m.set_shader_parameter("emission", emission)

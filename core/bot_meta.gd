@@ -5,7 +5,7 @@ extends RefCounted
 ## action, carry on". Pure functions of the flow/profile state (no randomness of its own).
 
 ## "par": AUTO takes the par result without playing (review §5.4, the default for AUTO);
-## "play": the bot plays the minigame (fossil probability hunt, largest bubble cluster,
+## "play": the bot plays the minigame (fossil: follow bones, else a spread pattern; largest bubble cluster,
 ## scratch in a seed-derived order, claw at the best prize centre).
 static var minigame_mode := "par"
 
@@ -125,12 +125,13 @@ static func minigame_command(f: GameFlow) -> Array:
 		"scratch_off":
 			return ["minigame_action", [scratch_pick(st, f.run.seed)]]
 		"claw_machine":
+			# aim at the richest-looking capsule (its tier colour is public)
 			var best := -1
-			for i in st.prizes.size():
-				var p: Dictionary = st.prizes[i]
-				if not bool(p.taken) and (best < 0 or int(p.points) > int(st.prizes[best].points)):
+			for i in st.balls.size():
+				var b: Dictionary = st.balls[i]
+				if not bool(b.taken) and (best < 0 or ClawMachine.TIERS.find(String(b.tier)) > ClawMachine.TIERS.find(String(st.balls[best].tier))):
 					best = i
-			return ["minigame_action", [float(st.prizes[best].pos) if best >= 0 else 0.5]]
+			return ["minigame_action", [float(st.balls[best].pos) if best >= 0 else 0.5]]
 	return ["minigame_finish"]
 
 static func _untouched(st: Dictionary) -> bool:
@@ -141,80 +142,46 @@ static func _untouched(st: Dictionary) -> bool:
 		"claw_machine": return int(st.actions_left) == ClawMachine.GRABS
 	return true
 
-## Probability hunt: the undug cell covered by the most fossil layouts consistent with the
-## public state (hits, misses, distance hints, completed fossils).
+## Luck dig (no hints): follow an unfinished fossil first (extend a line of two hits, else try
+## a hit's neighbours), otherwise dig the next cell of a fixed spread-out pattern.
 static func fossil_pick(st: Dictionary) -> int:
 	var w := int(st.w)
 	var h := int(st.h)
 	var cells: Array = st.cells
-	var hints: Array = st.hints
-	var places: Array = []
-	for size in FossilHunter.SIZES:
-		var ps: Array = []
-		for horiz in [true, false]:
-			for y in range(0, h - (0 if horiz else int(size) - 1)):
-				for x in range(0, w - (int(size) - 1 if horiz else 0)):
-					var p: Array = []
-					for k in int(size):
-						p.append((y + (0 if horiz else k)) * w + x + (k if horiz else 0))
-					ps.append(p)
-		places.append(ps)
-	var counts: Array = []
-	counts.resize(w * h)
-	counts.fill(0)
-	var any := false
-	for a in places[0]:
-		for b in places[1]:
-			var cover := {}
-			var overlap := false
-			for i in a:
-				cover[i] = 0
-			for i in b:
-				if cover.has(i):
-					overlap = true
-				cover[i] = 1
-			if overlap or not _fossil_ok(cells, hints, cover, a, b, w):
-				continue
-			any = true
-			for i in cover:
-				if String(cells[i]) == "?":
-					counts[i] += 1
-	var best := -1
+	var open := func(x: int, y: int) -> bool:
+		return x >= 0 and x < w and y >= 0 and y < h and String(cells[y * w + x]) == "?"
+	var hit := func(x: int, y: int) -> bool:
+		return x >= 0 and x < w and y >= 0 and y < h and String(cells[y * w + x]) == "hit"
+	var dirs := [Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1)]
+	# 1. a line of hits: dig past either end
 	for i in cells.size():
-		if String(cells[i]) != "?":
+		if String(cells[i]) != "hit":
 			continue
-		if best < 0 or int(counts[i]) > int(counts[best]):
-			best = i
-	if not any or best < 0:
-		for i in cells.size():
-			if String(cells[i]) == "?":
+		var x := i % w
+		var y := i / w
+		for d: Vector2i in dirs:
+			if hit.call(x + d.x, y + d.y):
+				var k := 1
+				while hit.call(x + d.x * k, y + d.y * k):
+					k += 1
+				if open.call(x + d.x * k, y + d.y * k):
+					return (y + d.y * k) * w + x + d.x * k
+				if open.call(x - d.x, y - d.y):
+					return (y - d.y) * w + x - d.x
+	# 2. a lone hit: try its neighbours
+	for i in cells.size():
+		if String(cells[i]) != "hit":
+			continue
+		for d: Vector2i in dirs:
+			if open.call(i % w + d.x, i / w + d.y):
+				return (i / w + d.y) * w + i % w + d.x
+	# 3. spread: every other cell of a diagonal lattice first, then the rest
+	for pass_i in 2:
+		for k in cells.size():
+			var i := (k * 17 + 3) % cells.size()
+			if String(cells[i]) == "?" and ((i % w + i / w) % 2 == 0) == (pass_i == 0):
 				return i
-	return best
-
-static func _fossil_ok(cells: Array, hints: Array, cover: Dictionary, a: Array, b: Array, w: int) -> bool:
-	var fossils := [a, b]
-	for i in cells.size():
-		var c := String(cells[i])
-		if c == "?":
-			continue
-		if c == ".":
-			if cover.has(i):
-				return false
-			var d := 99
-			for j in cover:
-				d = mini(d, absi(int(j) % w - i % w) + absi(int(j) / w - i / w))
-			if d != int(hints[i]):
-				return false
-		else:
-			if not cover.has(i):
-				return false
-			var complete := true
-			for j in fossils[cover[i]]:
-				if String(cells[j]) == "?":
-					complete = false
-			if (c == "bone") != complete:
-				return false
-	return true
+	return 0
 
 ## Largest poppable cluster (cell index x * H + y), or -1.
 static func bubble_pick(st: Dictionary) -> int:

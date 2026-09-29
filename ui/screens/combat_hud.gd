@@ -178,15 +178,14 @@ func _layout() -> void:
 	var w := minf(UiTheme.MODAL_MAX_W, size.x - safe.left - safe.right)
 	_bottom.reset_size()
 	var h := _bottom.get_combined_minimum_size().y
-	var bottom := size.y - UiTheme.tray_height(size) - 20.0
-	var slot := UiTheme.side_slot(size)
+	var slot := UiTheme.side_slot(size, safe)
 	if slot.size.x > 0.0:
 		w = slot.size.x
 		_bottom.size = Vector2(w, h)
 		_bottom.position = Vector2(slot.position.x, slot.end.y - h)
 	else:
 		_bottom.size = Vector2(w, h)
-		_bottom.position = Vector2((size.x - w) * 0.5, bottom - h)
+		_bottom.position = Vector2((size.x - w) * 0.5, UiTheme.tray_rect(size, safe).position.y - 20.0 - h)
 	if sheet.visible:
 		var sw := minf(560.0, w)
 		sheet.reset_size()
@@ -260,9 +259,7 @@ static func project(flow: GameFlow) -> Dictionary:
 
 ## Top edge (canvas y) of the bottom panel; 3D framing should stay above it.
 func content_top(view: Vector2) -> float:
-	if UiTheme.side_slot(view).size.x > 0.0:
-		return view.y - UiTheme.tray_height(view) - 20.0
-	return view.y - UiTheme.tray_height(view) - 20.0 - _bottom.get_combined_minimum_size().y
+	return UiTheme.bottom_bar_top(view, _bottom.get_combined_minimum_size().y, UiTheme.safe_margins(self))
 
 
 ## Disables Reroll / Attack while events play; the next refresh() restores them.

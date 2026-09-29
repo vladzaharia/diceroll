@@ -107,11 +107,14 @@ func _board_pet() -> void:
 
 
 ## Each pet in turn (or just --pet): equip it at L10, fill its meter and ATTACK, so the real
-## rules fire it; enemies and hero get lots of HP so the fight lasts.
+## rules fire it; enemies and hero get lots of HP so the fight lasts. A pet the rules don't
+## know yet (PetDefs) rides on a known pet's run: its model replaces the familiar and a faked
+## pet_charged + pet_acted (--effect=<e>, default its own effect) play through MetaBeats.
 func _combat_pet_acts() -> void:
 	var only := String(args.get("pet", ""))
-	var ids: Array = [only] if only != "" else PetDefs.IDS
-	var f := meta_flow(String(ids[0]), 10, int(args.get("seed", "7")))
+	var ids: Array = PetViewExt.IDS if only == "new" else ([only] if only != "" else PetDefs.IDS)
+	var run_pet := String(ids[0]) if PetDefs.has(String(ids[0])) else "guard_die"
+	var f := meta_flow(run_pet, 10, int(args.get("seed", "7")))
 	f.run.max_hp = 400
 	f.run.hp = 300
 	f.run.pos = 3
@@ -129,6 +132,9 @@ func _combat_pet_acts() -> void:
 				d.max_hp = 300
 	await c.play_events(ev)
 	for id in ids:
+		if not PetDefs.has(String(id)):
+			await _fake_pet_act(f, String(id))
+			continue
 		(f.run.meta.pet as Dictionary)["id"] = String(id)
 		(f.run.meta.pet as Dictionary)["level"] = 10
 		f.run.pet_state["charge"] = PetDefs.size(String(id))
@@ -144,7 +150,59 @@ func _combat_pet_acts() -> void:
 			break
 
 
+## Swaps the familiar for `id`'s model and plays a faked charge + pet_acted for it.
+func _fake_pet_act(f: GameFlow, id: String) -> void:
+	var old := c.pets.view
+	var v := PetView.create(id, 10)
+	v.name = "PetFamiliar"
+	c.world.add_child(v)
+	v.follow = true
+	v.scale = old.scale if old else Vector3.ONE * PetHost.COMBAT_SCALE
+	v.home = c.pets.home_position()
+	v.snap()
+	if old:
+		old.queue_free()
+	c.pets.view = v
+	# the HUD refreshes from the run (the stand-in pet): keep the meter on this pet's portrait
+	var keep := func() -> void: c.ui.meta_hud.meter.setup(id, 10)
+	get_tree().process_frame.connect(keep)
+	f.run.pet_state["charge"] = 0
+	await _pause(0.6)
+	# --act_at=<s>: start the charge at that time since launch (steady --frames strips)
+	var at := int(float(args.get("act_at", "0")) * 1000.0)
+	while Time.get_ticks_msec() < at:
+		await get_tree().process_frame
+	var n := v.size_pips
+	var effect := String(args.get("effect", PetViewExt.EFFECTS.get(id, "block")))
+	var cb := f.combat
+	var ev: Array[Dictionary] = [{"type": "pet_charged", "pet": id, "charge": n, "size": n}]
+	await c.play_events(ev)
+	await _pause(0.4)
+	var acted := {"type": "pet_acted", "pet": id, "effect": effect, "value": 6, "target": cb.target}
+	if effect == "fix":
+		# the lowest die spins to its best face
+		var lo := 0
+		for i in cb.dice_values.size():
+			if cb.dice_values[i] < cb.dice_values[lo]:
+				lo = i
+		acted["die_idx"] = lo
+		var best := 0
+		for fc in f.run.dice[lo].faces:
+			best = maxi(best, fc)
+		acted["face"] = best
+	elif effect == "rune":
+		acted["die_idx"] = 0
+	var aev: Array[Dictionary] = [acted]
+	if effect == "potion":
+		f._gain_potion(aev, "pet", String(args.get("potion", "healing")))
+	print("PET_ACT ", id, " ", effect)
+	await c.play_events(aev)
+	await _pause(0.6)
+	get_tree().process_frame.disconnect(keep)
+
+
 func _level_up() -> void:
+
 	var f := _flow()
 	f.run.hp = int(f.run.max_hp * 0.7)
 	c.start(f)

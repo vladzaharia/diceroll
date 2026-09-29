@@ -15,8 +15,9 @@ extends Control
 ## roll_board, board_reroll, confirm_move, combat_reroll, combat_attack, pick_draft[i], rune_assign[die],
 ## shop_buy[i, die], shop_reroll, shop_leave, forge_apply[die, face, op, src], event_choose[i].
 signal command(name: String, args: Array)
-## Navigation: new_run, continue, class_chosen(class_id), back_to_title, resume, pause,
-## abandon, speed(float), auto(bool), auto_rules(AutoRules).
+## Navigation: new_run (= open the Camp), continue, class_chosen(class_id), back_to_title, resume,
+## pause, abandon, speed(float), auto(bool), auto_rules(AutoRules); Camp: camp, camp_cmd(Array
+## for Camp.apply), start_run.
 signal menu(action: String, arg: Variant)
 
 var title: TitleScreen
@@ -39,8 +40,13 @@ var route_card: RouteCard
 ## AUTO / speed layer (speed pill, AUTO toggle, reason ticker, highlights) and its settings.
 var auto_hud: AutoHud
 var auto_settings: AutoSettingsPanel
+## The Camp hub overlay and its building screens (ui/camp).
+var camp: CampScreen
 ## Potion belt + pet charge meter (ui/hud/meta_hud.gd); emits command("use_potion", [slot]).
 var meta_hud: MetaHud
+## Minigames (ui/minigames): the full-screen game (phase MINIGAME) and its reward modal.
+var minigame: MinigameScreen
+var minigame_reward: MinigameRewardModal
 
 var _flow: GameFlow
 var _modals: Array[UiModal] = []
@@ -76,6 +82,8 @@ func _init() -> void:
 	for c in [board_hud, combat_hud, meta_hud, portal, banner, draft, passive, rune_assign, shop, forge, event, summary, auto_hud, inspector, title, class_select, route_card, pause, settings, auto_settings]:
 		add_child(c)
 	_modals = [draft, passive, rune_assign, shop, forge, event, summary]
+	MinigameUi.attach(self)
+	_modals.append(minigame_reward)
 	board_hud.visible = false
 	combat_hud.visible = false
 	title.visible = false
@@ -118,6 +126,27 @@ func _init() -> void:
 	auto_settings.rules_changed.connect(func(r: AutoRules) -> void: menu.emit("auto_rules", r))
 	summary.new_run_pressed.connect(func() -> void: menu.emit("new_run", null))
 	summary.title_pressed.connect(func() -> void: menu.emit("back_to_title", null))
+	_add_camp()
+
+
+## The Camp overlay sits under the pause / settings layers.
+func _add_camp() -> void:
+	camp = CampScreen.new()
+	add_child(camp)
+	move_child(camp, pause.get_index())
+	camp.command.connect(func(c: Array) -> void: menu.emit("camp_cmd", c))
+	camp.start_run.connect(func() -> void: menu.emit("start_run", null))
+	camp.home_pressed.connect(func() -> void: menu.emit("back_to_title", null))
+	camp.continue_pressed.connect(func() -> void: menu.emit("continue", null))
+	camp.settings_pressed.connect(open_settings)
+
+
+func show_camp(p: Profile, can_continue: bool) -> void:
+	_hide_run()
+	title.visible = false
+	class_select.visible = false
+	camp.visible = true
+	camp.show_profile(p, can_continue)
 
 
 func _cmd(name: String, args: Array) -> void:
@@ -127,6 +156,7 @@ func _cmd(name: String, args: Array) -> void:
 func show_title() -> void:
 	_hide_run()
 	class_select.visible = false
+	_hide_camp()
 	title.visible = true
 	title.refresh()
 
@@ -134,7 +164,14 @@ func show_title() -> void:
 func show_class_select() -> void:
 	_hide_run()
 	title.visible = false
+	_hide_camp()
 	class_select.visible = true
+
+
+func _hide_camp() -> void:
+	if camp and camp.visible:
+		camp.close_all()
+		camp.visible = false
 
 
 func _hide_run() -> void:
@@ -146,6 +183,7 @@ func _hide_run() -> void:
 	for m in _modals:
 		if m.visible:
 			m.close()
+	minigame.visible = false
 
 
 func open_pause() -> void:
@@ -196,6 +234,7 @@ func sync(flow: GameFlow) -> void:
 	_flow = flow
 	title.visible = false
 	class_select.visible = false
+	_hide_camp()
 	var ph := flow.phase
 	var in_combat := ph == GameFlow.Phase.COMBAT
 	var over := flow.is_over()
@@ -207,11 +246,13 @@ func sync(flow: GameFlow) -> void:
 		combat_hud.refresh(flow)
 	meta_hud.refresh(flow)
 	portal.refresh(flow)
-	var want: UiModal = null
+	var want: UiModal = MinigameUi.sync(self, flow)
 	var kind := String(flow.offer.get("kind", ""))
 	match ph:
 		GameFlow.Phase.DRAFT:
-			if kind == "rune_assign":
+			if want != null:
+				pass
+			elif kind == "rune_assign":
 				want = rune_assign
 			elif kind == "passive":
 				want = passive

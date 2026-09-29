@@ -10,6 +10,8 @@ extends RefCounted
 const TYPES := ["potion_gained", "potion_used", "pet_charged", "pet_acted", "level_up", "second_boss",
 	"face_cursed", "trait_triggered", "crowns_pending"]
 const TRAIT_ICONS := {"helm": "shield", "blade": "sword", "boots": "arrow_right", "charm": "coin"}
+const THORN_COLOR := Color(1.0, 0.7, 0.4)
+
 const DRINK_COLORS := {
 	"healing": Color(1.0, 0.45, 0.55), "stoneskin": Color(0.72, 0.78, 0.9), "reroll_tonic": Color(1.0, 0.78, 0.3),
 	"cleanse": Color(0.5, 0.9, 1.0),
@@ -178,7 +180,7 @@ static func _pet_acted(c: GameController, ev: Dictionary) -> void:
 	if hud:
 		hud.fire()
 	var view: PetView = c.pets.view if c.pets else null
-	var text := PetDefs.name_of(pet)
+	var text := PetView.display_name(pet)
 	match effect:
 		"heal": text = "%s: HEAL" % text
 		"bite": text = "BITE!"
@@ -187,6 +189,11 @@ static func _pet_acted(c: GameController, ev: Dictionary) -> void:
 		"block": text = "BLOCK %d" % v
 		"gold": text = "+%d GOLD" % v
 		"potion": text = "A POTION!"
+		"thorns": text = "THORNS %d" % v if v > 0 else "THORNS!"
+		"freeze": text = "FREEZE!"
+		"burn": text = "BURN %d" % v if v > 0 else "BURN!"
+		"fix": text = "FIXED!"
+		"rune": text = "RUNE ECHO!"
 	var at := c.pets.screen_point(0.45) if c.pets else c.hero_screen(2.4)
 	c.overlay.popup(at, text, accent.lightened(0.3), "pet_" + pet if UiIcons.exists("pet_" + pet) else "", 28)
 	Audio.play_sfx("buff")
@@ -222,14 +229,105 @@ static func _pet_acted(c: GameController, ev: Dictionary) -> void:
 			await view.act("block")
 			Fx.projectile(world, view.body_position(), c.hero_pos() + Vector3.UP * 0.8, Fx.BLOCK_COLOR, 0.25 / c.speed)
 			await c.wait(0.2)
+		"thorns":
+			# Pebble: its slam raises a thorned shield; the thorns then settle on the hero
+			await view.act("thorns")
+			Fx.projectile(world, view.body_position(), c.hero_pos() + Vector3.UP * 0.8, THORN_COLOR, 0.25 / c.speed)
+			await c.wait(0.25)
+			Fx.block_flash(world, c.hero_pos() + Vector3.UP * 0.8, 1.0)
+			Fx.burst(world, c.hero_pos() + Vector3.UP * 0.8, {"amount": 14, "lifetime": 0.4, "speed": Vector2(2.0, 3.5),
+				"gravity": Vector3.ZERO, "damping": 4.0, "size": 0.24, "color": THORN_COLOR, "tex": "spark"})
+			await c.wait(0.15)
+		"freeze":
+			await view.act("freeze", c.pets.target_point(tgt))
+			await c.wait(0.3)
+		"burn":
+			var pts := _enemy_points(c)
+			await view.act("burn", pts[0] if not pts.is_empty() else c.pets.target_point(tgt), {"targets": pts})
+			await c.wait(0.35)
+		"fix":
+			await _pet_fix(c, view, ev, accent)
+		"rune":
+			await view.act("rune")
+			var ri := int(ev.get("die_idx", -1))
+			if ri >= 0 and ri < c.tray.dice.size():
+				c.tray.highlight_group([ri] as Array[int], accent)
+				c.overlay.popup(c.tray.die_top_screen(ri), "ECHO", accent.lightened(0.3), "", 22)
+				await c.wait(0.45)
+				c.tray.clear_highlight()
 		"gold":
 			await view.act("gold")
 		"potion":
-			view.act("potion")
-			await c.wait(0.25)
+			var pcol: Color = MetaHud.POTION_COLORS.get(String(ev.get("potion", "healing")), UiPalette.HP_BRIGHT)
+			if PetViewExt.has(pet):
+				# Bubbles: the bottle pops out of the brew before the belt fly-in
+				await view.act("potion", Vector3.INF, {"color": pcol})
+			else:
+				view.act("potion")
+				await c.wait(0.25)
 		_:
 			await view.act(effect)
 	await c.wait(0.1)
+
+
+## World points (body height) of the living enemies in the current fight.
+static func _enemy_points(c: GameController) -> Array:
+	var out := []
+	if not c.in_combat:
+		return out
+	for i in c.stage.enemy_count():
+		if c.flow == null or c.flow.combat == null or c.flow.combat.alive(i):
+			out.append(c.stage.enemy_position(i) + Vector3.UP * 0.9)
+	return out
+
+
+## Tinker's fix: it hops off toward the tray, then the die (event die_idx) spins to its best
+## face (event face; falls back to the die's highest face) with a little flourish.
+static func _pet_fix(c: GameController, view: PetView, ev: Dictionary, accent: Color) -> void:
+	var di := int(ev.get("die_idx", ev.get("die", -1)))
+	var face := int(ev.get("face", ev.get("to", 0)))
+	if face <= 0 and c.flow and di >= 0 and di < c.flow.run.dice.size():
+		var fs: PackedInt32Array = c.flow.run.dice[di].faces
+		for f in fs:
+			face = maxi(face, f)
+	var from := c.pets.screen_point(0.1)
+	await view.act("fix", Vector3.INF, {"die_idx": di, "face": face})
+	if di < 0 or di >= c.tray.dice.size() or not c.tray.is_visible_in_tree():
+		await c.wait(0.3)
+		return
+	# a little beetle icon scurries to the die
+	var r := c.tray.get_die_screen_rect(di)
+	var to := r.get_center() if r.size != Vector2.ZERO else c.tray.die_top_screen(di)
+	await _hop_icon(c, "pet_" + String(ev.get("pet", "")), from, to)
+	c.tray.highlight_group([di] as Array[int], accent)
+	Audio.play_sfx("buff")
+	var vals: Array[int] = [face]
+	var idx: Array[int] = [di]
+	c.tray.roll(vals, idx)
+	await c.tray.settled
+	c.overlay.popup(c.tray.die_top_screen(di) + Vector2(0, -10), "→ %d" % face, accent.lightened(0.3), "", 26)
+	await c.wait(0.35)
+	c.tray.clear_highlight()
+
+
+## A pet portrait that hops along an arc from -> to (screen), then pops.
+static func _hop_icon(c: GameController, icon: String, from: Vector2, to: Vector2) -> void:
+	var r := UiIcons.rect(icon, 72, Color.WHITE) if UiIcons.exists(icon) else UiIcons.rect("star", 40, UiPalette.GOLD_BRIGHT)
+	r.size = Vector2(72, 72)
+	r.pivot_offset = r.size * 0.5
+	r.position = from - r.size * 0.5
+	c.overlay.add_child(r)
+	var start := r.position
+	var end := to - r.size * 0.5
+	var ctrl := (start + end) * 0.5 + Vector2(0, -160)
+	var t := r.create_tween()
+	t.tween_method(func(u: float) -> void:
+		r.position = start.lerp(ctrl, u).lerp(ctrl.lerp(end, u), u)
+		r.rotation = sin(u * PI * 3.0) * 0.3, 0.0, 1.0, 0.45 / c.speed).set_trans(Tween.TRANS_SINE)
+	t.tween_property(r, "scale", Vector2(1.4, 0.6), 0.06 / c.speed)
+	t.tween_property(r, "scale", Vector2.ONE * 0.01, 0.12 / c.speed)
+	t.tween_callback(r.queue_free)
+	await t.finished
 
 
 # ======================================================================= level-ups

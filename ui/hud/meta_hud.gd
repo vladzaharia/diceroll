@@ -191,12 +191,12 @@ func _place() -> void:
 	strip.reset_size()
 	var s := strip.get_combined_minimum_size()
 	strip.size = s
-	var band := (size.x - UiTheme.tray_width(size)) * 0.5
+	var tr := UiTheme.tray_rect(size, safe)
+	var band := tr.position.x
 	if _mode == "side_h":
 		# landscape: centred in the band left of the tray, level with the tray
-		var th := UiTheme.tray_height(size)
 		var x0 := safe.left
-		strip.position = Vector2(x0 + (band - x0 - s.x) * 0.5, size.y - th * 0.5 - s.y * 0.5)
+		strip.position = Vector2(x0 + (band - x0 - s.x) * 0.5, tr.get_center().y - s.y * 0.5)
 	elif _mode == "side_v":
 		# narrower landscape (4:3 tablets): a column in the band left of the tray, bottom-aligned
 		var x0 := safe.left
@@ -219,7 +219,7 @@ func _place() -> void:
 func _pick_mode(safe: UiTheme.Margins) -> String:
 	if size.x <= size.y:
 		return "top"
-	var band := (size.x - UiTheme.tray_width(size)) * 0.5 - safe.left
+	var band := UiTheme.tray_rect(size, safe).position.x - safe.left
 	var n := cap + (1 if pet_id != "" else 0)
 	var len := n * (SLOT_PX_LAND + 8) + 30
 	if band >= len + 32.0:

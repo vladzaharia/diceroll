@@ -534,6 +534,40 @@ ICONS["trait_ward"] = (fill("M2.8 18.4a9.2 9.2 0 0 1 18.4 0z") + shade("M12 9.2a
 ICONS["trait_pierce"] = (fill(SHIELD) + shade("M12 2.9v18.3c4.4-1.4 7.6-5 7.6-9.7V5.8z")
                          + f'<path d="M12.6 3.4l-2.2 5 2.8 2.6-2.6 4.4 1.2 5.6" fill="none" stroke="{O}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>')
 
+# ---------------------------------------------------------------- enemy affixes (§3A: HUD badges, cards, legend)
+ICONS["affix_armored"] = (fill(SHIELD) + shade("M12 2.9v18.3c4.4-1.4 7.6-5 7.6-9.7V5.8z")
+                          + f'<path d="M4.6 8.6h14.8M4.8 12.8h14.4M6.4 17h11.2M9 3.8v4.8M15 3.8v4.8M12 8.6v4.2M7.6 12.8v4.2M16.4 12.8v4.2M12 17v3.6" '
+                          f'fill="none" stroke="{O}" stroke-width="1.2" stroke-linecap="round"/>'
+                          + hl("M6.6 6.8l1.6-.6", 1.2, 0.7))
+ICONS["affix_thorned"] = ICONS["trait_thorns"]
+ICONS["affix_warded"] = (fill("M2.8 18.4a9.2 9.2 0 0 1 18.4 0z") + shade("M12 9.2a9.2 9.2 0 0 1 9.2 9.2H12z", 0.14)
+                         + fill("M1.8 18.4h20.4v2.6H1.8z") + hl("M6.4 14.6a6 6 0 0 1 3.6-3.8", 1.4, 0.8)
+                         + f'<path d="M12 9.2v9.2M7 12.2l2.6 6.2M17 12.2l-2.6 6.2" fill="none" stroke="{O}" stroke-opacity="0.35" stroke-width="1"/>')
+ICONS["affix_piercing"] = ICONS["trait_pierce"]
+ICONS["affix_frenzied"] = (fill(SKULL) + shade("M16.2 4a8.2 8.2 0 0 1 3.9 7c0 2.8-1.4 4.7-3.1 5.7V20a1.2 1.2 0 0 1-1.2 1.2h-1.2c2.6-5.7 3.6-11.8 1.6-17.2z", 0.16)
+                           + dark("M6.4 9.6l4.4 1.8-.6 2.6-3.2-.4z") + dark("M17.6 9.6l-4.4 1.8.6 2.6 3.2-.4z")
+                           + dark("M10.8 15.6h2.4l-1.2 1.8z")
+                           + f'<path d="M9.4 19.2v2M12 19.2v2M14.6 19.2v2" stroke="{O}" stroke-width="1.1" stroke-linecap="round"/>'
+                           + f'<path d="M5.4 7.2l5 2.2M18.6 7.2l-5 2.2" stroke="{O}" stroke-width="1.6" stroke-linecap="round"/>')
+ICONS["affix_regenerating"] = (circ(12, 12, 9.4) + shade("M18.6 5.4a9.4 9.4 0 0 1-13.2 13.2A9.4 9.4 0 0 0 18.6 5.4z", 0.16)
+                               + f'<path d="M10.2 5.8h3.6v4.4h4.4v3.6h-4.4v4.4h-3.6v-4.4H5.8v-3.6h4.4z" fill="#fff" stroke="{O}" stroke-width="1.3" stroke-linejoin="round"/>')
+ICONS["affix_vampiric"] = ICONS["intent_drain"]
+ICONS["affix_hexing"] = (die(4.2, 5.4, 13.6, 3, 0, False, 0.1)
+                         + f'<path d="M1.8 5.2c1.6-1.8 4.2-1.8 5.4.2M22.2 18.8c-1.6 1.8-4.2 1.8-5.4-.2" fill="none" stroke="{O}" stroke-width="4" stroke-linecap="round"/>'
+                         + f'<path d="M1.8 5.2c1.6-1.8 4.2-1.8 5.4.2M22.2 18.8c-1.6 1.8-4.2 1.8-5.4-.2" fill="none" stroke="#c8c0d8" stroke-width="1.8" stroke-linecap="round"/>'
+                         + f'<ellipse cx="3.2" cy="8.4" rx="1.8" ry="2.6" fill="none" stroke="{O}" stroke-width="3.2"/>'
+                         + f'<ellipse cx="3.2" cy="8.4" rx="1.8" ry="2.6" fill="none" stroke="#c8c0d8" stroke-width="1.4"/>'
+                         + f'<ellipse cx="20.8" cy="15.6" rx="1.8" ry="2.6" fill="none" stroke="{O}" stroke-width="3.2"/>'
+                         + f'<ellipse cx="20.8" cy="15.6" rx="1.8" ry="2.6" fill="none" stroke="#c8c0d8" stroke-width="1.4"/>')
+ICONS["affix_frostbound"] = (die(2.4, 7.8, 13.8, 2, -8)
+                             + g(lines(snow, 2.3), "translate(11.4 0.6) scale(0.52)"))
+ICONS["affix_gilded"] = ICONS["coin"]
+ICONS["intent_rally"] = (f'<ellipse cx="12" cy="10.2" rx="7.6" ry="3.2" fill="{F}" stroke="{O}" stroke-width="{SW}"/>'
+                         + fill("M4.4 10.2v6.4c0 1.8 3.4 3.2 7.6 3.2s7.6-1.4 7.6-3.2v-6.4c0 1.8-3.4 3.2-7.6 3.2s-7.6-1.4-7.6-3.2z")
+                         + f'<path d="M5.6 13.6l3 5.4M9.4 13.4l2.6 6.4M14.6 13.4l-2.6 6.4M18.4 13.6l-3 5.4" stroke="{O}" stroke-opacity="0.5" stroke-width="1.1"/>'
+                         + lines(["M6.6 2.6l3.8 6.4", "M17.4 2.6l-3.8 6.4"], 1.6)
+                         + circ(6.4, 2.6, 1.3, "#fff") + circ(17.6, 2.6, 1.3, "#fff"))
+
 # ---------------------------------------------------------------- biome emblems (route card, pause, summary)
 ICONS["biome_glade"] = (fill("M10.5 13.6h3v7.6h-3z")
                         + union(['<circle cx="12" cy="8.6" r="6.2"/>', '<circle cx="7" cy="12" r="4.2"/>', '<circle cx="17" cy="12" r="4.2"/>'])

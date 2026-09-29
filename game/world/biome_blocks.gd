@@ -99,7 +99,9 @@ static func dress(id: String, root: Node3D, d: Node3D, c: Node3D) -> void:
 	# ring side parity: an even side puts tile centres on half cells
 	var q := int(round((_extent - CELL * 0.5) / (CELL * 0.5)))
 	_off = 0.5 if q % 2 == 1 else 0.0
-	_rng.seed = Biome.seed_of(id) * 7919
+	# the terrain's height breaks vary with the board's dressing variant (Magma keeps its
+	# fixed framing: tight island, channel beside the ring, falls behind)
+	_rng.seed = Biome.seed_of(id) * 7919 + (0 if id == "magma" else Dressing.layout * 104729)
 	_terrain(d)
 	match id:
 		"glade":
@@ -114,15 +116,12 @@ static func dress(id: String, root: Node3D, d: Node3D, c: Node3D) -> void:
 static func inner_corner(id: String, holder: Node3D, p: Vector3, yaw: float, sx: float, sz: float) -> void:
 	match id:
 		"glade":
-			var b := bush(holder, p + Vector3(-sx * 0.15, 0, -sz * 0.1), 0.62, Color(0.36, 0.62, 0.24))
-			b.name = "Bush"
-			var f := flower_patch(holder, p, 1.0, 9)
-			f.name = "Flowers"
-			rock(holder, p + Vector3(-sx * 0.75, 0, sz * 0.05), 0.38, Color(0.6, 0.6, 0.58))
+			DressGlade.corner(holder, p, yaw, sx, sz)
 		"frost":
-			crystal_cluster(holder, p, 0.72, 4)
-			rock(holder, p + Vector3(-sx * 0.7, 0, sz * 0.1), 0.34, Color(0.92, 0.95, 1.0))
+			DressFrost.corner(holder, p, yaw, sx, sz)
 		"magma":
+			if DressMagma.corner(holder, p, yaw, sx, sz):
+				return
 			var v := Node3D.new()
 			v.name = "Vent"
 			v.position = p
@@ -1075,40 +1074,8 @@ static func mist(parent: Node3D, color: Color) -> GPUParticles3D:
 # --- Verdant Glade ------------------------------------------------------------------------------
 
 static func _glade(root: Node3D, d: Node3D, c: Node3D) -> void:
-	var H := Props.HAL
-	var leaf := Color(0.34, 0.62, 0.24)
-	var pine := Color(0.2, 0.5, 0.28)
-	# back row on the hills: pines and round trees, bushes along the hill foot
-	var back := [[-9.6, "pine", 1.05], [-7.0, "round", 1.15], [-3.8, "pine", 0.95], [-1.0, "round", 1.3],
-		[2.2, "pine", 1.1], [5.0, "round", 1.1], [7.8, "pine", 1.0], [10.0, "round", 0.95]]
-	for i in back.size():
-		var b: Array = back[i]
-		var z := -10.2 + 0.4 * float(i % 2)
-		if b[1] == "pine":
-			tinted(d, H + ["tree_pine_orange_large.gltf", "tree_pine_yellow_large.gltf"][i % 2], Vector3(b[0], 0, z),
-				_rng.randf() * 360.0, float(b[2]), pine.lightened(0.06 * (i % 3)), 0.9)
-		else:
-			_tag(round_tree(d, spot(Vector3(b[0], 0, z)), float(b[2]), leaf.lightened(0.05 * (i % 3)), i + 1))
-	for x in [-8.2, -5.4, -2.4, 0.8, 3.6, 6.4, 9.0]:
-		_tag(bush(d, spot(Vector3(x, 0, -8.6 - 0.3 * absf(sin(x)))), _rng.randf_range(0.55, 0.8), leaf.darkened(0.05), int(x * 10)))
-	# sides: trees at the back, a picnic spot and rocks toward the front
-	for side in [-1.0, 1.0]:
-		_tag(round_tree(d, spot(Vector3(side * 9.8, 0, -5.8)), 1.0, leaf.lightened(0.04), int(side * 5 + 20)))
-		tinted(d, H + "tree_pine_yellow_medium.gltf", Vector3(side * 9.6, 0, -2.2), side * 40.0, 1.0, pine.lightened(0.1), 0.9)
-		_tag(bush(d, spot(Vector3(side * 8.9, 0, 0.6)), 0.7, leaf, int(side * 7 + 40)))
-		_tag(rock(d, spot(Vector3(side * 9.6, 0, 3.2)), 0.55, Color(0.62, 0.62, 0.6), int(side * 3 + 60)))
-		_tag(rock(d, spot(Vector3(side * 8.9, 0, 4.2)), 0.32, Color(0.66, 0.65, 0.62), int(side * 3 + 61)))
-		tinted(d, H + "tree_pine_orange_small.gltf", Vector3(side * 9.7, 0, 7.8), side * 20.0, 1.0, pine.lightened(0.14), 0.9)
-		_tag(flower_patch(d, spot(Vector3(side * 8.8, 0, 6.0)), 0.7, 10))
-		put(d, H + "fence_seperate.gltf", Vector3(side * 8.6, 0, -3.8), 90.0, 0.9)
-	put(d, H + "bench.gltf", Vector3(-9.0, 0, 1.9), 90.0, 0.85)
-	put(d, Props.DUN + "barrel_small.gltf", Vector3(9.0, 0, 1.8), 30.0, 0.7)
-	put(d, Props.DUN + "crates_stacked.gltf", Vector3(9.4, 0, -0.6), -70.0, 0.62)
-	# front edge: low stuff only
-	for p in [Vector3(-6.0, 0, 9.8), Vector3(-1.5, 0, 10.1), Vector3(3.2, 0, 9.7), Vector3(7.2, 0, 10.0)]:
-		_tag(bush(d, spot(p), 0.5, leaf.lightened(0.05), int(p.x * 3 + 90)))
-	for p in [Vector3(-3.8, 0, 9.6), Vector3(5.4, 0, 9.9)]:
-		_tag(rock(d, spot(p), 0.4, Color(0.64, 0.63, 0.6), int(p.x + 70)))
+	# trees, bushes, rocks and side vignettes: seeded kits (see DressGlade)
+	DressGlade.dress(root, d, c)
 	scatter_tufts(d, Color(0.3, 0.52, 0.2), int(170 * _s * _s))
 	scatter_flowers(d, [Color(1.0, 0.97, 0.92), Color(1.0, 0.6, 0.72), Color(1.0, 0.85, 0.32), Color(0.72, 0.62, 1.0)],
 		int(150 * _s * _s))
@@ -1116,6 +1083,13 @@ static func _glade(root: Node3D, d: Node3D, c: Node3D) -> void:
 			Vector3(-6.0, 0, 9.2), Vector3(6.4, 0, 9.4)]:
 		_tag(flower_patch(d, spot(p), 0.9, 14))
 	_tag(butterflies(d))
+	match Dressing.kit(0):
+		1:
+			DressGlade.clearing(c)
+			return
+		2:
+			DressGlade.spring(c)
+			return
 	# set piece: the old oak on a mossy mound, a ring of standing stones and a campfire
 	var mound := Node3D.new()
 	mound.name = "Mound"
@@ -1156,35 +1130,14 @@ static func _glade(root: Node3D, d: Node3D, c: Node3D) -> void:
 # --- Frostpeak ----------------------------------------------------------------------------------
 
 static func _frost(root: Node3D, d: Node3D, c: Node3D) -> void:
-	var H := Props.HAL
-	var frosted := Color(0.82, 0.9, 1.0)
-	var pine := Color(0.36, 0.52, 0.62)
-	# back: frosted pines between crystal clusters on the stepped peaks
-	var back := [[-9.8, 1.1], [-6.4, 1.2], [-2.8, 1.0], [0.6, 1.3], [4.0, 1.05], [7.2, 1.15], [10.0, 1.0]]
-	for i in back.size():
-		var b: Array = back[i]
-		var z := -10.1 + 0.35 * float(i % 2)
-		var t := tinted(d, H + ["tree_pine_yellow_large.gltf", "tree_pine_orange_large.gltf"][i % 2], Vector3(b[0], 0, z),
-			_rng.randf() * 360.0, float(b[1]), pine.lerp(frosted, 0.35 * float(i % 3) / 2.0), 0.92)
-		t.name = "FrostPine"
+	# crystals on the back peaks (the Frostpeak signature)
 	for p in [Vector3(-8.2, 0, -8.8), Vector3(-4.6, 0, -9.0), Vector3(2.2, 0, -8.9), Vector3(5.8, 0, -8.7), Vector3(8.8, 0, -8.6)]:
-		_tag(crystal_cluster(d, spot(p), _rng.randf_range(0.6, 0.95), 5, int(p.x * 7 + 3), p.x < 0.0 and p.x > -6.0))
-	for side in [-1.0, 1.0]:
-		tinted(d, H + "tree_pine_yellow_medium.gltf", Vector3(side * 9.7, 0, -5.6), side * 30.0, 1.05, pine.lerp(frosted, 0.3), 0.92)
-		_tag(crystal_cluster(d, spot(Vector3(side * 9.2, 0, -2.6)), 0.8, 5, int(side * 9 + 30)))
-		_tag(rock(d, spot(Vector3(side * 9.5, 0, 0.8)), 0.55, Color(0.9, 0.93, 0.98), int(side * 4 + 50)))
-		tinted(d, H + "tree_pine_orange_small.gltf", Vector3(side * 9.6, 0, 3.6), side * -25.0, 1.0, pine.lerp(frosted, 0.5), 0.92)
-		_tag(crystal_cluster(d, spot(Vector3(side * 8.9, 0, 6.4)), 0.5, 4, int(side * 9 + 31), false))
-		tinted(d, H + "tree_pine_yellow_small.gltf", Vector3(side * 9.5, 0, 8.4), side * 50.0, 0.9, pine.lerp(frosted, 0.55), 0.92)
-		put(d, H + "lantern_standing.gltf", Vector3(side * 8.7, 0, -0.9), 0.0, 0.85)
-		var lp := spot(Vector3(side * 8.7, 0.75, -0.9))
-		Biome.flicker_light(d, lp, Color(1.0, 0.72, 0.4), 1.2, 3.6).set_meta("prescaled", true)
-	_tag(snowman(d, spot(Vector3(-9.0, 0, 5.2)), 30.0, 0.95))
-	for p in [Vector3(-5.0, 0, 9.8), Vector3(0.5, 0, 10.1), Vector3(5.6, 0, 9.7)]:
-		_tag(rock(d, spot(p), 0.42, Color(0.92, 0.95, 1.0), int(p.x * 5 + 80)))
-	for p in [Vector3(-2.4, 0, 9.9), Vector3(8.0, 0, 9.8)]:
-		_tag(crystal_cluster(d, spot(p), 0.42, 3, int(p.x * 3 + 90), false))
-	scatter_tufts(d, Color(0.62, 0.72, 0.62), int(70 * _s * _s))
+		var cp := spot(p)
+		Dressing.occupy(cp.x, cp.z, 0.7)
+		_tag(crystal_cluster(d, cp, _rng.randf_range(0.6, 0.95), 5, int(p.x * 7 + 3), p.x < 0.0 and p.x > -6.0))
+	# pines, icy rocks and the side camps: seeded kits (see DressFrost)
+	DressFrost.dress(d)
+	scatter_tufts(d, Color(0.62, 0.72, 0.62), int(50 * _s * _s))
 	# frozen ponds in the moat corners (thin icy slabs)
 	var mat := ice_material()
 	for sx in [-1.0, 1.0]:
@@ -1199,6 +1152,13 @@ static func _frost(root: Node3D, d: Node3D, c: Node3D) -> void:
 		slab.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		d.add_child(slab)
 	_tag(mist(d, Color(0.85, 0.92, 1.0, 0.16)))
+	match Dressing.kit(0):
+		1:
+			DressFrost.sword(c)
+			return
+		2:
+			DressFrost.spire(c)
+			return
 	# set piece: a stepped stone altar under a snow cap, crowned by a glowing ice crystal
 	var base_k := [1.95, 1.35, 0.8]
 	var y := 0.0
@@ -1299,16 +1259,9 @@ static func _magma(root: Node3D, d: Node3D, c: Node3D) -> void:
 	for side in [-1.0, 1.0]:
 		_tag(basalt_columns(d, spot(Vector3(side * side_x, 0, -5.8)), 1.5, 7, int(side * 7 + 3)))
 		_tag(spire(d, spot(Vector3(side * side_x + side * 0.6, 0, -4.4)), 0.7, int(side * 7 + 5)))
-		put(d, T + "anvil.gltf", Vector3(side * side_x, 0, -2.4), side * 70.0, 1.4)
-		put(d, T + "hammer.gltf", Vector3(side * side_x + 0.1, 0.02, -1.4), side * 20.0, 1.1)
-		var bz := put(d, D + "torch_lit.gltf", Vector3(side * side_x, 0, 1.2), 0.0, 1.3)
-		bz.name = "Brazier"
-		Biome.flame(d, bz.position + Vector3(0, 1.0, 0), Color(1.0, 0.5, 0.15), 0.42, 10).set_meta("prescaled", true)
-		Biome.flicker_light(d, bz.position + Vector3(0, 1.5, 0.3), Color(1.0, 0.5, 0.2), 1.6, 5.0).set_meta("prescaled", true)
-		put(d, D + "barrel_large.gltf", Vector3(side * side_x, 0, 3.8), side * 30.0, 0.75)
 		_tag(rock(d, spot(Vector3(side * side_x, 0, 6.6)), 0.55, basalt, int(side * 7 + 33)))
-	put(d, T + "grindstone.gltf", Vector3(-side_x, 0, 5.2), 80.0, 1.2)
-	put(d, D + "sword_shield_broken.gltf", Vector3(side_x, 0, 5.4), -80.0, 0.85)
+		# forge yard / mine camp / battlefield on the shelf (seeded kits, see DressMagma)
+		DressMagma.side(d, side, side_x * _s)
 	# front: low basalt boulders and a few thin glowing cracks (the camera side stays open)
 	for p in [Vector3(-5.6, 0, 9.9), Vector3(5.4, 0, 9.8)]:
 		_tag(basalt_columns(d, spot(p), 1.1, 10, int(p.x * 7 + 99), 0.6))
@@ -1316,6 +1269,17 @@ static func _magma(root: Node3D, d: Node3D, c: Node3D) -> void:
 		_tag(crack_decal(d, spot(p) + Vector3(0, 0.02, 0), 1.5, _rng.randf() * 180.0))
 	_tag(smoke(d, spot(Vector3(-side_x, 0, -8.0)) + Vector3(0, 0.5, 0), 0.9, smoke_col))
 	_tag(smoke(d, spot(Vector3(side_x, 0, -7.0)) + Vector3(0, 0.5, 0), 0.9, smoke_col))
+	for p in [Vector3(-5.6, 0, 9.9), Vector3(5.4, 0, 9.8)]:
+		var q := spot(p)
+		Dressing.occupy(q.x, q.z, 1.2)
+	DressMagma.front(d)
+	match Dressing.kit(0):
+		1:
+			DressMagma.hoard(c)
+			return
+		2:
+			DressMagma.war_drum(c)
+			return
 	# set piece: the Cinder Forge. A stepped basalt dais over a ring of lava, a great anvil on
 	# top with a glowing greatsword driven into it, flanked by two obsidian spires.
 	var moat := lava_pool(c, Vector3(0, 0.01, -0.1), 2.05)

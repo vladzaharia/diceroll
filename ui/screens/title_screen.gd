@@ -1,7 +1,8 @@
 class_name TitleScreen
 extends Control
-## Title: animated DICEROLL logo, New Run, Continue (enabled when user://save.json exists),
-## Settings. Emits new_run_pressed, continue_pressed, settings_pressed.
+## Title: animated DICEROLL logo, PLAY (opens the Camp hub), Continue (enabled when
+## user://save.json exists), Settings. Emits new_run_pressed (PLAY), continue_pressed,
+## settings_pressed.
 
 signal new_run_pressed
 signal continue_pressed
@@ -44,7 +45,8 @@ func _init() -> void:
 
 	_col = UiTheme.vbox(18)
 	add_child(_col)
-	new_btn = GameButton.make("NEW RUN", "dice", GameButton.Kind.PRIMARY, 46)
+	new_btn = GameButton.make("PLAY", "campfire", GameButton.Kind.PRIMARY, 46)
+	new_btn.icon_tint = UiPalette.TEXT_DARK
 	new_btn.min_height = 116
 	new_btn.pressed.connect(func() -> void: new_run_pressed.emit())
 	_col.add_child(new_btn)

@@ -5,7 +5,7 @@
 # emulate the notch / home-indicator safe area via --safe (see UiTheme.safe_margins).
 #
 # Usage: tools/shoot_matrix.sh <scenario> <out_dir> [set] [extra harness args...]
-#   set: all (default: desktop+mobile+dpi+zoom) | desktop | mobile | dpi | zoom | quick
+#   set: all (default: desktop+mobile+duo+dpi+zoom) | desktop | mobile | duo | dpi | zoom | quick
 #   dpi  = same device at @1x/@2x pixel density (macOS clamps windows to the display
 #          height, so @3x phones can't render off-screen; the UI is vector, @2x covers it)
 #   zoom = UI zoom via content_scale_factor (--ui-scale), like OS scaling / a UI-size option
@@ -37,10 +37,19 @@ ipadmini_land   1133x744   0.032,0.027,0,0
 ipadpro13       1032x1376  0.017,0.015,0,0
 ipadpro13_land  1376x1032  0.023,0.02,0,0
 "
+# iPhone Duo (foldable, Sept 2026; apple.com/iphone-duo/specs): outer 5.4" 1398x2034 @460ppi,
+# inner 7.6" 1878x2670 @430ppi. Point sizes assume @3x (Apple doesn't publish them); layout only
+# depends on aspect + relative size. Both screens have a Dynamic Island -> top inset emulated.
+DUO="
+duo_outer       466x678    0.087,0.05,0,0
+duo_inner       626x890    0.066,0.038,0,0
+duo_inner_land  890x626    0.094,0.054,0.03,0.03
+"
 QUICK="
 pc_1080p        1920x1080  0,0,0,0
 pc_1366x768     1366x768   0,0,0,0
 iphone17_17pro  402x874    0.071,0.039,0,0
+duo_outer       466x678    0.087,0.05,0,0
 ipadpro13_land  1376x1032  0.023,0.02,0,0
 "
 DPI="
@@ -58,11 +67,12 @@ ipadmini_z125   744x1133   0.021,0.018,0,0  1.25
 "
 case "$set_" in
 	desktop) list="$DESKTOP" ;;
-	mobile) list="$MOBILE" ;;
+	mobile) list="$MOBILE$DUO" ;;
+	duo) list="$DUO" ;;
 	quick) list="$QUICK" ;;
 	dpi) list="$DPI" ;;
 	zoom) list="$ZOOM" ;;
-	*) list="$DESKTOP$MOBILE$DPI$ZOOM" ;;
+	*) list="$DESKTOP$MOBILE$DUO$DPI$ZOOM" ;;
 esac
 
 echo "$list" | while read -r name res safe scale; do

@@ -15,6 +15,12 @@ const FONT_BODY := "res://assets/fonts/Fredoka-Variable.ttf"
 static var _scenes: Dictionary = {}
 
 
+## True when a prop file exists (optional packs, e.g. the KayKit EXTRA subsets).
+static func has(path: String) -> bool:
+	var full := path if path.begins_with("res://") else K + path
+	return _scenes.has(full) or ResourceLoader.exists(full)
+
+
 ## Instances a glTF/GLB (cached PackedScene). `path` may be absolute (res://) or relative to K.
 static func inst(path: String, scale := 1.0, shadows := true) -> Node3D:
 	var full := path if path.begins_with("res://") else K + path

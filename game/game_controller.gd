@@ -8,8 +8,14 @@ extends Node
 ##   end of playback  ->  _enter_idle(): ui.sync(flow), input unlocked, auto-save
 ##
 ## Input is locked while events play and unlocked once the flow awaits a player command.
-## Menus: title -> class select -> run -> summary -> title. Pause uses get_tree().paused;
+## Menus: title -> CAMP (the meta hub, 3D CampScene + CampScreen) -> run setup -> route card ->
+## run -> RESULTS (the run is banked into the profile) -> Camp. Pause uses get_tree().paused;
 ## the UI layer keeps processing (PROCESS_MODE_ALWAYS) so the pause menu works.
+##
+## Profile: user://profile.json (ProfileStore), loaded on first use and created fresh on first
+## launch; saved after every Camp command and after banking a run. Every run from the UI starts
+## with GameFlow.new_run(class, seed, board, {profile, mode, ascension}); a loaded run save
+## carries its own meta config (run.meta).
 
 ## Emitted every time playback ends and the flow waits for the player (phase = flow.phase).
 signal idle(phase: int)
@@ -43,7 +49,7 @@ var speed := 1.0
 var autosave := true
 ## True while events play (input locked).
 var busy := false
-## "title" | "class" | "run"
+## "title" | "class" | "camp" | "run"
 var mode := "title"
 var in_combat := false
 ## Set when the player leaves mid-playback; the EventPlayer stops at the next event.
@@ -51,6 +57,24 @@ var aborting := false
 
 var _tray_layer: CanvasLayer
 var _title_t := 0.0
+
+## Meta profile (loaded by ensure_profile()) and the Camp command layer over it.
+var profile: Profile
+var camp: Camp
+## Where the profile lives; false = never write it (scenarios).
+var profile_path := ProfileStore.PATH
+var persist_profile := true
+## True when this launch created the profile (the Camp shows its welcome once).
+var profile_is_new := false
+## Plays minigame tiles on AUTO while no minigame screen exists (off for scripted drivers).
+var minigame_fallback := true
+## The 3D camp while in the hub (null otherwise).
+var camp_scene: CampScene
+## game_over stats of the run being presented, and whether they were banked.
+var _game_over_stats: Dictionary = {}
+var _banked := false
+## CampState before the last banked run: the next show_camp() plays the build-out reveal.
+var camp_before: Dictionary = {}
 
 
 func _init() -> void:
@@ -108,6 +132,7 @@ func _ready() -> void:
 # --- menus -------------------------------------------------------------------------------
 
 func show_title() -> void:
+	_leave_camp_world()
 	mode = "title"
 	auto.set_enabled(false)
 	get_tree().paused = false
@@ -120,6 +145,7 @@ func show_title() -> void:
 	var b := Board.generate(rng, 1)
 	board.hero_class = HeroDefs.IDS[randi() % HeroDefs.IDS.size()]
 	board.hero_idx = 0
+	board.variant_seed = randi()
 	board.build(1, b.to_dict().tiles)
 	board.clear_targets()
 	_title_t = 0.0
@@ -135,10 +161,11 @@ func show_class_select() -> void:
 	ui.show_class_select()
 
 
-func new_run(class_id: String, seed := -1) -> void:
+func new_run(class_id := "", seed := -1) -> void:
 	if seed < 0:
 		seed = int(Time.get_unix_time_from_system()) % 1000000 + randi() % 1000
-	start(GameFlow.new_run(class_id, seed))
+	start(GameFlow.new_run(class_id if class_id != "" else String(ensure_profile().loadout.get("class", "knight")), seed,
+		Balance.BOARD_SIZE, run_opts()))
 	# a new road every run: show it before the first roll
 	busy = true
 	await wait(0.45)
@@ -157,8 +184,11 @@ func continue_run() -> bool:
 
 ## Starts presenting `f` (a new or loaded run) from its current state.
 func start(f: GameFlow) -> void:
+	_leave_camp_world()
 	flow = f
 	mode = "run"
+	_game_over_stats = {}
+	_banked = false
 	auto.set_enabled(false)
 	busy = false
 	in_combat = false
@@ -171,6 +201,8 @@ func start(f: GameFlow) -> void:
 	board.hero_class = f.run.class_id
 
 	board.hero_idx = f.run.pos
+	EnemyLooks.run_seed = f.run.seed  # per-run enemy variants
+	board.variant_seed = hash([f.run.seed, f.run.biome()])
 	board.build(f.run.biome(), f.run.board.to_dict().tiles)
 	if f.phase == GameFlow.Phase.BOARD_READY:
 		rig.home(board.hero, true)
@@ -220,8 +252,12 @@ func _restore_combat() -> void:
 
 func _on_menu(action: String, arg: Variant) -> void:
 	match action:
-		"new_run":
-			show_class_select()
+		"new_run", "camp":
+			show_camp()
+		"camp_cmd":
+			camp_command(arg)
+		"start_run":
+			start_from_camp()
 		"continue":
 			continue_run()
 		"class_chosen":
@@ -235,7 +271,7 @@ func _on_menu(action: String, arg: Variant) -> void:
 		"abandon":
 			get_tree().paused = false
 			delete_save()
-			leave_to_title()
+			abandon_to_camp()
 		"speed":
 			set_speed(float(arg))
 		"auto":
@@ -297,6 +333,7 @@ func run_command(cmd: String, args: Array = []) -> void:
 
 ## Plays an event list with input locked, then waits for the player.
 func play_events(evs: Array) -> void:
+	_note_game_over(evs)
 	var light := true
 	for ev: Dictionary in evs:
 		if not LIGHT_EVENTS.has(String(ev.get("type", ""))):
@@ -335,6 +372,8 @@ func wait(t: float) -> void:
 func _enter_idle() -> void:
 	if flow == null:
 		return
+	if flow.is_over():
+		bank_run()
 	ui.board_hud.busy = false
 	ui.combat_hud.busy = false
 	var ph := flow.phase
@@ -367,6 +406,7 @@ func _enter_idle() -> void:
 		run_over.emit(flow.phase == GameFlow.Phase.VICTORY)
 	elif ph != GameFlow.Phase.COMBAT:
 		save()
+	_minigame_fallback(ph)
 	idle.emit(ph)
 
 
@@ -536,6 +576,7 @@ func change_biome(ev: Dictionary) -> void:
 	var centre := hero_screen(0.8) / Vector2(maxf(vs.x, 1.0), maxf(vs.y, 1.0))
 	await overlay.dissolve(true, Color(look.sky_top).lerp(Color(look.sky_glow), 0.25), Color(look.sky_glow), 0.7, centre)
 	board.hero_idx = pos
+	board.variant_seed = hash([flow.run.seed, bid])
 	board.build(bid, tiles)
 	board.hide_tiles()
 	rig.overview(board.ring_bounds(), true)
@@ -574,6 +615,9 @@ func inspect_die(idx: int) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if mode == "camp":
+		_camp_input(event)
+		return
 	if mode != "run" or flow == null or get_tree().paused:
 		return
 	var mb := event as InputEventMouseButton
@@ -680,30 +724,18 @@ static func _seg_dist(p: Vector2, a: Vector2, b: Vector2) -> float:
 
 func _layout_tray() -> void:
 	var vs := get_viewport().get_visible_rect().size
-	var th := UiTheme.tray_height(vs)
-	var w := UiTheme.tray_width(vs)
-	tray.position = Vector2((vs.x - w) * 0.5, vs.y - th + 4.0)
-	tray.size = Vector2(w, th - 16.0)
+	var r := UiTheme.tray_rect(vs, UiTheme.safe_margins(tray))
+	tray.position = r.position
+	tray.size = r.size
 	_update_combat_rect()
 
 
-## Keeps the combat framing between the top HUD and the combat panel above the tray.
+## The camera frames the board / fight in the space the HUD leaves, measured live.
 func _update_combat_rect() -> void:
-	var vs := get_viewport().get_visible_rect().size
-	if vs.y <= 0.0 or ui == null:
+	if ui == null or rig.insets_source.is_valid():
 		return
-	var bottom := (ui.combat_hud.content_top(vs) - 14.0) / vs.y
-	if vs.y > vs.x:
-		var top := 0.12
-		rig.combat_rect_portrait = Rect2(0.05, top, 0.9, maxf(bottom - top, 0.3))
-
-	else:
-		# the bottom controls sit beside the tray: the world gets everything above it
-		var top := 0.1
-		rig.combat_rect_landscape = Rect2(0.1, top, 0.8, maxf(bottom - top, 0.3))
-		var bar_top := (ui.board_hud.content_top(vs) - 6.0) / vs.y
-		rig.safe_rect_landscape = Rect2(0.12, 0.09, 0.76, maxf(bar_top - 0.09, 0.3))
-
+	rig.insets_source = func() -> Dictionary:
+		return ScreenInsets.measure(ui, get_viewport().get_visible_rect().size)
 
 
 func _process(dt: float) -> void:
@@ -750,3 +782,199 @@ func delete_save() -> void:
 		return
 	if FileAccess.file_exists(SAVE_PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
+
+
+# --- camp & profile (meta layer) ---------------------------------------------------------------
+
+## The profile, loaded (or created fresh on first launch) on first use.
+func ensure_profile() -> Profile:
+	if profile == null:
+		profile = ProfileStore.load_profile(profile_path) if persist_profile else null
+		if profile == null:
+			profile = Profile.fresh()
+			profile_is_new = true
+			save_profile()
+	if camp == null or camp.profile != profile:
+		camp = Camp.new(profile)
+	return profile
+
+
+func save_profile() -> void:
+	if persist_profile and profile != null:
+		ProfileStore.save(profile, profile_path)
+
+
+## new_run opts from the profile: the meta layer, the chosen mode and ascension.
+func run_opts() -> Dictionary:
+	var p := ensure_profile()
+	return {"profile": p.to_dict(), "mode": String(p.loadout.get("mode", "standard")),
+		"ascension": int(p.ascension.get("selected", 0))}
+
+
+## The Camp hub: the 3D camp, the Crowns / Sigils header and the station screens.
+func show_camp() -> void:
+	ensure_profile()
+	mode = "camp"
+	auto.set_enabled(false)
+	get_tree().paused = false
+	flow = null
+	busy = false
+	aborting = false
+	in_combat = false
+	stage.clear()
+	tray.visible = false
+	_enter_camp_world()
+	ui.show_camp(profile, TitleScreen.has_save())
+	Audio.play_music("calm")
+	overlay.set_black(true)
+	overlay.fade_in(0.5)
+	await _camp_reveal()
+	if profile_is_new:
+		profile_is_new = false
+		await wait(0.6)
+		if mode == "camp":
+			ui.camp.show_welcome()
+
+
+## Applies a Camp command (Camp.apply format), saves the profile and refreshes the hub.
+func camp_command(cmd: Array) -> void:
+	ensure_profile()
+	var evs := camp.apply(cmd)
+	if evs.size() == 1 and String(evs[0].get("type", "")) == "error":
+		Audio.play_sfx("error")
+		overlay.toast(String(evs[0].get("msg", "Not now")).capitalize(), "", UiPalette.HP_BRIGHT, 0.5)
+		return
+	save_profile()
+	for e: Dictionary in evs:
+		match String(e.get("type", "")):
+			"upgrade_bought":
+				Audio.play_sfx("levelup")
+				overlay.toast(_upgrade_text(e), "up", UiPalette.HEAL)
+			"unlocked":
+				Audio.play_sfx("fanfare")
+				overlay.toast("Unlocked: %s" % CampInfo.name_of(String(e.kind), String(e.id)),
+					CampInfo.icon_of(String(e.kind), String(e.id)), UiPalette.GOLD_BRIGHT)
+			"trait_set", "pool_toggled", "starter_kind_set", "ascension_changed", "loadout_changed":
+				Audio.play_sfx("dice_select")
+	if camp_scene:
+		camp_scene.apply_profile(profile)
+	ui.camp.show_profile(profile, TitleScreen.has_save())
+
+
+func _upgrade_text(e: Dictionary) -> String:
+	var id := String(e.id)
+	match String(e.track):
+		"armory":
+			if GearDefs.DEFS.has(id):
+				return "%s  Level %d" % [GearDefs.name_of(id), int(e.level)]
+			return CampInfo.name_of("features", id) + " bought!"
+		"pet_den":
+			return "%s  Level %d" % [PetDefs.name_of(id), int(e.level)]
+	return String(UnlockDefs.upgrade_def(String(e.track), id).get("name", id)) + " bought!"
+
+
+## START from the run setup: a new run with the profile's loadout (replaces any run save).
+func start_from_camp() -> void:
+	ensure_profile()
+	delete_save()
+	await new_run(String(profile.loadout.get("class", "knight")))
+
+
+## Leaves a run from the pause menu: it is banked as a loss (a loss always pays, so quitting
+## never pays more than playing on), then the results screen shows.
+func abandon_to_camp() -> void:
+	if flow == null or flow.is_over() or mode != "run":
+		leave_to_title()
+		return
+	if busy:
+		aborting = true
+		overlay.fade_out(0.2)
+		return
+	var ev: Array[Dictionary] = []
+	flow._finish(false, ev)
+	await play_events(ev)
+
+
+## Banks the finished run into the profile once (Camp.bank_run) and hands the results screen
+## what it needs. With persist_profile off (scenarios) it banks into the in-memory profile only.
+func bank_run() -> void:
+	if _banked or flow == null or not flow.is_over():
+		return
+	_banked = true
+	ensure_profile()
+	var stats := _game_over_stats if not _game_over_stats.is_empty() else flow._summary()
+	var before := profile.to_dict()
+	camp_before = CampState.of(profile)
+	var evs := camp.bank_run(stats)
+	save_profile()
+	ui.summary.results = {"stats": stats, "events": evs, "before": before, "after": profile}
+	var last: Dictionary = evs.back()
+	print("RUN_BANKED victory=%s crowns=%d sigils=%d total_crowns=%d total_sigils=%d runs=%d unlocked=%s" % [
+		str(bool(stats.get("victory", false))), int(last.get("crowns", 0)), int(last.get("sigils", 0)), profile.crowns,
+		profile.sigils, int(profile.records.get("runs", 0)), str(last.get("unlocked", []))])
+
+
+func _note_game_over(evs: Array) -> void:
+	for ev: Dictionary in evs:
+		if String(ev.get("type", "")) == "game_over":
+			_game_over_stats = (ev.get("stats", {}) as Dictionary).duplicate(true)
+
+
+## Until the minigame screens exist (WP-E2 adds UiRoot.minigame), a minigame tile is played
+## on AUTO (par result) so a manual run never stalls in the MINIGAME phase.
+func _minigame_fallback(ph: int) -> void:
+	if not minigame_fallback or ph != GameFlow.Phase.MINIGAME or auto.enabled or ui.get("minigame") != null:
+		return
+	overlay.toast("%s: played on AUTO" % String(flow.offer.get("name", "Minigame")), "star", UiPalette.GOLD_BRIGHT)
+	run_command.call_deferred("minigame_auto")
+
+
+func _enter_camp_world() -> void:
+	if board.get_parent() == world:
+		world.remove_child(board)
+	if camp_scene == null:
+		camp_scene = CampScene.new()
+		world.add_child(camp_scene)
+	camp_scene.apply_profile(profile)
+	camp_scene.camera().make_current()
+	ui.camp.scene = camp_scene
+
+
+func _leave_camp_world() -> void:
+	if camp_scene != null:
+		ui.camp.scene = null
+		camp_scene.queue_free()
+		camp_scene = null
+	if board.get_parent() == null:
+		world.add_child(board)
+		world.move_child(board, 0)
+	rig.camera.make_current()
+
+
+## The build-out moments for what the last run unlocked (camera pans, the camp grows).
+## Tapping skips; game speed (2x / 4x) speeds it up.
+func _camp_reveal() -> void:
+	if camp_before.is_empty() or camp_scene == null:
+		return
+	var before := camp_before
+	camp_before = {}
+	if CampState.diff(before, CampState.of(profile)).is_empty():
+		return
+	ui.camp.set_revealing(true)
+	await camp_scene.reveal(before, CampState.of(profile), overlay, speed)
+	if is_inside_tree() and mode == "camp":
+		ui.camp.set_revealing(false)
+
+
+func _camp_input(event: InputEvent) -> void:
+	var mb := event as InputEventMouseButton
+	if mb == null or not mb.pressed or mb.button_index != MOUSE_BUTTON_LEFT or camp_scene == null:
+		return
+	if camp_scene.revealing:
+		camp_scene.skip_reveal()
+		return
+	if get_tree().paused or ui.camp.any_open():
+		return
+	var id := camp_scene.pick_station(mb.position)
+	if id != "":
+		ui.camp.open_station(id)
