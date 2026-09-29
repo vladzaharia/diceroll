@@ -16,7 +16,7 @@ const X2_MAX := 16
 const LOOKS := {
 	1: [Color("5ab8ff"), ModelIcons.K + "resources/Money_Coins_Stack_Small.gltf", 30.0],
 	2: [Color("4fd8b4"), ModelIcons.K + "resources/Money_Pile_Small.gltf", 25.0],
-	3: [Color("8fd85a"), ModelIcons.K + "resources/Money_Pile_Medium.gltf", 25.0],
+	3: [Color("8fd85a"), ModelIcons.K + "resources/Gold_Bars_Stack_Small.gltf", 30.0],
 	5: [Color("c98cff"), ModelIcons.K + "resources/Gem_Medium.gltf", 25.0],
 	6: [Color("ff6fb0"), ModelIcons.K + "resources/Gem_Large.gltf", 25.0],
 	10: [Color("ffc93d"), ModelIcons.K + "resources/Gems_Chest.gltf", 25.0],
@@ -27,6 +27,7 @@ const FIELD := Color("0f1d33")
 
 var _cab := Rect2()
 var _field := Rect2()
+var _fx := 0.0                # x of the lattice's left edge (bucket 0)
 var _bw := 40.0
 var _dy := 40.0
 var _hdr := Rect2()
@@ -101,6 +102,7 @@ func _layout() -> void:
 	var h := fixed * bw + 7.9 * dy + extra
 	_cab = Rect2((size - Vector2(w, h)) * 0.5, Vector2(w, h))
 	var fx := _cab.position.x + bw * 0.6
+	_fx = fx
 	_hdr = Rect2(Vector2(fx, _cab.position.y + bw * 0.28), Vector2(bw * 9.0, bw * 0.9))
 	_rail_y = _hdr.end.y + bw * 0.28
 	_drop_y = _rail_y + bw * 0.62
@@ -108,14 +110,15 @@ func _layout() -> void:
 	_bucket_top = _row0 + 7.0 * dy + dy * 0.85
 	_bucket_h = bw * 1.75 + extra
 	_field = Rect2(Vector2(fx, _hdr.end.y + bw * 0.14), Vector2(bw * 9.0, _bucket_top + _bucket_h - _hdr.end.y - bw * 0.14))
+	_field = _field.grow_individual(bw * 0.06, 0, bw * 0.06, 0)
 
 
 func slot_x(slot: float) -> float:
-	return _field.position.x + _bw * (slot + 0.5)
+	return _fx + _bw * (slot + 0.5)
 
 
 func peg_pos(row: int, x2: int) -> Vector2:
-	return Vector2(_field.position.x + _bw * (x2 * 0.5 + 0.5), _row0 + row * _dy)
+	return Vector2(_fx + _bw * (x2 * 0.5 + 0.5), _row0 + row * _dy)
 
 
 ## Where the ball rests on peg (row, x2).
@@ -124,7 +127,7 @@ func rest_pos(row: int, x2: int) -> Vector2:
 
 
 func bucket_rect(b: int) -> Rect2:
-	return Rect2(Vector2(_field.position.x + b * _bw, _bucket_top), Vector2(_bw, _bucket_h))
+	return Rect2(Vector2(_fx + b * _bw, _bucket_top), Vector2(_bw, _bucket_h - _bw * 0.12))
 
 
 func _peg_r() -> float:
@@ -137,7 +140,7 @@ func _ball_r() -> float:
 
 ## The slot under board x (clamped).
 func slot_at(x: float) -> int:
-	return clampi(int(floor((x - _field.position.x) / _bw)), 0, BUCKETS - 1)
+	return clampi(int(floor((x - _fx) / _bw)), 0, BUCKETS - 1)
 
 
 func _can_aim() -> bool:
@@ -329,7 +332,7 @@ func _land(info: Dictionary) -> void:
 		burst(c, GOLD, 30, "flake", 360.0, 320.0, 8.0)
 	ring(c, col.lightened(0.3), _bw * 1.4, 0.5, 6.0)
 	var txt := ("+%d x2!" % pts) if gold else "+%d" % pts
-	float_text(Vector2(clampf(c.x, _field.position.x + _bw * 1.2, _field.end.x - _bw * 1.2), r.position.y - _bw * 0.3), txt, GOLD if gold else col.lightened(0.6), int(clampf(_bw * (1.0 if big else 0.85), 26, 60)), 1.2)
+	float_text(Vector2(clampf(c.x, _fx + _bw * 1.2, _fx + _bw * 7.8), r.position.y - _bw * 0.3), txt, GOLD if gold else col.lightened(0.6), int(clampf(_bw * (1.0 if big else 0.85), 26, 60)), 1.2)
 	shake(3.0 + (5.0 if big else 0.0))
 	if v >= 10 or gold:
 		MgBoard.sfx("win")
@@ -514,6 +517,16 @@ func _draw_rail() -> void:
 func _draw_pegs() -> void:
 	var pr := _peg_r()
 	var gold: Array = state.get("golden", [])
+	# wall bumpers on the odd rows (the side walls turn the ball back)
+	for k in range(1, ROWS, 2):
+		for sd in [0, 1]:
+			var wx := _field.position.x if sd == 0 else _field.end.x
+			var dir := 1.0 if sd == 0 else -1.0
+			var y := _row0 + k * _dy
+			var tri := PackedVector2Array([Vector2(wx, y - _bw * 0.36), Vector2(wx + dir * _bw * 0.3, y), Vector2(wx, y + _bw * 0.36)])
+			draw_colored_polygon(tri, UiPalette.OUTLINE)
+			var inner := PackedVector2Array([Vector2(wx, y - _bw * 0.25), Vector2(wx + dir * _bw * 0.2, y), Vector2(wx, y + _bw * 0.25)])
+			draw_colored_polygon(inner, Color("5fe3c0"))
 	for k in ROWS:
 		var x2 := k % 2
 		while x2 <= X2_MAX:
@@ -562,7 +575,7 @@ func _draw_buckets() -> void:
 	var vals: Array = state.get("buckets", [])
 	var f := _field
 	# tray floor
-	var tray := Rect2(Vector2(f.position.x, _bucket_top), Vector2(f.size.x, _bucket_h))
+	var tray := Rect2(Vector2(_fx, _bucket_top), Vector2(bw * 9.0, _bucket_h - bw * 0.1))
 	draw_rect(tray, Color(0.02, 0.05, 0.1, 0.6))
 	for b in BUCKETS:
 		var r := bucket_rect(b).grow_individual(-bw * 0.05, 0, -bw * 0.05, -bw * 0.05)
@@ -606,7 +619,7 @@ func _draw_buckets() -> void:
 		draw_set_transform(Vector2.ZERO)
 	# dividers: posts between buckets rising a little into the field
 	for b in BUCKETS + 1:
-		var x := f.position.x + b * bw
+		var x := _fx + b * bw
 		var y0 := _bucket_top - _dy * 0.3
 		if b == 0 or b == BUCKETS:
 			continue
