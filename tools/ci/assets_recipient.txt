@@ -1,0 +1,2 @@
+# Public age recipient for tools/ci/assets.py (encrypt-only; the identity is the ASSETS_AGE_KEY secret)
+age1q52jcj42f63v7dvdh3tg9p5tlmpte00n4uez8v2007wkt0aynv7sdud0hu

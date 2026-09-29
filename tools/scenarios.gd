@@ -12,6 +12,11 @@ extends RefCounted
 const REGISTRY := {
 	"actors": "res://game/actors/scenarios.gd",
 	"actors_anims": "res://game/actors/scenarios.gd",
+	# hidden Developer menu (ui/modals/dev_menu.gd): opened as if the corner gesture fired
+	"dev_menu": "res://ui/modals/dev_menu_scenarios.gd",
+	"dev_menu_confirm": "res://ui/modals/dev_menu_scenarios.gd",
+	"dev_menu_store": "res://ui/modals/dev_menu_scenarios.gd",
+	"dev_menu_boot": "res://ui/modals/dev_menu_scenarios.gd",
 }
 
 const PROVIDERS := [
@@ -26,6 +31,7 @@ const PROVIDERS := [
 	"res://game/minigames/scenarios.gd",
 	"res://tools/icon_scenarios.gd",
 	"res://ui/icons/rendered/rendered_icons.gd",
+	"res://game/boot/scenarios.gd",
 ]
 
 

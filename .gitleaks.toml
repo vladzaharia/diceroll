@@ -1,0 +1,7 @@
+# gitleaks config (CI "static" job + local: gitleaks git --config .gitleaks.toml)
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Throwaway keys used only by the updater unit tests"
+paths = ['''^tests/fixtures/update/''']

@@ -1,0 +1,13 @@
+# Full-matrix scenarios (main / nightly; one CI shard per scenario)
+game_title
+game_board
+game_rolled
+game_combat
+game_shop
+game_boss
+game_victory
+route_card
+ui_settings
+ui_pause
+camp_mid
+ui_armory

@@ -1,0 +1,11 @@
+name: Idea / feature request
+description: Suggest content, a mechanic or an improvement
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: What would you like to see, and why would it make the game better?
+    validations:
+      required: true

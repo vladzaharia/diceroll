@@ -386,6 +386,11 @@ screen's buttons are **reparented into (or tweened onto) the shell's card slot**
 shell frees its gradient and card, and the title screen owns the buttons. The screenshot harness
 gets `--boot-stage=<state>` scenarios for every stage, so each one goes through `shoot_matrix.sh`.
 
+**Dev gesture.** The shell must host `DevGesture` (`ui/widgets/dev_gesture.gd`: 5 taps within ~3 s
+in the bottom-right 80×80 px, inside the safe area) from its first frame, in every state (errors
+included), so the hidden Developer menu (update channel, build info, diagnostics) is always
+reachable at boot. See docs/RELEASE.md, "Developer menu".
+
 ### 6.4 Download UX details (remote channels)
 
 - **Resume:** HTTP `Range` requests with `HTTPRequest.download_file` into `*.part`, then verify.

@@ -8,7 +8,8 @@ extends Node
 ## --frames=N         additionally saves N more shots 0.25 s apart as <png>_1.._N
 ## --ui-scale=F       multiplies the window's content_scale_factor (UI zoom / OS scaling tests)
 ## Without --shot the scenario just runs (handy for manual poking).
-## A safety timer force-quits wait + frames*0.25 + 10 s after start.
+## --timeout=S      safety timer: force-quits S seconds after start (default wait + frames*0.25 + 10;
+##                   CI software rendering (lavapipe) compiles shaders slowly, so tools/ci/shoot_ci.sh raises it)
 
 const FRAME_GAP := 0.25
 
@@ -30,7 +31,8 @@ func _ready() -> void:
 		# display link (macOS throttles vsync for occluded/off-screen windows).
 		DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_NO_FOCUS, true)
 		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
-		var guard := get_tree().create_timer(wait + frames * FRAME_GAP + 10.0, true, false, true)
+		var limit := float(args.get("timeout", str(wait + frames * FRAME_GAP + 10.0)))
+		var guard := get_tree().create_timer(limit, true, false, true)
 		guard.timeout.connect(func() -> void:
 			push_error("Shot: safety timeout, quitting")
 			get_tree().quit(2))
@@ -48,6 +50,11 @@ static func parse_args(list: PackedStringArray) -> Dictionary:
 
 func _run(name: String, wait: float, frames: int) -> void:
 	var tree := get_tree()
+	var missing := AssetCheck.run(true)
+	if not missing.is_empty():
+		push_error("Shot: required game assets are missing (%s); run tools/import_assets.sh" % ", ".join(missing))
+		tree.quit(1)
+		return
 	if tree.current_scene:
 		tree.current_scene.queue_free()
 	scenario = Scenarios.build(name)

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Blocks commits of third-party assets, key material and oversized files.
+# Enable: git config core.hooksPath tools/git-hooks
+exec "$(git rev-parse --show-toplevel)/tools/ci/check_repo.sh" --staged

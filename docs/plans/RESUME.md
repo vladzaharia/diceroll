@@ -5,7 +5,7 @@ All agents were stopped on purpose by Vlad. Nothing is running. Each unfinished 
 Standing rules for every resumed agent:
 - **Clean up:** heavy parallel sims are fine, but leave no stray processes (sims, servers, renders) behind.
 - **Test across devices:** every visual change is verified with `tools/shoot_matrix.sh <scenario> <dir> [all|desktop|mobile|dpi|zoom|quick]`, not a single resolution. The matrix covers desktop 1280×720 → 1920×1080; iPhone 17 / 17 Pro and 17 Pro Max in portrait and landscape; iPad mini and iPad Pro 13" in both orientations; iPhone Duo outer (portrait) and inner (portrait and landscape); @1x/@2x density; and UI zoom 0.8–1.5 (`--ui-scale`). Notch and home-indicator insets are emulated with `--safe`.
-- **Never launch a windowed Godot.** Use `tools/shoot.sh` for screenshots, running one at a time; from a worktree use `GODOT_PROJECT=$PWD /Users/vlad/Repos/diceroll/tools/shoot.sh ...`. Use `--headless` for tests and sims.
+- **Never launch a windowed Godot.** Use `tools/shoot.sh` for screenshots, running one at a time; from a worktree use `GODOT_PROJECT=$PWD <main checkout>/tools/shoot.sh ...`. Use `--headless` for tests and sims.
 - **Commit with explicit paths only.** End commit messages with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - **Tests:** `./tests/run.sh`. Run `godot --headless --path . --import` first in a fresh worktree.
 - **The spec is the source of truth:** `docs/specs/2026-09-28-diceroll-design.md`. §15, §16 and the "§16 decisions" override earlier sections.
@@ -135,7 +135,7 @@ Remaining / to verify:
 - **Real-item Armory:** design in docs/design/2026-09-29-armory-items.md. Vlad's decisions: 3 slots, a 2nd trinket slot, +1-tier affinity, the Necromancer keeps its skull staff, and variants carry properties; the design is final. (merged) the armor binder + item mounts (ItemMounts, ArmorBinder, Character loadouts, HEAD_FIT). Core items implementation is queued after the classes/skins core work merges, because both touch the profile schema.
 - **No AUTO in minigames:** being done by the Minigames 2.0 agent.
 - **CI/CD release pipeline (running, worktree wp-ci-release):** GitHub Actions for CI (tests, sim smoke, screenshot matrix + artifacts), release (macOS, iOS/iPadOS, Android, Windows, Linux x64/arm64, Web → GitHub Release), store uploads disabled by default, a private encrypted asset bundle for the paid assets, conventional commits + dev changelog + an LLM user-facing changelog. The user authorized E2E: private GitHub repos vladzaharia/diceroll + vladzaharia/diceroll-assets (per-unit encrypted asset bundles, incremental), push + green CI, a private pre-release. Plus in-game auto-updates (signed PCK patches + binary updates on desktop, a store prompt on mobile).
-- **Assets:** everything third-party lives in git-ignored `third_party/` (docs/ASSETS.md). A fresh worktree needs `THIRD_PARTY=/Users/vlad/Repos/diceroll/third_party tools/import_assets.sh`.
+- **Assets:** everything third-party lives in git-ignored `third_party/` (docs/ASSETS.md). A fresh worktree needs `THIRD_PARTY=<main checkout>/third_party tools/import_assets.sh`.
 - **Next:**
   1. Merge E1 → E2 → E3.
   2. UX/UI designer review of the whole game, then fixes.
