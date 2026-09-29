@@ -83,7 +83,9 @@ func home_position() -> Vector3:
 		var base := c.stage.hero_home
 		# the enemy line sits toward screen-right; the pet goes left of the hero, a bit toward
 		# the camera, so it never covers the hero or an enemy
-		return base - right * 0.75 + back * 0.55 + orbit
+		# (portrait frames the hero near the left edge: tuck the pet closer in)
+		var side := 0.62 if c.rig.is_portrait() else 0.75
+		return base - right * side + back * 0.6 + orbit
 	return c.board.hero.global_position - right * 0.85 + back * 0.35 + orbit
 
 

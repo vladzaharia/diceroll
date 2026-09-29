@@ -321,7 +321,7 @@ func level_toast(level: int, hp_gained: int, healed := 0) -> void:
 	t.tween_property(p, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	t.tween_property(p, "modulate:a", 1.0, 0.15)
 	t.tween_property(p, "position:y", at.y, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	t.chain().tween_interval(1.5)
+	t.chain().tween_interval(2.2)
 	t.chain().set_parallel(true)
 	t.tween_property(p, "modulate:a", 0.0, 0.35)
 	t.tween_property(p, "position:y", at.y - 24.0, 0.35)

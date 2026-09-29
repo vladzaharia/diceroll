@@ -62,6 +62,19 @@ func _hud_potions() -> void:
 		f.run.pos = 3
 		c.board.place_hero(3)
 		await c.play_events(f.debug_open("combat", "skeleton_warrior,skeleton_minion,skeleton_archer"))
+	if args.has("shop"):
+		# the shop with a potion of each owned type (they show their type)
+		f.run.gold = 200
+		var sev := f.debug_open("shop")
+		var items: Array = f.offer.items
+		items.clear()
+		for t in ["healing", "stoneskin", "reroll_tonic", "cleanse"]:
+			var it := f._shop_item("potion", {})
+			it.potion = t
+			it.label = PotionDefs.name_of(t)
+			it.desc = "%s Goes on your belt; drunk at once if the belt is full." % String(PotionDefs.DEFS[t].desc)
+			items.append(it)
+		await c.play_events(sev)
 	if args.has("tip"):
 		await _pause(0.3)
 		c.ui.meta_hud.show_slot_tip(int(args.tip))
