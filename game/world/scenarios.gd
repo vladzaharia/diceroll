@@ -8,7 +8,10 @@ extends RefCounted
 ##  combat_act1     hero vs 3 enemies, intents/HP visible, mid-attack
 ##  boss_act1..3    boss fights (Bone Warden, Hollow King, Lich + minions)
 ##  fx_gallery      every FX firing in a loop on the act 1 board
-##  enemy_gallery   every enemy look with its HUD, on the act 1 island
+##  board_<biome>   overview of a biome by id (glade, crypt, hollow, frost, throne, magma)
+##  enemy_gallery   enemy looks with their HUDs on the cleared act 1 island; --only=new|old|mini|
+##                  boss|size|all|<id,id,...> (default new), --pitch=deg, --shatter=1 (every
+##                  second Magma Golem in phase 2), --intents=1 (cycle intent kinds)
 ##  combat_sequence full beat loop (attack, hit, death, enemy attack, hero hit, summon, end)
 ##  tiles_ice_lava  close-up of the Frostpeak ice and Magma lava tiles (--biome=frost|magma)
 ##  combat_hero_check  position check (headless ok): the hero fights from the fight's tile even
