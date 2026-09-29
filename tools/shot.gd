@@ -50,6 +50,11 @@ static func parse_args(list: PackedStringArray) -> Dictionary:
 
 func _run(name: String, wait: float, frames: int) -> void:
 	var tree := get_tree()
+	var missing := AssetCheck.run(true)
+	if not missing.is_empty():
+		push_error("Shot: required game assets are missing (%s); run tools/import_assets.sh" % ", ".join(missing))
+		tree.quit(1)
+		return
 	if tree.current_scene:
 		tree.current_scene.queue_free()
 	scenario = Scenarios.build(name)

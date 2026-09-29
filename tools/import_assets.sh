@@ -14,12 +14,29 @@ SRC="$TP/kaykit"
 DST="$ROOT/assets"
 KK="$DST/kaykit"
 
+# Paid packs (*_EXTRA, Mystery Monthly) are optional: a FREE-only store (open-source forks)
+# just skips their content, with one note per absent pack. A missing FREE pack still fails.
+SKIPPED=" "
+absent_paid() { # absent_paid <path>: true (and notes it once) when <path> is in an absent paid pack
+	local rel="${1#"$SRC"/}" pack
+	[ -e "$1" ] && return 1
+	pack="${rel%%/*}"
+	case "$pack" in *_EXTRA | KayKit_Mystery_Monthly_*) ;; *) return 1 ;; esac
+	[ -d "$SRC/$pack" ] && return 1
+	case "$SKIPPED" in *" $pack "*) ;; *)
+		echo "   (no $pack: paid pack absent, skipping its content)"
+		SKIPPED="$SKIPPED$pack " ;;
+	esac
+	return 0
+}
 sync() { # sync <src_dir> <dst_dir> [rsync args...]
 	local s="$1" d="$2"; shift 2
+	absent_paid "$s" && return 0
 	mkdir -p "$d"
 	rsync -a --delete --filter="P *.import" --filter="P *.uid" --filter="P *_texture.png" "$@" "$s/" "$d/"
 }
 lic() { # lic <pack_dir> <dst_dir>
+	absent_paid "$SRC/$1" && return 0
 	cp -f "$SRC/$1/License.txt" "$2/License.txt"
 }
 
@@ -128,7 +145,7 @@ sync "$MM/4 - October 2023 - Werewolf/assets/gltf" "$KK/mystery/werewolf"
 sync "$MM/11 - May 2024 - Clown/assets/gltf" "$KK/mystery/clown"
 sync "$MM/10 - April 2024 - Paladin/assets/gltf" "$KK/mystery/paladin"
 sync "$MM/1 - July 2023 - Orc Raider/assets/gltf" "$KK/mystery/orc" --include='Orc_Wardrum*' --include='*.png' --exclude='*'
-cp -f "$MM/License.txt" "$KK/mystery/License.txt"
+absent_paid "$MM" || cp -f "$MM/License.txt" "$KK/mystery/License.txt"
 
 echo "== KayKit EXTRA props: tile props + rendered UI icons (paid packs; skipped when absent)"
 xsync() { # xsync <pack> <dst> <texture.png> <names...>: copies <name>.gltf/.bin + the texture
@@ -200,7 +217,7 @@ sync "$MMS/8 - February 2024 - Ninja/assets/gltf" "$FOES/monthly/ninja/weapons" 
 sync "$MMS/3 - September 2023 - Monster Costume/character/gltf" "$FOES/monthly/monster" --include='Monster.glb' \
 	--include='MonsterCostume.glb' --exclude='*'
 sync "$MMS/3 - September 2023 - Monster Costume/textures" "$FOES/monthly/monster/textures" --include='monstercostume_texture_*.png' --exclude='*'
-cp -f "$MMS/License.txt" "$FOES/monthly/License.txt"
+absent_paid "$MMS" || cp -f "$MMS/License.txt" "$FOES/monthly/License.txt"
 FWX="KayKit_FantasyWeaponsBits_1.0_EXTRA"
 fwx_keep=""
 for w in axe_D dagger_C hammer_D scythe shield_D spear_B staff_C staff_D sword_F sword_G wand_B; do
@@ -214,11 +231,10 @@ echo "== KayKit Forest Nature (EXTRA): trees, bare trees, bushes, rocks, grass (
 # All colours share one atlas (forest_texture.png), so the kept colours go into one folder.
 # Colour1 green, 2 deep green, 3 lime, 4 teal, 5 gold, 6 orange (7 red / 8 pink unused).
 FOR="$SRC/KayKit_Forest_Nature_Pack_1.0_EXTRA/Assets/gltf"
-mkdir -p "$KK/forest"
-rsync -a --delete --filter="P *.import" --filter="P *.uid" \
+absent_paid "$FOR" || { mkdir -p "$KK/forest"; rsync -a --delete --filter="P *.import" --filter="P *.uid" \
 	--include='Tree_[1-7]_*' --include='Tree_Bare_*' --include='Bush_[1-4]_*' --include='Rock_[1-6]_*' \
 	--include='Grass_[12]_[A-D]_Color?.*' --include='forest_texture.png' --exclude='*' \
-	"$FOR/Color1/" "$FOR/Color2/" "$FOR/Color3/" "$FOR/Color4/" "$FOR/Color5/" "$FOR/Color6/" "$KK/forest/"
+	"$FOR/Color1/" "$FOR/Color2/" "$FOR/Color3/" "$FOR/Color4/" "$FOR/Color5/" "$FOR/Color6/" "$KK/forest/"; }
 lic "KayKit_Forest_Nature_Pack_1.0_EXTRA" "$KK/forest"
 
 echo "== KayKit Dungeon (EXTRA): banners, furniture, props (no walls / floors / stairs)"
@@ -270,9 +286,11 @@ lic "$TX" "$KK/tools_extra"
 MM="KayKit_Mystery_Monthly_Series_4"
 sync "$SRC/$MM/11 - May 2024 - Clown/assets/gltf" "$KK/mystery/clown" --include='balloon_dog_*' --include='clown_ball.*' \
 	--include='clown_texture.png' --exclude='*'
-mkdir -p "$KK/mystery/figures"
-cp -f "$SRC/$MM/12 - June 2024 - Robot/characters/Robot_One.glb" "$KK/mystery/figures/Robot_One.glb"
-cp -f "$SRC/$MM/6 - December 2023 - Action Figure/character/gltf/ActionFigure.glb" "$KK/mystery/figures/ActionFigure.glb"
+if ! absent_paid "$SRC/$MM"; then
+	mkdir -p "$KK/mystery/figures"
+	cp -f "$SRC/$MM/12 - June 2024 - Robot/characters/Robot_One.glb" "$KK/mystery/figures/Robot_One.glb"
+	cp -f "$SRC/$MM/6 - December 2023 - Action Figure/character/gltf/ActionFigure.glb" "$KK/mystery/figures/ActionFigure.glb"
+fi
 lic "$MM" "$KK/mystery"
 
 echo "== Music beds (mixkit, re-encoded to 96 kbps mp3 to keep the repo lean)"
@@ -281,7 +299,8 @@ mkdir -p "$MUS"
 for name in zanarkand-forest-169 spirit-in-the-woods-2-147 ambient-251 vastness-184 nature-meditation-345; do
 	in="$TP/music/mixkit/mixkit-$name.mp3"
 	out="$MUS/mixkit-$name.mp3"
-	[ -f "$in" ] || { echo "missing $in" >&2; exit 1; }
+	# Mixkit tracks are free downloads (https://mixkit.co/free-stock-music/); a missing one only mutes that bed.
+	[ -f "$in" ] || { echo "   warning: missing $in (download it from mixkit.co; that music bed stays silent)" >&2; continue; }
 	if [ ! -f "$out" ] || [ "$in" -nt "$out" ]; then
 		if command -v ffmpeg >/dev/null; then
 			ffmpeg -loglevel error -y -i "$in" -vn -c:a libmp3lame -b:a 96k "$out"
