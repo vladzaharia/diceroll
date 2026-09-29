@@ -8,7 +8,7 @@ extends MgBoard
 ## JACKPOT) sweep the card with a gold shimmer.
 
 const CELLS := 9
-const MASK := 56
+const MASK := 96
 const BRUSH := 0.17
 const AUTO_CLEAR := 0.5
 
@@ -120,9 +120,9 @@ static func _foil_base() -> Image:
 			var cx := minf(x, MASK - 1 - x)
 			var cy := minf(y, MASK - 1 - y)
 			var a := 1.0
-			if cx < 7 and cy < 7:
-				var dd := Vector2(7 - cx, 7 - cy).length()
-				a = clampf(7.5 - dd, 0.0, 1.0)
+			if cx < 12 and cy < 12:
+				var dd := Vector2(12 - cx, 12 - cy).length()
+				a = clampf(12.5 - dd, 0.0, 1.0)
 			img.set_pixel(x, y, Color(c.r, c.g, c.b, a))
 	_base = img
 	return img

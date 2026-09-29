@@ -263,10 +263,27 @@ func _draw_bubble(b: Dictionary, hovered: bool, can: bool) -> void:
 	draw_circle(Vector2(-r * 0.36, -r * 0.4), r * 0.2, Color(1, 1, 1, 0.85 * a))
 	draw_circle(Vector2(-r * 0.12, -r * 0.52), r * 0.08, Color(1, 1, 1, 0.7 * a))
 	draw_arc(Vector2.ZERO, r * 0.74, 0.3, 1.3, 10, Color(1, 1, 1, 0.25 * a), r * 0.08, true)
+	_glyph(int(b.col), Vector2(r * 0.12, r * 0.14), r * 0.3, Color(1, 1, 1, 0.42 * a))
 	if hovered:
 		var hc := Color.WHITE if can else Color(1, 1, 1, 0.35)
 		draw_arc(Vector2.ZERO, r * 1.02, 0.0, TAU, 32, hc, 4.0, true)
 	draw_set_transform(Vector2.ZERO)
+
+
+## A small symbol per colour (heart, drop, leaf, star) so groups read without colour.
+func _glyph(kind: int, at: Vector2, s: float, col: Color) -> void:
+	match kind:
+		0:
+			draw_circle(at + Vector2(-s * 0.42, -s * 0.2), s * 0.48, col)
+			draw_circle(at + Vector2(s * 0.42, -s * 0.2), s * 0.48, col)
+			draw_colored_polygon(PackedVector2Array([at + Vector2(-s * 0.88, 0.0), at + Vector2(s * 0.88, 0.0), at + Vector2(0, s * 0.95)]), col)
+		1:
+			draw_circle(at + Vector2(0, s * 0.25), s * 0.6, col)
+			draw_colored_polygon(PackedVector2Array([at + Vector2(-s * 0.55, s * 0.05), at + Vector2(0, -s * 0.95), at + Vector2(s * 0.55, s * 0.05)]), col)
+		2:
+			draw_colored_polygon(PackedVector2Array([at + Vector2(0, -s), at + Vector2(s * 0.75, 0), at + Vector2(0, s), at + Vector2(-s * 0.75, 0)]), col)
+		_:
+			_star4(at, s * 1.05, col)
 
 
 func _draw_header() -> void:

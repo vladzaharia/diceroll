@@ -223,8 +223,10 @@ func _draw_board() -> void:
 		var hx := float(hash(k * 211 + 5) % 1000) / 1000.0
 		var col: Color = [Color("6fd6ff"), Color("ffd46b"), Color("ff8ad0"), Color("9dff8a")][k % 4]
 		var p := Vector2(w.position.x + 24 + hx * (w.size.x - 48), _floor_y - 6 + (k % 3) * 5.0)
-		draw_circle(p, (15.0 + 5.0 * (k % 3)) * u, col.darkened(0.45))
-		draw_circle(p - Vector2(4, 4) * u, (6.0 + 2.0 * (k % 2)) * u, col.darkened(0.2))
+		var br := (15.0 + 5.0 * (k % 3)) * u
+		draw_circle(p, br, col.darkened(0.55))
+		draw_circle(p - Vector2(1, 2) * u, br * 0.85, col.darkened(0.35))
+		draw_circle(p - Vector2(br * 0.35, br * 0.4), br * 0.3, col.darkened(0.05))
 	# prizes (with hitbox spotlights)
 	var prizes := _prizes()
 	var aim := MgLogic.claw_target(prizes, _claw) if _mode == "swing" else -1
@@ -237,8 +239,11 @@ func _draw_board() -> void:
 		var half := float(p.width) * 0.5 * (_win.size.x - 56.0)
 		var col: Color = MgLogic.PRIZE_COLORS.get(kind, Color.WHITE)
 		var hot := i == aim
-		var sp := Rect2(Vector2(x - half, _floor_y - 4), Vector2(half * 2.0, 12))
-		rrect(sp, Color(col.r, col.g, col.b, 0.55 if hot else 0.28), 6)
+		# the hitbox: a spotlight pool on the floor, exactly as wide as the grab window
+		draw_set_transform(Vector2(x, _floor_y + 2.0), 0.0, Vector2(half / 12.0, 1.0))
+		draw_circle(Vector2.ZERO, 12.0, Color(col.r, col.g, col.b, 0.5 if hot else 0.25))
+		draw_circle(Vector2.ZERO, 7.0, Color(1, 1, 1, 0.25 if hot else 0.1))
+		draw_set_transform(Vector2.ZERO)
 		if hot:
 			glow(Vector2(x, _floor_y - 20 * u), 60 * u, Color(col.r, col.g, col.b, 0.8))
 		var base := Vector2(x, _floor_y + (8.0 * u if kind == "legendary" else 0.0))

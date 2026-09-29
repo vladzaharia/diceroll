@@ -43,6 +43,5 @@ static func _started(c: GameController, ev: Dictionary) -> void:
 	if c.board.hero:
 		c.board.hero.play_once("cheer", "idle")
 	Audio.play_sfx("fanfare")
-	c.overlay.popup(c.hero_screen(2.4), String(ev.get("name", "Minigame")).to_upper() + "!", col.lightened(0.25), "star", 40)
-	await c.wait(0.75)
+	await c.wait(0.7)
 	await c.ui.minigame.open_game(ev)

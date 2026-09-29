@@ -46,7 +46,7 @@ func _layout() -> void:
 	var header := 86.0
 	var avail := Vector2(size.x, size.y - header)
 	var s := minf(avail.x, avail.y)
-	_cell = (s - 36.0) / 5.0
+	_cell = (s - 56.0) / 5.0
 	var gs := _cell * 5.0
 	_grid = Rect2(Vector2((size.x - gs) * 0.5, header + (avail.y - gs) * 0.5), Vector2(gs, gs))
 
@@ -155,6 +155,7 @@ func _draw_board() -> void:
 	rrect(_grid.grow(6.0), SOIL, 18)
 	for i in cells.size():
 		_draw_cell(i, String(cells[i]), int(hints[i]) if i < hints.size() else -1)
+	_draw_skeleton(cells)
 	# shovel strikes
 	for i in _dig:
 		var k := clampf((time - float(_dig[i])) / dur(0.18), 0.0, 1.0)
@@ -200,12 +201,16 @@ func _draw_cell(i: int, kind: String, hint: int) -> void:
 		rrect(rr, DIRT * shade, _cell * 0.22)
 		rrect(Rect2(rr.position, Vector2(rr.size.x, rr.size.y * 0.8)), DIRT_TOP * shade, _cell * 0.22)
 		rrect(Rect2(rr.position + rr.size * Vector2(0.14, 0.08), rr.size * Vector2(0.72, 0.22)), Color(1, 1, 1, 0.12), _cell * 0.12)
-		# pebbles and a tuft
-		for p in 3:
+		# little stones (lit from the top-left) and a grass tuft
+		for p in 2 + h % 2:
 			var ph := hash(h + p * 31)
-			var pp := rr.position + rr.size * Vector2(0.2 + 0.6 * float(ph % 97) / 97.0, 0.35 + 0.35 * float((ph / 97) % 89) / 89.0)
-			draw_circle(pp, _cell * (0.035 + 0.02 * (ph % 3)), Color("5e3a22"))
-			draw_circle(pp - Vector2(1, 1), _cell * 0.02, Color("d9a674"))
+			var pp := rr.position + rr.size * Vector2(0.2 + 0.6 * float(ph % 97) / 97.0, 0.38 + 0.32 * float((ph / 97) % 89) / 89.0)
+			var sr := _cell * (0.04 + 0.018 * (ph % 3))
+			draw_set_transform(pp, 0.0, Vector2(1.25, 0.85))
+			draw_circle(Vector2(0, sr * 0.35), sr, Color(0.2, 0.12, 0.07, 0.45))
+			draw_circle(Vector2.ZERO, sr, Color("8d7f74"))
+			draw_circle(Vector2(-sr * 0.3, -sr * 0.3), sr * 0.5, Color("bcb0a4"))
+			draw_set_transform(Vector2.ZERO)
 		if h % 3 == 0:
 			var g := rr.position + Vector2(rr.size.x * 0.72, rr.size.y * 0.2)
 			for b in 3:
@@ -225,27 +230,77 @@ func _draw_cell(i: int, kind: String, hint: int) -> void:
 			glow(c, _cell * 0.5, Color(col.r, col.g, col.b, gk if hint <= 1 else gk * 0.6))
 			text_c(c, str(hint), int(_cell * 0.5 * pop), col, 8)
 		"hit":
-			glow(c, _cell * 0.55, Color(1.0, 0.85, 0.5, 0.55))
-			_bone(c + Vector2(-_cell * 0.26, _cell * 0.08), c + Vector2(_cell * 0.26, -_cell * 0.08), _cell * 0.1 * pop, Color("f4e6c6"), false)
-			_crack(c + Vector2(_cell * 0.24, _cell * 0.2))
+			# a bone piece still half in the dirt, glinting: more of this fossil is nearby
+			glow(c, _cell * 0.55, Color(1.0, 0.85, 0.5, 0.45 + 0.15 * sin(time * 4.0 + i)))
+			_bone(c + Vector2(-_cell * 0.26, _cell * 0.02), c + Vector2(_cell * 0.26, -_cell * 0.1), _cell * 0.1 * pop, Color("f4e6c6"), false)
+			var dirt := Rect2(hr.position + Vector2(_cell * 0.07, hr.size.y * 0.52), Vector2(hr.size.x - _cell * 0.14, hr.size.y * 0.4))
+			rrect(dirt, Color("4a2e1b"), _cell * 0.14)
+			for d in 3:
+				draw_circle(dirt.position + Vector2(dirt.size.x * (0.25 + 0.25 * d), 2.0), _cell * 0.09, Color("4a2e1b"))
+			_star4(c + Vector2(_cell * 0.2, -_cell * 0.22), _cell * (0.08 + 0.03 * sin(time * 6.0 + i)), Color(1.0, 0.95, 0.75))
 		"bone":
-			var links := MgLogic.bone_links(state.get("cells", []), i, 5)
 			var shine := time < _glow_until
 			glow(c, _cell * 0.62, Color(1.0, 0.78, 0.25, 0.75 if shine else 0.45))
-			var col := Color("fff4d6")
-			var half := _cell * 0.5 + 4.0
-			var t := _cell * 0.12 * pop
-			var any := false
-			for d in 4:
-				if links[d]:
-					any = true
-					var dir: Vector2 = [Vector2.LEFT, Vector2.UP, Vector2.RIGHT, Vector2.DOWN][d]
-					_bone_bar(c, c + dir * half, t, col)
-			if not any:
-				_bone(c + Vector2(-_cell * 0.28, 0), c + Vector2(_cell * 0.28, 0), t, col, true)
-			draw_circle(c, t * 1.45, UiPalette.OUTLINE)
-			draw_circle(c, t * 1.2, col)
-			draw_circle(c - Vector2(t * 0.3, t * 0.3), t * 0.4, Color(1, 1, 1, 0.8))
+
+
+## Finished fossils: one continuous skeleton over their cells, drawn in passes (gold halo,
+## outline, bone, highlight) so neighbouring cells join without seams; chain ends get knobs.
+func _draw_skeleton(cells: Array) -> void:
+	var segs: Array = []   # [a, b]
+	var joints: Array = [] # [centre, scale]
+	var knobs: Array = []  # [pos, perpendicular]
+	for i in cells.size():
+		if String(cells[i]) != "bone":
+			continue
+		var r := cell_rect(i)
+		var c := r.get_center()
+		var rev := float(_reveal.get(i, -10.0))
+		var k := clampf((time - rev) / dur(0.35), 0.0, 1.0)
+		var pop := 1.0 + 0.25 * sin(k * PI) if k < 1.0 else 1.0
+		var links := MgLogic.bone_links(cells, i, 5)
+		var dirs: Array = []
+		for d in 4:
+			if links[d]:
+				var dir: Vector2 = [Vector2.LEFT, Vector2.UP, Vector2.RIGHT, Vector2.DOWN][d]
+				dirs.append(dir)
+				if d >= 2:
+					segs.append([c, c + dir * _cell])
+		joints.append([c, pop])
+		if dirs.size() == 1:
+			var away: Vector2 = -dirs[0]
+			var e := c + away * _cell * 0.3
+			segs.append([c, e])
+			knobs.append([e, Vector2(-away.y, away.x)])
+		elif dirs.is_empty():
+			segs.append([c - Vector2(_cell * 0.3, 0), c + Vector2(_cell * 0.3, 0)])
+			knobs.append([c - Vector2(_cell * 0.3, 0), Vector2.UP])
+			knobs.append([c + Vector2(_cell * 0.3, 0), Vector2.UP])
+	var t := _cell * 0.12
+	var col := Color("fff4d6")
+	var gold := Color(1.0, 0.78, 0.25, 0.55 + 0.25 * sin(time * 3.0))
+	for pass_i in 4:
+		var extra: float = [14.0, 6.0, 0.0, 0.0][pass_i]
+		var pc: Color = [gold, UiPalette.OUTLINE, col, Color(1, 1, 1, 0.55)][pass_i]
+		for sgm in segs:
+			var a: Vector2 = sgm[0]
+			var b: Vector2 = sgm[1]
+			if pass_i == 3:
+				var n := (b - a).normalized()
+				var off := Vector2(-n.y, n.x) * t * 0.45
+				if absf(n.x) > 0.5:
+					off = Vector2(0, -t * 0.45)
+				draw_line(a + off, b + off, pc, t * 0.5, true)
+			else:
+				draw_line(a, b, pc, t * 2.0 + extra, true)
+		if pass_i == 3:
+			continue
+		for kn in knobs:
+			var p: Vector2 = kn[0]
+			var q: Vector2 = kn[1]
+			for sg in [-1.0, 1.0]:
+				draw_circle(p + q * sg * t * 0.85, t * 0.95 + extra * 0.5, pc)
+		for j in joints:
+			draw_circle(j[0], t * 1.35 * float(j[1]) + extra * 0.5, pc)
 
 
 ## A cartoon bone from a to b (thickness t); gold = finished-fossil trim.

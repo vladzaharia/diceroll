@@ -13,6 +13,8 @@ extends RefCounted
 ##                      Saves <shot>_step_NN.png per step, prints MG_PLAY_OK / MG_PLAY_FAIL
 ##                      and quits (exit 0 / 1).
 ##      --auto=1        (fresh) press the screen's AUTO button (par result)
+##      --state=anim    --actions=N actions after --delay=S seconds (frame sequences: pair it
+##                      with --wait and --frames)
 ##  tile_minigames  a board with all four minigame tiles next to the hero (--close=1: close-up)
 ##  mg_play_auto    a run with all four minigames equipped (opts.meta from the max profile,
 ##                  loadout = every minigame), played by AUTO through the real toggle
@@ -92,7 +94,9 @@ class _Driver extends Node:
 		var scr := c.ui.minigame
 		if st == "result":
 			scr.set_meta("hold", 999.0)
-		var n := {"mid": 2, "result": 99, "reward": 99, "play": 99}.get(st, 2) as int
+		var n := {"mid": 2, "anim": int(args.get("actions", "1")), "result": 99, "reward": 99, "play": 99}.get(st, 2) as int
+		if args.has("delay"):
+			await _pause(float(args.delay))
 		if st == "play":
 			await _snap("opened")
 		var played := 0
@@ -105,7 +109,7 @@ class _Driver extends Node:
 			await _idle()
 			if st == "play":
 				await _snap("after action %d" % played)
-		if st == "mid":
+		if st == "mid" or st == "anim":
 			return
 		# the screen cashes the game in by itself once the board settles
 		var guard := 0
@@ -164,7 +168,10 @@ class _Driver extends Node:
 		match id:
 			"fossil_hunter":
 				var fb := b as FossilBoard
-				_click(o + fb.cell_rect(int(a[1]) * 5 + int(a[0])).get_center())
+				var p := o + fb.cell_rect(int(a[1]) * 5 + int(a[0])).get_center()
+				if args.has("debug"):
+					print("CLICK ", p, " board ", b.get_global_rect(), " locked ", b.locked, " hovered ", get_viewport().gui_get_hovered_control())
+				_click(p)
 			"bubble_breaker":
 				var bb := b as BubbleBoard
 				_click(o + bb.to_screen(Vector2(int(a[0]), int(a[1]))))
@@ -294,7 +301,7 @@ class _Driver extends Node:
 			e.position = p
 			e.global_position = p
 			e.button_mask = MOUSE_BUTTON_MASK_LEFT if down else 0
-			get_viewport().push_input(e)
+			get_viewport().push_input(e, true)
 
 	func _click_control(ctl: Control) -> void:
 		if ctl:
@@ -307,7 +314,7 @@ class _Driver extends Node:
 		d.position = pts[0]
 		d.global_position = pts[0]
 		d.button_mask = MOUSE_BUTTON_MASK_LEFT
-		get_viewport().push_input(d)
+		get_viewport().push_input(d, true)
 		for k in range(1, pts.size()):
 			await get_tree().process_frame
 			await get_tree().process_frame
@@ -316,13 +323,13 @@ class _Driver extends Node:
 			m.global_position = pts[k]
 			m.relative = Vector2(pts[k]) - Vector2(pts[k - 1])
 			m.button_mask = MOUSE_BUTTON_MASK_LEFT
-			get_viewport().push_input(m)
+			get_viewport().push_input(m, true)
 		var u := InputEventMouseButton.new()
 		u.button_index = MOUSE_BUTTON_LEFT
 		u.pressed = false
 		u.position = pts[-1]
 		u.global_position = pts[-1]
-		get_viewport().push_input(u)
+		get_viewport().push_input(u, true)
 
 	func _idle() -> void:
 		for i in 400:

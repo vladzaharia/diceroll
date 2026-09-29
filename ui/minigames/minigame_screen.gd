@@ -410,28 +410,40 @@ func _layout() -> void:
 	var rs := ribbon.get_combined_minimum_size()
 	ribbon.size = rs
 	var board_r: Rect2
+	var side_ctl: Array[Control] = [ribbon, _hint, _stats, _meter_box, _buttons]
 	if land:
-		var col_w := minf(480.0, vs.x * 0.36)
-		var bx := safe.left + 12.0
-		var bw := vs.x - col_w - safe.left - safe.right - 40.0
-		board_r = Rect2(Vector2(bx, top + 8.0), Vector2(bw, vs.y - top - safe.bottom - 16.0))
-		var cx := vs.x - safe.right - col_w
-		ribbon.position = Vector2(cx + (col_w - rs.x) * 0.5, top + 6.0)
-		var y := ribbon.position.y + rs.y + 8.0
-		_hint.custom_minimum_size = Vector2(col_w, 0)
-		_hint.size = Vector2(col_w, 0)
+		# board square on the left, the info column beside it (scaled up a notch: the
+		# landscape canvas is wider); the pair is centred
+		var k := 1.3
+		var side := minf(vs.y - top - safe.bottom - 90.0, vs.x * 0.56)
+		var col_w := minf(640.0 * k, vs.x - side - safe.left - safe.right - 80.0)
+		var cw := col_w / k
+		var x0 := (vs.x - side - 60.0 - col_w) * 0.5
+		board_r = Rect2(Vector2(x0, (vs.y - side) * 0.5 + 6.0), Vector2(side, side))
+		var cx := x0 + side + 60.0
+		for ctl in side_ctl:
+			ctl.scale = Vector2(k, k)
+		_hint.custom_minimum_size = Vector2(cw, 0)
+		_hint.size = Vector2(cw, 0)
+		var hint_h := _hint.get_combined_minimum_size().y
+		var total := (rs.y + 10.0 + hint_h + 24.0 + 88.0 + 100.0 + 88.0) * k
+		var y := maxf(top, (vs.y - total) * 0.5)
+		ribbon.position = Vector2(cx + (col_w - rs.x * k) * 0.5, y)
+		y += (rs.y + 10.0) * k
 		_hint.position = Vector2(cx, y)
-		y += _hint.get_combined_minimum_size().y + 18.0
+		y += (hint_h + 24.0) * k
 		_stats.position = Vector2(cx, y)
-		_stats.size = Vector2(col_w, 64)
-		y += 84.0
-		_meter_box.position = Vector2(cx + 10.0, y)
-		_meter_box.size = Vector2(col_w - 20.0, 60)
-		_meter.custom_minimum_size = Vector2(col_w - 20.0, 60)
-		y += 86.0
-		_buttons.position = Vector2(cx, maxf(y, vs.y - safe.bottom - 110.0))
-		_buttons.size = Vector2(col_w, 88)
+		_stats.size = Vector2(cw, 64)
+		y += 88.0 * k
+		_meter_box.position = Vector2(cx + 10.0 * k, y)
+		_meter_box.size = Vector2(cw - 20.0, 60)
+		_meter.custom_minimum_size = Vector2(cw - 20.0, 60)
+		y += 100.0 * k
+		_buttons.position = Vector2(cx, y)
+		_buttons.size = Vector2(cw, 88)
 	else:
+		for ctl in side_ctl:
+			ctl.scale = Vector2.ONE
 		ribbon.position = Vector2((vs.x - rs.x) * 0.5, top)
 		var y := top + rs.y + 2.0
 		var hw := minf(vs.x - 60.0, 640.0)
