@@ -11,8 +11,6 @@ const BODY_PATH := "res://assets/fonts/Fredoka-Variable.ttf"
 
 ## Safe padding from screen edges (logical px), raised by the device safe area when larger.
 const EDGE := 24.0
-## Portion of the screen height reserved for the dice tray (owned by game/dice).
-const TRAY_FRACTION := 0.24
 ## Max width of modal panels.
 const MODAL_MAX_W := 680.0
 ## Minimum touch target on phones.
@@ -258,26 +256,97 @@ static func _emulated_safe() -> Array:
 	return _safe_emu
 
 
-## Height of the dice-tray band at the bottom of the screen.
+# ---------------------------------------------------------------- responsive layout
+#
+# One set of rules places the HUD column, the dice tray and the bottom controls at every
+# canvas size (the canvas is 720x1280-based, `expand` stretch, so desktops are ~1280 tall
+# and phones ~720 wide; a UI-size setting / OS zoom shrinks the logical canvas).
+#
+#   portrait:  [HUD row full width] ... board ... [bottom bar] [tray full width]
+#   landscape: one centred column (column_width): [HUD row + AUTO cluster] at the top,
+#              [tray | side slot (ROLL / GO / Attack)] at the bottom.
+# The 3D camera frames the board in whatever is left between them (measured at runtime,
+# see game/camera/screen_insets.gd).
+
+## Landscape side slot (bottom controls beside the tray): min / max width.
+const SLOT_MIN_W := 420.0
+const SLOT_MAX_W := 520.0
+
+
+## Portrait layout = taller than wide (phones, iPad portrait).
+static func is_tall(view: Vector2) -> bool:
+	return view.y > view.x
+
+
+## Width of the centred content column (HUD group, tray + side slot).
+static func column_width(view: Vector2, safe: Margins = null) -> float:
+	var avail := view.x - (safe.left + safe.right if safe else EDGE * 2.0)
+	if is_tall(view):
+		return avail
+	return minf(avail, clampf(view.y * 1.15, 1100.0, 1560.0))
+
+
+## Height of the dice-tray band at the bottom of the screen (die size follows it, so it is
+## capped: portrait by the tray width, landscape by an absolute maximum).
 static func tray_height(view: Vector2) -> float:
-	return round(view.y * TRAY_FRACTION)
+	if is_tall(view):
+		return round(clampf(minf(view.y * 0.2, (view.x - 24.0) * 0.44), 190.0, 360.0))
+	return round(clampf(view.y * 0.235, 170.0, 320.0))
 
 
-## Width of the dice tray (portrait: nearly full width; landscape: capped and centred).
-static func tray_width(view: Vector2) -> float:
-	return view.x - 24.0 if view.y > view.x else minf(view.x - 48.0, 920.0)
+## Width of the side slot beside the tray in landscape (0 = no room: controls go above).
+static func _slot_w(view: Vector2, safe: Margins = null) -> float:
+	if is_tall(view):
+		return 0.0
+	var col := column_width(view, safe)
+	var sw := clampf(col * 0.3, SLOT_MIN_W, SLOT_MAX_W)
+	return sw if col - sw - 20.0 >= tray_height(view) * 2.4 else 0.0
 
 
-## Landscape only: the free band to the right of the dice tray, where the bottom HUD
-## (ROLL / GO / Reroll / Attack) lives so the world keeps the height above the tray.
-## Empty Rect2 in portrait or when the band is too narrow.
-static func side_slot(view: Vector2) -> Rect2:
-	if view.y > view.x:
-		return Rect2()
+## Width of the dice tray: portrait nearly full width; landscape the column minus the side
+## slot (wide on desktop), or a capped centred tray when there is no side slot.
+static func tray_width(view: Vector2, safe: Margins = null) -> float:
+	if is_tall(view):
+		return view.x - 24.0
+	var col := column_width(view, safe)
+	var sw := _slot_w(view, safe)
+	if sw > 0.0:
+		return col - sw - 20.0
+	return minf(col, tray_height(view) * 4.2)
+
+
+## Screen rect of the dice tray (canvas px). Lifted above a home indicator.
+static func tray_rect(view: Vector2, safe: Margins = null) -> Rect2:
 	var th := tray_height(view)
-	var x0 := (view.x + tray_width(view)) * 0.5 + 20.0
-	var r := Rect2(x0, view.y - th - 40.0, view.x - x0 - 28.0, th + 20.0)
-	return r if r.size.x >= 420.0 else Rect2()
+	var tw := tray_width(view, safe)
+	var lift := maxf((safe.bottom if safe else EDGE) - EDGE, 0.0) * 0.6
+	var x := (view.x - tw) * 0.5
+	if _slot_w(view, safe) > 0.0:
+		x = (view.x - column_width(view, safe)) * 0.5
+	return Rect2(round(x), view.y - th + 4.0 - lift, tw, th - 16.0)
+
+
+## Landscape only: the free band right of the dice tray (inside the column), where the
+## bottom HUD (ROLL / GO / Reroll / Attack) lives so the world keeps the height above the
+## tray. Empty Rect2 in portrait or when the column is too narrow.
+static func side_slot(view: Vector2, safe: Margins = null) -> Rect2:
+	var sw := _slot_w(view, safe)
+	if sw <= 0.0:
+		return Rect2()
+	var tr := tray_rect(view, safe)
+	var x0 := tr.end.x + 20.0
+	var top := tr.position.y - 40.0
+	return Rect2(x0, top, sw, tr.end.y - top)
+
+
+## Top edge of the bottom-controls area (canvas y) for a bar of height `bar_h`: beside the
+## tray in landscape (the higher of tray top and bar top), stacked above it in portrait.
+static func bottom_bar_top(view: Vector2, bar_h: float, safe: Margins = null) -> float:
+	var tr := tray_rect(view, safe)
+	var slot := side_slot(view, safe)
+	if slot.size.x > 0.0:
+		return minf(tr.position.y, slot.end.y - bar_h)
+	return tr.position.y - 20.0 - bar_h
 
 
 ## Vertical gradient texture (top -> bottom colours, optional middle stop).

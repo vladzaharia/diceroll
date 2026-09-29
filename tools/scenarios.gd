@@ -25,6 +25,7 @@ const PROVIDERS := [
 	"res://game/pets/scenarios.gd",
 	"res://game/minigames/scenarios.gd",
 	"res://tools/icon_scenarios.gd",
+	"res://ui/icons/rendered/rendered_icons.gd",
 ]
 
 

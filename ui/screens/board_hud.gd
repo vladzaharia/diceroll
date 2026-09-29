@@ -85,26 +85,37 @@ func _layout() -> void:
 	if size.x <= 0.0:
 		return
 	var safe := UiTheme.safe_margins(self)
-	var w := minf(UiTheme.MODAL_MAX_W, size.x - safe.left - safe.right)
 	_col.reset_size()
 	var h := _col.get_combined_minimum_size().y
-	var slot := UiTheme.side_slot(size)
+	var slot := UiTheme.side_slot(size, safe)
 	if slot.size.x > 0.0:
 		# landscape: beside the tray, bottom-aligned, so the board keeps the height
 		_col.size = Vector2(slot.size.x, h)
 		_col.position = Vector2(slot.position.x, slot.end.y - h)
 		return
-	var bottom := size.y - UiTheme.tray_height(size) - 20.0
+	var w := minf(UiTheme.MODAL_MAX_W, size.x - safe.left - safe.right)
+	# portrait: the reserved band is sized for the tallest state (move pill + GO); a
+	# shorter bar (ROLL) sits centred in it so the board framing never jumps between states
+	var band := bar_reserve()
+	var bottom := UiTheme.tray_rect(size, safe).position.y - 20.0
 	_col.size = Vector2(w, h)
-	_col.position = Vector2((size.x - w) * 0.5, bottom - h)
+	_col.position = Vector2((size.x - w) * 0.5, bottom - band + maxf(band - h, 0.0) * 0.5)
 
 
-## Top edge of the bottom controls in portrait (the board must stay above it); the tray
-## top in landscape, where the controls sit beside the tray.
+## Height reserved for the bottom controls: the tallest of the ROLL state and the rolled
+## state (move pill over GO / Reroll), measured from the actual widgets.
+func bar_reserve() -> float:
+	var sep := float(_col.get_theme_constant("separation"))
+	var roll_h := roll_btn.get_combined_minimum_size().y
+	var go_h := maxf(go_btn.get_combined_minimum_size().y, reroll_btn.get_combined_minimum_size().y)
+	var pill_h := maxf(move_pill.get_combined_minimum_size().y, 72.0)
+	return maxf(roll_h, pill_h + sep + go_h)
+
+
+## Top edge (canvas y) of the bottom controls: the board must stay above it. Beside the tray
+## in landscape (the tray top, or the bar top if the bar is taller than the tray).
 func content_top(view: Vector2) -> float:
-	if UiTheme.side_slot(view).size.x > 0.0:
-		return view.y - UiTheme.tray_height(view) - 20.0
-	return view.y - UiTheme.tray_height(view) - 20.0 - 214.0
+	return UiTheme.bottom_bar_top(view, bar_reserve(), UiTheme.safe_margins(self))
 
 
 func refresh(flow: GameFlow) -> void:
@@ -192,7 +203,7 @@ func toast(text: String, icon := "", color: Color = UiPalette.TEXT) -> void:
 	row.add_child(UiTheme.label(text, 28, color, true, 0, true))
 	_toast_holder.add_child(p)
 	p.reset_size()
-	var y := size.y - UiTheme.tray_height(size) - 180.0 - _toast_holder.get_child_count() * 70.0
+	var y := content_top(size) - 70.0 - _toast_holder.get_child_count() * 70.0
 	p.position = Vector2((size.x - p.size.x) * 0.5, y)
 	p.pivot_offset = p.size * 0.5
 	p.scale = Vector2(0.6, 0.6)

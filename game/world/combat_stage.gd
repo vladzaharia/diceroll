@@ -38,6 +38,9 @@ var _ground_y := 0.0
 var _distance := DISTANCE
 ## Sideways shift of the enemy line (world units along `side`) so it clears the hero on screen.
 var _lateral := 0.0
+## Footprint (x SPACING) of each enemy slot: big rigs and bosses get wider slots, so a boss
+## and its summons don't crowd each other.
+var _widths: Array[float] = []
 
 
 func _init() -> void:
@@ -60,6 +63,9 @@ func begin(p_hero: Character, anchor: Dictionary, enemy_list: Array) -> void:
 	_face(hero, hero_home + facing, 0.3)
 	_arena()
 	var n := enemy_list.size()
+	_widths.clear()
+	for d in enemy_list:
+		_widths.append(footprint(String((d as Dictionary).get("id", "skeleton_minion"))))
 	for i in n:
 		_add(enemy_list[i], i, n, 0.05 + 0.2 * i)
 	await get_tree().create_timer((0.2 * n + 0.75) / speed, false).timeout
@@ -142,6 +148,10 @@ func end_on_board(overview := false) -> void:
 ## Adds one enemy mid-fight (summons). Returns its index.
 func add_enemy(d: Dictionary) -> int:
 	var i := enemies.size()
+	while _widths.size() < i:
+		_widths.append(1.0)
+	_widths.resize(i)
+	_widths.append(footprint(String(d.get("id", "skeleton_minion"))))
 	_add(d, i, i + 1, 0.0)
 	_relayout()
 	refresh_wards()
@@ -173,10 +183,27 @@ func enemy_positions() -> Array[Vector3]:
 	return out
 
 
+## Slot width factor for an enemy id (1 = a regular figure; big rigs / bosses up to 1.8).
+static func footprint(id: String) -> float:
+	return clampf(EnemyLooks.hud_height(id) / 2.3, 1.0, 1.8)
+
+
 func _slot(i: int, n: int) -> Vector3:
 	var c := float(i) - float(n - 1) * 0.5
-	var along := _distance + (0.35 if n > 1 else 0.3) + absf(c) * -0.3
-	var base := hero_home + facing * along + side * (c * SPACING + _lateral * (1.0 if n > 1 else 0.5))
+	# lateral offset from the line's centre, from the cumulative slot widths
+	var off := c * SPACING
+	var wide := 1.0
+	if _widths.size() >= n and n > 0:
+		var total := 0.0
+		for k in n:
+			total += _widths[k]
+		var acc := 0.0
+		for k in i:
+			acc += _widths[k]
+		off = (acc + _widths[i] * 0.5 - total * 0.5) * SPACING
+		wide = _widths[i]
+	var along := _distance + (0.35 if n > 1 else 0.3) + absf(c) * -0.3 + (wide - 1.0) * 0.8
+	var base := hero_home + facing * along + side * (off + _lateral * (1.0 if n > 1 else 0.5))
 	return Vector3(base.x, _ground_y + _floor_offset(), base.z)
 
 
@@ -537,6 +564,7 @@ func clear() -> void:
 		h.queue_free()
 	enemies.clear()
 	huds.clear()
+	_widths.clear()
 	data.clear()
 	for k in _wards:
 		if is_instance_valid(_wards[k]):
