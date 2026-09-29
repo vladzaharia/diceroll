@@ -10,6 +10,7 @@ extends RefCounted
 ##  fx_gallery      every FX firing in a loop on the act 1 board
 ##  enemy_gallery   every enemy look with its HUD, on the act 1 island
 ##  combat_sequence full beat loop (attack, hit, death, enemy attack, hero hit, summon, end)
+##  tiles_ice_lava  close-up of the Frostpeak ice and Magma lava tiles (--biome=frost|magma)
 ##  combat_hero_check  position check (headless ok): the hero fights from the fight's tile even
 ##                  when its model was left elsewhere, and returns there after every lunge;
 ##                  prints HERO_TILE_OK / HERO_TILE_FAIL and quits (exit 0 / 1)
@@ -18,7 +19,7 @@ extends RefCounted
 const NAMES := ["board_glade", "board_crypt", "board_hollow", "board_frost", "board_throne", "board_magma",
 	"board_act1", "board_act2", "board_act3", "board_follow", "board_mutate", "board_portal", "combat_act1",
 	"combat_act2", "combat_act3", "boss_act1", "boss_act2", "boss_act3", "fx_gallery", "enemy_gallery", "combat_sequence",
-	"combat_hero_check"]
+	"combat_hero_check", "tiles_ice_lava"]
 
 
 static func names() -> PackedStringArray:
@@ -148,6 +149,9 @@ class _Driver extends Node3D:
 			if scenario.ends_with("_" + id):
 				biome_id = id
 				act = BoardScenarios.tier_of(id)
+		if scenario == "tiles_ice_lava":
+			biome_id = "magma"
+			act = 3
 		biome_id = String(args.get("biome", biome_id))
 		board = BoardView.new()
 		add_child(board)
@@ -193,6 +197,18 @@ class _Driver extends Node3D:
 				await _sequence()
 			"combat_hero_check":
 				await _hero_check()
+			"tiles_ice_lava":
+				for k in [1, 3, 5]:
+					board.set_tile(k, {"type": "ice"})
+				for k in [2, 4, 6]:
+					board.set_tile(k, {"type": "lava"})
+				board.place_hero(0)
+				await get_tree().create_timer(0.1).timeout
+				var pts := PackedVector3Array()
+				for k in 7:
+					pts.append(board.tile_global_position(k))
+				pts.append(board.tile_global_position(3) + Vector3.UP * 2.0)
+				rig.frame_points(pts, 0.0, 42.0, true)
 			"enemy_gallery":
 				_gallery(String(args.get("only", "new")))
 			"fx_gallery":

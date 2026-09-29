@@ -135,15 +135,17 @@ static func _lava_vent() -> Node3D:
 	var bx := BoxMesh.new()
 	bx.size = Vector3(1.22, 0.06, 1.22)
 	pool.mesh = bx
-	pool.material_override = BiomeBlocks.lava_material(2.3, 0.9, 0.68)
+	pool.material_override = BiomeBlocks.lava_material(1.5, 1.25, 0.82)
 	pool.position.y = 0.02
 	pool.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	n.add_child(pool)
-	var basalt := Color(0.2, 0.16, 0.17)
-	for i in 6:
-		var a := TAU * float(i) / 6.0 + 0.4
-		var r := BiomeBlocks.rock(n, Vector3(cos(a) * 0.62, -0.1, sin(a) * 0.62), 0.2 + 0.05 * float(i % 3), basalt, 300 + i)
-		r.name = "Rim%d" % i
+	# a few low crust stones at the corners (the pool itself stays open and bright)
+	var basalt := Color(0.22, 0.18, 0.19)
+	for i in 3:
+		var c := [Vector3(-0.46, 0.0, -0.44), Vector3(0.5, 0.0, 0.42), Vector3(-0.5, 0.0, 0.46)][i] as Vector3
+		var r := BiomeBlocks.rock(n, c, 0.12 + 0.04 * float(i % 2), basalt, 300 + i)
+		r.name = "Crust%d" % i
+		r.scale.y *= 0.6
 	var ember := Biome.flame(n, Vector3(0, 0.12, 0), Color(1.0, 0.45, 0.1), 0.3, 8)
 	ember.name = "Embers"
 	var l := OmniLight3D.new()
