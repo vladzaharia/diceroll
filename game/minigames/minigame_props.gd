@@ -165,8 +165,17 @@ static func _claw(n: Node3D) -> void:
 		for sz in [-1.0, 1.0]:
 			_mesh(cab, _sphere(0.022), _mat(Color("fff6c0"), 0.2, 0.0, 2.2), Vector3(-0.3 + k * 0.15, 0.99, sz * 0.325))
 	# prize + claw inside
-	var star := Props.put(cab, Props.PLAT + "yellow/star_yellow.gltf", Vector3(0.08, 0.38, 0.02), 0.0, 0.3)
-	star.name = "Prize"
+	# a little pile of prize capsules (tier colours) inside the glass
+	var caps := [[Vector3(-0.15, 0.42, 0.05), Color("8fd0ff")], [Vector3(0.1, 0.42, -0.08), Color("6fe07a")],
+		[Vector3(0.18, 0.42, 0.12), Color("8fd0ff")], [Vector3(-0.02, 0.52, 0.02), Color("c070ff")], [Vector3(-0.2, 0.42, -0.14), Color("ffc93d")]]
+	for k in caps.size():
+		var holder := Node3D.new()
+		holder.name = "Capsule%d" % k
+		holder.position = caps[k][0]
+		cab.add_child(holder)
+		var top := _mesh(holder, _sphere(0.07, 0.07), _mat(caps[k][1], 0.25, 0.0, 0.15), Vector3(0, 0.017, 0))
+		top.scale = Vector3(1, 1, 1)
+		_mesh(holder, _sphere(0.068, 0.07), _mat(Color("f0eef8"), 0.3), Vector3(0, -0.017, 0))
 	var claw := Node3D.new()
 	claw.name = "Claw"
 	claw.position = Vector3(-0.08, 0.8, 0.0)
