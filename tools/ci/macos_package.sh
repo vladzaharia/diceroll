@@ -68,7 +68,15 @@ stage="$tmp/dmg"
 mkdir -p "$stage"
 cp -R "$app" "$stage/"
 ln -s /Applications "$stage/Applications"
-hdiutil create -quiet -volname "Diceroll $version" -srcfolder "$stage" -ov -format UDZO "$dmg"
+# hdiutil fails intermittently on CI runners ("Resource busy"): retry, and show its error
+for attempt in 1 2 3 4; do
+	if hdiutil create -volname "Diceroll $version" -srcfolder "$stage" -ov -format UDZO "$dmg"; then
+		break
+	fi
+	[ "$attempt" = 4 ] && { echo "macos_package: hdiutil create failed 4 times" >&2; exit 1; }
+	echo "==> hdiutil create failed (attempt $attempt), retrying"
+	sleep $((attempt * 5))
+done
 if [ $signed = 1 ]; then
 	codesign --force --timestamp --keychain "$keychain" -s "$identity" "$dmg"
 fi
