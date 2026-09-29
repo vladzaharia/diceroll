@@ -144,6 +144,7 @@ func add_enemy(d: Dictionary) -> int:
 	var i := enemies.size()
 	_add(d, i, i + 1, 0.0)
 	_relayout()
+	refresh_wards()
 	return i
 
 
@@ -260,6 +261,79 @@ func set_enemy(i: int, d: Dictionary) -> void:
 	for k in d:
 		data[i][k] = d[k]
 	huds[i].set_data(data[i], true)
+	if d.has("traits") or d.has("hp"):
+		refresh_wards()
+
+
+# --- ward (Bone Warden phase 2): a shimmering dome while any summoned ally stands -----------
+
+var _wards: Dictionary = {}  # enemy index -> MeshInstance3D
+
+
+## Shows or hides each warded enemy's dome from the current data (traits + living summons).
+func refresh_wards() -> void:
+	var summons := false
+	for k in data.size():
+		if bool(data[k].get("summoned", false)) and int(data[k].get("hp", 0)) > 0:
+			summons = true
+	for k in data.size():
+		var on := summons and "ward" in (data[k].get("traits", []) as Array) and int(data[k].get("hp", 0)) > 0
+		if on and not _wards.has(k) and k < enemies.size():
+			_wards[k] = _ward_dome(enemies[k], String(data[k].get("id", "")))
+		elif not on and _wards.has(k):
+			var dome: MeshInstance3D = _wards[k]
+			_wards.erase(k)
+			if is_instance_valid(dome):
+				var t := dome.create_tween()
+				t.tween_property(dome, "scale", Vector3.ONE * 1.3, 0.25)
+				t.parallel().tween_property(dome, "transparency", 1.0, 0.25)
+				t.tween_callback(dome.queue_free)
+
+
+func flash_ward(i: int) -> void:
+	if not _wards.has(i):
+		return
+	var dome: MeshInstance3D = _wards[i]
+	if is_instance_valid(dome):
+		var m := dome.material_override as StandardMaterial3D
+		var t := dome.create_tween()
+		t.tween_property(m, "emission_energy_multiplier", 3.0, 0.06)
+		t.tween_property(m, "emission_energy_multiplier", 0.9, 0.3)
+
+
+func _ward_dome(ch: Character, _id: String) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.name = "WardDome"
+	var sm := SphereMesh.new()
+	# child of the figure (local units, so it follows relayouts)
+	var r := 1.25
+	sm.radius = r
+	sm.height = r * 2.0
+	sm.radial_segments = 24
+	sm.rings = 12
+	mi.mesh = sm
+	var m := StandardMaterial3D.new()
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.albedo_color = Color(0.7, 0.5, 1.0, 0.12)
+	m.emission_enabled = true
+	m.emission = Color(0.6, 0.35, 1.0)
+	m.emission_energy_multiplier = 0.9
+	m.rim_enabled = true
+	m.rim = 1.0
+	m.rim_tint = 0.2
+	m.cull_mode = BaseMaterial3D.CULL_BACK
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+	mi.material_override = m
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	ch.add_child(mi)
+	mi.position = Vector3.UP * r * 0.75
+	mi.scale = Vector3.ONE * 0.01
+	var t := mi.create_tween()
+	t.tween_property(mi, "scale", Vector3.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	var p := mi.create_tween().set_loops()
+	p.tween_property(m, "albedo_color:a", 0.2, 0.9).set_trans(Tween.TRANS_SINE)
+	p.tween_property(m, "albedo_color:a", 0.1, 0.9).set_trans(Tween.TRANS_SINE)
+	return mi
 
 
 ## Moves the target marker under enemy i.
@@ -352,6 +426,8 @@ func enemy_die(i: int) -> void:
 		return
 	var ch := enemies[i]
 	var id := String(data[i].get("id", ""))
+	data[i]["hp"] = 0
+	refresh_wards()
 	var hud := huds[i]
 	var ht := hud.create_tween().set_speed_scale(speed)
 	ht.tween_method(hud.set_opacity, 1.0, 0.0, 0.3)
@@ -460,6 +536,10 @@ func clear() -> void:
 	enemies.clear()
 	huds.clear()
 	data.clear()
+	for k in _wards:
+		if is_instance_valid(_wards[k]):
+			_wards[k].queue_free()
+	_wards.clear()
 	if _target_ring:
 		_target_ring.queue_free()
 		_target_ring = null

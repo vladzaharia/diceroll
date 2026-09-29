@@ -93,7 +93,14 @@ func _one(ev: Dictionary) -> void:
 				Fx.damage_number(c.world_parent(), c.hero_pos() + Vector3.UP * 1.8, -amount, false, Fx.HERO_DAMAGE_COLOR)
 				await _wait(0.45)
 		"trap":
-			await _trap(ev)
+			if bool(ev.get("ice", false)):
+				await BiomeBeats.trap_ice(c, ev)
+			else:
+				await _trap(ev)
+		"lava":
+			await BiomeBeats.lava(c, ev)
+		"enemy_healed":
+			await BiomeBeats.enemy_healed(c, ev)
 		"duel":
 			var mine: Array = ev.player
 			var theirs: Array = ev.npc
@@ -211,6 +218,8 @@ func _one(ev: Dictionary) -> void:
 			c.overlay.toast("A minion rises!", "skull", UiPalette.TEXT)
 			await _wait(0.7)
 		"boss_phase":
+			if int(ev.enemy_idx) < c.stage.enemy_count():
+				c.stage.set_enemy(int(ev.enemy_idx), {"traits": ev.get("traits", []), "phase": int(ev.phase)})
 			c.rig.shake(0.9, 0.6)
 			Fx.flash(c, Color(0.8, 0.2, 0.3, 0.45), 0.5)
 			var nm := String(c.stage.data[int(ev.enemy_idx)].get("name", "The boss")) if int(ev.enemy_idx) < c.stage.data.size() else "The boss"
@@ -525,6 +534,8 @@ func _damage(ev: Dictionary) -> void:
 	if tgt is String:
 		# enemy hits hero
 		var attacker := int(ev.get("attacker", -1))
+		if BiomeBeats.hero_damage(c, ev):
+			attacker = -1
 		if attacker >= 0:
 			await c.stage.enemy_attack(attacker)
 		await c.stage.hero_hit(amount, blocked)
@@ -562,6 +573,7 @@ func _damage(ev: Dictionary) -> void:
 			await c.stage.enemy_hit(i, amount, false, blocked)
 	if ev.has("hp"):
 		c.stage.set_enemy(i, {"hp": int(ev.hp), "block": int(ev.get("block", 0))})
+	BiomeBeats.enemy_damage(c, ev)
 
 
 func _block(ev: Dictionary) -> void:
@@ -575,6 +587,9 @@ func _block(ev: Dictionary) -> void:
 		return
 	var i := int(tgt)
 	c.stage.set_enemy(i, {"block": int(ev.get("total", 0))})
+	if String(ev.get("source", "")) == "shatter":
+		await BiomeBeats.shatter(c, i)
+		return
 	if amount > 0 and i < c.stage.enemy_count():
 		var ch: Character = c.stage.enemies[i]
 		ch.play_once("block" if ch.has_anim("block") else "hit", EnemyLooks.clip(String(c.stage.data[i].get("id", "")), "idle"), 0.08)
@@ -588,6 +603,8 @@ func _status(ev: Dictionary) -> void:
 	var st := String(ev.status)
 	var v := int(ev.get("value", 0))
 	if tgt is String:
+		if await BiomeBeats.hero_status(c, ev):
+			return
 		match st:
 			"curse":
 				if bool(ev.get("pending", false)):

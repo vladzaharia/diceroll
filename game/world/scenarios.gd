@@ -10,11 +10,15 @@ extends RefCounted
 ##  fx_gallery      every FX firing in a loop on the act 1 board
 ##  enemy_gallery   every enemy look with its HUD, on the act 1 island
 ##  combat_sequence full beat loop (attack, hit, death, enemy attack, hero hit, summon, end)
+##  combat_hero_check  position check (headless ok): the hero fights from the fight's tile even
+##                  when its model was left elsewhere, and returns there after every lunge;
+##                  prints HERO_TILE_OK / HERO_TILE_FAIL and quits (exit 0 / 1)
 ## Optional args: --hero=<class>, --tile=<idx>.
 
 const NAMES := ["board_glade", "board_crypt", "board_hollow", "board_frost", "board_throne", "board_magma",
 	"board_act1", "board_act2", "board_act3", "board_follow", "board_mutate", "board_portal", "combat_act1",
-	"combat_act2", "combat_act3", "boss_act1", "boss_act2", "boss_act3", "fx_gallery", "enemy_gallery", "combat_sequence"]
+	"combat_act2", "combat_act3", "boss_act1", "boss_act2", "boss_act3", "fx_gallery", "enemy_gallery", "combat_sequence",
+	"combat_hero_check"]
 
 
 static func names() -> PackedStringArray:
@@ -187,6 +191,8 @@ class _Driver extends Node3D:
 				await _combat(act, wait)
 			"combat_sequence":
 				await _sequence()
+			"combat_hero_check":
+				await _hero_check()
 			"enemy_gallery":
 				_gallery(String(args.get("only", "new")))
 			"fx_gallery":
@@ -286,6 +292,50 @@ class _Driver extends Node3D:
 		rig.shake(0.5, 0.3)
 		if scenario == "combat_act1":
 			Fx.flash(self, Color(1.0, 0.85, 0.5, 0.25))
+
+	## Asserts the hero stands on `idx` (its combat anchor); prints and returns the result.
+	func _hero_on(idx: int, what: String) -> bool:
+		var want: Vector3 = board.combat_anchor(idx).hero
+		var d := board.hero.global_position.distance_to(want)
+		var ok := d < 0.05 and board.hero_idx == board.wrap_idx(idx)
+		if ok:
+			print("HERO_TILE_OK %s (tile %d)" % [what, idx])
+		else:
+			push_error("HERO_TILE_FAIL %s: hero_idx %d, %.2f from tile %d" % [what, board.hero_idx, d, idx])
+		return ok
+
+	func _hero_check() -> void:
+		var ok := true
+		# the hero model is left on tile 9 but the fight is on tile 12 (stale hop / restore)
+		board.place_hero(9)
+		stage = CombatStage.new()
+		add_child(stage)
+		rig.overview(board.ring_bounds(), true)
+		await get_tree().process_frame
+		await stage.begin_on_board(board, 12, BoardScenarios.mock_enemies("act1"), rig)
+		ok = _hero_on(12, "begin") and ok
+		ok = stage.hero_home.distance_to(board.tile_global_position(12)) < 0.05 and ok
+		for style in ["melee", "magic"]:
+			await stage.hero_attack(1, style)
+			await get_tree().create_timer(0.6).timeout
+			ok = _hero_on(12, "after %s attack" % style) and ok
+		await stage.enemy_attack(0)
+		await stage.hero_hit(4)
+		await get_tree().create_timer(0.5).timeout
+		ok = _hero_on(12, "after enemy attack") and ok
+		stage.end_on_board()
+		await get_tree().create_timer(0.3).timeout
+		ok = _hero_on(12, "after the fight") and ok
+		# a second fight on a corner, hero already there
+		board.place_hero(14)
+		await stage.begin_on_board(board, 14, BoardScenarios.mock_enemies("act2"), rig)
+		await stage.hero_attack(0)
+		await get_tree().create_timer(0.6).timeout
+		ok = _hero_on(14, "corner fight") and ok
+		stage.end_on_board()
+		print("HERO_TILE_CHECK ", "PASS" if ok else "FAIL")
+		if not Shot.args.has("shot"):
+			get_tree().quit(0 if ok else 1)
 
 	func _sequence() -> void:
 		var idx := 9
