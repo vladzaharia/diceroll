@@ -132,4 +132,8 @@ class Medal:
 		for i in 28:
 			disc.append(c + Vector2(cos(TAU * i / 28.0), sin(TAU * i / 28.0)) * r * 0.92)
 		for poly in Geometry2D.intersect_polygons(band, disc):
-			draw_colored_polygon(poly, Color(1, 1, 1, 0.35))
+			var area := 0.0
+			for i in poly.size():
+				area += poly[i].cross(poly[(i + 1) % poly.size()])
+			if poly.size() >= 3 and absf(area) > 8.0:
+				draw_colored_polygon(poly, Color(1, 1, 1, 0.35))

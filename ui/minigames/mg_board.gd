@@ -254,6 +254,22 @@ func glow(at: Vector2, radius: float, col: Color, steps := 6) -> void:
 		draw_circle(at, radius * k, c)
 
 
+## Draws `band` clipped to `clip` (both convex), skipping degenerate slivers.
+func clipped(band: PackedVector2Array, clip: PackedVector2Array, col: Color) -> void:
+	for poly in Geometry2D.intersect_polygons(band, clip):
+		if poly.size() < 3:
+			continue
+		var area := 0.0
+		for i in poly.size():
+			area += poly[i].cross(poly[(i + 1) % poly.size()])
+		if absf(area) > 8.0:
+			draw_colored_polygon(poly, col)
+
+
+static func rect_poly(r: Rect2) -> PackedVector2Array:
+	return PackedVector2Array([r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)])
+
+
 func _star4(at: Vector2, r: float, col: Color) -> void:
 	var pts := PackedVector2Array()
 	for i in 8:

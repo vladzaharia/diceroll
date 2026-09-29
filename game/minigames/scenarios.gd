@@ -42,6 +42,7 @@ static func build(name: String) -> Node:
 static func all_games_flow(seed: int, cls := "knight") -> GameFlow:
 	var meta := MetaRun.build(MetaPresets.get_preset("max"), cls)
 	meta.minigames = MinigameDefs.IDS.duplicate()
+	meta.whetstone = 0  # no opening Forge offer: straight to the board
 	for id in MinigameDefs.IDS:
 		meta.mastery[id] = 5
 	return GameFlow.new_run(cls, seed, Balance.BOARD_SIZE, {"meta": meta})
@@ -208,11 +209,11 @@ class _Driver extends Node:
 		await _pause(0.4)
 		if args.get("close", "0") == "1":
 			var pts := PackedVector3Array()
-			for i in [1, 4]:
+			for i in [1, 2, 3, 4]:
 				var p := c.board.tile_global_position(i)
-				pts.append(p + Vector3(-1.0, 0, -1.0))
-				pts.append(p + Vector3(1.0, 1.2, 1.0))
-			c.rig.frame_points(pts, 20.0, 40.0, true)
+				pts.append(p + Vector3(-1.4, 0, -1.4))
+				pts.append(p + Vector3(1.4, 1.4, 1.4))
+			c.rig.frame_points(pts, float(args.get("yaw", "0")), float(args.get("pitch", "48")), true)
 		else:
 			c.rig.overview(c.board.ring_bounds(), true)
 		if args.get("land", "0") == "1":

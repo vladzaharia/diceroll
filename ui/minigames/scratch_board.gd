@@ -343,9 +343,7 @@ func _draw_board() -> void:
 		var x0 := c.position.x + k * c.size.x * 1.4
 		var band := PackedVector2Array([Vector2(x0, c.position.y - 40), Vector2(x0 + 90, c.position.y - 40),
 			Vector2(x0 - 110, c.end.y + 40), Vector2(x0 - 200, c.end.y + 40)])
-		var card_poly := PackedVector2Array([c.position, Vector2(c.end.x, c.position.y), c.end, Vector2(c.position.x, c.end.y)])
-		for poly in Geometry2D.intersect_polygons(band, card_poly):
-			draw_colored_polygon(poly, Color(1.0, 0.95, 0.7, 0.28))
+		clipped(band, rect_poly(c), Color(1.0, 0.95, 0.7, 0.28))
 
 
 func _draw_cell(i: int, face: int, best: Dictionary) -> void:
@@ -391,9 +389,7 @@ func _draw_cell(i: int, face: int, best: Dictionary) -> void:
 			var sx := r.position.x + sk * r.size.x
 			var band := PackedVector2Array([Vector2(sx, r.position.y), Vector2(sx + 16, r.position.y),
 				Vector2(sx - 14, r.end.y), Vector2(sx - 30, r.end.y)])
-			var cell_poly := PackedVector2Array([r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)])
-			for poly in Geometry2D.intersect_polygons(band, cell_poly):
-				draw_colored_polygon(poly, Color(1, 1, 1, 0.22 * a))
+			clipped(band, rect_poly(r), Color(1, 1, 1, 0.22 * a))
 			if not _committed[i] and not locked and int(state.get("actions_left", 0)) > 0:
 				text_c(r.get_center() + Vector2(0, r.size.y * 0.33), "SCRATCH", 16, Color(0.4, 0.42, 0.5, 0.75))
 

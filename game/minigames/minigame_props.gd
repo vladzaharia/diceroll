@@ -113,8 +113,9 @@ static func _bubbles(n: Node3D) -> void:
 static func _scratch(n: Node3D) -> void:
 	var card := Node3D.new()
 	card.name = "Card"
-	card.position = Vector3(0.0, 0.42, -0.12)
-	card.rotation = Vector3(deg_to_rad(-22.0), deg_to_rad(12.0), 0.0)
+	card.position = Vector3(-0.05, 0.5, -0.12)
+	card.rotation = Vector3(deg_to_rad(-14.0), deg_to_rad(10.0), deg_to_rad(-4.0))
+	card.scale = Vector3.ONE * 1.12
 	n.add_child(card)
 	_mesh(card, _box(Vector3(0.96, 0.8, 0.04)), _mat(Color("fff1d6"), 0.6), Vector3.ZERO, Vector3.ZERO, "Paper")
 	_mesh(card, _box(Vector3(0.9, 0.16, 0.05)), _mat(Color("7a2fbf"), 0.4, 0.0, 0.2), Vector3(0, 0.27, 0.005))
@@ -126,7 +127,7 @@ static func _scratch(n: Node3D) -> void:
 		var m := _mat(Color("c9d0de") if foil else Color("fffaf0"), 0.25 if foil else 0.8, 0.75 if foil else 0.0)
 		_mesh(card, _box(Vector3(0.24, 0.19, 0.05)), m, Vector3(x, y, 0.005))
 	# a revealed 6 and a die at the foot
-	var d := Props.put(n, Props.BGB + "D6_A.gltf", Vector3(0.42, 0.0, 0.32), 25.0, 1.4)
+	var d := Props.put(n, Props.BGB + "D6_A.gltf", Vector3(0.45, 0.0, 0.38), 25.0, 0.55)
 	d.name = "Die"
 	var coin := Props.put(n, Props.DUN + "coin.gltf", Vector3(-0.42, 0.0, 0.3), 0.0, 0.9)
 	coin.name = "Coin"
@@ -138,21 +139,26 @@ static func _claw(n: Node3D) -> void:
 	cab.name = "Cabinet"
 	cab.position = Vector3(0.0, 0.0, -0.1)
 	cab.rotation.y = deg_to_rad(-12.0)
+	cab.scale = Vector3.ONE * 1.25
 	n.add_child(cab)
 	var pink := _mat(Color("ff5d95"), 0.45)
 	_mesh(cab, _box(Vector3(0.72, 0.36, 0.62)), pink, Vector3(0, 0.18, 0), Vector3.ZERO, "Base")
 	_mesh(cab, _box(Vector3(0.28, 0.14, 0.04)), _mat(Color("22102e"), 0.8), Vector3(-0.16, 0.2, 0.31))
 	_mesh(cab, _box(Vector3(0.08, 0.08, 0.06)), _mat(Color("ff3b5c"), 0.3, 0.0, 0.6), Vector3(0.2, 0.3, 0.3))
-	# glass box: four thin pillars + a see-through pane
+	# glass box: four thin metal pillars + a see-through pane
+	var metal_dark := _mat(Color("c9cfdc"), 0.3, 0.7)
 	for sx in [-1.0, 1.0]:
 		for sz in [-1.0, 1.0]:
-			_mesh(cab, _box(Vector3(0.05, 0.56, 0.05)), pink, Vector3(sx * 0.33, 0.64, sz * 0.28))
-	var glass := _mat(Color(0.75, 0.9, 1.0, 0.18), 0.05)
+			_mesh(cab, _box(Vector3(0.045, 0.56, 0.045)), metal_dark, Vector3(sx * 0.33, 0.64, sz * 0.28))
+	var glass := _mat(Color(0.7, 0.9, 1.0, 0.26), 0.05, 0.0, 0.15)
 	glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_mesh(cab, _box(Vector3(0.66, 0.56, 0.56)), glass, Vector3(0, 0.64, 0), Vector3.ZERO, "Glass")
-	# marquee
-	_mesh(cab, _box(Vector3(0.76, 0.16, 0.66)), pink, Vector3(0, 1.0, 0))
-	_mesh(cab, _box(Vector3(0.6, 0.1, 0.02)), _mat(Color("ffe07a"), 0.3, 0.0, 1.2), Vector3(0, 1.0, 0.335), Vector3.ZERO, "Marquee")
+	# marquee: a glowing sign band all around under a pink cap, with bulbs
+	_mesh(cab, _box(Vector3(0.74, 0.14, 0.64)), _mat(Color("ffd84a"), 0.3, 0.0, 1.1), Vector3(0, 0.99, 0), Vector3.ZERO, "Marquee")
+	_mesh(cab, _box(Vector3(0.8, 0.07, 0.7)), pink, Vector3(0, 1.09, 0))
+	for k in 5:
+		for sz in [-1.0, 1.0]:
+			_mesh(cab, _sphere(0.022), _mat(Color("fff6c0"), 0.2, 0.0, 2.2), Vector3(-0.3 + k * 0.15, 0.99, sz * 0.325))
 	# prize + claw inside
 	var star := Props.put(cab, Props.PLAT + "yellow/star_yellow.gltf", Vector3(0.08, 0.38, 0.02), 0.0, 0.3)
 	star.name = "Prize"
