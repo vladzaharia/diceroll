@@ -78,19 +78,22 @@ const SFX := {
 }
 
 const M := "res://assets/audio/music/"
+## CC0 beds from OpenGameArt (RandomMind, cynicmusic); see assets/CREDITS.md.
 const MUSIC := {
-	"title": M + "mixkit-zanarkand-forest-169.mp3",
-	"act1": M + "mixkit-spirit-in-the-woods-2-147.mp3",
-	"act2": M + "mixkit-ambient-251.mp3",
-	"act3": M + "mixkit-vastness-184.mp3",
-	"calm": M + "mixkit-nature-meditation-345.mp3",
+	"title": M + "bards-tale.mp3",
+	"calm": M + "old-tower-inn.mp3",
+	"boss": M + "battle-theme-a.mp3",
 	# biome beds (by BiomeDefs id)
-	"glade": M + "mixkit-nature-meditation-345.mp3",
-	"crypt": M + "mixkit-spirit-in-the-woods-2-147.mp3",
-	"hollow": M + "mixkit-ambient-251.mp3",
-	"frost": M + "mixkit-zanarkand-forest-169.mp3",
-	"throne": M + "mixkit-vastness-184.mp3",
-	"magma": M + "mixkit-vastness-184.mp3",
+	"glade": M + "harvest-season.mp3",
+	"crypt": M + "lament-for-a-warriors-soul.mp3",
+	"hollow": M + "dark-forest.mp3",
+	"frost": M + "rising-moon.mp3",
+	"throne": M + "medieval-battle.mp3",
+	"magma": M + "battle-theme-b.mp3",
+	# legacy act ids (default route: crypt -> hollow -> throne)
+	"act1": M + "lament-for-a-warriors-soul.mp3",
+	"act2": M + "dark-forest.mp3",
+	"act3": M + "medieval-battle.mp3",
 }
 const MUSIC_DB := -8.0
 

@@ -218,7 +218,8 @@ func start(f: GameFlow) -> void:
 		show_move_target(t, steps if steps > 0 or f.board_move == 0 else f.run.board.size(), f.is_board_double())
 	if f.phase == GameFlow.Phase.PORTAL:
 		player._show_portal(f.offer)
-	Audio.play_music(f.run.biome())
+	var boss_fight := f.phase == GameFlow.Phase.COMBAT and f.combat != null and f.combat.boss
+	Audio.play_music("boss" if boss_fight else f.run.biome())
 	overlay.set_black(true)
 	overlay.fade_in(0.5)
 	if f.phase == GameFlow.Phase.COMBAT and f.combat != null:
@@ -511,7 +512,7 @@ func _boss_intro(tile: int, enemies: Array) -> void:
 		await get_tree().process_frame
 	stage.reframe()
 	overlay.vignette(0.0, 0.8)
-	Audio.play_music(flow.run.biome(), 1.2)
+	Audio.play_music("boss", 1.2)
 	ui.combat_hud.visible = true
 	ui.combat_hud.modulate.a = 0.0
 	var ht := ui.combat_hud.create_tween()
@@ -545,6 +546,8 @@ func end_combat(ev: Dictionary) -> void:
 	var title := "VICTORY"
 	if bool(ev.get("boss", false)):
 		title = "BOSS DEFEATED!"
+		if flow:
+			Audio.play_music(flow.run.biome(), 1.5)
 	elif bool(ev.get("miniboss", false)):
 		title = "MINI-BOSS SLAIN!"
 	overlay.announce(title, "  ·  ".join(parts), UiPalette.GOLD_BRIGHT, 0.9)
