@@ -11,6 +11,7 @@ extends SceneTree
 ##        [--campaign=N [--campaigns=M] [--snapshot=R]] [--seed-step=N]
 ## Analysis: [--strip=gear|hp|atk|boots|charm|traits|gear4|pet|pet4|belt|whetstone|starter|slot|
 ##           mastery|packs|midpacks|-<pack>|t:<slot>:<tier>:<trait>|lv:<slot>:<level>,...]
+##           [--affixes=off|on|force:<id>] [--force] [--hero=<class>.<field>=<v>] [--cl=<KNOB>=<v>]
 ##           [--tune-hp= --tune-atk= --tune-boss= --tune-base= --tune-step= --tune-atk-step=
 ##            --tune-gold= --tune-shop=1,3,5] [--danger=lo,hi] [--real-heur=p|scope:p,...] [--items]
 ## Each class row is also printed machine-readable ("#row class wins runs level_sum fights act_sum
@@ -150,6 +151,9 @@ func _init() -> void:
 			strip = Array(arg.substr(8).split(",", false))
 		elif arg == "--items":
 			track_items = true
+		elif arg.begins_with("--affixes="):
+			# off | on | force:<id> (that affix on every elite leader, nothing else)
+			AffixDefs.sim_mode = arg.substr(10)
 		elif arg == "--force":
 			force_classes = true
 		elif arg.begins_with("--hero="):

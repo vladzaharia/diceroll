@@ -74,7 +74,7 @@ static func all_ids(kind: String) -> Array:
 		"packs": return PACK_IDS.duplicate()
 		"gear": return GearDefs.SLOTS.duplicate()
 		"potions": return PotionDefs.IDS.duplicate()
-		"features": return ["potion_belt", "loadout_slot"]
+		"features": return ["potion_belt", "loadout_slot", "affixes"]
 		"runes": return Runes.IDS.duplicate()
 		"kinds": return DiceKinds.IDS.duplicate()
 		"passives": return Passives.IDS.duplicate()
@@ -116,7 +116,7 @@ const MILESTONES := [
 	{"id": "wanderer", "run": 2, "desc": "Complete 20 laps in total.", "cond": {"stat": "laps", "min": 20},
 		"unlocks": [["gear", "blade"], ["biomes", "crypt"]]},
 	{"id": "brawler", "run": 3, "desc": "Win 45 fights in total.", "cond": {"stat": "fights", "min": 45},
-		"unlocks": [["classes", "barbarian"]]},
+		"unlocks": [["classes", "barbarian"], ["features", "affixes"]]},
 	{"id": "gate_crasher", "run": 4, "desc": "Reach the mini-boss twice.", "cond": {"stat": "minibosses_reached", "min": 2},
 		"unlocks": [["packs", "gamblers_kit"], ["gear", "boots"]]},
 	{"id": "arcade_regular", "run": 5, "desc": "Play 14 minigames.", "cond": {"stat": "minigames", "min": 14},

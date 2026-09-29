@@ -29,7 +29,7 @@ static func mid() -> Profile:
 		"bosses": ["boss_cinder_king", "boss_magma_golem"],
 		"pets": ["pumpkin_sprite", "skull_buddy"], "minigames": ["fossil_hunter"],
 		"packs": ["gamblers_kit", "cold_steel", "numerology", "colossus"], "gear": ["helm", "blade", "boots", "charm"],
-		"potions": ["stoneskin", "reroll_tonic"], "features": ["potion_belt"],
+		"potions": ["stoneskin", "reroll_tonic"], "features": ["potion_belt", "affixes"],
 	}
 	for kind in grants:
 		for id in grants[kind]:

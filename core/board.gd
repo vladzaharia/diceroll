@@ -3,7 +3,8 @@ extends RefCounted
 ## Ring board: the perimeter of an n x n grid, ring size 4(n-1). Supported sizes: 24 (7x7)
 ## and 32 (9x9); any 4(n-1) with n >= 5 works with proportionally scaled tile counts.
 ## Tile 0 is Start; the other corners (n-1, 2(n-1), 3(n-1)) are Forge, Treasury and Portal.
-## Each tile: {type, enemies:Array[String], elite:bool}. Types: start forge treasury portal enemy
+## Each tile: {type, enemies:Array[String], elite:bool} (+ enemy_affixes: [[ids] per enemy] when
+## any enemy has an affix; see AffixDefs and RunState.roll_affixes). Types: start forge treasury portal enemy
 ## elite miniboss chest event campfire trap empty, plus biome tiles ice (Frostpeak traps) and
 ## lava (Magma Depths), and meta-layer minigame tiles ({type:"minigame", game:<minigame id>}).
 ## Presentation lays the ring out with side()/size()/corners(); tile i walks clockwise from Start. `biome` ("" = none) sets the tile mix and the enemy roster.
@@ -204,6 +205,7 @@ func portal_targets(pos: int) -> Array[int]:
 
 func clear_enemies(idx: int) -> void:
 	tiles[idx]["enemies"] = []
+	tiles[idx].erase("enemy_affixes")
 	tiles[idx]["cleared"] = true
 
 ## First `n` tiles of `type` strictly ahead of `pos` (not wrapping past Start twice).
@@ -223,6 +225,9 @@ func set_tile(idx: int, type: String, rng: Rng, act: int, lap: int) -> Dictionar
 
 func change(idx: int) -> Dictionary:
 	var c := {"idx": idx, "type": tiles[idx].type, "enemies": tiles[idx].enemies.duplicate(), "elite": tiles[idx].elite}
+	# affixes: parallel to enemies ([] per enemy without one); present on every tile with enemies
+	if not tiles[idx].enemies.is_empty():
+		c["affixes"] = affixes_of(idx)
 	if tiles[idx].has("game"):
 		c["game"] = String(tiles[idx].game)
 	return c
@@ -321,10 +326,21 @@ func remove_minibosses() -> Array[Dictionary]:
 			out.append(change(i))
 	return out
 
+## Affixes of tile idx's enemies: one array per enemy (AffixDefs ids; [] = none).
+func affixes_of(idx: int) -> Array:
+	var t: Dictionary = tiles[idx]
+	var a: Array = t.get("enemy_affixes", [])
+	var out: Array = []
+	for k in (t.enemies as Array).size():
+		out.append((a[k] as Array).duplicate() if k < a.size() else [])
+	return out
+
 func to_dict() -> Dictionary:
 	var t: Array = []
 	for tile in tiles:
 		var d := {"type": tile.type, "enemies": Array(tile.enemies).duplicate(), "elite": bool(tile.elite)}
+		if tile.has("enemy_affixes"):
+			d["enemy_affixes"] = (tile.enemy_affixes as Array).duplicate(true)
 		if tile.get("cleared", false):
 			d["cleared"] = true
 		if tile.has("game"):
@@ -344,5 +360,13 @@ static func from_dict(d: Dictionary) -> Board:
 			tile["cleared"] = true
 		if td.has("game"):
 			tile["game"] = String(td.game)
+		if td.has("enemy_affixes"):
+			var ea: Array = []
+			for lst in td.enemy_affixes:
+				var one: Array = []
+				for x in lst:
+					one.append(String(x))
+				ea.append(one)
+			tile["enemy_affixes"] = ea
 		b.tiles.append(tile)
 	return b

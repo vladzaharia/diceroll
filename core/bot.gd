@@ -1128,7 +1128,8 @@ static func _combat_model(f: GameFlow, rules: AutoRules) -> CombatModel:
 			hit = 0.0
 		var future := _avg_attack(String(e.id), float(e.atk_mult), int(e.atk_bonus)) * 1.2 + 2.0
 		cm.add_enemy(k, float(e.hp), float(e.block), float(e.poison), hit, pierce, other, future,
-			CombatState.has_trait(e, "ward") and summons > 0, bool(e.frozen), CombatState.has_trait(e, "thorns"))
+			(CombatState.has_trait(e, "ward") and summons > 0) or (CombatState.has_trait(e, "ward_allies") and c._unwarded_others(k) > 0),
+			bool(e.frozen), CombatState.has_trait(e, "thorns"))
 	return cm
 
 ## Class mechanics in the combat model (c == null: the pool-value model, no fight yet).

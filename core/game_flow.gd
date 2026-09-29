@@ -343,6 +343,7 @@ func _move(steps: int, teleport: bool) -> Array[Dictionary]:
 						if changes[c].idx == mb.idx:
 							changes.remove_at(c)
 					changes.append(mb)
+			run.roll_change_affixes(changes)
 			changes.append_array(run.place_minigames([dest]))
 			ev.append({"type": "board_mutated", "changes": changes})
 		if run.has_passive("piggy_bank"):
@@ -414,10 +415,10 @@ func _trigger_tile(idx: int, ev: Array[Dictionary]) -> void:
 	match type:
 		"enemy", "elite":
 			if not tile.enemies.is_empty():
-				_start_combat(tile.enemies, bool(tile.elite), false, idx, ev)
+				_start_combat(tile.enemies, bool(tile.elite), false, idx, ev, false, run.board.affixes_of(idx))
 		"miniboss":
 			if not tile.enemies.is_empty():
-				_start_combat(tile.enemies, false, false, idx, ev, true)
+				_start_combat(tile.enemies, false, false, idx, ev, true, run.board.affixes_of(idx))
 		"chest":
 			_consume(idx, ev)
 			if run.potion_cap > 0 and run.rng.chance(Balance.CHEST_POTION_CHANCE):
@@ -535,14 +536,14 @@ func _gold(ev: Array[Dictionary], amount: int, source: String) -> void:
 
 # ================================================================ combat
 
-func _start_combat(ids: Array, elite: bool, boss: bool, tile: int, ev: Array[Dictionary], miniboss := false) -> void:
+func _start_combat(ids: Array, elite: bool, boss: bool, tile: int, ev: Array[Dictionary], miniboss := false, affixes: Array = []) -> void:
 	combat = CombatState.new()
 	phase = Phase.COMBAT
 	if miniboss:
 		run.stats.miniboss_reached = true
 	if boss:
 		run.stats.boss_reached = true
-	ev.append_array(combat.begin(run, ids, elite, boss, tile, miniboss))
+	ev.append_array(combat.begin(run, ids, elite, boss, tile, miniboss, affixes))
 	if combat.result == "won":
 		# the pet finished the fight before the first attack
 		_on_combat_won(ev)
@@ -699,6 +700,7 @@ func _new_biome(dest: int, ev: Array[Dictionary]) -> void:
 	if not run.board.is_corner(dest) and Board._is_fight(String(run.board.tiles[dest].type)):
 		run.board.tiles[dest] = Board.make_tile("empty")
 	run.after_board_generated([dest])
+	run.roll_board_affixes()
 	run.stats.max_act = maxi(int(run.stats.get("max_act", 1)), run.act)
 	ev.append({"type": "act_started", "act": run.act, "biome": run.biome(), "biome_name": BiomeDefs.name_of(run.biome()),
 		"biome_desc": BiomeDefs.desc_of(run.biome()), "lap": run.lap,
@@ -1229,6 +1231,7 @@ func event_choose(i: int) -> Array[Dictionary]:
 			var changes: Array[Dictionary] = []
 			for idx in run.board.next_of_type(run.pos, "empty", 3):
 				changes.append(run.board.set_tile(idx, type, run.rng, run.act, run.eff_lap()))
+			run.roll_change_affixes(changes)
 			ev.append({"type": "board_mutated", "changes": changes})
 		"merchant":
 			if i == 0:

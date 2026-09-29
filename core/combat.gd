@@ -42,7 +42,8 @@ var last_overkill: int = 0         # damage_enemy: overkill of the last lethal h
 
 # ---------------------------------------------------------------- setup
 
-func begin(run: RunState, ids: Array, p_elite: bool, p_boss: bool, p_tile: int, p_miniboss := false) -> Array[Dictionary]:
+## affixes (optional): per enemy, AffixDefs ids rolled at tile spawn (Board.affixes_of).
+func begin(run: RunState, ids: Array, p_elite: bool, p_boss: bool, p_tile: int, p_miniboss := false, affixes: Array = []) -> Array[Dictionary]:
 	elite = p_elite
 	boss = p_boss
 	miniboss = p_miniboss
@@ -60,6 +61,11 @@ func begin(run: RunState, ids: Array, p_elite: bool, p_boss: bool, p_tile: int, 
 	if not run.meta.is_empty():
 		for e in enemies:
 			meta_enemy(run, e)
+	for k in enemies.size():
+		if k < affixes.size() and not (affixes[k] as Array).is_empty() and not bool(enemies[k].boss):
+			AffixDefs.apply(enemies[k], affixes[k], EnemyDefs.band(lap))
+	_note_seen(run)
+	if not run.meta.is_empty():
 		if int(run.pet_state.get("boost", 0)) > 0:
 			boost = true
 			run.pet_state["boost"] = int(run.pet_state.boost) - 1
@@ -101,6 +107,7 @@ static func make_enemy(rng: Rng, id: String, p_act: int, p_lap: int, p_elite: bo
 		"elite": p_elite, "atk_mult": atk_mult, "step": step, "summoned": summoned,
 		"miniboss": EnemyDefs.is_miniboss(id), "traits": EnemyDefs.traits(id, 1).duplicate(),
 		"frenzy": 0, "form": EnemyDefs.form(id, 1),
+		"affixes": [], "thorns_value": Balance.ENEMY_THORNS, "actions": 0, "chilled": false,
 	}
 
 ## Meta-layer enemy modifiers (ascension): A1 elites +15% HP; A6 +4% HP/attack (not bosses);
@@ -122,13 +129,26 @@ static func meta_enemy(run: RunState, e: Dictionary) -> void:
 			hp_m *= UnlockDefs.ASC_SKIP_MINIBOSS_BOSS_HP
 		if stage >= 1:
 			hp_m *= UnlockDefs.ASC_SECOND_BOSS_HP
-	if bool(e.get("miniboss", false)) and run.has_asc("miniboss_trait"):
-		var t := String(UnlockDefs.ASC_MINIBOSS_TRAIT.get(run.route[1], "armor"))
-		if not (e.traits as Array).has(t):
-			e.traits.append(t)
 	if hp_m != 1.0:
 		e.hp = maxi(1, int(round(int(e.hp) * hp_m)))
 		e.max_hp = e.hp
+
+## Records enemy ids and affixes met this run (stats.seen_enemies / seen_affixes, for the
+## Bestiary and first-encounter popups).
+func _note_seen(run: RunState) -> void:
+	var se: Array = run.stats.get("seen_enemies", [])
+	var sa: Array = run.stats.get("seen_affixes", [])
+	for e in enemies:
+		if not se.has(String(e.id)):
+			se.append(String(e.id))
+		for a in e.get("affixes", []):
+			if not sa.has(String(a)):
+				sa.append(String(a))
+	run.stats["seen_enemies"] = se
+	run.stats["seen_affixes"] = sa
+
+static func has_affix(e: Dictionary, a: String) -> bool:
+	return (e.get("affixes", []) as Array).has(a)
 
 static func has_trait(e: Dictionary, t: String) -> bool:
 	return (e.get("traits", []) as Array).has(t)
@@ -171,6 +191,8 @@ func roll_intent(rng: Rng, i: int) -> void:
 	# At the summon cap the step is spent on Block 8 instead (rule 21).
 	if entry.kind == "summon" and _summoned_alive() >= Balance.MAX_SUMMONED_ALIVE:
 		entry = {"kind": "block", "value": 8}
+	if String(entry.kind) == "attack" and has_affix(e, "vampiric"):
+		entry = {"kind": "drain", "value": entry.value}
 	var value := int(entry.value)
 	match String(entry.kind):
 		"attack", "chill", "drain":
@@ -490,7 +512,9 @@ func attack(run: RunState) -> Array[Dictionary]:
 		ev.append_array(_frenzy(tgt0))
 	if thorny and total > 0:
 		# Briar thorns: reflect damage to the hero, never lethal.
-		var th := mini(Balance.ENEMY_THORNS, run.hp - 1)
+		var th := mini(int(enemies[tgt0].get("thorns_value", Balance.ENEMY_THORNS)), run.hp - 1)
+		if th > 0 and has_affix(enemies[tgt0], "thorned"):
+			ev.append({"type": "affix_triggered", "enemy_idx": tgt0, "affix": "thorned", "value": th})
 		if th > 0:
 			run.hp -= th
 			run.stats.damage_taken = int(run.stats.get("damage_taken", 0)) + th
@@ -588,6 +612,10 @@ func damage_enemy(i: int, amount: int, source: String, run: RunState, ignore_blo
 		# Bone Warden's legion: half damage while any summoned ally stands.
 		amount = int(ceil(amount / 2.0))
 		warded = true
+	elif has_trait(e, "ward_allies") and _unwarded_others(i) > 0:
+		# Warded affix: half damage while any other non-warded enemy stands.
+		amount = int(ceil(amount / 2.0))
+		warded = true
 	var blocked := 0
 	if not ignore_block:
 		blocked = mini(int(e.block), amount)
@@ -604,6 +632,14 @@ func damage_enemy(i: int, amount: int, source: String, run: RunState, ignore_blo
 		e.poison = 0
 		e.frozen = false
 		ev.append({"type": "enemy_died", "enemy_idx": i, "id": e.id})
+		run.stats.kills = int(run.stats.get("kills", 0)) + 1
+		if not (e.get("affixes", []) as Array).is_empty():
+			run.stats.affixed_kills = int(run.stats.get("affixed_kills", 0)) + 1
+			if has_affix(e, "gilded"):
+				var gc := PetLogic.add_charge(run, AffixDefs.GILDED_PET_CHARGE)
+				if not gc.is_empty():
+					ev.append({"type": "affix_triggered", "enemy_idx": i, "affix": "gilded", "value": AffixDefs.GILDED_PET_CHARGE})
+					ev.append_array(gc)
 		if run.has_passive("bloodthirst"):
 			var h := run.heal(Balance.PASSIVE_BLOODTHIRST)
 			ev.append(_passive("bloodthirst", Balance.PASSIVE_BLOODTHIRST))
@@ -649,6 +685,14 @@ func _frenzy(i: int) -> Array[Dictionary]:
 		out.append({"type": "affix_triggered", "enemy_idx": i, "affix": "frenzied", "value": int(e.frenzy)})
 	return out
 
+## Living enemies other than i without the Warded affix.
+func _unwarded_others(i: int) -> int:
+	var n := 0
+	for k in enemies.size():
+		if k != i and alive(k) and not has_trait(enemies[k], "ward_allies"):
+			n += 1
+	return n
+
 ## Living summoned allies.
 func _summons_alive() -> int:
 	var n := 0
@@ -684,6 +728,7 @@ func _enemy_phase(run: RunState) -> Array[Dictionary]:
 			e.frozen = false
 			ev.append({"type": "status", "target": i, "status": "frozen", "value": 0, "skipped": true})
 		else:
+			ev.append_array(_affix_before_action(run, i))
 			ev.append_array(_execute_intent(run, i))
 			if result == "lost":
 				return ev
@@ -758,6 +803,31 @@ func _heal_enemy(i: int, amount: int, source: String) -> Array[Dictionary]:
 		return []
 	e.hp = int(e.hp) + h
 	return [{"type": "enemy_healed", "enemy_idx": i, "amount": h, "hp": int(e.hp), "max_hp": int(e.max_hp), "source": source}]
+
+## Affix procs when enemy i acts (a frozen enemy skips them): Regenerating heals unless
+## poisoned; Hexing curses on its 1st action and every HEX_EVERY-th after; Frostbound chills
+## with its first attack.
+func _affix_before_action(run: RunState, i: int) -> Array[Dictionary]:
+	var e := enemies[i]
+	var ev: Array[Dictionary] = []
+	if (e.get("affixes", []) as Array).is_empty():
+		return ev
+	e["actions"] = int(e.get("actions", 0)) + 1
+	if has_affix(e, "regenerating") and int(e.poison) <= 0:
+		var h := _heal_enemy(i, maxi(1, int(round(int(e.max_hp) * AffixDefs.REGEN_PCT))), "regenerating")
+		if not h.is_empty():
+			ev.append({"type": "affix_triggered", "enemy_idx": i, "affix": "regenerating", "value": int(h[0].amount)})
+			ev.append_array(h)
+	if has_affix(e, "hexing") and (int(e.actions) - 1) % AffixDefs.HEX_EVERY == 0:
+		pending_curse += 1
+		ev.append({"type": "affix_triggered", "enemy_idx": i, "affix": "hexing", "value": 1})
+		ev.append({"type": "status", "target": "hero", "status": "curse", "value": 1, "source": i, "pending": true})
+	if has_affix(e, "frostbound") and not bool(e.get("chilled", false)) and ["attack", "chill", "drain"].has(String(e.intent.kind)):
+		e["chilled"] = true
+		pending_curse += 1
+		ev.append({"type": "affix_triggered", "enemy_idx": i, "affix": "frostbound", "value": 1})
+		ev.append({"type": "status", "target": "hero", "status": "curse", "value": 1, "source": i, "pending": true, "chill": true})
+	return ev
 
 func _execute_intent(run: RunState, i: int) -> Array[Dictionary]:
 	var ev: Array[Dictionary] = []
@@ -853,8 +923,9 @@ func _win(run: RunState) -> Array[Dictionary]:
 			continue
 		var def := EnemyDefs.def(e.id)
 		var m := Balance.ELITE_REWARD_MULT if e.elite else 1.0
-		g += float(def.gold) * m * (1.0 if e.boss else gold_mult)
-		x += float(def.xp) * m
+		var am := AffixDefs.reward_mult(e.get("affixes", []))
+		g += float(def.gold) * m * (1.0 if e.boss else gold_mult) * float(am[0])
+		x += float(def.xp) * m * float(am[1])
 	if run.has_passive("scholar"):
 		x *= Balance.PASSIVE_SCHOLAR
 	gold_reward = int(round(g * Balance.tune_gold))
@@ -944,6 +1015,8 @@ static func _norm_enemy(ed: Dictionary) -> Dictionary:
 		"summoned": bool(ed.summoned), "miniboss": bool(ed.get("miniboss", false)),
 		"traits": _strings(ed.get("traits", [])),
 		"frenzy": int(ed.get("frenzy", 0)), "form": String(ed.get("form", "")),
+		"affixes": _strings(ed.get("affixes", [])), "thorns_value": int(ed.get("thorns_value", Balance.ENEMY_THORNS)),
+		"actions": int(ed.get("actions", 0)), "chilled": bool(ed.get("chilled", false)),
 	}
 
 static func _strings(a: Array) -> Array:

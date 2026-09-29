@@ -40,6 +40,7 @@ static func build(profile_dict: Dictionary, class_id := "") -> Dictionary:
 		"pet": pet, "minigames": mg, "mastery": mastery,
 		"pools": {"runes": p.pool("runes"), "kinds": p.pool("kinds"), "passives": p.pool("passives")},
 		"biomes": Array(p.unlocks.biomes), "bosses": Array(p.unlocks.bosses), "minibosses": Array(p.unlocks.minibosses),
+		"affixes": p.owns("features", "affixes"),
 	}
 
 ## Normalises a meta config loaded from JSON (ints stay ints, arrays hold Strings).
@@ -52,6 +53,7 @@ static func normalize(m: Dictionary) -> Dictionary:
 	for k in ["catchup", "gold_pct"]:
 		out[k] = float(out.get(k, 0.0))
 	out.hazard_mult = float(out.get("hazard_mult", 1.0))
+	out.affixes = bool(out.get("affixes", false))
 	out.starter_kind = String(out.get("starter_kind", ""))
 	for k in ["asc_keys", "traits", "potion_types", "minigames", "biomes", "bosses", "minibosses"]:
 		out[k] = _strings(out.get(k, []))
