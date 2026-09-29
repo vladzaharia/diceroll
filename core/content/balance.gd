@@ -200,7 +200,9 @@ const MINIGAME_TILES_MAX := 3
 const SHORT_LAPS := 10
 const SHORT_BIOME_LAPS := [1, 6]
 const SHORT_MINIBOSS_LAP := 6
-const SHORT_EFF_LAPS := [1, 2, 3, 4, 5, 8, 9, 10, 11, 12]
+const SHORT_EFF_LAPS := [1, 2, 3, 4, 5, 7, 8, 9, 10, 11]
+## Short Road final boss HP multiplier (less time to build than a 15-lap run).
+const SHORT_BOSS_HP := 0.75
 
 ## Balance targets for the greedy sim bot (A0, standard mode), used by tools/sim.gd reports.
 const TARGET_FRESH := [0.22, 0.30]

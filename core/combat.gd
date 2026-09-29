@@ -46,6 +46,12 @@ func begin(run: RunState, ids: Array, p_elite: bool, p_boss: bool, p_tile: int, 
 	lap = run.eff_lap()
 	for id in ids:
 		enemies.append(make_enemy(run.rng, String(id), act, lap, elite))
+	if run.mode == "short":
+		# Short Road: fewer laps to build, so the final boss is lighter
+		for e in enemies:
+			if bool(e.boss):
+				e.hp = maxi(1, int(round(int(e.hp) * Balance.SHORT_BOSS_HP)))
+				e.max_hp = e.hp
 	if not run.meta.is_empty():
 		for e in enemies:
 			meta_enemy(run, e)
