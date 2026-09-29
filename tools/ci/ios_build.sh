@@ -18,6 +18,7 @@ cd "$ROOT"
 version="$1"
 out="$2"
 mkdir -p "$out"
+out="$(cd "$out" && pwd)" # absolute: the zips below run from other directories
 tmp="$(mktemp -d "${RUNNER_TEMP:-/tmp}/iosbuild.XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT
 
