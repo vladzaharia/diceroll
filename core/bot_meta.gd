@@ -271,21 +271,25 @@ static func choose_loadout(p: Profile) -> Array:
 		if p.owns("minigames", id) and mg.size() < p.loadout_slots():
 			mg.append(id)
 	var pet := ""
-	var pref := ["skull_buddy", "guard_die", "lantern_ghost", "pumpkin_sprite", "crystal_wisp", "coin_mimic"]
+	var pref := ["skull_buddy", "guard_die", "lantern_ghost", "pumpkin_sprite", "crystal_wisp", "coin_mimic",
+		"wick", "frost_mote", "pebble_golem", "grimoire", "tinker_gear", "cauldron"]
 	for id in pref:
 		if p.owns("pets", id) and (pet == "" or p.pet_level(id) > p.pet_level(pet)):
 			pet = id
 	return [mg, pet]
 
 ## Spends Crowns and Sigils greedily: the cheapest affordable item each step, Sigil unlocks in
-## CLASS -> PACK -> PET -> MINIGAME -> BIOME order, gear traits keep their default. Returns the
-## commands applied.
-static func spend(camp: Camp) -> Array:
+## CLASS -> PACK -> PET -> MINIGAME -> BIOME order, gear traits keep their default. A player who
+## just got a major unlock (class, pet or biome) from a milestone enjoys it before buying another
+## (`got_major`). Returns the commands applied.
+static func spend(camp: Camp, got_major := false) -> Array:
 	var done: Array = []
 	for guard in 200:
 		var best: Dictionary = {}
 		for it in camp.catalog():
 			if not bool(it.affordable):
+				continue
+			if got_major and UnlockDefs.MAJOR_KINDS.has(String(it.kind)):
 				continue
 			if best.is_empty() or _spend_rank(it) < _spend_rank(best):
 				best = it

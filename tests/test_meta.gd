@@ -122,12 +122,14 @@ func test_camp_traits_are_switchable_after_level_4() -> void:
 func test_camp_sigil_unlocks_and_pool_toggle() -> void:
 	var p := Profile.fresh()
 	var camp := Camp.new(p)
-	assert_eq(camp.unlock("classes", "mage")[0].type, "error", "no Sigils")
+	assert_eq(camp.unlock("classes", "paladin")[0].type, "error", "no Sigils")
 	p.sigils = 20
-	var ev := camp.unlock("classes", "mage")
-	assert_eq(_first(ev, "unlocked"), {"type": "unlocked", "kind": "classes", "id": "mage", "source": "sigils"})
-	assert_eq(p.sigils, 20 - int(UnlockDefs.SIGIL_PRICE.classes))
-	assert_eq(camp.unlock("classes", "mage")[0].type, "error", "already owned")
+	assert_eq(camp.unlock("classes", "mage")[0].type, "error", "only the next two locked classes")
+	var ev := camp.unlock("classes", "paladin")
+	assert_eq(_first(ev, "unlocked"), {"type": "unlocked", "kind": "classes", "id": "paladin", "source": "sigils"})
+	assert_eq(p.sigils, 20 - int(UnlockDefs.sigil_cost("classes", "paladin").sigils))
+	assert_eq(camp.unlock("classes", "paladin")[0].type, "error", "already owned")
+	assert_eq(UnlockDefs.buyable_classes(p.unlocks.classes), ["barbarian", "mage"])
 	# pool toggle: at most 25% of each unlocked pool off
 	var owned := p.pool("runes").size()
 	var allowed := int(floor(owned * UnlockDefs.POOL_TOGGLE_MAX))
@@ -330,15 +332,25 @@ func test_pet_charge_persists_across_fights_and_fires_automatically() -> void:
 
 func test_every_pet_acts() -> void:
 	var expect := {"pumpkin_sprite": "heal", "skull_buddy": "bite", "lantern_ghost": "poison", "guard_die": "block",
-		"coin_mimic": "gold", "crystal_wisp": "reroll"}
+		"coin_mimic": "gold", "crystal_wisp": "reroll", "pebble_golem": "block", "frost_mote": "freeze", "wick": "burn",
+		"tinker_gear": "fix", "grimoire": "rune", "cauldron": "potion"}
 	for pet in PetDefs.IDS:
 		var f := _pet_flow(pet, 10)
 		assert_eq(f.run.pet_level(), 10)
 		_fight(f, "skeleton_minion,skeleton_minion")
 		f.run.pet_state.charge = PetDefs.size(pet)
+		f.run.pet_state["rune"] = Runes.IDS.find("blade")
+		f.run.pet_state["rune_v"] = 4
 		f.combat.dice_values.assign([4, 4])
 		var ev: Array[Dictionary] = []
-		if pet == "crystal_wisp":
+		if pet == "cauldron":
+			# Bubbles charges per fight won and brews right after the fight
+			f.run.pet_state.charge = PetDefs.size(pet) - 1
+			f.combat.enemies[0].hp = 1
+			f.combat.enemies[1].hp = 0
+			f.combat.target = 0
+			ev = f.combat_attack()
+		elif pet == "crystal_wisp":
 			ev = f.combat.start_turn(f.run)
 		else:
 			ev = f.combat_attack()

@@ -106,12 +106,12 @@ static func milestone_for(kind: String, id: String) -> Dictionary:
 
 
 ## How a locked thing unlocks: the milestone text, plus the Sigil price when it can be bought.
-static func lock_text(kind: String, id: String) -> String:
+static func lock_text(kind: String, id: String, p: Profile = null) -> String:
 	var m := milestone_for(kind, id)
 	var parts := PackedStringArray()
 	if not m.is_empty():
 		parts.append(String(m.desc))
-	var cost := UnlockDefs.sigil_cost(kind, id)
+	var cost := UnlockDefs.sigil_cost(kind, id, p.unlocks.get("classes", []) if p != null else null)
 	if not cost.is_empty():
 		parts.append("or %d Sigils" % int(cost.sigils))
 	return "  ".join(parts) if not parts.is_empty() else "Locked"
@@ -119,17 +119,7 @@ static func lock_text(kind: String, id: String) -> String:
 
 ## [current, needed] toward a milestone condition ({stat, min} or {any: [...]}: best branch).
 static func progress(p: Profile, cond: Dictionary) -> Array:
-	if cond.has("any"):
-		var best := [0, 1]
-		var best_r := -1.0
-		for sub in cond.any:
-			var pr := progress(p, sub)
-			var r := float(pr[0]) / maxf(1.0, float(pr[1]))
-			if r > best_r:
-				best_r = r
-				best = pr
-		return best
-	return [mini(p.counter(String(cond.stat)), int(cond.min)), int(cond.min)]
+	return p.cond_progress(cond)
 
 
 ## Station lock state: {locked, text}. The Armory opens with the first gear piece, the Pet Den

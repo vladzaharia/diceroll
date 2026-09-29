@@ -41,6 +41,8 @@ static func build(profile_dict: Dictionary, class_id := "") -> Dictionary:
 		"pools": {"runes": p.pool("runes"), "kinds": p.pool("kinds"), "passives": p.pool("passives")},
 		"biomes": Array(p.unlocks.biomes), "bosses": Array(p.unlocks.bosses), "minibosses": Array(p.unlocks.minibosses),
 		"affixes": p.owns("features", "affixes"),
+		"skin": p.equipped_skin(class_id) if class_id != "" else "default",
+		"prestige": p.prestige_on(class_id) if class_id != "" else false,
 	}
 
 ## Normalises a meta config loaded from JSON (ints stay ints, arrays hold Strings).
@@ -54,6 +56,8 @@ static func normalize(m: Dictionary) -> Dictionary:
 		out[k] = float(out.get(k, 0.0))
 	out.hazard_mult = float(out.get("hazard_mult", 1.0))
 	out.affixes = bool(out.get("affixes", false))
+	out.skin = String(out.get("skin", "default"))
+	out.prestige = bool(out.get("prestige", false))
 	out.starter_kind = String(out.get("starter_kind", ""))
 	for k in ["asc_keys", "traits", "potion_types", "minigames", "biomes", "bosses", "minibosses"]:
 		out[k] = _strings(out.get(k, []))
@@ -92,6 +96,8 @@ static func apply_start(r: RunState) -> void:
 		r.belt.append("healing")
 	r.potions = r.belt.size()
 	r.lap_rerolls = r.lap_reroll_refill()
+	r.skin = String(m.get("skin", "default"))
+	r.skin_prestige = bool(m.get("prestige", false))
 	var sk := String(m.starter_kind)
 	if sk != "" and r.dice.size() >= 2 and UnlockDefs.STARTER_KINDS.has(sk):
 		var tags := r.dice[1].tags

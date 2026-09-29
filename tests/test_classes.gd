@@ -115,9 +115,9 @@ func test_paladin_oath_value() -> void:
 	assert_eq(ClassLogic.oath_of([[1, 1, 3, 3, 5, 5], [1, 2, 3, 4, 5, 6]]), 5)
 	var f := GameFlow.new_run("paladin", 2)
 	f.debug_open("combat", "skeleton_minion")
-	assert_eq(f.combat.oath, 4, "two Twins swear to 4")
+	assert_eq(f.combat.oath, 4, "Twin + Standard: ties go to 4")
 	assert_eq(f.run.dice[0].kind, "twin")
-	assert_eq(f.run.dice[1].kind, "twin")
+	assert_eq(f.run.dice[1].kind, String(HeroDefs.DATA.paladin.kinds[1]))
 
 func test_paladin_oath_pair_worked_example() -> void:
 	_setup("paladin", [["twin", ""], ["twin", ""]])
@@ -125,10 +125,11 @@ func test_paladin_oath_pair_worked_example() -> void:
 	_dice([4, 4])
 	var ev := c.attack(run)
 	var cb: Dictionary = _all(ev, "combo")[0]
-	assert_eq(int(cb.total), 20, "(4+4+2) x (1.5+0.5)")
+	var pips := 2 * ClassLogic.PALADIN_OATH_PIP
+	assert_eq(int(cb.total), int(floor((8 + pips) * (1.5 + ClassLogic.PALADIN_OATH_MULT))), "(4+4+pips) x (1.5+mult)")
 	var kept := _all(ev, "class_triggered", "oath_kept")
 	assert_eq(kept.size(), 1)
-	assert_eq(int(kept[0].value), 2)
+	assert_eq(int(kept[0].value), pips)
 
 func test_paladin_oath_ignores_other_sets_and_straights() -> void:
 	_setup("paladin", [["twin", ""], ["twin", ""], ["twin", ""]])
@@ -138,8 +139,8 @@ func test_paladin_oath_ignores_other_sets_and_straights() -> void:
 	assert_true(_all(ev, "class_triggered", "oath_kept").is_empty())
 	assert_eq(ClassLogic.oath_bonus(4, "small_straight", [0, 1, 2, 3], [1, 2, 3, 4])[0], 0.0)
 	assert_eq(ClassLogic.oath_bonus(4, "high_roller", [0], [4, 4]), [0.0, 0])
-	assert_eq(ClassLogic.oath_bonus(4, "two_pair", [0, 1, 2, 3], [4, 4, 6, 6]), [ClassLogic.PALADIN_OATH_MULT, 2], "either sub-set")
-	assert_eq(ClassLogic.oath_bonus(4, "full_house", [0, 1, 2, 3, 4], [2, 2, 2, 4, 4]), [ClassLogic.PALADIN_OATH_MULT, 2])
+	assert_eq(ClassLogic.oath_bonus(4, "two_pair", [0, 1, 2, 3], [4, 4, 6, 6]), [ClassLogic.PALADIN_OATH_MULT, 2 * ClassLogic.PALADIN_OATH_PIP], "either sub-set")
+	assert_eq(ClassLogic.oath_bonus(4, "full_house", [0, 1, 2, 3, 4], [2, 2, 2, 4, 4]), [ClassLogic.PALADIN_OATH_MULT, 2 * ClassLogic.PALADIN_OATH_PIP])
 
 func test_paladin_sanctify_at_biome_change() -> void:
 	var f := GameFlow.new_run("paladin", 4)
@@ -176,7 +177,7 @@ func test_ranger_aim_without_rerolls() -> void:
 	_setup("ranger", [["standard", ""], ["standard", ""]])
 	_dice([5, 3])
 	var ev := c.attack(run)
-	assert_eq(int(_all(ev, "combo")[0].total), int(floor(8 * ClassLogic.RANGER_AIM_MULT)), "High Roller sums every die")
+	assert_eq(int(_all(ev, "combo")[0].total), int(floor(8 * ClassLogic.aim_mult(2))), "High Roller sums every die")
 	assert_eq(_all(ev, "class_triggered", "aim").size(), 1)
 
 func test_ranger_no_aim_after_a_reroll() -> void:
@@ -197,11 +198,11 @@ func test_ranger_piercing_shot_carries_overkill_once() -> void:
 	c.enemies[1].block = 1
 	c.target = 0
 	_dice([6, 6])
-	# pair of 6s: 12 x 1.5 = 18 x 1.3 = 23; 20 overkill -> enemy 1 (block 1, hp 2) dies, 17 more does not carry
+	# pair of 6s: 12 x 1.5 = 18 x Aim; the overkill beyond 3 HP carries to enemy 1 (block 1, hp 2) once
 	var ev := c.attack(run)
 	var ps := _all(ev, "class_triggered", "piercing_shot")
 	assert_eq(ps.size(), 1)
-	assert_eq(int(ps[0].value), 20)
+	assert_eq(int(ps[0].value), int(floor((int(floor(18 * ClassLogic.aim_mult(2))) - 3) * ClassLogic.RANGER_PIERCE_PCT)))
 	assert_eq(int(ps[0].enemy_idx), 1)
 	assert_true(not c.alive(1))
 	assert_eq(int(c.enemies[2].hp), 100, "only one carry")
@@ -269,7 +270,9 @@ func test_ninja_board_reroll_doubles_are_refunded_once() -> void:
 func test_druid_seed_grows_every_lap() -> void:
 	var f := GameFlow.new_run("druid", 3)
 	assert_true(f.run.dice[0].has_tag("seed"))
-	assert_eq(f.run.dice[0].kind, "low")
+	assert_eq(f.run.dice[0].kind, String(HeroDefs.DATA.druid.kinds[0]))
+	f.run.dice[0] = Die.make("", "low")
+	f.run.dice[0].add_tag("seed")
 	var ev := ClassLogic.on_lap(f.run)
 	var fc := _all(ev, "face_changed")
 	assert_eq(fc.size(), 1)

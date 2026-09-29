@@ -183,7 +183,7 @@ static func _combat(f: GameFlow) -> Array:
 					continue
 				if keep_hi and c.dice_values[i] >= 5:
 					continue
-				if f.run.dice[i].rune == "wild":
+				if c.die_at(f.run, i).rune == "wild":
 					continue
 				want[i] = true
 	for i in want.size():
@@ -221,6 +221,8 @@ static func _best_draft(f: GameFlow) -> int:
 	return best
 
 static func _die_for_rune(f: GameFlow, _rune: String) -> int:
+	if f.run.turret != null and f.run.turret.rune == "" and ClassLogic.TURRET_RUNES.has(_rune):
+		return GameFlow.TURRET # a free Turret slot takes any rune it can fire
 	var best := 0
 	var best_s := INF
 	for i in f.run.dice.size():
@@ -251,7 +253,7 @@ static func _shop(f: GameFlow) -> Array:
 			"rune":
 				var rs := float(RUNE_SCORE.get(String(it.rune), 4))
 				var target := _die_for_rune(f, String(it.rune))
-				var cur := f.run.dice[target].rune
+				var cur := f._die(target).rune
 				var cur_s := 0.0 if cur == "" else float(RUNE_SCORE.get(cur, 4))
 				s = rs - cur_s if (has_free or rs > cur_s) else 0.0
 			"combat_reroll":
@@ -271,7 +273,7 @@ static func _shop(f: GameFlow) -> Array:
 				die_idx = _die_for_rune(f, String(it.rune))
 			else:
 				die_idx = _lowest_die(f)
-			if die_idx < 0:
+			if die_idx < 0 and die_idx != GameFlow.TURRET:
 				return ["shop_leave"]
 		return ["shop_buy", best, die_idx]
 	return ["shop_leave"]
@@ -317,9 +319,9 @@ static func _forge(f: GameFlow) -> Array:
 	var die := f.run.dice[d]
 	var lo := die.lowest_face()
 	if ops.has("mirror"):
-		var hi := 0
+		var hi := lo
 		for k in 6:
-			if die.faces[k] > die.faces[hi]:
+			if die.faces[k] > die.faces[hi] and die.faces[k] != Die.PRETEND:
 				hi = k
 		if die.faces[hi] - die.faces[lo] > 1:
 			return ["forge_apply", d, lo, "mirror", hi]
@@ -747,6 +749,11 @@ class CombatModel:
 	var aim := 1.0           # Ranger: damage factor when no die was rerolled this turn
 	var aim_ok := false      # Ranger: no reroll spent yet this turn
 	var pierce_carry := false  # Ranger: overkill carries once to the next living enemy
+	var kill_value := 0.0    # Necromancer: worth of a kill beyond the enemy itself (a Bone die)
+	var pretend_mask := 0    # Monster Kid: dice whose ★ face (Die.PRETEND) acts as Wild
+	var wild_rune_mask := 0  # dice with the Wild rune (with pretend dice they share the Wild cap)
+	var e_boo := PackedByteArray()      # BOO! effect per enemy: 0 none (brave), 1 cower, 2 cower/flee, 3 weaken
+	var e_max := PackedFloat64Array()   # max HP per enemy (flee threshold)
 	var ne := 0
 	var e_idx := PackedInt32Array()
 	var e_hp := PackedFloat64Array()
@@ -856,12 +863,26 @@ class CombatModel:
 		var key := 0
 		if use_memo:
 			for i in n:
-				key = key * 10 + vals[i]
+				key = key * 11 + vals[i]
 			key = key * 64 + rer
 			var m: Variant = memo.get(key)
 			if m != null:
 				return m
-		var cb: Array = Bot._combo(vals, wild_mask)
+		var raw := vals
+		var wm := wild_mask
+		var star := false
+		if pretend_mask != 0:
+			# the first Wild-rune die or ★ face in pool order is the Wild; a ★ beyond the cap scores 0
+			raw = vals.duplicate()
+			wm = 0
+			for i in n:
+				var is_star := ((pretend_mask >> i) & 1) == 1 and vals[i] == Die.PRETEND
+				star = star or is_star
+				if (is_star or ((wild_rune_mask >> i) & 1) == 1) and wm == 0:
+					wm = 1 << i
+				elif is_star:
+					raw[i] = 0
+		var cb: Array = Bot._combo(raw, wm)
 		var gm: int = cb[1]
 		var eff: PackedInt32Array = cb[2]
 		var code: int = cb[3]
@@ -905,9 +926,9 @@ class CombatModel:
 				Bot.R_BLADE, Bot.R_VENOM, Bot.R_VAMPIRE, Bot.R_ECHO, Bot.R_HEAVY, Bot.R_GILDED:
 					on = ing
 				Bot.R_EMBER:
-					on = p == 6
+					on = p == 6 and vals[i] != Die.PRETEND
 				Bot.R_FROST:
-					on = p == 1
+					on = p == 1 and vals[i] != Die.PRETEND
 				Bot.R_THUNDER:
 					on = rerolled
 				Bot.R_LUCKY:
@@ -973,7 +994,7 @@ class CombatModel:
 			var d0 := _hit(t, float(total))
 			dealt += d0
 			if pierce_carry and h[t] <= 0.0:
-				var over := (ceilf(total / 2.0) if e_ward[t] == 1 else float(total)) - e_block[t] - e_hp[t]
+				var over := floorf(((ceilf(total / 2.0) if e_ward[t] == 1 else float(total)) - e_block[t] - e_hp[t]) * ClassLogic.RANGER_PIERCE_PCT)
 				if over > 0.0:
 					for k in ne:
 						if k != t and h[k] > 0.0:
@@ -1011,13 +1032,24 @@ class CombatModel:
 					h[k] = 0.0
 				if h[k] <= 0.0:
 					kills += 1
-					val += e_future[k]
+					val += e_future[k] + kill_value
 					continue
 				all_dead = false
 				if k == t and venom > 0.0:
 					val += minf(h[k], venom * 1.5) * 0.7
 				if e_frozen[k] == 1 or (frost and k == t):
 					continue
+				if star and k == t and e_boo.size() > k and e_boo[k] > 0:
+					if e_boo[k] == 3:
+						incoming += e_hit[k] * (1.0 - ClassLogic.BOO_WEAKEN)
+						pierce += e_pierce[k] * (1.0 - ClassLogic.BOO_WEAKEN)
+						threat += e_other[k]
+						continue
+					if e_boo[k] == 2 and h[k] <= e_max[k] * ClassLogic.FLEE_PCT:
+						val += e_future[k] * 0.8 + h[k] * 0.5 # it runs off: no more threat
+						continue
+					threat += e_other[k] * 0.5
+					continue # cowers: no action this turn
 				incoming += e_hit[k]
 				pierce += e_pierce[k]
 				threat += e_other[k]
@@ -1079,9 +1111,8 @@ static func _combat_model(f: GameFlow, rules: AutoRules) -> CombatModel:
 	var c := f.combat
 	var run := f.run
 	var cm := CombatModel.new()
-	cm.set_dice(_dice_desc(run.dice))
+	cm.set_dice(_dice_desc(c.pool_dice(run)))
 	cm.set_passives(Array(run.passives), run.gold, c.turn == 1)
-	_class_model(cm, run, c)
 	cm.atk = run.atk
 	cm.lucky_room = maxi(0, Balance.MAX_BANKED_REROLLS - run.banked_rerolls)
 	cm.hero_hp = float(run.hp)
@@ -1135,11 +1166,28 @@ static func _combat_model(f: GameFlow, rules: AutoRules) -> CombatModel:
 		cm.add_enemy(k, float(e.hp), float(e.block), float(e.poison), hit, pierce, other, future,
 			(CombatState.has_trait(e, "ward") and summons > 0) or (CombatState.has_trait(e, "ward_allies") and c._unwarded_others(k) > 0),
 			bool(e.frozen), CombatState.has_trait(e, "thorns"))
+	_class_model(cm, run, c)
 	return cm
 
 ## Class mechanics in the combat model (c == null: the pool-value model, no fight yet).
 static func _class_model(cm: CombatModel, run: RunState, c: CombatState, dice: Array = []) -> void:
 	match HeroDefs.mechanic(run.class_id):
+		"boo":
+			var pd: Array = c.pool_dice(run) if c != null else []
+			for i in cm.n:
+				var desc_faces: PackedInt32Array = cm.faces[i]
+				if desc_faces.has(Die.PRETEND):
+					cm.pretend_mask |= 1 << i
+				if cm.rune[i] == Bot.R_WILD:
+					cm.wild_rune_mask |= 1 << i
+			if c != null:
+				for k in cm.ne:
+					var e: Dictionary = c.enemies[cm.e_idx[k]]
+					var bv := 0
+					if not bool(e.get("brave", false)):
+						bv = 3 if (bool(e.boss) or bool(e.get("miniboss", false))) else (1 if bool(e.elite) else 2)
+					cm.e_boo.append(bv)
+					cm.e_max.append(float(e.max_hp))
 		"oath":
 			if c != null:
 				cm.oath = c.oath
@@ -1148,8 +1196,11 @@ static func _class_model(cm: CombatModel, run: RunState, c: CombatState, dice: A
 				for d in dice:
 					fs.append(d[0])
 				cm.oath = ClassLogic.oath_of(fs)
+		"bone_harvest":
+			if c != null and c.bones_raised < ClassLogic.BONE_MAX and c.pool_dice(run).size() + c.pending_bones < ClassLogic.BONE_POOL_MAX:
+				cm.kill_value = 6.0 # a Bone die for the rest of the fight: kill the weak ones first
 		"aim":
-			cm.aim = ClassLogic.RANGER_AIM_MULT
+			cm.aim = ClassLogic.aim_mult(cm.n)
 			cm.aim_ok = c == null or c.rerolls_used_this_turn == 0
 			cm.pierce_carry = true
 
@@ -1340,7 +1391,7 @@ static func _combat_key(f: GameFlow, rules: AutoRules) -> int:
 	for e in c.enemies:
 		en.append([e.hp, e.block, e.poison, e.frozen, e.intent.kind, e.intent.value, e.atk_bonus, e.traits])
 	var dd: Array = []
-	for d in f.run.dice:
+	for d in c.pool_dice(f.run):
 		dd.append([d.faces, d.rune])
 	var k := hash([f.run.seed, int(f.run.stats.get("combat_turns", 0)), c.turn, c.rerolls_left, c.dice_values,
 		c.locked, c.rerolled, en, dd, f.run.hp, f.run.max_hp, f.run.block, f.run.gold, f.run.passives,
@@ -1578,7 +1629,29 @@ static func _best_rune_die(f: GameFlow, rules: AutoRules, r: String) -> Array:
 		if g > best_g + 1e-6:
 			best_g = g
 			best = i
+	if f.run.turret != null and ClassLogic.TURRET_RUNES.has(r):
+		var tg := _turret_rune_value(f, rules, r) - _turret_rune_value(f, rules, f.run.turret.rune)
+		if tg > best_g + 1e-6:
+			best_g = tg
+			best = GameFlow.TURRET
 	return [best, best_g]
+
+## PV worth per turn of rune `r` on the Engineer's Turret (the shot itself is always there).
+static func _turret_rune_value(f: GameFlow, rules: AutoRules, r: String) -> float:
+	var t := float(ClassLogic.TURRET_T[clampi(f.run.act, 1, 3) - 1])
+	var avg := f.run.turret.face_sum() / 6.0
+	match r:
+		"heavy":
+			return avg * t * float(_fw(rules).dmg)
+		"ember":
+			return 2.0 * float(_fw(rules).dmg)
+		"frost":
+			return 1.2 * float(_fw(rules).def)
+		"guard":
+			return avg * 0.7 * float(_fw(rules).def)
+		"gilded":
+			return avg * 0.3 * float(_fw(rules).econ)
+	return 0.0
 
 static func _new_die_gain(f: GameFlow, rules: AutoRules, kind: String) -> float:
 	if f.run.dice.size() >= f.run.max_dice():
@@ -1605,7 +1678,7 @@ static func _best_face_edit(f: GameFlow, rules: AutoRules, ops: Array, lowest_on
 					best = [i, fi, "raise", -1, g]
 			if ops.has("mirror") and fi == d.lowest_face():
 				for src in 6:
-					if d.faces[src] <= d.faces[fi] or tried.has("m%d" % d.faces[src]):
+					if d.faces[src] <= d.faces[fi] or d.faces[src] == Die.PRETEND or tried.has("m%d" % d.faces[src]):
 						continue
 					tried["m%d" % d.faces[src]] = true
 					var g2 := _face_gain(f, rules, i, fi, d.faces[src])
@@ -1731,6 +1804,8 @@ static func _cat_why(rules: AutoRules, cat: String) -> String:
 	return {"dmg": "more damage", "def": "better defense", "econ": "more gold"}.get(cat, "best value")
 
 static func _rune_why(f: GameFlow, r: String, i: int) -> String:
+	if i == GameFlow.TURRET:
+		return "on the Turret"
 	var d := f.run.dice[i]
 	match r:
 		"heavy", "blade":
@@ -1785,7 +1860,7 @@ static func _decide_rune_assign(f: GameFlow, rules: AutoRules) -> Dictionary:
 	var i := int(bd[0])
 	if _build_lapse(f, rules, 12):
 		i = _die_for_rune(f, r)
-	var old := f.run.dice[i].rune
+	var old := f._die(i).rune
 	var msg := "%s Rune on die %d" % [Runes.DEFS[r].name, i + 1]
 	if old != "":
 		msg += " (replaces %s)" % Runes.DEFS[old].name
@@ -1826,7 +1901,7 @@ static func _decide_shop(f: GameFlow, rules: AutoRules) -> Dictionary:
 			continue
 		var die_idx := int(ov[2])
 		if bool(it.needs_die):
-			if die_idx < 0:
+			if die_idx < 0 and die_idx != GameFlow.TURRET:
 				continue
 			if String(it.id) == "face_raise" and not run.dice[die_idx].can_raise(run.dice[die_idx].lowest_face()):
 				continue

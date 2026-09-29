@@ -431,6 +431,9 @@ func _campaign(n: int, m: int, seed0: int, board: int, mode: String) -> void:
 	var wins_per_run: Array = []
 	var maxed_at: Array = []
 	var sink := Camp.total_crowns_sink()
+	var double_class_runs := 0   # runs (over all campaigns) that unlocked 2+ classes
+	var double_major_runs := 0   # runs that unlocked 2+ majors (class / pet / biome)
+	var all_classes_by := []     # per campaign: run when every class was owned (or 9999)
 	for k in n:
 		crowns_per_run.append(0)
 		sigils_per_run.append(0)
@@ -440,8 +443,11 @@ func _campaign(n: int, m: int, seed0: int, board: int, mode: String) -> void:
 		var camp := Camp.new(p)
 		var spent := 0
 		var got_max := false
+		var have_all := 9999
 		for r in n:
 			var c := _pick_class(p)
+			var classes_this_run := 0
+			var majors_this_run := 0
 			var lo := BotMeta.choose_loadout(p)
 			camp.set_class(c)
 			camp.set_loadout(lo[0], String(lo[1]))
@@ -457,6 +463,10 @@ func _campaign(n: int, m: int, seed0: int, board: int, mode: String) -> void:
 				if e.type == "sigils_changed":
 					sigils_per_run[r] += int(e.amount)
 				elif e.type == "unlocked":
+					if String(e.kind) == "classes":
+						classes_this_run += 1
+					if String(e.kind) in ["classes", "pets", "biomes"]:
+						majors_this_run += 1
 					var key := "%s:%s" % [e.kind, e.id]
 					if not first_run.has(key):
 						first_run[key] = []
@@ -465,12 +475,22 @@ func _campaign(n: int, m: int, seed0: int, board: int, mode: String) -> void:
 					if not milestone_run.has(e.id):
 						milestone_run[e.id] = []
 					(milestone_run[e.id] as Array).append(r + 1)
-			for cmd in BotMeta.spend(camp):
+			for cmd in BotMeta.spend(camp, majors_this_run > 0):
 				if String(cmd[0]) == "unlock":
+					if String(cmd[1]) == "classes":
+						classes_this_run += 1
+					if String(cmd[1]) in ["classes", "pets", "biomes"]:
+						majors_this_run += 1
 					var key := "%s:%s" % [cmd[1], cmd[2]]
 					if not first_run.has(key):
 						first_run[key] = []
 					(first_run[key] as Array).append(r + 1)
+			if classes_this_run >= 2:
+				double_class_runs += 1
+			if majors_this_run >= 2:
+				double_major_runs += 1
+			if have_all == 9999 and (p.unlocks.classes as Array).size() >= HeroDefs.IDS.size():
+				have_all = r + 1
 			spent = p.records.crowns_earned - p.crowns
 			if snapshot_run == r + 1:
 				print("snapshot run %d: gear=%s upgrades=%s pets=%s pet_lv=%s classes=%s packs=%s minigames=%s potions=%s crowns=%d sigils=%d asc=%s" % [
@@ -479,6 +499,7 @@ func _campaign(n: int, m: int, seed0: int, board: int, mode: String) -> void:
 			if not got_max and spent >= sink:
 				got_max = true
 				maxed_at.append(r + 1)
+		all_classes_by.append(have_all)
 	print("")
 	print("Campaign: %d fresh profiles x %d runs, policy=%s, mode=%s, mg=%s (bot spends greedily after every run)" % [m, n, policy, mode, BotMeta.minigame_mode])
 	print("")
@@ -506,6 +527,33 @@ func _campaign(n: int, m: int, seed0: int, board: int, mode: String) -> void:
 		if r < 25 or r % 5 == 4:
 			print("| %d | %.1f | %.2f | %.0f |" % [r + 1, float(crowns_per_run[r]) / m, float(sigils_per_run[r]) / m, 100.0 * wins_per_run[r] / m])
 	print("")
+	print("")
+	print("| class | median unlock run | p90 | got it |")
+	print("|---|---|---|---|")
+	for cid in HeroDefs.IDS:
+		var a: Array = first_run.get("classes:" + cid, [])
+		print("| %s | %s | %s | %d/%d |" % [cid, "start" if cid == "knight" else _median_s(a), _pct_s(a, 0.9, m), a.size(), m])
+		print("#class %s %s %d" % [cid, _median_s(a), a.size()])
+	print("")
+	print("| pet | median unlock run | got it |")
+	print("|---|---|---|")
+	for pid in PetDefs.IDS:
+		var a2: Array = first_run.get("pets:" + pid, [])
+		print("| %s | %s | %d/%d |" % [pid, _median_s(a2), a2.size(), m])
+	var by40 := 0
+	for x in all_classes_by:
+		if int(x) <= 40:
+			by40 += 1
+	print("every class by run 40: %d/%d profiles; median run %s" % [by40, m, _median_s(all_classes_by)])
+	print("runs unlocking 2+ classes: %d of %d; runs unlocking 2+ majors (class/pet/biome): %d" % [double_class_runs, n * m, double_major_runs])
+	# machine-readable, for summing campaign shards: #u <kind:id> <run> · #ms <milestone> <run> · #camp ...
+	for key in first_run:
+		for v in first_run[key]:
+			print("#u %s %d" % [key, int(v)])
+	for key in milestone_run:
+		for v in milestone_run[key]:
+			print("#ms %s %d" % [key, int(v)])
+	print("#camp %d %d %d %d %s" % [m, n * m, double_class_runs, double_major_runs, ",".join(all_classes_by.map(func(x): return str(x)))])
 	print("avg Crowns/run over %d runs: %.1f · Crowns sink (everything bought): %d · profiles that bought everything: %d/%d, median run %s" % [n, total / n, sink, maxed_at.size(), m, _median_s(maxed_at)])
 	print("errors=%d time=%.1fs" % [total_errors, (Time.get_ticks_msec() - t0) / 1000.0])
 
@@ -528,6 +576,15 @@ static func _median(a: Array) -> float:
 	var b := a.duplicate()
 	b.sort()
 	return float(b[b.size() / 2])
+
+## p-quantile over `m` campaigns where missing entries count as "never" (9999).
+static func _pct_s(a: Array, p: float, m: int) -> String:
+	var b := a.duplicate()
+	while b.size() < m:
+		b.append(9999)
+	b.sort()
+	var v := int(b[mini(b.size() - 1, int(ceil(p * b.size())) - 1)])
+	return "never" if v >= 9999 else str(v)
 
 static func _median_s(a: Array) -> String:
 	return "-" if a.is_empty() else str(int(_median(a)))
