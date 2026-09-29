@@ -61,6 +61,19 @@ static func random_kind(rng: Rng, rarity_filter := "") -> String:
 static func label(id: String) -> String:
 	return "%s Die" % def(id).name
 
+## Weighted kind pick among `allowed` (empty = every kind): each kind keeps its unrestricted
+## odds (rarity weight / kinds of that rarity) times `bias[kind]` (default 1). Class-only kinds
+## (DEFS[id].class_only) never appear.
+static func random_kind_biased(rng: Rng, allowed: Array, bias: Dictionary) -> String:
+	var w := {}
+	for id in IDS:
+		if (allowed.is_empty() or allowed.has(id)) and not bool(DEFS[id].get("class_only", false)):
+			var r: String = DEFS[id].rarity
+			w[id] = float(RARITY_WEIGHTS[r]) / float(of_rarity(r).size()) * float(bias.get(id, 1.0))
+	if w.is_empty():
+		return "standard"
+	return String(rng.weighted(w))
+
 ## random_kind() restricted to `allowed` kinds (empty = all kinds, identical to random_kind).
 static func random_kind_in(rng: Rng, allowed: Array, rarity_filter := "") -> String:
 	if allowed.is_empty():

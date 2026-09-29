@@ -11,6 +11,7 @@ extends SceneTree
 ##        [--campaign=N [--campaigns=M] [--snapshot=R]] [--seed-step=N]
 ## Analysis: [--strip=gear|hp|atk|boots|charm|traits|gear4|pet|pet4|belt|whetstone|starter|slot|
 ##           mastery|packs|midpacks|-<pack>|t:<slot>:<tier>:<trait>|lv:<slot>:<level>,...]
+##           [--affixes=off|on|force:<id>] [--force] [--hero=<class>.<field>=<v>] [--cl=<KNOB>=<v>]
 ##           [--tune-hp= --tune-atk= --tune-boss= --tune-base= --tune-step= --tune-atk-step=
 ##            --tune-gold= --tune-shop=1,3,5] [--danger=lo,hi] [--real-heur=p|scope:p,...] [--items]
 ## Each class row is also printed machine-readable ("#row class wins runs level_sum fights act_sum
@@ -51,6 +52,9 @@ var combos := {}
 ## In-run upgrades by source (run.stats.upgrades) summed over every run, and gold earned.
 var upgrades := {}
 var gold_sum := 0
+## --force (and any explicit --class=<id>[,<id>...]): classes the profile has locked are granted
+## for the sim instead of skipped, so per-class rows exist at every profile.
+var force_classes := false
 
 func _init() -> void:
 	var runs := 100
@@ -147,6 +151,29 @@ func _init() -> void:
 			strip = Array(arg.substr(8).split(",", false))
 		elif arg == "--items":
 			track_items = true
+		elif arg.begins_with("--affixes="):
+			# off | on | force:<id> (that affix on every elite leader, nothing else)
+			AffixDefs.sim_mode = arg.substr(10)
+		elif arg == "--force":
+			force_classes = true
+		elif arg.begins_with("--hero="):
+			# --hero=<class>.<field>=<value>: hp/atk/board_rerolls/combat_rerolls ints, runes/kinds/tags
+			# as a|b lists (empty entries allowed: "guard|")
+			var spec := arg.substr(7)
+			var cid := spec.get_slice(".", 0)
+			var kv := spec.substr(cid.length() + 1)
+			var key := kv.get_slice("=", 0)
+			var val := kv.substr(key.length() + 1)
+			var t: Dictionary = HeroDefs.tune.get(cid, {})
+			t[key] = Array(val.split("|")) if key in ["runes", "kinds", "tags"] else (val.to_int() if val.is_valid_int() else val)
+			HeroDefs.tune[cid] = t
+		elif arg.begins_with("--cl="):
+			# --cl=<ClassLogic knob>=<value>, e.g. --cl=RANGER_AIM_MULT=1.25
+			var spec2 := arg.substr(5)
+			var knob := spec2.get_slice("=", 0)
+			var v2 := spec2.substr(knob.length() + 1)
+			if not ClassLogic.tune_knob(knob, v2.to_float()):
+				print("unknown --cl knob ", knob)
 		elif arg == "--verbose":
 			verbose = true
 	rules = AutoRules.all_on(focus, "realistic" if policy == "realistic" else "expert")
@@ -165,7 +192,13 @@ func _init() -> void:
 			prof.loadout.pet = "" if pet_override == "none" else pet_override
 		_strip(prof, strip)
 		opts["profile"] = prof
-	var classes: Array = HeroDefs.IDS if cls == "all" else [cls]
+	var classes: Array = HeroDefs.IDS if cls == "all" else Array(cls.split(",", false))
+	if not prof.is_empty() and (force_classes or cls != "all"):
+		# per-class rows: the sim forces the class even where the profile has it locked
+		for c in classes:
+			if not (prof.unlocks.classes as Array).has(c):
+				(prof.unlocks.classes as Array).append(c)
+		opts["profile"] = prof
 	var total_stuck := 0
 	var rows: Array = []
 	var by_route := {}   # route -> [wins, runs]
@@ -239,6 +272,8 @@ func _init() -> void:
 				upgrades[k] = int(upgrades.get(k, 0)) + int(up[k])
 		# machine-readable row for shard aggregation (tools: sum wins/runs over shards)
 		print("#row %s %d %d %d %d %d %d" % [c, wins, runs, level_sum, fights_won_sum, act_sum, win_level_sum])
+		for k in deaths:
+			print("#death %s %s %d" % [c, k, int(deaths[k])])
 		all_wins += wins
 		all_runs += runs
 		rows.append([c, 100.0 * wins / runs, float(act_sum) / runs, float(board_turns) / runs,
@@ -259,6 +294,8 @@ func _init() -> void:
 		if row[9] > 0:
 			print("  WARNING: %d runs hit the command cap" % row[9])
 	_table("route", by_route)
+	for k in by_route:
+		print("#route %s %d %d" % [k, int(by_route[k][0]), int(by_route[k][1])])
 	_table("final boss", by_boss)
 	_table("route / final boss", by_combo)
 	_table("mini-boss", by_mini, false)

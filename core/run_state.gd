@@ -64,7 +64,7 @@ var cursed_faces: Array[Dictionary] = []
 ## the rest of the random stream. Invalid overrides are ignored.
 static func create(p_class_id: String, p_seed: int, p_board_size: int = Balance.BOARD_SIZE, opts: Dictionary = {}) -> RunState:
 	var r := RunState.new()
-	var def: Dictionary = HeroDefs.DATA[p_class_id]
+	var def: Dictionary = HeroDefs.def(p_class_id)
 	r.class_id = p_class_id
 	r.seed = p_seed
 	r.rng = Rng.new(p_seed)
@@ -72,8 +72,13 @@ static func create(p_class_id: String, p_seed: int, p_board_size: int = Balance.
 	r.hp = r.max_hp
 	r.atk = int(def.atk)
 	r.board_rerolls = int(def.board_rerolls)
-	for rune_id in def.runes:
-		r.dice.append(Die.make(String(rune_id)))
+	r.combat_rerolls = int(HeroDefs.field(p_class_id, "combat_rerolls"))
+	var kinds: Array = HeroDefs.field(p_class_id, "kinds")
+	var tags: Array = HeroDefs.field(p_class_id, "tags")
+	for k in (def.runes as Array).size():
+		var die := Die.make(String(def.runes[k]), String(kinds[k]))
+		die.add_tag(String(tags[k]))
+		r.dice.append(die)
 	r.board_size = p_board_size
 	r.mode = "short" if String(opts.get("mode", "standard")) == "short" else "standard"
 	if opts.has("meta"):
@@ -112,6 +117,7 @@ static func create(p_class_id: String, p_seed: int, p_board_size: int = Balance.
 	MetaRun.apply_start(r)
 	r.board = Board.generate(r.rng, 1, r.board_size, r.eff_lap(1), r.route[0])
 	r.after_board_generated([])
+	r.roll_board_affixes()
 	r.stats = {
 		"board_turns": 0, "combat_turns": 0, "fights_won": 0, "damage_dealt": 0, "damage_taken": 0,
 		"gold_earned": 0, "best_combo": "", "best_mult": 0.0, "max_act": 1, "commands": 0,
@@ -145,6 +151,52 @@ func after_board_generated(protect: Array) -> Array[Dictionary]:
 			out.append(board.change(idx))
 	out.append_array(place_minigames(protect))
 	return out
+
+# ------------------------------------------------------------------ affixes
+
+## "" (affixes off), "on" or "force:<id>" (sim). Meta runs turn them on with the `affixes`
+## feature (the brawler milestone); legacy runs never have them.
+func affix_mode() -> String:
+	if AffixDefs.sim_mode == "off":
+		return ""
+	if AffixDefs.sim_mode != "":
+		return AffixDefs.sim_mode
+	return "on" if bool(meta.get("affixes", false)) else ""
+
+## Rolls the affixes of tile idx's enemies (derived Rng: the run stream is never touched).
+## The mini-boss tile gets one biome affix at A4+ (whatever the affix mode).
+func roll_affixes(idx: int) -> void:
+	var t: Dictionary = board.tiles[idx]
+	t.erase("enemy_affixes")
+	var ids: Array = t.enemies
+	if ids.is_empty():
+		return
+	var rng := Rng.new(hash([seed, "affix", lap, idx, ids]))
+	var out: Array = []
+	if String(t.type) == "miniboss":
+		if has_asc("miniboss_trait"):
+			out = [AffixDefs.roll_miniboss(rng, String(ids[0]), board.biome)]
+	else:
+		var mode := affix_mode()
+		if mode == "":
+			return
+		out = AffixDefs.roll_tile(rng, ids, board.biome, EnemyDefs.band(eff_lap()), bool(t.elite), mode)
+	for a in out:
+		if not (a as Array).is_empty():
+			t["enemy_affixes"] = out
+			return
+
+func roll_board_affixes() -> void:
+	for i in board.size():
+		roll_affixes(i)
+
+## Rolls affixes for the tiles in board `changes` and writes them into each change's `affixes`.
+func roll_change_affixes(changes: Array) -> void:
+	for c in changes:
+		var idx := int(c.idx)
+		if not (board.tiles[idx].enemies as Array).is_empty():
+			roll_affixes(idx)
+			c["affixes"] = board.affixes_of(idx)
 
 # ------------------------------------------------------------------ mode helpers
 

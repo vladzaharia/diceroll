@@ -197,7 +197,7 @@ static func _combat(f: GameFlow) -> Array:
 static func _draft_score(f: GameFlow, o: Dictionary) -> float:
 	match String(o.id):
 		"new_die":
-			return 9.0 + float(KIND_SCORE.get(String(o.get("kind", "standard")), 6)) / 5.0
+			return 9.0 + _kind_score(f, String(o.get("kind", "standard"))) / 5.0
 		"rune":
 			return float(RUNE_SCORE.get(String(o.get("rune", "")), 4))
 		"combat_reroll":
@@ -247,7 +247,7 @@ static func _shop(f: GameFlow) -> Array:
 			"potion":
 				s = 9.0 if hp_ratio(f) < 0.55 else 0.0
 			"die":
-				s = (8.0 + float(KIND_SCORE.get(String(it.get("kind", "standard")), 6)) / 5.0) if f.run.dice.size() < f.run.max_dice() else 0.0
+				s = (8.0 + _kind_score(f, String(it.get("kind", "standard"))) / 5.0) if f.run.dice.size() < f.run.max_dice() else 0.0
 			"rune":
 				var rs := float(RUNE_SCORE.get(String(it.rune), 4))
 				var target := _die_for_rune(f, String(it.rune))
@@ -288,8 +288,29 @@ static func _lowest_die(f: GameFlow) -> int:
 			best = i
 	return best
 
+## Greedy kind taste, with the Paladin's liking for uniform dice.
+static func _kind_score(f: GameFlow, kind: String) -> float:
+	var s := float(KIND_SCORE.get(kind, 6))
+	if HeroDefs.mechanic(f.run.class_id) == "oath" and ClassLogic.PALADIN_SHOP_KINDS.has(kind):
+		s += 3.0
+	return s
+
 static func _forge(f: GameFlow) -> Array:
 	var ops: Array = f.offer.get("ops", ["raise"])
+	if ops.has("mirror") and HeroDefs.mechanic(f.run.class_id) == "oath":
+		# Paladin: mirror an Oath face over the lowest non-Oath face
+		var o := ClassLogic.pool_oath(f.run.dice)
+		for i in f.run.dice.size():
+			var dd := f.run.dice[i]
+			var src := Array(dd.faces).find(o)
+			if src < 0:
+				continue
+			var lo := -1
+			for k in 6:
+				if dd.faces[k] != o and (lo < 0 or dd.faces[k] < dd.faces[lo]):
+					lo = k
+			if lo >= 0 and dd.faces[lo] < o:
+				return ["forge_apply", i, lo, "mirror", src]
 	var d := _lowest_die(f)
 	if d < 0:
 		return ["forge_apply", 0, 0, "skip", -1]
@@ -716,6 +737,11 @@ class CombatModel:
 	var hero_missing := 0.0
 	var hero_block := 0.0
 	var survive := false
+	# class mechanics (ClassLogic)
+	var oath := 0            # Paladin: sets of this value get +mult and +1 pip per die
+	var aim := 1.0           # Ranger: damage factor when no die was rerolled this turn
+	var aim_ok := false      # Ranger: no reroll spent yet this turn
+	var pierce_carry := false  # Ranger: overkill carries once to the next living enemy
 	var ne := 0
 	var e_idx := PackedInt32Array()
 	var e_hp := PackedFloat64Array()
@@ -843,6 +869,14 @@ class CombatModel:
 			mult += Balance.PASSIVE_SET_BONUS
 		var sum := 0.0
 		var bonus := 0.0
+		if oath > 0 and code != Bot.C_HIGH and code != Bot.C_STRAIGHT:
+			var on := 0
+			for i in n:
+				if ((gm >> i) & 1) == 1 and eff[i] == oath:
+					on += 1
+			if on >= 2:
+				mult += ClassLogic.PALADIN_OATH_MULT
+				bonus += ClassLogic.PALADIN_OATH_PIP * on
 		var flat := float(midas)
 		var ember := 0.0
 		var thunder := 0.0
@@ -916,7 +950,8 @@ class CombatModel:
 				gold += 1.0
 		if straight and code == Bot.C_STRAIGHT:
 			flat += Balance.PASSIVE_STRAIGHT_DAMAGE
-		var total := int(floor(((sum + bonus) * mult + flat) * factor)) + atk
+		var fac := factor * (aim if (aim_ok and rer == 0) else 1.0)
+		var total := int(floor(((sum + bonus) * mult + flat) * fac)) + atk
 		var heal_extra := float(Balance.PASSIVE_FULL_HOUSE_HEAL) if (fh_party and code == Bot.C_FULL) else 0.0
 		var best := -INF
 		var best_t := -1
@@ -932,6 +967,13 @@ class CombatModel:
 			var progress := 0.0
 			var d0 := _hit(t, float(total))
 			dealt += d0
+			if pierce_carry and h[t] <= 0.0:
+				var over := (ceilf(total / 2.0) if e_ward[t] == 1 else float(total)) - e_block[t] - e_hp[t]
+				if over > 0.0:
+					for k in ne:
+						if k != t and h[k] > 0.0:
+							dealt += _hit(k, over)
+							break
 			progress += d0 * 0.03 * (e_hit[t] + e_pierce[t] + e_other[t])
 			if ember > 0.0:
 				for k in ne:
@@ -1013,6 +1055,9 @@ static func _avg_attack(id: String, atk_mult: float, atk_bonus: int) -> float:
 	if EnemyDefs.is_boss(id):
 		for ph in def.phases:
 			pats.append_array(ph)
+	elif def.has("phases"):
+		for ph in def.phases:
+			pats.append_array(ph)
 	else:
 		pats = def.pattern
 	var s := 0.0
@@ -1031,6 +1076,7 @@ static func _combat_model(f: GameFlow, rules: AutoRules) -> CombatModel:
 	var cm := CombatModel.new()
 	cm.set_dice(_dice_desc(run.dice))
 	cm.set_passives(Array(run.passives), run.gold, c.turn == 1)
+	_class_model(cm, run, c)
 	cm.atk = run.atk
 	cm.lucky_room = maxi(0, Balance.MAX_BANKED_REROLLS - run.banked_rerolls)
 	cm.hero_hp = float(run.hp)
@@ -1069,6 +1115,8 @@ static func _combat_model(f: GameFlow, rules: AutoRules) -> CombatModel:
 				other = v * 0.4
 			"buff":
 				other = v * 2.0
+			"rally":
+				other = v * 2.0 * c.alive_indices().size()
 			"curse":
 				other = 3.0 * v
 			"summon":
@@ -1080,8 +1128,32 @@ static func _combat_model(f: GameFlow, rules: AutoRules) -> CombatModel:
 			hit = 0.0
 		var future := _avg_attack(String(e.id), float(e.atk_mult), int(e.atk_bonus)) * 1.2 + 2.0
 		cm.add_enemy(k, float(e.hp), float(e.block), float(e.poison), hit, pierce, other, future,
-			CombatState.has_trait(e, "ward") and summons > 0, bool(e.frozen), CombatState.has_trait(e, "thorns"))
+			(CombatState.has_trait(e, "ward") and summons > 0) or (CombatState.has_trait(e, "ward_allies") and c._unwarded_others(k) > 0),
+			bool(e.frozen), CombatState.has_trait(e, "thorns"))
 	return cm
+
+## Class mechanics in the combat model (c == null: the pool-value model, no fight yet).
+static func _class_model(cm: CombatModel, run: RunState, c: CombatState, dice: Array = []) -> void:
+	match HeroDefs.mechanic(run.class_id):
+		"oath":
+			if c != null:
+				cm.oath = c.oath
+			else:
+				var fs: Array = []
+				for d in dice:
+					fs.append(d[0])
+				cm.oath = ClassLogic.oath_of(fs)
+		"aim":
+			cm.aim = ClassLogic.RANGER_AIM_MULT
+			cm.aim_ok = c == null or c.rerolls_used_this_turn == 0
+			cm.pierce_carry = true
+
+## Rerolls the plan may count on: the Ninja's likely refunds make a reroll cost less than 1.
+static func _plan_budget(f: GameFlow) -> int:
+	var c := f.combat
+	if HeroDefs.mechanic(f.run.class_id) == "shadow_step":
+		return c.rerolls_left + int(ceil((ClassLogic.NINJA_REFUNDS_PER_TURN - c.refunds_this_turn) * 0.5))
+	return c.rerolls_left
 
 ## Private samples: face index per (sample, die) from an Rng seeded by `seed`.
 static func _samples(seed: int, ns: int) -> PackedInt32Array:
@@ -1265,9 +1337,13 @@ static func _combat_key(f: GameFlow, rules: AutoRules) -> int:
 	var dd: Array = []
 	for d in f.run.dice:
 		dd.append([d.faces, d.rune])
-	return hash([f.run.seed, int(f.run.stats.get("combat_turns", 0)), c.turn, c.rerolls_left, c.dice_values,
+	var k := hash([f.run.seed, int(f.run.stats.get("combat_turns", 0)), c.turn, c.rerolls_left, c.dice_values,
 		c.locked, c.rerolled, en, dd, f.run.hp, f.run.max_hp, f.run.block, f.run.gold, f.run.passives,
 		f.run.banked_rerolls, rules.focus, rules.skill])
+	if HeroDefs.mechanic(f.run.class_id) != "":
+		# class state only for the new classes (the old four keep their exact noise stream)
+		k = hash([k, f.run.class_id, c.oath, c.rerolls_used_this_turn, c.refunds_this_turn])
+	return k
 
 static func _enemy_name(f: GameFlow, i: int) -> String:
 	return String(f.combat.enemies[i].name) if i >= 0 and i < f.combat.enemies.size() else "?"
@@ -1298,7 +1374,7 @@ static func _combat_plan(f: GameFlow, rules: AutoRules) -> Dictionary:
 		if lapse:
 			plan = _rule_of_thumb(cm, cur, cur_cb, free_mask)
 		else:
-			plan = _plan_rerolls(cm, cur, rer_prev, free_mask, c.rerolls_left, key, real)
+			plan = _plan_rerolls(cm, cur, rer_prev, free_mask, _plan_budget(f), key, real)
 			var grp: int = cur_cb[1]
 			if real and nrng.chance(REAL_GUT) and grp != 0 and float(cur_cb[0]) >= 1.5 and float(cur_cb[0]) < 5.0:
 				# gut feel: keep the pair/set, reroll everything else that can move
@@ -1400,6 +1476,7 @@ static func _pv_model(dice: Array, passives: Array, run: RunState, rules: AutoRu
 	var cm := CombatModel.new()
 	cm.set_dice(dice)
 	cm.set_passives(passives, g, false)
+	_class_model(cm, run, null, dice)
 	if passives.has("opening_salvo"):
 		cm.factor *= 1.0 + (Balance.PASSIVE_DAMAGE_MULT - 1.0) * 0.4 # first turn of ~2.5
 	cm.atk = a
@@ -1428,7 +1505,7 @@ static func _pv_sample(cm: CombatModel, v: PackedInt32Array, k: int) -> float:
 static func _pv_scores(dice: Array, passives: Array, run: RunState, rules: AutoRules, gold := -1, atk := -9999) -> PackedFloat64Array:
 	var g := run.gold if gold < 0 else gold
 	var a := run.atk if atk == -9999 else atk
-	var key := hash([dice, passives, g / 8, a, rules.focus, run.max_hp])
+	var key := hash([dice, passives, g / 8, a, rules.focus, run.max_hp, run.class_id])
 	var hit: Variant = _pv_cache.get(key)
 	if hit != null:
 		return hit
@@ -1611,7 +1688,9 @@ static func _option_value(f: GameFlow, rules: AutoRules, o: Dictionary) -> Array
 		"new_die", "die":
 			var kind := String(o.get("kind", "standard"))
 			var g := _new_die_gain(f, rules, kind)
-			return [g * _pref(rules, "dmg"), "%s: another die means bigger combos" % DiceKinds.label(kind), -1]
+			if HeroDefs.mechanic(run.class_id) == "oath" and ClassLogic.PALADIN_SHOP_KINDS.has(kind):
+				g *= 1.3 # uniform dice keep the Oath
+			return [g * _pref(rules, "dmg"),"%s: another die means bigger combos" % DiceKinds.label(kind), -1]
 		"rune":
 			var r := String(o.rune)
 			var bd := _best_rune_die(f, rules, r)
@@ -1628,7 +1707,8 @@ static func _option_value(f: GameFlow, rules: AutoRules, o: Dictionary) -> Array
 			return [gain * hp_pt * _pref(rules, "def"), "+%d max HP: staying alive" % Balance.DRAFT_MAX_HP, -1]
 		"face_raise":
 			var e := _best_face_edit(f, rules, ["raise"], String(o.id) == "face_raise" and o.has("price"))
-			return [float(e[4]) * _pref(rules, "dmg"), "Face Raise on die %d" % (int(e[0]) + 1), int(e[0])]
+			var fr := 1.3 if HeroDefs.mechanic(run.class_id) == "overgrowth" else 1.0 # growth compounds raises
+			return [float(e[4]) * fr * _pref(rules, "dmg"),"Face Raise on die %d" % (int(e[0]) + 1), int(e[0])]
 		"potion":
 			var heal := minf(run.pct_of_max(Balance.SHOP_POTION_PCT), run.max_hp - run.hp)
 			return [heal * _hp_pt(f, rules), "Potion: heal %d" % int(heal), -1]

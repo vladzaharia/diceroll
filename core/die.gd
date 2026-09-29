@@ -7,6 +7,9 @@ var faces: PackedInt32Array = PackedInt32Array([1, 2, 3, 4, 5, 6])
 var rune: String = ""
 var edited: PackedByteArray = PackedByteArray([0, 0, 0, 0, 0, 0])
 var kind: String = "standard"
+## Generic class-mechanic tags (e.g. "seed" for the Druid's growing dice, "bone" for the
+## Necromancer's temporary dice). Serialised; old saves load with none.
+var tags: PackedStringArray = PackedStringArray()
 
 static func make(rune_id: String = "", kind_id: String = "standard") -> Die:
 	var d := Die.new()
@@ -14,6 +17,13 @@ static func make(rune_id: String = "", kind_id: String = "standard") -> Die:
 	d.kind = kind_id
 	d.faces = DiceKinds.faces(kind_id)
 	return d
+
+func has_tag(t: String) -> bool:
+	return tags.has(t)
+
+func add_tag(t: String) -> void:
+	if t != "" and not tags.has(t):
+		tags.append(t)
 
 ## Highest value a face can be raised to (9 for Giant dice, 6 otherwise).
 func raise_cap() -> int:
@@ -66,7 +76,10 @@ func to_dict() -> Dictionary:
 	var e: Array = []
 	for v in edited:
 		e.append(v)
-	return {"faces": f, "rune": rune, "edited": e, "kind": kind}
+	var out := {"faces": f, "rune": rune, "edited": e, "kind": kind}
+	if not tags.is_empty():
+		out["tags"] = Array(tags)
+	return out
 
 static func from_dict(d: Dictionary) -> Die:
 	var die := Die.new()
@@ -80,4 +93,6 @@ static func from_dict(d: Dictionary) -> Die:
 	for v in d.get("edited", [0, 0, 0, 0, 0, 0]):
 		e.append(int(v))
 	die.edited = e
+	for t in d.get("tags", []):
+		die.add_tag(String(t))
 	return die

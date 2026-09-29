@@ -68,13 +68,13 @@ static func all_ids(kind: String) -> Array:
 				b.append_array(tier)
 			return b
 		"bosses": return ["boss_lich", "boss_bone_warden", "boss_cinder_king", "boss_magma_golem"]
-		"minibosses": return ["mini_pumpkin_knight", "mini_grave_mage", "mini_frost_warden", "mini_bone_champion", "mini_briar_beast", "mini_cinder_brute"]
+		"minibosses": return ["mini_pumpkin_knight", "mini_grave_mage", "mini_frost_warden", "mini_bone_champion", "mini_briar_beast", "mini_cinder_brute", "mini_moonfang", "mini_orc_warchief"]
 		"pets": return PetDefs.IDS.duplicate()
 		"minigames": return MinigameDefs.IDS.duplicate()
 		"packs": return PACK_IDS.duplicate()
 		"gear": return GearDefs.SLOTS.duplicate()
 		"potions": return PotionDefs.IDS.duplicate()
-		"features": return ["potion_belt", "loadout_slot"]
+		"features": return ["potion_belt", "loadout_slot", "affixes"]
 		"runes": return Runes.IDS.duplicate()
 		"kinds": return DiceKinds.IDS.duplicate()
 		"passives": return Passives.IDS.duplicate()
@@ -116,7 +116,7 @@ const MILESTONES := [
 	{"id": "wanderer", "run": 2, "desc": "Complete 20 laps in total.", "cond": {"stat": "laps", "min": 20},
 		"unlocks": [["gear", "blade"], ["biomes", "crypt"]]},
 	{"id": "brawler", "run": 3, "desc": "Win 45 fights in total.", "cond": {"stat": "fights", "min": 45},
-		"unlocks": [["classes", "barbarian"]]},
+		"unlocks": [["classes", "barbarian"], ["features", "affixes"]]},
 	{"id": "gate_crasher", "run": 4, "desc": "Reach the mini-boss twice.", "cond": {"stat": "minibosses_reached", "min": 2},
 		"unlocks": [["packs", "gamblers_kit"], ["gear", "boots"]]},
 	{"id": "arcade_regular", "run": 5, "desc": "Play 14 minigames.", "cond": {"stat": "minigames", "min": 14},
@@ -150,7 +150,8 @@ const MILESTONES := [
 	{"id": "banker", "run": 18, "desc": "Cash out the Treasury 40 times.", "cond": {"stat": "cashouts", "min": 40},
 		"unlocks": [["pets", "coin_mimic"]]},
 	{"id": "warden_slayer", "run": 22, "desc": "Defeat 13 mini-bosses.", "cond": {"stat": "minibosses_killed", "min": 13},
-		"unlocks": [["minibosses", "mini_frost_warden"], ["minibosses", "mini_briar_beast"], ["minibosses", "mini_cinder_brute"]]},
+		"unlocks": [["minibosses", "mini_frost_warden"], ["minibosses", "mini_briar_beast"], ["minibosses", "mini_cinder_brute"],
+			["minibosses", "mini_moonfang"], ["minibosses", "mini_orc_warchief"]]},
 	{"id": "archmage", "run": 20, "desc": "Win 3 runs with the Mage.", "cond": {"stat": "mage_wins", "min": 3},
 		"unlocks": [["packs", "pyromancy"]]},
 	{"id": "rune_lord", "run": 24, "desc": "In 15 runs, fight with 5 dice that all carry runes.", "cond": {"stat": "full_runes", "min": 15},
