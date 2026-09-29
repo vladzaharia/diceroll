@@ -70,7 +70,7 @@ const DEFS := {
 	"rune_bloom": {"name": "Rune Bloom", "rarity": "boss", "icon": "bloom",
 		"desc": "Every die without a rune gains a random rune now and at the start of each act."},
 	"fast_feet": {"name": "Fast Feet", "rarity": "boss", "icon": "wing",
-		"desc": "Moving on doubles: after landing, hop forward again by one die's value."},
+		"desc": "Moving on doubles: after landing, hop forward again by the pair value."},
 	"resonance": {"name": "Resonance", "rarity": "boss", "icon": "wave",
 		"desc": "Runes on dice in your combo trigger twice."},
 	"phoenix": {"name": "Phoenix Feather", "rarity": "boss", "icon": "feather",

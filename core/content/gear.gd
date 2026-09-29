@@ -59,7 +59,7 @@ const TRAIT_DEFS := {
 	"blade_overflow": {"name": "Cleave", "desc": "A kill carries 50% of the excess damage to the next enemy."},
 	"boots_portal": {"name": "Long Stride", "desc": "Portal range +2."},
 	"boots_sure_foot": {"name": "Sure Foot", "desc": "Traps and ice: dodge on 3+."},
-	"boots_pair_pick": {"name": "Pathfinder's Eye", "desc": "When two pairs show, move by the higher pair."},
+	"boots_pair_pick": {"name": "Pathfinder's Eye", "desc": "When values tie for the move, the higher value moves."},
 	"boots_treasury_step": {"name": "Tithe", "desc": "Passing the Treasury banks +5."},
 	"charm_cheap_restock": {"name": "Haggle", "desc": "Shop restocks cost 5 gold."},
 	"charm_free_restock": {"name": "Regular", "desc": "One free restock per shop."},

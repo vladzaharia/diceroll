@@ -40,7 +40,7 @@ func _play(cls: String, seed: int, steps: int, rules: AutoRules) -> GameFlow:
 
 func test_decide_never_mutates_flow_and_commands_are_legal() -> void:
 	var f := _play("mage", 11, 700, AutoRules.all_on())
-	assert_true(f.commands.size() > 300, "played a good chunk of the run")
+	assert_true(f.commands.size() > 300 or f.is_over(), "played a good chunk of the run (or finished it)")
 
 func test_full_runs_finish() -> void:
 	for cls in ["knight", "rogue"]:

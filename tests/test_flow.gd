@@ -136,10 +136,10 @@ func test_treasury_doubles() -> void:
 		var before := f.run.treasury
 		var ev := f.roll_board()
 		var br := _first(ev, "board_rolled")
-		var a: int = f.board_roll[f.board_choice[0]]
-		var b: int = f.board_roll[f.board_choice[1]]
-		var add := a * Balance.TREASURY_PAIR_MULT if a == b and a > 0 else 0
-		assert_eq(br.double, a == b and a > 0)
+		var pv := GameFlow.pair_value_of(f.board_roll, f.board_choice)
+		var add := pv * Balance.TREASURY_PAIR_MULT
+		assert_eq(br.double, pv > 0)
+		assert_eq(br.pair_value, pv)
 		assert_eq(br.treasury_added, add)
 		assert_eq(f.run.treasury, before + add)
 
@@ -989,37 +989,74 @@ func _pick(values: Array, s := 1) -> Array:
 	v.assign(values)
 	return Array(GameFlow.pick_move_dice(v, Rng.new(s)))
 
-func test_move_pair_wins() -> void:
-	assert_eq(_pick([2, 5, 2, 6, 1]), [0, 2])
-	assert_eq(_pick([4, 4, 4, 1]), [0, 1], "trips: two of them")
-	assert_eq(_pick([3, 6, 6, 6, 3]), [1, 2], "three 6s beat a pair of 3s")
+func _vals(values: Array, p: Array) -> Array:
+	var out: Array = []
+	for i in p:
+		out.append(values[i])
+	out.sort()
+	return out
 
-func test_move_two_pair_tie_random_but_seeded() -> void:
+func test_move_one_die_of_each_top_value() -> void:
+	# [2,2,2,5,6,6]: 2 has the most dice, 6 is second -> 2 + 6
+	assert_eq(_vals([2, 2, 2, 5, 6, 6], _pick([2, 2, 2, 5, 6, 6])), [2, 6])
+	assert_eq(_pick([2, 5, 2, 6, 6]), [0, 3], "first die of each value")
+	assert_eq(_vals([3, 6, 6, 6, 3], _pick([3, 6, 6, 6, 3])), [3, 6])
+	assert_eq(_pick([4, 4, 4, 1]), [0, 3], "trips + the other value")
+
+func test_move_single_value_moves_two_of_it() -> void:
+	assert_eq(_pick([4, 4, 4]), [0, 1])
+	assert_eq(_pick([0, 5, 5, 0]), [1, 2], "blanks ignored, one value left")
+
+func test_move_second_rank_tie_is_random_but_seeded() -> void:
 	var seen := {}
 	for s in 40:
-		var p := _pick([5, 2, 5, 2, 1], s)
-		assert_true(p == [0, 2] or p == [1, 3], "one of the pairs")
-		assert_eq(p, _pick([5, 2, 5, 2, 1], s), "deterministic by seed")
-		seen[str(p)] = true
-	assert_eq(seen.size(), 2, "both pairs happen")
+		var p := _pick([2, 2, 5, 6], s)
+		var v := _vals([2, 2, 5, 6], p)
+		assert_true(v == [2, 5] or v == [2, 6], "2 plus 5 or 6: %s" % str(v))
+		assert_eq(p, _pick([2, 2, 5, 6], s), "deterministic by seed")
+		seen[str(v)] = true
+	assert_eq(seen.size(), 2, "both tie-breaks happen")
+
+func test_move_top_rank_tie_picks_two_of_the_tied() -> void:
+	var seen := {}
+	for s in 60:
+		var v := _vals([5, 2, 5, 2, 6, 6], _pick([5, 2, 5, 2, 6, 6], s))
+		assert_eq(v.size(), 2)
+		assert_true(v[0] != v[1], "one die of each value")
+		seen[str(v)] = true
+	assert_eq(seen.size(), 3, "every pair of the tied values happens")
 
 func test_move_all_unique_random_two() -> void:
 	var seen := {}
 	for s in 60:
-		var p := _pick([1, 2, 3, 4, 5], s)
+		var p := _pick([1, 3, 4, 5, 6], s)
 		assert_eq(p.size(), 2)
 		assert_true(p[0] < p[1])
 		seen[str(p)] = true
 	assert_true(seen.size() > 5, "random pairs")
 
-func test_move_ignores_blanks() -> void:
-	assert_eq(_pick([0, 0, 3, 5]).size(), 2)
+func test_move_pathfinders_eye_prefers_high() -> void:
+	var v: Array[int] = [2, 2, 5, 6]
 	for s in 20:
-		var p := _pick([0, 0, 3, 5], s)
-		assert_eq(p, [2, 3], "zeros ignored (%d)" % s)
+		assert_eq(Array(GameFlow.pick_move_dice(v, Rng.new(s), true)), [0, 3])
+
+func test_move_ignores_blanks() -> void:
+	for s in 20:
+		assert_eq(_pick([0, 0, 3, 5], s), [2, 3], "zeros ignored (%d)" % s)
 		var q := _pick([0, 0, 0, 4], s)
 		assert_true(q.has(3), "the only live die moves")
 	assert_eq(_pick([0, 6, 0, 6]), [1, 3], "a pair of 6s, not the blank pair")
+
+func test_pair_value_rule() -> void:
+	var cases := [
+		[[2, 2, 2, 5, 6, 6], 2], [[2, 2, 6, 6], 6], [[2, 2, 5, 6], 2], [[1, 3, 4, 5, 6], 0],
+		[[4, 4], 4], [[3, 5], 0], [[0, 0, 3], 0], [[0, 0, 3, 5], 0], [[4, 4, 0], 4],
+	]
+	for c in cases:
+		var v: Array[int] = []
+		v.assign(c[0])
+		var p := GameFlow.pick_move_dice(v, Rng.new(3))
+		assert_eq(GameFlow.pair_value_of(v, p), int(c[1]), str(c[0]))
 
 func test_move_two_dice_pool_takes_both() -> void:
 	assert_eq(_pick([0, 0]), [0, 1])
@@ -1069,7 +1106,7 @@ func test_gilded_fires_for_each_chosen_die() -> void:
 			n += 1
 	assert_eq(n, 2)
 
-func test_treasury_only_on_chosen_doubles() -> void:
+func test_treasury_on_any_pair_in_the_roll() -> void:
 	var f := _flow()
 	f.run.dice.append(Die.new())
 	f.run.dice.append(Die.new())
@@ -1079,6 +1116,12 @@ func test_treasury_only_on_chosen_doubles() -> void:
 		f.run.rng = Rng.new(s)
 		f._select_move(r)
 		assert_true(f.is_board_double())
+		assert_eq(f.board_pair_value(), 5)
+	var t: Array[int] = [3, 3, 1, 6]
+	f._select_move(t)
+	assert_true(f.is_board_double(), "a pair anywhere in the roll")
+	assert_eq(f.board_pair_value(), 3)
 	var u: Array[int] = [1, 2, 3, 4]
 	f._select_move(u)
 	assert_true(not f.is_board_double())
+	assert_eq(f.board_pair_value(), 0)

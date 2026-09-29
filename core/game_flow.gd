@@ -109,34 +109,36 @@ func _do_board_roll() -> Array[Dictionary]:
 		idx.append(i)
 	ev.append({"type": "dice_rolled", "values": values.duplicate(), "indices": idx, "context": "board"})
 	_select_move(values)
-	# Chosen doubles feed the Treasury bank: +value * TREASURY_PAIR_MULT.
+	# Doubles feed the Treasury bank: +pair value * TREASURY_PAIR_MULT.
 	var added := 0
-	if is_board_double():
-		added = board_roll[board_choice[0]] * Balance.TREASURY_PAIR_MULT
+	var pv := board_pair_value()
+	if pv > 0:
+		added = pv * Balance.TREASURY_PAIR_MULT
 		if run.has_pet("coin_mimic"):
 			added += 2
 	run.treasury += added
 	ev.append({"type": "board_rolled", "values": board_roll.duplicate(), "chosen": board_choice.duplicate(),
-		"move": board_move, "target": board_target(), "targets": landing_preview(), "double": is_board_double(),
+		"move": board_move, "target": board_target(), "targets": landing_preview(), "double": pv > 0, "pair_value": pv,
 		"treasury_added": added, "treasury": run.treasury, "rerolls_left": board_rerolls_left})
 	return ev
 
 ## Sets the current board roll and auto-selects the two moving dice (see pick_move_dice).
 func _select_move(values: Array[int]) -> void:
 	board_roll = values.duplicate()
-	board_choice = pick_move_dice(values, run.rng)
-	if run.has_trait("boots_pair_pick"):
-		board_choice = _highest_pair(values, board_choice)
+	board_choice = pick_move_dice(values, run.rng, run.has_trait("boots_pair_pick"))
 	board_move = 0
 	for i in board_choice:
 		board_move += board_roll[i]
 
-## Movement rule: the pool rolls, then two dice are picked automatically.
-## Blank faces (0) are ignored unless fewer than two dice show a value. The most frequent value
-## wins: if some value shows at least twice, two dice of that value move (ties between values
-## are broken at random). If every value is unique, two random dice move. A 2-die pool moves
-## both. Returns the two dice indices, ascending. The move is their sum.
-static func pick_move_dice(values: Array[int], rng: Rng) -> Array[int]:
+## Movement rule (Vlad, 2026-09-28): the pool rolls, then two dice are picked automatically:
+## ONE die of each of the two pip values shown by the most dice. Ties at any rank are broken at
+## random with the run Rng (Boots L8 "Pathfinder's Eye": ties go to the higher value). Blank
+## faces (0) are ignored unless fewer than two dice show a value. If only one value shows, two
+## dice of it move. The move is the sum of the two picked dice.
+## Examples: [2,2,2,5,6,6] -> 2 + 6 = 8 · [2,2,5,6] -> 2 + (5 or 6) · [1,3,4,5,6] -> two random
+## values · [4,4,4] -> 4 + 4 · [0,0,3] -> 3 + 0. Returns the two dice indices, ascending (the
+## first die showing each picked value). The Rng is only used when a tie decides the pick.
+static func pick_move_dice(values: Array[int], rng: Rng, prefer_high := false) -> Array[int]:
 	var n := values.size()
 	var out: Array[int] = []
 	if n <= 2:
@@ -153,54 +155,74 @@ static func pick_move_dice(values: Array[int], rng: Rng) -> Array[int]:
 	if live.size() < 2:
 		out.append_array(live)
 		while out.size() < 2:
-			var b: int = rng.pick(blanks)
+			var b: int = blanks[0] if blanks.size() == 1 else int(rng.pick(blanks))
 			blanks.erase(b)
 			out.append(b)
 		out.sort()
 		return out
 	var by_val := {}
+	var order: Array = []   # distinct values, first-seen order
 	for i in live:
 		if not by_val.has(values[i]):
 			by_val[values[i]] = [] as Array[int]
+			order.append(values[i])
 		(by_val[values[i]] as Array[int]).append(i)
-	var best := 0
-	for v in by_val:
-		best = maxi(best, (by_val[v] as Array[int]).size())
-	if best >= 2:
+	if order.size() == 1:
+		var only: Array[int] = by_val[order[0]]
+		out.append(only[0])
+		out.append(only[1])
+		return out
+	var picked: Array = []
+	while picked.size() < 2:
+		var best := 0
+		for v in order:
+			if not picked.has(v):
+				best = maxi(best, (by_val[v] as Array[int]).size())
 		var tied: Array = []
-		for v in by_val:
-			if (by_val[v] as Array[int]).size() == best:
+		for v in order:
+			if not picked.has(v) and (by_val[v] as Array[int]).size() == best:
 				tied.append(v)
 		tied.sort()
-		var pick_v: int = tied[0] if tied.size() == 1 else int(rng.pick(tied))
-		var group: Array[int] = by_val[pick_v]
-		out.append(group[0])
-		out.append(group[1])
-		return out
-	var pool := live.duplicate()
-	var a: int = rng.pick(pool)
-	pool.erase(a)
-	var b2: int = rng.pick(pool)
-	out.append(a)
-	out.append(b2)
+		var need := 2 - picked.size()
+		if tied.size() <= need:
+			picked.append_array(tied)
+		elif prefer_high:
+			picked.append_array(tied.slice(tied.size() - need))
+		elif need == 1:
+			picked.append(rng.pick(tied))
+		else:
+			rng.shuffle(tied)
+			picked.append_array(tied.slice(0, need))
+	for v in picked:
+		out.append((by_val[v] as Array[int])[0])
 	out.sort()
 	return out
 
-## Boots L8 trait: with two or more pairs showing, move by the highest pair.
-static func _highest_pair(values: Array[int], fallback: Array[int]) -> Array[int]:
-	for v in range(Combo.MAX_VALUE, 0, -1):
-		var idx: Array[int] = []
-		for i in values.size():
-			if values[i] == v:
-				idx.append(i)
-		if idx.size() >= 2:
-			return [idx[0], idx[1]] as Array[int]
-	return fallback
+## The roll's pair value: when the most common non-blank value shows on 2+ dice (the roll holds
+## a pair), the higher such value among the two moving dice; else 0. Feeds the Treasury
+## (pair value x TREASURY_PAIR_MULT), Fast Feet's hop and every "doubles" effect.
+static func pair_value_of(values: Array[int], choice: Array[int]) -> int:
+	var counts := {}
+	var top := 0
+	for v in values:
+		if v > 0:
+			counts[v] = int(counts.get(v, 0)) + 1
+			top = maxi(top, int(counts[v]))
+	if top < 2:
+		return 0
+	var pv := 0
+	for i in choice:
+		if i >= 0 and i < values.size() and values[i] > 0 and int(counts.get(values[i], 0)) == top:
+			pv = maxi(pv, values[i])
+	return pv
 
-## True when the two chosen dice show the same non-blank value.
+## The current board roll's pair value (0 = no doubles).
+func board_pair_value() -> int:
+	return pair_value_of(board_roll, board_choice)
+
+## Doubles: the board roll contains a pair (its most common value shows on 2+ dice).
 func is_board_double() -> bool:
-	return board_choice.size() == 2 and board_roll[board_choice[0]] > 0 \
-		and board_roll[board_choice[0]] == board_roll[board_choice[1]]
+	return board_pair_value() > 0
 
 ## Landing tile of the current move (Start on the final lap if the move crosses it).
 func board_target() -> int:
@@ -225,8 +247,8 @@ func confirm_move() -> Array[Dictionary]:
 		if run.dice[i].rune == "gilded" and board_roll[i] > 0:
 			ev.append({"type": "rune_fired", "die_idx": i, "rune": "gilded", "effect": "gold", "value": board_roll[i]})
 			_gold(ev, board_roll[i], "gilded")
-	var doubles := is_board_double()
-	var hop := board_roll[board_choice[0]] if doubles else 0
+	var hop := board_pair_value()
+	var doubles := hop > 0
 	if doubles:
 		ev.append_array(PetLogic.on_board_double(run))
 	if doubles and run.has_passive("double_trouble") and run.banked_rerolls < Balance.MAX_BANKED_REROLLS:
