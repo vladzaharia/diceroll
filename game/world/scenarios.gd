@@ -8,7 +8,10 @@ extends RefCounted
 ##  combat_act1     hero vs 3 enemies, intents/HP visible, mid-attack
 ##  boss_act1..3    boss fights (Bone Warden, Hollow King, Lich + minions)
 ##  fx_gallery      every FX firing in a loop on the act 1 board
-##  board_<biome>   overview of a biome by id (glade, crypt, hollow, frost, throne, magma)
+##  board_<biome>   overview of a biome by id (glade, crypt, hollow, frost, throne, magma);
+##                  --variant=N picks the dressing variant seed (default 0; see Dressing)
+##  biome_variants  contact sheet: biomes x dressing variants (--biomes=a,b --variants=0,1,2)
+##  dressing_catalog  labelled grid of a runtime asset folder (--dir=forest --filter=Tree_+Color1)
 ##  enemy_gallery   enemy looks with their HUDs on the cleared act 1 island; --only=new|old|mini|
 ##                  boss|size|all|<id,id,...> (default new), --pitch=deg, --shatter=1 (every
 ##                  second Magma Golem in phase 2), --intents=1 (cycle intent kinds)
@@ -22,7 +25,7 @@ extends RefCounted
 const NAMES := ["board_glade", "board_crypt", "board_hollow", "board_frost", "board_throne", "board_magma",
 	"board_act1", "board_act2", "board_act3", "board_follow", "board_mutate", "board_portal", "combat_act1",
 	"combat_act2", "combat_act3", "boss_act1", "boss_act2", "boss_act3", "fx_gallery", "enemy_gallery", "combat_sequence",
-	"combat_hero_check", "tiles_ice_lava"]
+	"combat_hero_check", "tiles_ice_lava", "dressing_catalog", "biome_variants"]
 
 
 static func names() -> PackedStringArray:
@@ -32,6 +35,14 @@ static func names() -> PackedStringArray:
 static func build(name: String) -> Node:
 	if not NAMES.has(name):
 		return null
+	if name == "dressing_catalog":
+		var cat := DressingCatalog.new()
+		cat.name = "DressingCatalog"
+		return cat
+	if name == "biome_variants":
+		var sheet := DressingSheet.new()
+		sheet.name = "BiomeVariants"
+		return sheet
 	var root := _Driver.new()
 	root.name = "WorldScenario"
 	root.scenario = name
@@ -160,6 +171,7 @@ class _Driver extends Node3D:
 		add_child(board)
 		board.hero_class = String(args.get("hero", ["knight", "barbarian", "mage"][act - 1]))
 		board.hero_idx = int(args.get("tile", "0"))
+		board.variant_seed = int(args.get("variant", "0"))
 		var tiles: Array = BoardScenarios.mock_tiles(act) if scenario.ends_with(str(act)) and not args.has("biome") \
 			else BoardScenarios.biome_tiles(biome_id)
 		board.build(biome_id, tiles)

@@ -116,6 +116,7 @@ func show_title() -> void:
 	var b := Board.generate(rng, 1)
 	board.hero_class = HeroDefs.IDS[randi() % HeroDefs.IDS.size()]
 	board.hero_idx = 0
+	board.variant_seed = randi()
 	board.build(1, b.to_dict().tiles)
 	board.clear_targets()
 	_title_t = 0.0
@@ -167,6 +168,7 @@ func start(f: GameFlow) -> void:
 	board.hero_class = f.run.class_id
 
 	board.hero_idx = f.run.pos
+	board.variant_seed = hash([f.run.seed, f.run.biome()])
 	board.build(f.run.biome(), f.run.board.to_dict().tiles)
 	if f.phase == GameFlow.Phase.BOARD_READY:
 		rig.home(board.hero, true)
@@ -532,6 +534,7 @@ func change_biome(ev: Dictionary) -> void:
 	var centre := hero_screen(0.8) / Vector2(maxf(vs.x, 1.0), maxf(vs.y, 1.0))
 	await overlay.dissolve(true, Color(look.sky_top).lerp(Color(look.sky_glow), 0.25), Color(look.sky_glow), 0.7, centre)
 	board.hero_idx = pos
+	board.variant_seed = hash([flow.run.seed, bid])
 	board.build(bid, tiles)
 	board.hide_tiles()
 	rig.overview(board.ring_bounds(), true)

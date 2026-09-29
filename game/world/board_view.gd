@@ -35,6 +35,8 @@ var tiles: Array = []
 var hero: Character
 var hero_class := "knight"
 var hero_idx := 0
+## Seeds the biome's dressing variant (set before build(); see Biome.build / Dressing).
+var variant_seed := 0
 var biome: Node3D
 
 var _tiles_root: Node3D
@@ -73,7 +75,7 @@ func build(p_biome: Variant, p_tiles: Array) -> void:
 	side = ring_size / 4 + 1
 	for i in ring_size:
 		tiles.append(_norm(p_tiles[i] if i < p_tiles.size() else {}))
-	biome = Biome.build(biome_id, ring_extent())
+	biome = Biome.build(biome_id, ring_extent(), variant_seed)
 	add_child(biome)
 	_tiles_root = Node3D.new()
 	_tiles_root.name = "Tiles"
