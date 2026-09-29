@@ -11,6 +11,10 @@
 #                    (also the project/window icon, config/icon)
 #   icon.icns        macOS bundle icon (16..512@2x, iconutil)
 # build/icon/preview_sizes.png: 1024/180/120/60/29 px preview (iOS mask) on light + dark home screens
+# build/icon/grid.png (only with ICON_REFS=<dir of competitor icons>): crowded home-screen mock
+# Art: tools/icon/icon_art.gd (in-engine, concept IconArt.FINAL = "hero": the knight standing on a
+# giant die, gold pool of light on navy; hero_dark for the dark appearance). tools/icon/vector_art.py
+# holds the 2D/SVG exploration concepts (monogram, loop, ...), rendered with cairosvg.
 # Needs Godot (GODOT_APP, default /Applications/Godot.app via tools/shoot.sh), python3 + Pillow
 # (a venv is created under build/icon-venv if Pillow is missing), iconutil.
 set -euo pipefail
@@ -41,7 +45,7 @@ render() {  # scenario out.png
 	[ -f "$2" ] || { echo "build_icons: render of $1 failed" >&2; exit 1; }
 }
 render app_icon "$TMP/render.png"
-render icon_doubles_dark "$TMP/render_dark.png"
+render icon_hero_dark "$TMP/render_dark.png"
 
 echo "==> deriving icons"
 "$PY" "$T" ios "$TMP/render.png" "$OUT/icon.png"
@@ -52,6 +56,17 @@ rm -rf "$TMP/Diceroll.iconset"
 "$PY" "$T" iconset "$OUT/icon_macos.png" "$TMP/Diceroll.iconset"
 iconutil -c icns "$TMP/Diceroll.iconset" -o "$OUT/icon.icns"
 "$PY" "$T" sheet "$TMP/preview_sizes.png" "Diceroll=$OUT/icon.png" "dark=$OUT/icon_dark.png" "tinted=$OUT/icon_tinted.png"
+# Optional crowded home-screen mock: ICON_REFS=/dir/with/competitor/*.jpg|png (not in the repo).
+if [ -n "${ICON_REFS:-}" ] && [ -d "$ICON_REFS" ]; then
+	refs=()
+	for f in "$ICON_REFS"/*.jpg "$ICON_REFS"/*.png; do
+		[ -f "$f" ] || continue
+		b="$(basename "$f")"; refs+=("${b%%[_.]*}=$f")
+		[ ${#refs[@]} -ge 15 ] && break
+	done
+	"$PY" "$T" grid "$TMP/grid.png" "Diceroll=$OUT/icon.png" "dark=$OUT/icon_dark.png" -- "${refs[@]}"
+	echo "    grid mock: $TMP/grid.png"
+fi
 for f in icon.png icon_dark.png icon_tinted.png icon_macos.png; do
 	echo "    $f: $(sips -g pixelWidth -g pixelHeight -g hasAlpha "$OUT/$f" | tail -3 | awk '{printf "%s=%s ", $1, $2}')"
 done

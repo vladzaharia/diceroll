@@ -7,6 +7,9 @@
   icon_tools.py iconset <macos.png> <dir.iconset>        16..512@2x PNGs for iconutil
   icon_tools.py sheet  <out.png> <label=render.png>...   comparison sheet: 1024/180/120/60/29 px, masked,
                                                          on light and dark home-screen backgrounds
+  icon_tools.py grid   <out.png> label=cand.png ... -- label=ref.png ...
+                                                         crowded home-screen mock: each candidate at 60 px
+                                                         among competitor icons, light + dark wallpaper
 """
 import sys
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
@@ -147,6 +150,54 @@ def cmd_sheet(out, items):
     sheet.save(out)
 
 
+def _home_grid(cands, refs, bg, cols=4, icon=60, gap_x=27, gap_y=26, label_color=(255, 255, 255), labels=None):
+    """One iPhone-like home-screen page (1x scale: 60 px icons) with `cands` mixed into `refs`."""
+    rows = (len(cands) + len(refs) + cols - 1) // cols
+    pad = 24
+    w = pad * 2 + cols * icon + (cols - 1) * gap_x
+    h = pad * 2 + rows * (icon + 14) + (rows - 1) * gap_y
+    page = Image.new("RGB", (w, h), bg)
+    d = ImageDraw.Draw(page)
+    mask = squircle_mask(icon * 4).resize((icon, icon), Image.LANCZOS)
+    items = list(refs)
+    # spread candidates through the page (not all in a corner)
+    slots = [5, 10, 2, 13, 7, 0]
+    for i, c in enumerate(cands):
+        items.insert(min(slots[i % len(slots)], len(items)), c)
+    f = font(10)
+    for i, (label, path) in enumerate(items):
+        x = pad + (i % cols) * (icon + gap_x)
+        y = pad + (i // cols) * (icon + 14 + gap_y)
+        art = load_rgb(path).resize((icon, icon), Image.LANCZOS).convert("RGBA")
+        art.putalpha(mask)
+        page.paste(art, (x, y), art)
+        tw = d.textlength(label[:11], font=f)
+        d.text((x + (icon - tw) / 2, y + icon + 3), label[:11], fill=label_color, font=f)
+    return page
+
+
+def cmd_grid(out, cands, refs):
+    """Crowded-grid mock: each candidate on a home-screen page among competitor icons, on a light
+    and a dark wallpaper, plus a 2x "App Store search" strip at 64/40 px."""
+    pages = []
+    for label, path in cands:
+        lt = _home_grid([(label, path)], refs, (214, 205, 190), label_color=(30, 30, 30))
+        dk = _home_grid([(label, path)], refs, (20, 20, 26))
+        pages.append((label, lt, dk))
+    pw, ph = pages[0][1].size
+    head = 30
+    W = 2 * pw + 3 * 16
+    H = len(pages) * (ph + head + 16) + 16
+    sheet = Image.new("RGB", (W, H), (245, 243, 238))
+    d = ImageDraw.Draw(sheet)
+    for i, (label, lt, dk) in enumerate(pages):
+        y = 16 + i * (ph + head + 16)
+        d.text((16, y + 4), label, fill=(20, 20, 20), font=font(18))
+        sheet.paste(lt, (16, y + head))
+        sheet.paste(dk, (32 + pw, y + head))
+    sheet.save(out)
+
+
 def main(argv):
     if len(argv) < 2:
         print(__doc__)
@@ -162,6 +213,10 @@ def main(argv):
         cmd_iconset(argv[2], argv[3])
     elif c == "sheet":
         cmd_sheet(argv[2], [a.split("=", 1) for a in argv[3:]])
+    elif c == "grid":
+        # grid <out.png> label=cand.png ... -- label=ref.png ...
+        i = argv.index("--")
+        cmd_grid(argv[2], [a.split("=", 1) for a in argv[3:i]], [a.split("=", 1) for a in argv[i + 1:]])
     else:
         print(__doc__)
         return 2
