@@ -1,8 +1,10 @@
 class_name BiomeBlocks
 extends RefCounted
-## The three BlockBits biomes: Verdant Glade (sunny meadow), Frostpeak (snowy peak) and
-## Magma Depths (basalt over lava). Biome.build() owns the shared parts (environment, lights,
-## island, clouds, ambient particles, spreading) and calls dress() for the rest.
+## The BlockBits biomes: Verdant Glade (sunny meadow), Frostpeak (snowy peak), Magma Depths
+## (basalt over lava) and the 2026-09-29 four: Deep Mines (cave), Orc Warcamp (muddy stockade),
+## Sunscorched Ruins (desert tomb) and Moonlit Woods (night forest; their kits live in
+## game/world/dressing/). Biome.build() owns the shared parts (environment, lights, island,
+## clouds, ambient particles, spreading) and calls dress() for the rest.
 ##
 ## Terrain: the island top is paved with BlockBits cubes on the ring's own grid (cell =
 ## BoardView.PITCH, so every ring tile sits on one block). The border outside the ring rises
@@ -63,6 +65,74 @@ const LOOKS := {
 		"cloud_deep": Color(0.2, 0.05, 0.03), "cloud_light": Color(0.5, 0.14, 0.05), "cloud_rim": Color(1.0, 0.5, 0.2),
 		"sea": "lava", "tile_base": Color(0.6, 0.57, 0.56), "tile_glow": Color(1.0, 0.4, 0.1),
 	},
+	# --- 2026-09-29 biomes (docs/design/2026-09-29-new-biomes.md) ---------------------------------
+	# Deep Mines: slate and charcoal under a low cave ambient, many small warm lantern lights,
+	# dark distance fog; the island floats in a dark abyss.
+	"mines": {
+		"sky_top": Color(0.03, 0.03, 0.05), "sky_horizon": Color(0.16, 0.12, 0.11),
+		"sky_bottom": Color(0.03, 0.025, 0.035), "sky_glow": Color(1.0, 0.62, 0.3),
+		"glow_strength": 0.25, "stars": 0.0,
+		"fog": Color(0.07, 0.06, 0.07), "fog_density": 0.012, "fog_height_density": 0.0,
+		"ambient": Color(0.52, 0.5, 0.62), "ambient_energy": 0.42,
+		"key": Color(1.0, 0.82, 0.62), "key_energy": 0.85, "key_rot": Vector3(-62.0, -28.0, 0.0),
+		"fill": Color(0.45, 0.62, 0.9), "fill_energy": 0.35,
+		"exposure": 1.05, "saturation": 1.12, "contrast": 1.1, "glow": 0.45,
+		"island_top": Color(0.2, 0.19, 0.21), "island_side": Color(0.17, 0.15, 0.16),
+		"island_bottom": Color(0.06, 0.05, 0.07),
+		"particles": "dust", "light": Color(1.0, 0.62, 0.28),
+		"cloud_deep": Color(0.03, 0.025, 0.035), "cloud_light": Color(0.12, 0.1, 0.1), "cloud_rim": Color(0.55, 0.36, 0.2),
+		"sea": "clouds", "tile_base": Color(0.4, 0.37, 0.38),
+	},
+	# Orc Warcamp: churned mud under a low late-afternoon sun through smoke, a warm rim.
+	"warcamp": {
+		"sky_top": Color(0.2, 0.17, 0.3), "sky_horizon": Color(0.98, 0.58, 0.32),
+		"sky_bottom": Color(0.26, 0.14, 0.12), "sky_glow": Color(1.0, 0.62, 0.3),
+		"glow_strength": 0.8, "stars": 0.0,
+		"fog": Color(0.5, 0.34, 0.28), "fog_density": 0.003, "fog_height_density": 0.0,
+		"ambient": Color(0.72, 0.58, 0.55), "ambient_energy": 0.5,
+		"key": Color(1.0, 0.74, 0.5), "key_energy": 1.45, "key_rot": Vector3(-38.0, -125.0, 0.0),
+		"fill": Color(0.55, 0.5, 0.85), "fill_energy": 0.4,
+		"exposure": 0.98, "saturation": 1.1, "contrast": 1.1, "glow": 0.35,
+		"island_top": Color(0.36, 0.27, 0.2), "island_side": Color(0.34, 0.24, 0.18),
+		"island_bottom": Color(0.14, 0.09, 0.08),
+		"particles": "ash", "light": Color(1.0, 0.55, 0.22),
+		"cloud_deep": Color(0.28, 0.16, 0.18), "cloud_light": Color(0.78, 0.5, 0.4), "cloud_rim": Color(1.0, 0.72, 0.45),
+		"sea": "clouds", "tile_base": Color(0.46, 0.36, 0.28),
+	},
+	# Sunscorched Ruins: bleached sand and terracotta under a harsh high-noon key, short hard
+	# shadows, strong bloom.
+	"ruins": {
+		"sky_top": Color(0.32, 0.58, 0.94), "sky_horizon": Color(0.98, 0.9, 0.7),
+		"sky_bottom": Color(0.86, 0.72, 0.52), "sky_glow": Color(1.0, 0.95, 0.75),
+		"glow_strength": 0.9, "stars": 0.0,
+		"fog": Color(0.95, 0.84, 0.66), "fog_density": 0.0, "fog_height_density": 0.0,
+		"ambient": Color(0.9, 0.8, 0.68), "ambient_energy": 0.55,
+		"key": Color(1.0, 0.95, 0.84), "key_energy": 1.55, "key_rot": Vector3(-74.0, 18.0, 0.0),
+		"fill": Color(0.6, 0.72, 1.0), "fill_energy": 0.3,
+		"exposure": 0.84, "saturation": 1.14, "contrast": 1.16, "glow": 0.45,
+		"island_top": Color(0.86, 0.72, 0.5), "island_side": Color(0.7, 0.44, 0.3),
+		"island_bottom": Color(0.36, 0.2, 0.16),
+		"particles": "sand", "light": Color(1.0, 0.78, 0.45),
+		"cloud_deep": Color(0.82, 0.66, 0.5), "cloud_light": Color(1.0, 0.95, 0.85), "cloud_rim": Color(1.0, 0.92, 0.7),
+		"sea": "clouds", "tile_base": Color(0.66, 0.52, 0.38),
+	},
+	# Moonlit Woods: deep indigo, silver-blue moonlight, teal foliage, warm firefly pinpoints; the
+	# moon's key brightens with its phase (DressMoonlit).
+	"moonlit": {
+		"sky_top": Color(0.03, 0.04, 0.13), "sky_horizon": Color(0.14, 0.18, 0.4),
+		"sky_bottom": Color(0.04, 0.05, 0.12), "sky_glow": Color(0.72, 0.82, 1.0),
+		"glow_strength": 0.5, "stars": 1.0,
+		"fog": Color(0.1, 0.13, 0.26), "fog_density": 0.004, "fog_height_density": 0.0,
+		"ambient": Color(0.46, 0.52, 0.9), "ambient_energy": 0.55,
+		"key": Color(0.72, 0.82, 1.0), "key_energy": 1.1, "key_rot": Vector3(-50.0, 30.0, 0.0),
+		"fill": Color(0.62, 0.42, 1.0), "fill_energy": 0.45,
+		"exposure": 1.08, "saturation": 1.15, "contrast": 1.1, "glow": 0.5,
+		"island_top": Color(0.16, 0.26, 0.3), "island_side": Color(0.2, 0.2, 0.3),
+		"island_bottom": Color(0.06, 0.06, 0.14),
+		"particles": "fireflies", "light": Color(0.7, 0.8, 1.0),
+		"cloud_deep": Color(0.05, 0.06, 0.16), "cloud_light": Color(0.2, 0.26, 0.48), "cloud_rim": Color(0.62, 0.72, 1.0),
+		"sea": "clouds", "tile_base": Color(0.36, 0.4, 0.5),
+	},
 }
 
 ## Terrain palette per biome: flat paving (weighted), raised tops, raised fill, accents.
@@ -75,6 +145,14 @@ const TERRAIN := {
 		"raise_tint": Color(0.92, 0.95, 1.0)},
 	"magma": {"floor": [["stone_dark", 1]], "top": ["stone_dark"], "fill": "stone_dark",
 		"tint": Color(1, 1, 1), "shader": "basalt", "channel": true},
+	"mines": {"floor": [["stone_dark", 1]], "floor_shader": "cave", "top": ["stone_dark", "stone", "stone_dark"],
+		"fill": "stone_dark", "tint": Color(1, 1, 1), "raise_tint": Color(0.62, 0.6, 0.66)},
+	"warcamp": {"floor": [["dirt", 1]], "floor_shader": "mud", "path": "gravel", "top": ["dirt"],
+		"fill": "dirt", "tint": Color(1, 1, 1), "raise_tint": Color(0.82, 0.7, 0.6)},
+	"ruins": {"floor": [["dirt", 1]], "floor_shader": "sand", "top": ["stone"], "fill": "stone",
+		"tint": Color(1, 1, 1), "raise_tint": Color(1.0, 0.8, 0.56)},
+	"moonlit": {"floor": [["grass", 1]], "floor_shader": "night_meadow", "top": ["grass", "dirt_with_grass", "grass"],
+		"fill": "dirt", "tint": Color(1, 1, 1), "raise_tint": Color(0.36, 0.48, 0.62)},
 }
 
 ## Current build state (set by dress()).
@@ -110,6 +188,14 @@ static func dress(id: String, root: Node3D, d: Node3D, c: Node3D) -> void:
 			_frost(root, d, c)
 		"magma":
 			_magma(root, d, c)
+		"mines":
+			DressMines.dress(root, d, c)
+		"warcamp":
+			DressWarcamp.dress(root, d, c)
+		"ruins":
+			DressRuins.dress(root, d, c)
+		"moonlit":
+			DressMoonlit.dress(root, d, c)
 
 
 ## One of the four moat-corner vignettes (larger rings).
@@ -119,6 +205,14 @@ static func inner_corner(id: String, holder: Node3D, p: Vector3, yaw: float, sx:
 			DressGlade.corner(holder, p, yaw, sx, sz)
 		"frost":
 			DressFrost.corner(holder, p, yaw, sx, sz)
+		"mines":
+			DressMines.corner(holder, p, yaw, sx, sz)
+		"warcamp":
+			DressWarcamp.corner(holder, p, yaw, sx, sz)
+		"ruins":
+			DressRuins.corner(holder, p, yaw, sx, sz)
+		"moonlit":
+			DressMoonlit.corner(holder, p, yaw, sx, sz)
 		"magma":
 			if DressMagma.corner(holder, p, yaw, sx, sz):
 				return
@@ -164,6 +258,29 @@ static func _height(cx: float, cz: float) -> int:
 				up = 2 if edge else 1
 			elif not front:
 				up = (2 if edge else 0) if cz < 0.0 else (1 if edge and cz < _extent * 0.5 else 0)
+		"mines":
+			# the cave: tall rock walls at the back and sides, low ledges toward the camera
+			if back:
+				up = 3 if edge else 2
+			elif not front:
+				up = (3 if edge else 1) if cz < -_extent * 0.2 else (2 if edge else 0) if cz < _extent * 0.5 else (1 if edge else 0)
+		"warcamp":
+			# a raised stockade bank at the back, flat camp ground elsewhere
+			if back:
+				up = 2 if edge else 1
+			elif not front:
+				up = 1 if edge and cz < _extent * 0.3 else 0
+		"ruins":
+			# flat sand: a single low dune line at the far edge
+			if back:
+				up = 1 if edge or absf(cx) > _extent * 0.6 else 0
+		"moonlit":
+			# wooded hills: a low terrace behind the ring (the tree line stays in view), rolling
+			# edges on the sides
+			if back:
+				up = 1
+			elif not front:
+				up = (1 if edge else 0) if cz < _extent * 0.4 else 0
 	# break up the rows
 	if up > 0 and _rng.randf() < 0.22:
 		up = maxi(up - 1, 0) if _rng.randf() < 0.6 else up + 1
@@ -338,6 +455,21 @@ const GROUNDS := {
 	"snow": {"top_a": Color(0.82, 0.88, 0.97), "top_b": Color(0.95, 0.97, 1.0), "speck_color": Color(0.7, 0.8, 0.95),
 		"side_color": Color(0.42, 0.46, 0.56), "patch_scale": 0.1, "speck_amount": 0.3, "glint": 1.2, "roughness": 0.7,
 		"lip": 0.3},
+	# Deep Mines: slate cave floor with gravel speckle (the gem glints come from real crystals)
+	"cave": {"top_a": Color(0.23, 0.22, 0.25), "top_b": Color(0.32, 0.3, 0.32), "speck_color": Color(0.36, 0.33, 0.33),
+		"side_color": Color(0.14, 0.13, 0.15), "patch_scale": 0.12, "speck_amount": 0.3, "speck_scale": 1.7, "lip": 0.0},
+	# Orc Warcamp: churned mud, darker puddle patches, straw speckle
+	"mud": {"top_a": Color(0.3, 0.21, 0.15), "top_b": Color(0.42, 0.31, 0.21), "speck_color": Color(0.5, 0.42, 0.26),
+		"side_color": Color(0.28, 0.19, 0.13), "patch_scale": 0.14, "speck_amount": 0.22, "speck_scale": 1.6, "lip": 0.12},
+	"mud_path": {"top_a": Color(0.4, 0.31, 0.24), "top_b": Color(0.46, 0.36, 0.27), "speck_color": Color(0.34, 0.28, 0.24),
+		"side_color": Color(0.28, 0.19, 0.13), "patch_scale": 0.5, "speck_amount": 0.45, "speck_scale": 3.0, "lip": 0.0},
+	# Sunscorched Ruins: bleached sand in soft drifts
+	"sand": {"top_a": Color(0.84, 0.69, 0.47), "top_b": Color(0.95, 0.84, 0.62), "speck_color": Color(0.74, 0.58, 0.38),
+		"side_color": Color(0.74, 0.5, 0.34), "patch_scale": 0.1, "speck_amount": 0.18, "speck_scale": 2.2,
+		"roughness": 0.95, "lip": 0.3},
+	# Moonlit Woods: a cool night meadow (teal-green under moonlight)
+	"night_meadow": {"top_a": Color(0.13, 0.3, 0.22), "top_b": Color(0.22, 0.42, 0.28), "speck_color": Color(0.1, 0.22, 0.18),
+		"side_color": Color(0.22, 0.18, 0.24), "patch_scale": 0.12, "speck_amount": 0.3, "speck_scale": 1.6, "lip": 0.22},
 }
 
 
@@ -480,8 +612,10 @@ static func tinted(d: Node3D, path: String, at: Vector3, yaw: float, scale: floa
 
 ## Flat-shaded copy of a primitive mesh with optional vertex jitter (low-poly KayKit look).
 ## Vertex colour = `color`, blended to `bottom` below y = 0 of the source mesh.
+## `outward`: normals face out of the solid (correct lighting). The older biomes were tuned with
+## the historical inside-out normals and keep them; the 2026-09-29 biomes pass true (see solid()).
 static func faceted(src: Mesh, color: Color, jitter := 0.0, seed := 1, bottom := Color(0, 0, 0, 0),
-		squash := Vector3.ONE) -> ArrayMesh:
+		squash := Vector3.ONE, outward := false) -> ArrayMesh:
 	var arr := src.surface_get_arrays(0)
 	var verts: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
 	var idx: PackedInt32Array = arr[Mesh.ARRAY_INDEX]
@@ -517,7 +651,7 @@ static func faceted(src: Mesh, color: Color, jitter := 0.0, seed := 1, bottom :=
 			if bottom.a > 0.0:
 				col = bottom.lerp(color, smoothstep(lo, lo + (hi - lo) * 0.7, (v as Vector3).y))
 			st.set_color(Color(col.r * shade, col.g * shade, col.b * shade, col.a))
-			st.set_normal(-nrm)
+			st.set_normal(nrm if outward else -nrm)
 			st.add_vertex(v)
 	var mesh := st.commit()
 	var m := StandardMaterial3D.new()
@@ -526,6 +660,12 @@ static func faceted(src: Mesh, color: Color, jitter := 0.0, seed := 1, bottom :=
 	m.roughness = 0.9
 	mesh.surface_set_material(0, m)
 	return mesh
+
+
+## faceted() with outward normals (lit correctly): the new biomes' procedural props.
+static func solid(src: Mesh, color: Color, jitter := 0.0, seed := 1, bottom := Color(0, 0, 0, 0),
+		squash := Vector3.ONE) -> ArrayMesh:
+	return faceted(src, color, jitter, seed, bottom, squash, true)
 
 
 static func _sphere(radius: float, segs := 7, rings := 4) -> SphereMesh:
@@ -538,7 +678,7 @@ static func _sphere(radius: float, segs := 7, rings := 4) -> SphereMesh:
 
 
 ## A chunky low-poly round tree (trunk + three canopy lumps).
-static func round_tree(parent: Node3D, pos: Vector3, k: float, leaf: Color, seed := 1) -> Node3D:
+static func round_tree(parent: Node3D, pos: Vector3, k: float, leaf: Color, seed := 1, outward := false) -> Node3D:
 	var n := Node3D.new()
 	n.name = "RoundTree"
 	n.position = pos
@@ -551,7 +691,7 @@ static func round_tree(parent: Node3D, pos: Vector3, k: float, leaf: Color, seed
 	cm.height = 1.5
 	cm.radial_segments = 6
 	cm.rings = 1
-	trunk.mesh = faceted(cm, Color(0.42, 0.28, 0.18), 0.02, seed)
+	trunk.mesh = faceted(cm, Color(0.42, 0.28, 0.18), 0.02, seed, Color(0, 0, 0, 0), Vector3.ONE, outward)
 	trunk.position.y = 0.75
 	n.add_child(trunk)
 	var lumps := [[Vector3(0, 1.95, 0), 0.95], [Vector3(0.55, 1.6, 0.25), 0.62], [Vector3(-0.5, 1.7, -0.2), 0.66],
@@ -560,7 +700,7 @@ static func round_tree(parent: Node3D, pos: Vector3, k: float, leaf: Color, seed
 		var l: Array = lumps[li]
 		var mi := MeshInstance3D.new()
 		mi.mesh = faceted(_sphere(float(l[1]), 8, 5), leaf.lightened(0.08 * (li % 2)), 0.08, seed * 13 + li,
-			leaf.darkened(0.35))
+			leaf.darkened(0.35), Vector3.ONE, outward)
 		mi.position = l[0]
 		n.add_child(mi)
 	n.scale = Vector3.ONE * k
@@ -586,7 +726,7 @@ static func blossoms(tree: Node3D, count: int, seed := 1) -> void:
 
 
 ## A low mound of leaves.
-static func bush(parent: Node3D, pos: Vector3, k: float, leaf: Color, seed := 3) -> Node3D:
+static func bush(parent: Node3D, pos: Vector3, k: float, leaf: Color, seed := 3, outward := false) -> Node3D:
 	var n := Node3D.new()
 	n.name = "Bush"
 	n.position = pos
@@ -595,7 +735,7 @@ static func bush(parent: Node3D, pos: Vector3, k: float, leaf: Color, seed := 3)
 		var mi := MeshInstance3D.new()
 		var r: float = [0.55, 0.42, 0.38][li]
 		mi.mesh = faceted(_sphere(r, 7, 4), leaf.lightened(0.06 * li), 0.06, seed * 7 + li, leaf.darkened(0.35),
-			Vector3(1.0, 0.8, 1.0))
+			Vector3(1.0, 0.8, 1.0), outward)
 		mi.position = [Vector3(0, 0.35, 0), Vector3(0.45, 0.25, 0.15), Vector3(-0.4, 0.24, 0.1)][li]
 		n.add_child(mi)
 	n.scale = Vector3.ONE * k
@@ -603,10 +743,10 @@ static func bush(parent: Node3D, pos: Vector3, k: float, leaf: Color, seed := 3)
 
 
 ## A faceted boulder.
-static func rock(parent: Node3D, pos: Vector3, k: float, color: Color, seed := 5) -> MeshInstance3D:
+static func rock(parent: Node3D, pos: Vector3, k: float, color: Color, seed := 5, outward := false) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
 	mi.name = "Rock"
-	mi.mesh = faceted(_sphere(1.0, 6, 3), color, 0.18, seed, color.darkened(0.35), Vector3(1.0, 0.62, 0.9))
+	mi.mesh = faceted(_sphere(1.0, 6, 3), color, 0.18, seed, color.darkened(0.35), Vector3(1.0, 0.62, 0.9), outward)
 	mi.position = pos + Vector3.UP * 0.3 * k
 	mi.rotation.y = float(seed) * 0.9
 	mi.scale = Vector3.ONE * k

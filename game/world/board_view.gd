@@ -37,6 +37,9 @@ var hero_class := "knight"
 var hero_idx := 0
 ## Seeds the biome's dressing variant (set before build(); see Biome.build / Dressing).
 var variant_seed := 0
+## Moonlit Woods: the phase the sky moon shows ("crescent" | "half" | "full"; "" = crescent). Set
+## before build() (the controller passes run.moon_phase()); set_moon_phase() animates a change.
+var moon_phase := ""
 var biome: Node3D
 
 var _tiles_root: Node3D
@@ -50,6 +53,8 @@ var _hidden: Array[Node3D] = []
 ## Tiles whose top glows for the current move preview (cleared by clear_targets()).
 var _path_lit: Array[int] = []
 var _hidden_fx: Array[Node3D] = []
+## Orc Warcamp: Empty tiles that still show the broken staves of a smashed drum.
+var _smashed: Dictionary = {}
 
 
 func _init() -> void:
@@ -70,12 +75,13 @@ func build(p_biome: Variant, p_tiles: Array) -> void:
 	_hidden.clear()
 	_hidden_fx.clear()
 	_path_lit.clear()
+	_smashed.clear()
 	tiles = []
 	ring_size = p_tiles.size() if p_tiles.size() >= 16 and p_tiles.size() % 4 == 0 else DEFAULT_RING
 	side = ring_size / 4 + 1
 	for i in ring_size:
 		tiles.append(_norm(p_tiles[i] if i < p_tiles.size() else {}))
-	biome = Biome.build(biome_id, ring_extent(), variant_seed)
+	biome = Biome.build(biome_id, ring_extent(), variant_seed, {"moon_phase": moon_phase})
 	add_child(biome)
 	_tiles_root = Node3D.new()
 	_tiles_root.name = "Tiles"
@@ -173,7 +179,7 @@ func _norm(t: Dictionary) -> Dictionary:
 	# affixes: board tiles carry `enemy_affixes`, board_mutated changes `affixes` (parallel to enemies)
 	var affixes: Array = t.get("enemy_affixes", t.get("affixes", []))
 	return {"type": type, "enemies": enemies.duplicate(), "elite": bool(t.get("elite", type == "elite")),
-		"game": String(t.get("game", "")), "enemy_affixes": affixes.duplicate(true)}
+		"game": String(t.get("game", "")), "enemy_affixes": affixes.duplicate(true), "moon": bool(t.get("moon", false))}
 
 
 func _build_tile(i: int) -> void:
@@ -195,7 +201,7 @@ func _build_tile(i: int) -> void:
 	var tw := 1.7 if corner else 1.6
 	top.scale = Vector3(tw, 0.75, tw)
 	top.position.y = TILE_TOP - 0.15
-	var tmat := _tile_material(TileStyle.color(tiles[i].type), top)
+	var tmat := _tile_material(TileStyle.tile_color(tiles[i]), top)
 	root.add_child(top)
 	Props.set_shadows(base, true)
 	Props.set_shadows(top, false)
@@ -233,7 +239,8 @@ func _dress_tile(i: int, animate: bool) -> void:
 	holder.position = Vector3(0, TILE_TOP, 0)
 	_tile_nodes[i].add_child(holder)
 	var type := String(t.type)
-	holder.add_child(TileStyle.make_prop(type, String(t.get("game", ""))))
+	holder.add_child(TileStyle.make_prop(type, String(t.get("game", "")),
+		{"biome": biome_id, "moon": bool(t.get("moon", false)), "smashed": _smashed.has(i)}))
 	var figs: Array[Character] = []
 	var ids: Array = t.enemies
 	var affs: Array = t.get("enemy_affixes", [])
@@ -327,6 +334,8 @@ func _dress_miniboss(holder: Node3D, id: String, idx := -1, affixes: Array = [])
 func set_tile(idx: int, tile: Dictionary, animate := true) -> void:
 	idx = posmod(idx, ring_size)
 	tiles[idx] = _norm(tile)
+	if String(tiles[idx].type) != "empty":
+		_smashed.erase(idx)
 	var old: Node3D = _props[idx]
 	if old:
 		if animate:
@@ -335,7 +344,7 @@ func set_tile(idx: int, tile: Dictionary, animate := true) -> void:
 			t.tween_callback(old.queue_free)
 		else:
 			old.queue_free()
-	var col := TileStyle.color(tiles[idx].type)
+	var col := TileStyle.tile_color(tiles[idx])
 	if animate:
 		var mat := _top_mats[idx]
 		var tw := create_tween()
@@ -365,7 +374,7 @@ func set_tile_dressing_visible(idx: int, on: bool) -> void:
 ## Short glow + bounce on a tile (landing feedback).
 func pulse_tile(idx: int, color := Color(0, 0, 0, 0)) -> void:
 	idx = posmod(idx, ring_size)
-	var col := color if color.a > 0.0 else TileStyle.color(tiles[idx].type)
+	var col := color if color.a > 0.0 else TileStyle.tile_color(tiles[idx])
 	var mat := _top_mats[idx]
 	var tw := create_tween()
 	tw.tween_method(func(e: float) -> void: mat.set_shader_parameter("emission", col * e), 0.9, 0.0, 0.6) \
@@ -378,6 +387,97 @@ func _bounce(n: Node3D, depth: float) -> void:
 	var t := n.create_tween()
 	t.tween_property(n, "position:y", -depth, 0.07).set_trans(Tween.TRANS_SINE)
 	t.tween_property(n, "position:y", 0.0, 0.3).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+
+
+# --- new-biome twists (docs/design/2026-09-29-new-biomes.md) ---------------------------------
+## Presentation-only hooks the event beats call; the rules already changed the tiles.
+
+## Deep Mines cave-in: the ore vein shakes, the ceiling drops a dust cloud and a pebble trickle,
+## and the tile becomes the rubble trap (tile_changed {source:"cave_in"}).
+func cave_in(idx: int) -> void:
+	idx = posmod(idx, ring_size)
+	var p := tile_position(idx)
+	var n: Node3D = _props[idx]
+	if n:
+		var t := n.create_tween()
+		for k in 4:
+			t.tween_property(n, "position:x", 0.06 * (1.0 if k % 2 == 0 else -1.0), 0.05)
+		t.tween_property(n, "position:x", 0.0, 0.05)
+	Fx.burst(self, p + Vector3.UP * 2.6, {"amount": 22, "lifetime": 0.9, "speed": Vector2(0.2, 0.8), "size": 0.14,
+		"color": Color(0.5, 0.46, 0.44), "tex": "hard", "additive": false, "gravity": Vector3(0, -9.0, 0), "radius": 0.5,
+		"dir": Vector3.DOWN, "spread": 20.0})
+	await get_tree().create_timer(0.25).timeout
+	Fx.burst(self, p + Vector3.UP * 0.3, {"amount": 26, "lifetime": 1.3, "speed": Vector2(0.6, 1.8), "size": 0.9,
+		"color": Color(0.62, 0.56, 0.5, 0.7), "tex": "dot", "additive": false, "gravity": Vector3(0, 0.25, 0), "damping": 2.5,
+		"radius": 0.45, "spread": 80.0})
+	set_tile(idx, {"type": "trap"}, true)
+	_bounce(_tile_nodes[idx], 0.18)
+	await get_tree().create_timer(0.35).timeout
+
+
+## Orc Warcamp: the drum on tile idx bursts into staves and the tile goes Empty (broken staves stay
+## on it until something else spawns there).
+func smash_drum(idx: int) -> void:
+	idx = posmod(idx, ring_size)
+	var p := tile_position(idx)
+	Fx.burst(self, p + Vector3.UP * 0.5, {"amount": 18, "lifetime": 0.8, "speed": Vector2(2.0, 4.5), "size": 0.2,
+		"color": Color(0.72, 0.5, 0.3), "tex": "rounded", "additive": false, "spread": 60.0, "gravity": Vector3(0, -9.0, 0)})
+	Fx.burst(self, p + Vector3.UP * 0.5, {"amount": 12, "lifetime": 0.5, "speed": Vector2(1.5, 3.0), "size": 0.3,
+		"color": Color(1.0, 0.75, 0.4), "tex": "spark"})
+	Fx.shockwave(self, p + Vector3.UP * 0.05, Color(1.0, 0.6, 0.3), 1.9, 0.45)
+	_smashed[idx] = true
+	set_tile(idx, {"type": "empty"}, true)
+	await get_tree().create_timer(0.3).timeout
+
+
+## Tiles holding a standing war drum.
+func drum_tiles() -> Array[int]:
+	var out: Array[int] = []
+	for i in ring_size:
+		if String(tiles[i].type) == "drum":
+			out.append(i)
+	return out
+
+
+## Orc Warcamp rally: every standing drum thumps (a squash on its prop and a red ground ring).
+func drum_beat(beats := 2) -> void:
+	for b in beats:
+		for i in drum_tiles():
+			var n: Node3D = _props[i]
+			if n and n.visible:
+				var t := n.create_tween()
+				t.tween_property(n, "scale", Vector3(1.12, 0.84, 1.12), 0.06)
+				t.tween_property(n, "scale", Vector3.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			Fx.shockwave(self, tile_position(i) + Vector3.UP * 0.05, Color(1.0, 0.35, 0.18), 2.4, 0.5)
+		await get_tree().create_timer(0.3).timeout
+
+
+## Sunscorched Ruins oasis landing: a splash of water and a cool ring.
+func oasis_splash(idx: int) -> void:
+	idx = posmod(idx, ring_size)
+	var p := tile_position(idx)
+	Fx.burst(self, p + Vector3.UP * 0.25, {"amount": 22, "lifetime": 0.7, "speed": Vector2(1.5, 3.2), "size": 0.16,
+		"color": Color(0.55, 0.9, 1.0), "tex": "hard", "spread": 35.0, "gravity": Vector3(0, -8.0, 0)})
+	Fx.shockwave(self, p + Vector3.UP * 0.05, Color(0.45, 0.95, 1.0), 2.0, 0.6)
+
+
+## Moonlit Woods: the sky moon (and the woods' light) takes `phase`'s look.
+func set_moon_phase(phase: String, animate := true) -> void:
+	moon_phase = phase
+	if biome:
+		DressMoonlit.set_phase(biome, phase, animate)
+
+
+## Moonlit Woods: fills the sky moon to `f` (0 new .. 1 full), e.g. with the Moon King's meter.
+func set_moon_fill(f: float, animate := true) -> void:
+	if biome:
+		DressMoonlit.set_fill(biome, f, animate)
+
+
+## Moonlit Woods: the blood moon (the Moon King's phase 2) or back to silver.
+func set_blood_moon(on: bool, animate := true) -> void:
+	if biome:
+		DressMoonlit.set_blood(biome, on, animate)
 
 
 # --- landing targets ------------------------------------------------------------------------
@@ -603,7 +703,7 @@ func rise_wave(from: int, duration := 1.1) -> void:
 			pulse_tile(i)
 			continue
 		var delay := duration * 0.75 * float(_ring_dist(i, from)) / float(half)
-		var col := TileStyle.color(String(tiles[i].type))
+		var col := TileStyle.tile_color(tiles[i])
 		var pos := tile_position(i)
 		var t := n.create_tween()
 		t.tween_interval(delay)
