@@ -325,19 +325,9 @@ func _crack_heart() -> void:
 	MgBoard.sfx("glass", 0.08, -4.0)
 
 
-## A chime that climbs with the streak (Audio has no pitch argument: the pitch is set on the
-## player that just started, when the autoload exposes its pool).
+## A chime that climbs with the streak.
 func _chime(streak: int) -> void:
-	MgBoard.sfx("bell", 0.0, -2.0)
-	var loop := Engine.get_main_loop() as SceneTree
-	var a: Node = loop.root.get_node_or_null("Audio") if loop else null
-	if a != null:
-		var pool: Variant = a.get("_pool")
-		var nx: Variant = a.get("_next")
-		if pool is Array and nx is int and (pool as Array).size() > 0:
-			var pl: Variant = pool[(int(nx) - 1 + pool.size()) % pool.size()]
-			if pl is AudioStreamPlayer:
-				(pl as AudioStreamPlayer).pitch_scale = minf(1.0 + 0.12 * (streak - 1), 1.7)
+	MgBoard.sfx("bell", 0.0, -2.0, minf(1.0 + 0.12 * (streak - 1), 1.7))
 	if streak >= 3:
 		MgBoard.sfx("coin", 0.05, -6.0)
 
