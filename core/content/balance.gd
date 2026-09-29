@@ -75,7 +75,7 @@ const LAVA_LAND_PCT := 0.06
 # (ENEMY_BASE_SCALE + ENEMY_ATK_LAP_STEP*(lap-1)). 2026-09-28 rebalance: a gentle start (no
 # drafts, 2 dice), HP growing faster than attack late (long fights, fewer one-shots).
 const ENEMY_BASE_SCALE := 1.0
-const ENEMY_LAP_STEP := 0.34
+const ENEMY_LAP_STEP := 0.35
 const ENEMY_ATK_LAP_STEP := 0.125
 const ELITE_HP_MULT := 1.3
 const ELITE_ATK_MULT := 1.15
@@ -88,12 +88,12 @@ const ELITE_BOSS_PASSIVE_CHANCE := 0.15
 # Progression. Levels are automatic and slow (about 5-7 per full run): each gives
 # LEVEL_MAX_HP max HP and heals LEVEL_MAX_HP + LEVEL_HEAL_PCT of max HP. No drafts from kills:
 # upgrades come from shops, events, chests, minigames, elites and the mini-boss.
-const LEVEL_MAX_HP := 5
+const LEVEL_MAX_HP := 4
 const LEVEL_HEAL_PCT := 0.10
 ## Legacy level-up draft option (debug scenarios only).
 const DRAFT_MAX_HP := 8
-const XP_THRESHOLDS := [40, 90, 150, 220, 300, 390]
-const XP_STEP_AFTER := 100
+const XP_THRESHOLDS := [25, 55, 90, 130, 175, 225]
+const XP_STEP_AFTER := 60
 
 # Shop
 ## Dice prices live in DiceKinds.DEFS[kind].price.

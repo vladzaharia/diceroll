@@ -4,8 +4,8 @@ extends RefCounted
 ##   fresh  a brand-new profile: Knight only, starter pack, Glade/Hollow/Throne, no pet,
 ##          Scratch-off + Claw Machine, belt 2 with 1 Healing Draught, no gear
 ##   mid    run 10 of a typical campaign (tools/sim.gd --campaign --snapshot=10, realistic bot):
-##          3 classes, all biomes, 5 packs, gear L3-4 with the L4 traits, belt 2, Whetstone and
-##          Starter Kit, Pumpkin Sprite at XP level 5, 3 minigames owned (2 equipped)
+##          3 classes, all biomes, 5 packs, gear L3-4 with the L4 traits, belt 2, Starter Kit,
+##          Pumpkin Sprite at XP level 4, 3 minigames owned (2 equipped)
 ##   max    everything unlocked and maxed: all packs/classes/biomes/bosses, gear L8 with traits,
 ##          every pet L10, every minigame mastered, all Crowns upgrades, 3 minigame slots
 ## Ascension is 0 in every preset; pass the level separately (profile.ascension.selected).
@@ -34,10 +34,10 @@ static func mid() -> Profile:
 	for kind in grants:
 		for id in grants[kind]:
 			p.grant(kind, id)
-	p.gear = {"helm": 4, "blade": 4, "boots": 4, "charm": 3}
-	p.pet_xp = {"pumpkin_sprite": 150, "skull_buddy": 5}
+	p.gear = {"helm": 4, "blade": 4, "boots": 4, "charm": 4}
+	p.pet_xp = {"pumpkin_sprite": 140, "skull_buddy": 5}
 	p.minigame_plays = {"scratch_off": 12, "claw_machine": 12, "fossil_hunter": 6}
-	p.upgrades = {"whetstone": 1, "starter_kit": 1}
+	p.upgrades = {"starter_kit": 1}
 	p.loadout = {"class": "knight", "mode": "standard", "minigames": ["fossil_hunter", "claw_machine"], "pet": "pumpkin_sprite"}
 	p.crowns = 0
 	return p

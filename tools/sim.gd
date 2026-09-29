@@ -182,6 +182,7 @@ func _init() -> void:
 		var pet_sum := 0
 		var deaths := {}
 		var stuck := 0
+		var win_level_sum := 0
 		for r in runs:
 			var s: int = seed0 + r * 7919
 			var res := _play(c, s, board, opts, verbose)
@@ -197,6 +198,7 @@ func _init() -> void:
 				_count_items(f, won)
 			if won:
 				wins += 1
+				win_level_sum += f.run.level
 			else:
 				var key := "boss" if last_fight.contains("boss_") else "act%d" % f.run.act
 				if last_fight.contains("mini_"):
@@ -225,7 +227,7 @@ func _init() -> void:
 			for k in up:
 				upgrades[k] = int(upgrades.get(k, 0)) + int(up[k])
 		# machine-readable row for shard aggregation (tools: sum wins/runs over shards)
-		print("#row %s %d %d %d %d %d" % [c, wins, runs, level_sum, fights_won_sum, act_sum])
+		print("#row %s %d %d %d %d %d %d" % [c, wins, runs, level_sum, fights_won_sum, act_sum, win_level_sum])
 		all_wins += wins
 		all_runs += runs
 		rows.append([c, 100.0 * wins / runs, float(act_sum) / runs, float(board_turns) / runs,

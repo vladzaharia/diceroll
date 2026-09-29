@@ -168,7 +168,7 @@ static func milestone(id: String) -> Dictionary:
 ## Bought with Camp.buy_upgrade(track, id). `requires` names a feature unlock (milestone).
 const UPGRADES := {
 	"workshop": {
-		"whetstone": {"name": "Whetstone", "desc": "Start every run with 1 Face Raise.", "cost": {"crowns": 100}},
+		"whetstone": {"name": "Whetstone", "desc": "Start every run with 1 Face Raise.", "cost": {"crowns": 220}},
 		"starter_kit": {"name": "Starter Kit", "desc": "Choose the kind of your second starting die: a sidegrade (Standard, Low, Odd).", "cost": {"crowns": 40}},
 	},
 	"armory": {

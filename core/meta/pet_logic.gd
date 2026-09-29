@@ -54,7 +54,7 @@ static func on_turn_start(run: RunState, c: CombatState) -> Array[Dictionary]:
 		ev.append_array(_charge(run, n))
 	elif id == "crystal_wisp" and is_full(run):
 		c.rerolls_left += PetDefs.WISP_REROLLS
-		c.pet_mult += PetDefs.WISP_MULT
+		c.pet_mult += PetDefs.wisp_mult(lvl)
 		ev.append(_acted(run, "reroll", PetDefs.WISP_REROLLS, "hero"))
 		if lvl >= 5:
 			if run.banked_rerolls < Balance.MAX_BANKED_REROLLS:

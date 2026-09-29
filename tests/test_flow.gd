@@ -212,8 +212,9 @@ func test_level_up_is_automatic() -> void:
 
 func test_levels_are_slow() -> void:
 	# about 5-7 levels per full run: the XP curve is steep
-	assert_true(Balance.xp_for_level(1) >= 30)
-	assert_true(Balance.xp_for_level(6) - Balance.xp_for_level(5) >= 60)
+	assert_true(Balance.xp_for_level(1) >= 20)
+	assert_true(Balance.xp_for_level(6) - Balance.xp_for_level(5) >= 40)
+	assert_true(Balance.xp_for_level(7) >= 250, "level 8+ is out of reach in a normal run")
 
 func test_upgrades_counted_by_source() -> void:
 	var f := _flow()

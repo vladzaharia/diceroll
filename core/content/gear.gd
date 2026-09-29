@@ -51,7 +51,7 @@ const TRAITS := {
 }
 
 const TRAIT_DEFS := {
-	"helm_lap_heal": {"name": "Hearty", "desc": "Lap heal +1%."},
+	"helm_lap_heal": {"name": "Hearty", "desc": "Lap heal +0.5%."},
 	"helm_campfire": {"name": "Camper", "desc": "Campfires heal +10%."},
 	"helm_last_stand": {"name": "Last Stand", "desc": "Once per run, a lethal hit leaves you at 1 HP if you were above 50% HP."},
 	"helm_bulwark": {"name": "Bulwark", "desc": "Block 4 on turn 1 of every fight."},
@@ -70,7 +70,7 @@ const TRAIT_DEFS := {
 }
 
 const TRAIT_BONUS := {
-	"helm_lap_heal": 0.01, "helm_campfire": 0.10, "helm_bulwark": 4, "blade_pair": 1, "blade_high": 3,
+	"helm_lap_heal": 0.005, "helm_campfire": 0.10, "helm_bulwark": 4, "blade_pair": 1, "blade_high": 3,
 	"blade_boss_opener": 1.3, "blade_overflow": 0.5, "boots_portal": 2, "boots_sure_foot": 3,
 	"boots_treasury_step": 5, "charm_cheap_restock": 5, "charm_treasury": 1.25,
 }
