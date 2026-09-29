@@ -107,6 +107,36 @@ Never delete the `channels` release: installed games read their updates from it.
 - iOS/Android builds only show a "new version in the store" prompt; Web, itch and Steam builds rely
   on their platform. Players can turn automatic checks off in Settings.
 
+### Developer menu and channel switching
+
+A hidden **Developer menu** (`ui/modals/dev_menu.gd`) opens after **5 taps / clicks within
+~3 s in the bottom-right corner** (80×80 px, inside the safe area) of the first screen at boot:
+the title screen and the missing-assets screen (the future streaming loader must host it
+too). There's no visual hint; a small toast confirms the unlock. The gesture is a drop-in
+widget, `ui/widgets/dev_gesture.gd` (`add_child(DevGesture.new())`).
+
+- **Update channel:** `stable` or `beta`, the two channels `tools/ci/update_manifest.py`
+  publishes. The choice is saved in `user://settings.cfg` `[update] channel`, overrides
+  `build_info.json` `channel` (`UpdatePolicy.effective_channel()` → `Updater.channel()` → the
+  `UpdateClient` context), drops any pack already staged from the old channel and re-checks at
+  once. **RESET TO DEFAULT** removes the override; **CHECK NOW** forces a check.
+- **No downgrades.** If the new channel's latest version is older than the running one (e.g.
+  beta → stable on `0.5.0-beta.2` while stable is `0.4.0`), `UpdatePolicy.decide()` returns
+  `none` with `behind: true`, even when that manifest's `min_supported` would force an update.
+  The game keeps the running version until the channel ships something newer, and the menu
+  says so. Picking `stable` while a prerelease runs first shows an inline confirmation that
+  explains this.
+- **Where it's allowed:** only builds that update themselves (GitHub desktop builds; dev builds
+  save the choice but never check). App Store / TestFlight / Google Play, web and sideloaded
+  mobile builds show the picker disabled with the reason, and ignore any saved override. The
+  rest of the menu works everywhere.
+- **Build info + COPY DIAGNOSTICS:** version, commit, channel, distribution, Godot version and
+  build date, copied to the clipboard as text for bug reports.
+- Other systems can add rows: `DevMenu.register_section(id, title, order)` and
+  `DevMenu.register_row(section, id, func(menu) -> Control, order)`.
+- Screenshots: `tools/shoot_matrix.sh dev_menu <out>` (also `dev_menu_confirm`,
+  `dev_menu_store`, `dev_menu_boot`).
+
 ## Secrets and variables
 
 Set with `gh secret set NAME -R vladzaharia/diceroll` (or Settings > Secrets and variables >

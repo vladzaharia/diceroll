@@ -94,8 +94,8 @@ func test_up_to_date_and_binary_paths() -> void:
 	r = await c.check(_ctx({"engine": "4.6.1"}))
 	assert_eq(r["decision"]["action"], Policy.BINARY)
 	assert_true(not c.store.has_pack("staged"), "binary path downloads nothing")
-	r = await c.check(_ctx({"channel": "beta"}))
-	assert_true(not r["ok"], "missing beta feed is an error, not a crash")
+	r = await c.check(_ctx({"channel": "nightly"}))
+	assert_true(not r["ok"], "missing channel feed is an error, not a crash")
 	c.free()
 
 

@@ -19,6 +19,9 @@ extends Node
 ##   Updater.check_now()            # manual "Check now" (coroutine; returns the check result)
 ##   Updater.restart_to_update()    # apply the staged pack and relaunch into it
 ##   Updater.set_auto_enabled(false)
+##   Updater.channel()              # effective channel (dev-menu override or build default)
+##   await Updater.switch_channel("beta")   # persist override + drop staged pack + re-check
+##   await Updater.reset_channel()          # back to the build default + re-check
 
 ## Download progress of a content pack (0..100).
 signal download_progress(percent: int)
@@ -59,6 +62,10 @@ var status := ""
 var status_version := ""
 var status_url := ""
 var status_mandatory := false
+## Where the channel override lives (tests point this elsewhere).
+var settings_path := Policy.SETTINGS_PATH
+## Platform override for tests ("" = Policy.platform_key()).
+var platform := ""
 var _banner: Node
 var _layer: CanvasLayer
 
@@ -104,7 +111,7 @@ func _active() -> bool:
 
 
 func is_desktop() -> bool:
-	return Policy.platform_key().get_slice(".", 0) in DESKTOP
+	return _platform().get_slice(".", 0) in DESKTOP
 
 
 ## Content packs are applied only by exported desktop GitHub builds with Auto-update on.
@@ -182,14 +189,7 @@ func check_now(force := true) -> Dictionary:
 			client.fetcher.headers = PackedStringArray(["Authorization: Bearer " + token])
 		client.download_progress.connect(_on_progress)
 	store.set_last_check(now)
-	var ctx := {
-		"base_url": Policy.base_url(), "channel": info.get("channel", "stable"),
-		"public_key": Keys.PUBLIC_KEY_PEM, "distribution": info.get("distribution", "dev"),
-		"platform": Policy.platform_key(), "engine": Policy.engine_version(),
-		"version": current_version(), "binary_version": binary_version(),
-		"download": info.get("distribution") == Policy.DIST_GITHUB and is_desktop(),
-	}
-	var r: Dictionary = await client.check(ctx)
+	var r: Dictionary = await client.check(check_context())
 	if not r["ok"]:
 		push_warning("Updater: check failed: %s" % r["error"])
 		if status == "downloading":
@@ -208,6 +208,69 @@ func check_now(force := true) -> Dictionary:
 			store_update_available.emit(ver, d["url"], d["mandatory"])
 	check_finished.emit(r)
 	return r
+
+
+## UpdateClient.check() context for this build: effective channel (override or build default).
+func check_context() -> Dictionary:
+	return {
+		"base_url": Policy.base_url(), "channel": channel(),
+		"public_key": Keys.PUBLIC_KEY_PEM, "distribution": info.get("distribution", "dev"),
+		"platform": _platform(), "engine": Policy.engine_version(),
+		"version": current_version(), "binary_version": binary_version(),
+		"download": info.get("distribution") == Policy.DIST_GITHUB and is_desktop(),
+	}
+
+
+# ------------------------------------------------------------------ channel (dev menu)
+
+## Channel used for checks: the Developer-menu override when this build allows one, else
+## build_info "channel".
+func channel() -> String:
+	return Policy.effective_channel(info, settings_path, _platform())
+
+
+func build_channel() -> String:
+	return Policy.build_channel(info)
+
+
+func has_channel_override() -> bool:
+	return Policy.channel_override(settings_path) != ""
+
+
+## "" when the channel can be switched in this build, else why not (store / web / sideload).
+func channel_lock_reason() -> String:
+	return Policy.channel_lock_reason(String(info.get("distribution", Policy.DIST_DEV)), _platform())
+
+
+## Persists `ch` as the override and re-checks at once. A pack staged from the old channel
+## is dropped (it would otherwise activate on the next boot). Never downgrades: when `ch` is
+## behind the running version the check reports behind=true and nothing changes.
+## Returns the check result ({"ok": false, "error"} when the switch isn't allowed).
+func switch_channel(ch: String) -> Dictionary:
+	var why := channel_lock_reason()
+	if why != "":
+		return {"ok": false, "error": why, "decision": {"action": Policy.NONE}}
+	if not Policy.set_channel_override(ch, settings_path):
+		return {"ok": false, "error": "unknown channel '%s'" % ch, "decision": {"action": Policy.NONE}}
+	return await _after_channel_change()
+
+
+## Drops the override (back to build_info "channel") and re-checks.
+func reset_channel() -> Dictionary:
+	Policy.clear_channel_override(settings_path)
+	return await _after_channel_change()
+
+
+func _after_channel_change() -> Dictionary:
+	if store and store.has_pack("staged"):
+		store.discard("staged")
+	if status != "":
+		_set_status("")
+	return await check_now(true)
+
+
+func _platform() -> String:
+	return platform if platform != "" else Policy.platform_key()
 
 
 func _on_progress(done: int, total: int) -> void:

@@ -24,6 +24,11 @@ static var _label_settings: Dictionary = {}
 
 static func display_font() -> Font:
 	if _display == null:
+		# Source checkouts without the third-party fonts (missing-assets boot screen + dev
+		# menu): fall back to the engine font instead of drawing nothing.
+		if not FileAccess.file_exists(DISPLAY_PATH) and not ResourceLoader.exists(DISPLAY_PATH):
+			_display = ThemeDB.fallback_font
+			return _display
 		var f := FontFile.new()
 		f.load_dynamic_font(DISPLAY_PATH)
 		f.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
@@ -36,7 +41,7 @@ static func display_font() -> Font:
 ## Fredoka at a variable weight (300..700).
 static func body_font(weight: int = 500) -> Font:
 	if not _body.has(weight):
-		var base: Font = load(BODY_PATH)
+		var base: Font = load(BODY_PATH) if ResourceLoader.exists(BODY_PATH) else ThemeDB.fallback_font
 		var v := FontVariation.new()
 		v.base_font = base
 		var ts := TextServerManager.get_primary_interface()

@@ -5,6 +5,8 @@ extends Control
 ## no project theme, fonts or third-party textures, since those are exactly what may be missing.
 ## Layout: a DICE|ROLL lockup (logo + wordmark, scaled down on narrow screens) above a card with
 ## the explanation, a "Read the build guide" button (README) and Quit. Respects safe areas.
+## Hosts the hidden DevGesture (bottom-right corner, 5 taps): the Developer menu uses UiTheme,
+## which falls back to the engine font when the third-party fonts are missing.
 
 const LOGO_PATH := "res://assets/icon/logo_doubles.png"
 
@@ -81,6 +83,8 @@ func _build() -> void:
 
 	col.add_child(_lockup())
 	col.add_child(_card_panel())
+	# hidden Developer menu (build info / diagnostics work without the third-party assets)
+	add_child(DevGesture.new())
 
 
 func _lockup() -> Control:
