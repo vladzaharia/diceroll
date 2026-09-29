@@ -23,3 +23,6 @@
 /.ci-cache/
 /build_info.json
 *.age.part
+
+# Throwaway test keys for the updater tests (~/.gitignore ignores *.pem)
+!tests/fixtures/update/*.pem
