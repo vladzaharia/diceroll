@@ -226,7 +226,7 @@ route sweep forces each route with `--route=` so every route plays the same seed
 | Orc Warchief | rally **2** [3] |
 | Sunscorched Ruins | heat **8%** [5%] at each lap end unless you landed on an oasis that lap, never lethal; oasis heal **5%** [8%]; early pool bone_cutthroat, skeleton_warrior, bone_knight, cultist; late pool bone_cutthroat, bone_golem, bone_knight, brute |
 | Moonlit Woods | as designed: Half moon transforms at ≤65%, Full lap (13; Short Road 8) pre-transformed, +1 elite, moon rune chest, fight gold ×1.5 |
-| The Hollow (old biome) | event heal **5%** [8%]; early pool skeleton_archer → werewolf |
+| The Hollow (old biome) | event heal **3%** [8%]; early pool skeleton_archer → werewolf |
 | Short Road finale HP | tier-3 second biome **×0.65** [0.75]; Moonlit ×0.72; Hollow ×0.88, Frost ×0.85, Warcamp ×0.68 (`short_boss_hp`) |
 
 **Final bosses.** Before this pass the old four ranged from 42% (Bone Warden) to 84% (Cinder

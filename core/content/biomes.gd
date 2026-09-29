@@ -42,7 +42,7 @@ const DEFS := {
 	},
 	"hollow": {
 		"name": "The Hollow", "tier": 2,
-		"desc": "Restless spirits: events are twice as common, and finishing one heals 8% of your max HP.",
+		"desc": "Restless spirits: events are twice as common, and finishing one heals 3% of your max HP.",
 		"mix": {"event": 2},
 		"pools": [["werewolf", "cultist", "hollow_wisp", "bandit"],
 			["cultist", "bandit", "hollow_wisp", "werewolf"]],
