@@ -1,12 +1,16 @@
 extends RefCounted
 ## WP-E3 scenarios (in-run meta presentation) for the screenshot harness (tools/shot.gd).
 ##
-##  pets_gallery     all 6 pets at L1 (front row) and L10 (back row), charge pips part-full
-##                   (--act=<effect> loops that action on every pet)
+##  pets_gallery     all 12 pets at L1 (front row) and L10 (back row), charge pips part-full
+##                   (--pets=new|old: just the six newer / original pets; --pet=<id>: one pet
+##                   close up; --act=<effect> loops that action on every pet, --act=own
+##                   loops each pet's own effect)
 ##  hud_potions      the run HUD with a max-profile belt of 3 potion types and the pet meter
 ##                   (--tip=N opens the tooltip of belt slot N; --combat=1 in a fight)
 ##  board_pet        a pet following the hero along a hop (--pet=<id>, default pumpkin_sprite)
-##  combat_pet_acts  a fight where each pet (or --pet=<id>) fires its effect in turn
+##  combat_pet_acts  a fight where each pet (or --pet=<id>) fires its effect in turn; a pet the
+##                   rules don't know yet gets a faked pet_acted event (--effect=<e> picks one;
+##                   --pet=new runs the six newer pets)
 ##  level_up_auto    an automatic level-up (+max HP toast, level badge pulse)
 ##  events_misc      second_boss, face_cursed, trait_triggered, a doubles board roll and a
 ##                   Crowns pop, one after another (--only=<event> plays just that one)
@@ -46,7 +50,10 @@ static func _gallery() -> Node3D:
 	root.add_child(cam)
 	var font: Font = load("res://assets/fonts/LilitaOne-Regular.ttf")
 	var pets: Array[PetView] = []
-	var ids: Array = PetDefs.IDS
+	var ids: Array = PetView.ALL_IDS
+	match String(args.get("pets", "")):
+		"new": ids = PetViewExt.IDS
+		"old": ids = PetView.ALL_IDS.filter(func(x: String) -> bool: return not PetViewExt.has(x))
 	if args.has("pet"):
 		ids = [String(args.pet)]
 		cam.close = true
@@ -55,10 +62,11 @@ static func _gallery() -> Node3D:
 			var id := String(ids[i])
 			var p := PetView.create(id, lv)
 			root.add_child(p)
-			p.set_charge(PetDefs.size(id) if lv == 10 else PetDefs.size(id) / 2, PetDefs.size(id))
+			var n := PetView.pips_for(id)
+			p.set_charge(n if lv == 10 else n / 2, n)
 			pets.append(p)
 			var l := Label3D.new()
-			l.text = "%s\nL%d" % [PetDefs.name_of(id), lv]
+			l.text = "%s\nL%d" % [PetView.display_name(id), lv]
 			l.font = font
 			l.font_size = 44
 			l.pixel_size = 0.004
@@ -78,12 +86,15 @@ static func _loop_act(root: Node3D, pets: Array[PetView], act: String) -> void:
 	while root.is_inside_tree():
 		for p in pets:
 			p.home = p.global_position
-			var tgt := p.global_position + Vector3(0.0, PetView.HOVER, -1.2)
-			p.act(act, tgt if act in ["bite", "heal"] else Vector3.INF)
+			var tgt := p.global_position + Vector3(0.0, PetView.HOVER, -1.4)
+			var eff := String(PetViewExt.EFFECTS.get(p.pet_id, "")) if act == "own" else act
+			var at := tgt if eff in ["bite", "heal", "freeze", "burn"] or PetViewExt.has(p.pet_id) else Vector3.INF
+			p.act(eff, at, {"targets": [tgt, tgt + Vector3(1.0, 0.0, -0.3)], "die_idx": 0, "face": 6})
 		await root.get_tree().create_timer(1.6).timeout
 
 
-## Lays the pets out (portrait: 3 columns x 4 rows; landscape: 6 x 2) and frames them.
+## Lays the pets out (portrait: 3 columns, or 4 for 12 pets; landscape: 6 columns), one row
+## per level (L1 in front of L10), and frames them.
 class _GalleryCam extends Camera3D:
 	var pets: Array[PetView] = []
 	var close := false
@@ -107,17 +118,22 @@ class _GalleryCam extends Camera3D:
 			position = t + Vector3(0.0, sin(pp), cos(pp)) * dd
 			look_at(t)
 			return
-		var cols := 3 if portrait else 6
-		var rows := 4 if portrait else 2
+		var n := pets.size() / 2
+		var cols := (3 if n <= 6 else 4) if portrait else 6
+		var rows := ceili(float(n) / cols) * 2
 		var gap := Vector2(1.3, 2.0) if portrait else Vector2(1.25, 2.2)
+		var dist := 11.0 if portrait else 12.5
+		if n > 6:
+			gap.y = 1.8 if portrait else 1.85
+			# a squarer portrait window (foldables, iPads) sees less depth: back off
+			dist = 14.0 * maxf(1.0, s.x / s.y / 0.58) if portrait else 15.4
 		for k in pets.size():
 			var pet_i := k / 2
 			var lv_i := k % 2
 			var col := pet_i % cols
 			var row := (pet_i / cols) * 2 + lv_i
 			pets[k].position = Vector3((col - (cols - 1) * 0.5) * gap.x, 0.0, (row - (rows - 1) * 0.5) * gap.y)
-		var target := Vector3(0.0, 0.75, 0.2)
-		var dist := 11.0 if portrait else 12.5
+		var target := Vector3(0.0, 0.75, 0.2 if n <= 6 else 0.75)
 		var pitch := deg_to_rad(46.0 if portrait else 42.0)
 		position = target + Vector3(0.0, sin(pitch), cos(pitch)) * dist
 		look_at(target)

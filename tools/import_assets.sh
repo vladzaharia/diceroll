@@ -78,10 +78,11 @@ SK="KayKit_Skeletons_1.1_FREE"
 sync "$SRC/$SK/characters/gltf" "$KK/skeletons" --include='Skeleton_Minion.glb' --include='*.png' --exclude='*'
 lic "$SK" "$KK/skeletons"
 
-echo "== KayKit ResourceBits EXTRA gems (Crystal Wisp pet; EXTRA = never committed, skipped if absent)"
+echo "== KayKit ResourceBits EXTRA gems, stone chunks, ore nuggets and cogs (Crystal Wisp, Pebble and Tinker pets; EXTRA = never committed, skipped if absent)"
 RB="KayKit_ResourceBits_1.0_EXTRA"
 if [ -d "$SRC/$RB/Assets/gltf" ]; then
-	sync "$SRC/$RB/Assets/gltf" "$KK/resource" --include='Gem_*' --include='resource_bits_texture.png' --exclude='*'
+	sync "$SRC/$RB/Assets/gltf" "$KK/resource" --include='Gem_*' --include='Stone_Chunks_*' \
+		--include='*_Nugget_*' --include='Parts_Cog.*' --include='resource_bits_texture.png' --exclude='*'
 	lic "$RB" "$KK/resource"
 fi
 
