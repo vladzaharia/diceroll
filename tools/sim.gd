@@ -24,6 +24,8 @@ extends SceneTree
 const MAX_COMMANDS := 20000
 
 var total_errors := 0
+## Seed stride between runs (--seed-step=N).
+var seed_step := 7919
 ## --snapshot=N (campaign): print each profile's state after run N.
 var snapshot_run := 0
 var policy := "greedy"
@@ -101,6 +103,8 @@ func _init() -> void:
 			campaign = arg.substr(11).to_int()
 		elif arg.begins_with("--campaigns="):
 			campaigns = arg.substr(12).to_int()
+		elif arg.begins_with("--seed-step="):
+			seed_step = arg.substr(12).to_int()
 		elif arg.begins_with("--snapshot="):
 			snapshot_run = arg.substr(11).to_int()
 		elif arg.begins_with("--scopes="):
@@ -184,7 +188,7 @@ func _init() -> void:
 		var stuck := 0
 		var win_level_sum := 0
 		for r in runs:
-			var s: int = seed0 + r * 7919
+			var s: int = seed0 + r * seed_step
 			var res := _play(c, s, board, opts, verbose)
 			var f: GameFlow = res.flow
 			var last_fight: String = res.last_fight
