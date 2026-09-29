@@ -230,7 +230,7 @@ func _one(ev: Dictionary) -> void:
 			await _wait(0.1)
 		"offer_closed":
 			c.close_modals()
-		"level_up", "potion_gained", "potion_used", "pet_charged", "pet_acted", "second_boss", "face_cursed", "trait_triggered", "crowns_pending":
+		"level_up", "potion_gained", "potion_used", "pet_charged", "pet_acted", "second_boss", "face_cursed", "item_triggered", "crowns_pending":
 			# meta-layer beats (auto level-ups, potions, pets, ascension events): game/pets/meta_beats.gd
 			await MetaBeats.play(c, ev)
 		"act_started":

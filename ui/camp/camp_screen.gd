@@ -238,6 +238,9 @@ func _ready_count(cat: Array, station: String) -> int:
 	for item in cat:
 		if not bool(item.affordable):
 			continue
+		# the Armory shop's items are a browse, not a nudge: ranks, the pouch and blueprints count
+		if station == "armory" and String(item.kind) == "items":
+			continue
 		if (tracks[station] as Array).has(String(item.track)) or (String(item.track) == "sigils" and (kinds[station] as Array).has(String(item.kind))):
 			n += 1
 	return n

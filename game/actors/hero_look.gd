@@ -33,10 +33,11 @@ static func color(class_id: String) -> Color:
 
 
 ## The class hero in `skin` (a SkinDefs slot id; "" = default), with the prestige overlay.
-static func create(class_id: String, skin := "default", prestige := false) -> Character:
+## `p_loadout` ({} = the class kit): an ArmoryLook loadout, the equipped Armory items.
+static func create(class_id: String, skin := "default", prestige := false, p_loadout: Dictionary = {}) -> Character:
 	if not Character.KITS.has(class_id):
 		return Character.create(class_id if Character.MODELS.has(class_id) else "knight")
-	var lo := loadout(class_id, skin, prestige)
+	var lo := p_loadout if not p_loadout.is_empty() else loadout(class_id, skin, prestige)
 	var ch := Character.create(String(lo.model), "", lo)
 	var tex := texture_of(class_id, skin)
 	if tex != null:

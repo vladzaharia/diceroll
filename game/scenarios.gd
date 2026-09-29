@@ -394,7 +394,7 @@ class _Driver extends Node:
 				Balance.BOARD_SIZE, c.run_opts().merged(run_opts(), true))
 			print("AUTO_PROFILE run=%d/%d runs_banked=%d crowns=%d sigils=%d classes=%s pets=%s gear=%s meta=%s" % [k + 1, runs,
 				int(c.profile.records.get("runs", 0)), c.profile.crowns, c.profile.sigils, str(c.profile.unlocks.classes),
-				str(c.profile.unlocks.pets), str(c.profile.gear), str(not f.run.meta.is_empty())])
+				str(c.profile.unlocks.pets), str(c.profile.armory.get("ranks", {})), str(not f.run.meta.is_empty())])
 			if String(args.get("ui-auto", "0")) == "1":
 				code = await AutoScenarios.run_ui_auto(self, c, f, args, _shot_base)
 			else:
@@ -412,7 +412,7 @@ class _Driver extends Node:
 				await _save("%s_camp_%02d.png" % [_shot_base, k + 1])
 		print("AUTO_CAMPAIGN_END runs=%d crowns=%d sigils=%d milestones=%s unlocked_classes=%s pets=%s gear=%s" % [
 			int(c.profile.records.get("runs", 0)), c.profile.crowns, c.profile.sigils, str(c.profile.milestones),
-			str(c.profile.unlocks.classes), str(c.profile.unlocks.pets), str(c.profile.gear)])
+			str(c.profile.unlocks.classes), str(c.profile.unlocks.pets), str(c.profile.armory.get("ranks", {}))])
 		await _quit(code)
 
 	## Between runs: spend like the campaign bot, then pick the loadout (least-played class).

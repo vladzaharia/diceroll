@@ -459,10 +459,10 @@ func _others(s: Dictionary) -> Array:
 	return out
 
 
-## A class character in its equipped look (HeroLook: signature kit, Wardrobe skin, prestige).
+## A class character in its equipped look (HeroLook: the equipped Armory items, Wardrobe skin, prestige).
 func _class_npc(class_id: String, anim: String) -> Character:
 	var look: Array = (state.get("skins", {}) as Dictionary).get(class_id, ["default", false])
-	var ch := HeroLook.create(class_id, String(look[0]), bool(look[1]))
+	var ch := HeroLook.create(class_id, String(look[0]), bool(look[1]), look[2] if look.size() > 2 else {})
 	ch.play("idle", 0.0)
 	if ch.has_anim(anim):
 		ch.play(anim, 0.0)

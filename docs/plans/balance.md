@@ -532,6 +532,8 @@ skeleton cloaks). A class unlock grants its kit.
 **Run.**
 - `run.meta.items` = `{slot: {id, variant, tier}}`; `meta.back`, `meta.appearance`,
   `meta.ranks`. `RunState.item(slot)`.
+- `run.meta.look` = the full worn loadout (`Profile.loadout_for`, inactive rank-0 items too),
+  presentation only: the run hero wears it (`ArmoryLook.of_meta`).
 - `GameFlow.loadout_info()` = `{items: {slot: {id, variant, tier, name, variant_name, rule,
   text, secondary, style, hands}}, back, appearance, style}` (style = the weapon's attack
   style; "" = the class default).

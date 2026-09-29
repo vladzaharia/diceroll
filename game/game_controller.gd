@@ -150,6 +150,7 @@ func show_title() -> void:
 	board.hero_class = String(shown[randi() % shown.size()])
 	board.hero_skin = "default"
 	board.hero_prestige = false
+	board.hero_look = {}
 	board.hero_idx = 0
 	board.variant_seed = randi()
 	board.build(1, b.to_dict().tiles)
@@ -208,6 +209,13 @@ func start(f: GameFlow) -> void:
 	board.hero_class = f.run.class_id
 	board.hero_skin = f.run.skin
 	board.hero_prestige = f.run.skin_prestige
+	board.hero_look = ArmoryLook.of_meta(f.run.meta, f.run.class_id, f.run.skin, f.run.skin_prestige)
+	# the item callouts show each item's 3D picture: render them ahead
+	var pics: Array = []
+	var its: Dictionary = f.run.meta.get("items", {})
+	for slot in its:
+		pics.append(ArmoryLook.shown_id(f.run.class_id, String(its[slot].id), String(its[slot].get("variant", ""))))
+	ItemThumb.prewarm(pics)
 
 	board.hero_idx = f.run.pos
 	EnemyLooks.run_seed = f.run.seed  # per-run enemy variants
@@ -870,7 +878,17 @@ func camp_command(cmd: Array) -> void:
 				Audio.play_sfx("fanfare")
 				overlay.toast("Unlocked: %s" % CampInfo.name_of(String(e.kind), String(e.id)),
 					CampInfo.icon_of(String(e.kind), String(e.id)), UiPalette.GOLD_BRIGHT)
-			"trait_set", "pool_toggled", "starter_kind_set", "ascension_changed", "loadout_changed":
+			"pool_toggled", "starter_kind_set", "ascension_changed", "loadout_changed":
+				Audio.play_sfx("dice_select")
+			"item_unlocked":
+				Audio.play_sfx("fanfare")
+				overlay.toast("New item: %s" % ItemDefs.name_of(String(e.id)), CampInfo.icon_of("items", String(e.id)), UiPalette.GOLD_BRIGHT)
+			"variant_crafted":
+				Audio.play_sfx("levelup")
+				overlay.toast("Crafted: %s" % ItemDefs.name_of(String(e.variant)), "anvil", UiPalette.GOLD_BRIGHT)
+			"item_equipped":
+				Audio.play_sfx("buff")
+			"appearance_set":
 				Audio.play_sfx("dice_select")
 			"skin_equipped", "prestige_set":
 				Audio.play_sfx("buff")
@@ -887,8 +905,12 @@ func _upgrade_text(e: Dictionary) -> String:
 	var id := String(e.id)
 	match String(e.track):
 		"armory":
-			if GearDefs.DEFS.has(id):
-				return "%s  Level %d" % [GearDefs.name_of(id), int(e.level)]
+			if ItemDefs.GROUPS.has(id):
+				var t := ItemDefs.rank_tier(int(e.level))
+				var up := t > ItemDefs.rank_tier(int(e.level) - 1)
+				return "%s %d" % [CampInfo.name_of("gear", id), int(e.level)] + ("  ·  Tier %s!" % ["", "I", "II", "III"][t] if up else "")
+			if id == "pouch":
+				return "Belt Pouch bought: a 2nd trinket slot!"
 			return CampInfo.name_of("features", id) + " bought!"
 		"pet_den":
 			return "%s  Level %d" % [PetDefs.name_of(id), int(e.level)]

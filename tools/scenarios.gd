@@ -38,6 +38,8 @@ const PROVIDERS := [
 	"res://game/boot/scenarios.gd",
 	"res://game/classes/class_scenarios.gd",
 	"res://ui/camp/wardrobe_scenarios.gd",
+	# the Armory: screen, picker, craft, rank-up, appearance, camp racks, item callouts, results
+	"res://ui/camp/armory_ui_scenarios.gd",
 ]
 
 

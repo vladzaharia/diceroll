@@ -1,8 +1,9 @@
 class_name ClassSelect
 extends Control
-## Class select: a turning 3D hero (HeroPortrait, in the equipped Wardrobe look), a grid of
-## class chips (11 classes), the class name, its mechanic badge with the rule, stats, the
-## starting dice with their kinds (each die's six faces; the Pretend ★ is a star) and Start.
+## Class select: a turning 3D hero (HeroPortrait, in the equipped Wardrobe look and Armory
+## items), a grid of class chips (11 classes), the class name, its mechanic badge with the rule,
+## stats, the class's kit (equipped items with their tiers; the signature kit without a
+## profile), the starting dice with their kinds (each die's six faces; the Pretend ★ is a star) and Start.
 ## With a profile (set_profile) locked classes show their unlock and the secret Monster Kid is
 ## a "???" mystery chip with only its hint; Start is disabled on them. Portrait stacks the
 ## preview over the info; landscape puts them side by side.
@@ -150,13 +151,19 @@ func select(id: String, animate := true) -> void:
 			_detail.add_child(lc)
 		_detail.add_child(ClassDetail.mechanic_badge(id, 20))
 		_detail.add_child(ClassDetail.stats_row(id))
+		_detail.add_child(UiModal.section_label("Kit"))
+		var strip := KitStrip.of_profile(profile, id, 60) if profile != null and open else KitStrip.of_kit(id, 60)
+		_detail.add_child(strip)
+		var names := UiTheme.para(strip.names_text(), 18, UiPalette.TEXT_DIM, 600)
+		names.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_detail.add_child(names)
 		_detail.add_child(UiModal.section_label("Starting dice"))
 		_detail.add_child(ClassDetail.dice_rows(id, 34))
 	start_btn.set_enabled(open)
 	var skin := profile.equipped_skin(id) if profile != null and open else "default"
 	var pres := profile.prestige_on(id) if profile != null and open else false
 	portrait.ring_color = UiPalette.class_color(id) if open else Color(0.4, 0.38, 0.55)
-	portrait.set_hero(id, skin, pres, animate)
+	portrait.set_hero(id, skin, pres, animate, ArmoryLook.of_profile(profile, id, skin, pres) if profile != null and open else {})
 	portrait.silhouette = not open
 	if animate:
 		UiTheme.pop(_name, 1.1, 0.25)

@@ -32,6 +32,8 @@ var hero: Character
 var class_id := ""
 var skin := "default"
 var prestige := false
+## The worn Armory loadout (ArmoryLook; {} = the class kit).
+var look: Dictionary = {}
 
 var _viewport: SubViewport
 var _pivot: Node3D
@@ -108,16 +110,18 @@ func _init() -> void:
 	_frame()
 
 
-## Shows `id`'s hero in a Wardrobe look (rebuilds only when something changed).
-func set_hero(id: String, p_skin := "default", p_prestige := false, pop := true) -> void:
-	if hero and id == class_id and p_skin == skin and p_prestige == prestige:
+## Shows `id`'s hero in a Wardrobe look (rebuilds only when something changed). `p_look`: the
+## equipped Armory loadout (ArmoryLook.of_profile; {} = the class's signature kit).
+func set_hero(id: String, p_skin := "default", p_prestige := false, pop := true, p_look: Dictionary = {}) -> void:
+	if hero and id == class_id and p_skin == skin and p_prestige == prestige and p_look.hash() == look.hash():
 		return
 	class_id = id
 	skin = p_skin
 	prestige = p_prestige
+	look = p_look.duplicate(true)
 	if hero:
 		hero.queue_free()
-	hero = HeroLook.create(id, p_skin, p_prestige)
+	hero = HeroLook.create(id, p_skin, p_prestige, look)
 	_pivot.add_child(hero)
 	hero.play("idle", 0.0)
 	_apply_silhouette()
@@ -153,9 +157,9 @@ func _frame() -> void:
 	if _cam == null:
 		return
 	var z := clampf(zoom, 1.0, 2.2)
-	var look := Vector3(0, lerpf(1.0, 1.6, (z - 1.0) / 1.2), 0)
+	var aim := Vector3(0, lerpf(1.0, 1.6, (z - 1.0) / 1.2), 0)
 	var pos := Vector3(0, lerpf(1.45, 1.8, (z - 1.0) / 1.2), 6.3 / z)
-	_cam.transform = Transform3D(Basis.looking_at(look - pos), pos)
+	_cam.transform = Transform3D(Basis.looking_at(aim - pos), pos)
 
 
 func _process(delta: float) -> void:

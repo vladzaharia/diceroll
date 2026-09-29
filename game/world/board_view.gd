@@ -37,6 +37,8 @@ var hero_class := "knight"
 ## Equipped skin (SkinDefs slot) and the A10 prestige overlay of the hero (HeroLook).
 var hero_skin := "default"
 var hero_prestige := false
+## The worn Armory loadout (ArmoryLook.of_meta; {} = the class kit).
+var hero_look: Dictionary = {}
 var hero_idx := 0
 ## Seeds the biome's dressing variant (set before build(); see Biome.build / Dressing).
 var variant_seed := 0
@@ -723,7 +725,7 @@ func rise_wave(from: int, duration := 1.1) -> void:
 # --- hero -----------------------------------------------------------------------------------
 
 func _spawn_hero() -> void:
-	hero = HeroLook.create(hero_class, hero_skin, hero_prestige)
+	hero = HeroLook.create(hero_class, hero_skin, hero_prestige, hero_look)
 	hero.name = "Hero"
 	hero.scale = Vector3.ONE * HERO_SCALE
 	add_child(hero)

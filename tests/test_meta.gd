@@ -85,7 +85,6 @@ func test_profile_round_trip_and_tolerant_loader() -> void:
 	assert_true(not r.owns("pets", "dragon"), "unknown ids dropped")
 	assert_true(not r.owns_item("laser_sword"), "unknown items dropped")
 	assert_eq(r.rank("armor"), ItemDefs.RANK_MAX, "ranks clamped")
-	assert_eq(r.gear_level("helm"), ItemDefs.RANK_MAX, "legacy view: helm = the Armor rank")
 	assert_eq(Profile.from_dict({}).unlocks.classes, ["knight"], "empty dict = fresh")
 
 # ================================================================ camp
@@ -98,7 +97,7 @@ func test_camp_rank_levels_costs_and_caps() -> void:
 	p.crowns = 10000
 	var spent := 0
 	for l in ItemDefs.RANK_MAX:
-		var ev := camp.level_gear("helm") if l == 0 else camp.rank_up("armor")
+		var ev := camp.rank_up("armor")
 		assert_eq(_first(ev, "upgrade_bought").level, l + 1)
 		assert_eq(String(_first(ev, "upgrade_bought").id), "armor")
 		spent += int(ItemDefs.RANK_COSTS[l])
@@ -110,13 +109,20 @@ func test_camp_rank_levels_costs_and_caps() -> void:
 	assert_eq(ItemDefs.base_stats({"weapon": 7, "armor": 3}).atk, 0)
 	assert_eq(ItemDefs.base_stats({"armor": 4}).max_hp, mini(ItemDefs.HP_CAP, int(floor(4 * ItemDefs.HP_PER_RANK))))
 
-func test_camp_traits_are_gone() -> void:
+func test_camp_legacy_gear_commands_are_gone() -> void:
 	var p := Profile.fresh()
 	var camp := Camp.new(p)
-	p.grant("gear", "blade")
-	assert_true(p.owns("gear", "weapon") and p.owns("gear", "blade"), "a legacy piece id grants its rank group")
-	assert_eq(camp.set_trait("blade", "4", "blade_high")[0].type, "error", "traits are item rules now")
-	assert_eq(p.active_traits(), [])
+	assert_eq(String(camp.apply(["level_gear", "helm"])[0].type), "error", "level_gear is gone: rank_up")
+	assert_eq(String(camp.apply(["set_trait", "blade", "4", "blade_high"])[0].type), "error", "traits are item rules now")
+	# an old (v2) file's gear piece ids still load as their rank groups
+	var d := p.to_dict()
+	d.erase("armory")
+	d["version"] = 2
+	d.unlocks["gear"] = ["blade", "helm"]
+	d["gear"] = {"blade": 3, "helm": 1}
+	var q := Profile.from_dict(d)
+	assert_true(q.owns("gear", "weapon") and q.owns("gear", "armor"), "old pieces load as rank groups")
+	assert_eq(q.rank("weapon"), 3)
 
 func test_camp_sigil_unlocks_and_pool_toggle() -> void:
 	var p := Profile.fresh()

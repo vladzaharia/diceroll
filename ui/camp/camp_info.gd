@@ -6,8 +6,8 @@ extends RefCounted
 
 const KIND_LABEL := {
 	"classes": "Class", "biomes": "Biome", "bosses": "Final boss", "minibosses": "Mini-boss", "pets": "Pet",
-	"minigames": "Minigame", "packs": "Workshop pack", "gear": "Armory gear", "potions": "Potion",
-	"features": "Camp upgrade",
+	"minigames": "Minigame", "packs": "Workshop pack", "gear": "Armory rank", "potions": "Potion",
+	"features": "Camp upgrade", "items": "Armory item",
 }
 
 const PET_ICON := {
@@ -35,15 +35,17 @@ const MINIGAME_COLOR := {"fossil_hunter": Color("e0b070"), "bubble_breaker": Col
 	"scratch_off": Color("ffc93d"), "claw_machine": Color("ff6fae"), "bubble_shooter": Color("7f8cff"), "plinko": Color("5fe0c0"),
 	"shell_game": Color("e08a4a"), "memory_match": Color("b58cff"), "fishing": Color("4ac0e8"), "lucky_wheel": Color("ff7a5a"),
 	"high_low": Color("9ae05a")}
-const GEAR_ICON := {"helm": "shield", "blade": "sword", "boots": "speed", "charm": "coin",
-	"weapon": "sword", "offhand": "shield", "armor": "shield", "trinket": "coin"}
+const GEAR_ICON := {"weapon": "sword", "offhand": "shield", "armor": "armor", "trinket": "ring"}
+## Glyph per Armory slot (items without a 3D thumbnail at hand).
+const SLOT_ICON := {"weapon": "sword", "offhand": "shield", "head": "helmet", "body": "armor", "trinket": "ring",
+	"trinket2": "pouch", "back": "cape"}
 ## Armory rank groups (the "gear" unlock kind since the real-item Armory).
 const GROUP_NAME := {"weapon": "Weapon rank", "offhand": "Off-hand rank", "armor": "Armor rank", "trinket": "Trinket rank"}
 const FEATURE_NAME := {"potion_belt": "Third Potion Slot", "loadout_slot": "Third Minigame Slot"}
 
 ## Camp stations in display order: id -> {name, icon, color, blurb}.
 const STATIONS := {
-	"armory": {"name": "Armory", "icon": "anvil", "color": Color("ff9a5a"), "blurb": "Gear and traits"},
+	"armory": {"name": "Armory", "icon": "anvil", "color": Color("ff9a5a"), "blurb": "Weapons and armor"},
 	"workshop": {"name": "Dice Workshop", "icon": "dice", "color": Color("7ad0ff"), "blurb": "Packs and pools"},
 	"pet_den": {"name": "Pet Den", "icon": "heart", "color": Color("ffb45a"), "blurb": "Familiars"},
 	"arcade": {"name": "Arcade", "icon": "star", "color": Color("ff6fd0"), "blurb": "Minigames"},
@@ -66,7 +68,9 @@ static func name_of(kind: String, id: String) -> String:
 		"packs":
 			return String(UnlockDefs.PACKS[id].name) if UnlockDefs.PACKS.has(id) else id
 		"gear":
-			return String(GROUP_NAME.get(id, GearDefs.name_of(id)))
+			return String(GROUP_NAME.get(id, id))
+		"items":
+			return ItemDefs.name_of(id)
 		"potions":
 			return PotionDefs.name_of(id)
 		"features":
@@ -84,6 +88,7 @@ static func icon_of(kind: String, id: String) -> String:
 		"minigames": return String(MINIGAME_ICON.get(id, "star"))
 		"packs": return "dice"
 		"gear": return String(GEAR_ICON.get(id, "anvil"))
+		"items": return String(SLOT_ICON.get(ItemDefs.slot_of(ItemDefs.base_of(id)), "anvil"))
 		"potions": return "potion"
 		"features": return "plus"
 	return "star"
@@ -96,6 +101,7 @@ static func color_of(kind: String, id: String) -> Color:
 		"minigames": return MINIGAME_COLOR.get(id, UiPalette.GOLD)
 		"bosses", "minibosses": return UiPalette.DANGER.lightened(0.2)
 		"classes": return UiPalette.GOLD_BRIGHT
+		"items", "gear": return Color("ff9a5a")
 	return UiPalette.GOLD
 
 
@@ -178,7 +184,9 @@ static func nearest_goals(p: Profile, n := 3) -> Array:
 	if not cheapest.is_empty():
 		var c := int(cheapest.cost.crowns)
 		var title := String(cheapest.name)
-		if String(cheapest.cmd[0]) in ["level_gear", "level_pet"]:
+		if String(cheapest.cmd[0]) == "rank_up":
+			title = "%s %d" % [title, int(cheapest.level) + 1]
+		elif String(cheapest.cmd[0]) == "level_pet":
 			title = "%s L%d" % [title, int(cheapest.level) + 1]
 		var g := {"title": title, "detail": "%d Crowns short" % (c - p.crowns), "cur": p.crowns, "need": c,
 			"icon": "crown", "color": UiPalette.GOLD, "ratio": float(p.crowns) / float(c)}
@@ -198,25 +206,3 @@ static func pet_xp_bar(p: Profile, id: String) -> Array:
 	var lo := 0 if lvl <= 1 else int(PetDefs.XP_LEVELS[lvl - 2])
 	var hi := int(PetDefs.XP_LEVELS[lvl - 1])
 	return [xp - lo, hi - lo]
-
-
-## Short gear stat line for a level ("+2 max HP", "-20% hazards · +1 reroll/biome").
-static func gear_stat(slot: String, level: int) -> String:
-	var s := GearDefs.stats({slot: level})
-	match slot:
-		"helm":
-			return "+%d max HP" % int(s.max_hp)
-		"blade":
-			return "+%d ATK" % int(s.atk)
-		"boots":
-			var t := "-%d%% trap & lava damage" % int(round((1.0 - float(s.hazard_mult)) * 100.0))
-			if int(s.lap_rerolls) > 0:
-				t += "  ·  +1 reroll per biome"
-			return t
-		"charm":
-			return "+%s%% gold" % _pct(float(s.gold_pct) * 100.0)
-	return ""
-
-
-static func _pct(v: float) -> String:
-	return str(int(v)) if absf(v - round(v)) < 0.05 else "%.1f" % v

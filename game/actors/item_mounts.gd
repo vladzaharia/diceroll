@@ -435,3 +435,75 @@ static func all_scenes() -> PackedStringArray:
 			if not out.has(String(t[id].glb)):
 				out.append(String(t[id].glb))
 	return out
+
+
+## A display prop of an item / variant / model id (the Camp racks, Armory thumbnails): the model
+## stood upright in a holder, its longest side along +Y (long weapons: grip down, as authored),
+## its flat side toward +Z (shields, books), centred on x / z with its base at y = 0. null when
+## the model is unknown or missing.
+static func upright(id: String) -> Node3D:
+	var it := item(id)
+	var model := String(it.get("model", ""))
+	if model == "" or not MOUNTS.has(model):
+		return null
+	var path := String(MOUNTS[model].scene)
+	if not ResourceLoader.exists(path):
+		return null
+	var holder := Node3D.new()
+	holder.name = "Prop_" + id
+	var inst: Node3D = (load(path) as PackedScene).instantiate()
+	holder.add_child(inst)
+	var b := local_bounds(inst)
+	var e := b.size
+	var axes := [0, 1, 2]
+	axes.sort_custom(func(a: int, c: int) -> bool: return e[a] > e[c])
+	var long_i: int = axes[0]
+	var mid_i: int = axes[1]
+	var thin_i: int = axes[2]
+	var cols := [Vector3.RIGHT, Vector3.UP, Vector3.BACK]
+	if e[long_i] > e[mid_i] * 1.6 and long_i != 1:
+		# long along x / z (bows): stand it up, flattest side forward
+		cols = [Vector3.ZERO, Vector3.ZERO, Vector3.ZERO]
+		cols[long_i] = Vector3.UP
+		cols[thin_i] = Vector3.BACK
+		cols[mid_i] = Vector3.UP.cross(Vector3.BACK)
+	elif e[thin_i] < e[mid_i] * 0.45 and thin_i != 2 and e[long_i] <= e[mid_i] * 1.6:
+		# flat pieces lying in another plane: turn the flat side forward, keep y up when it can
+		cols = [Vector3.ZERO, Vector3.ZERO, Vector3.ZERO]
+		cols[thin_i] = Vector3.BACK
+		if thin_i != 1:
+			cols[1] = Vector3.UP
+			cols[2 - thin_i] = Vector3.RIGHT
+		else:
+			cols[long_i] = Vector3.RIGHT
+			cols[mid_i] = Vector3.UP
+	var basis := Basis(cols[0], cols[1], cols[2])
+	if basis.determinant() < 0.0:
+		cols[thin_i] = -cols[thin_i]
+		basis = Basis(cols[0], cols[1], cols[2])
+	inst.transform = Transform3D(basis, Vector3.ZERO)
+	var nb := local_bounds(holder)
+	inst.position = Vector3(-nb.get_center().x, -nb.position.y, -nb.get_center().z)
+	return holder
+
+
+## Bounds of every mesh under `root` in `root`'s own space.
+static func local_bounds(root: Node3D) -> AABB:
+	var out := AABB()
+	var first := true
+	for mi in root.find_children("*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		if m.mesh == null:
+			continue
+		var xf := m.transform
+		var p := m.get_parent()
+		while p != null and p != root and p is Node3D:
+			xf = (p as Node3D).transform * xf
+			p = p.get_parent()
+		var bb := xf * m.get_aabb()
+		if first:
+			out = bb
+			first = false
+		else:
+			out = out.merge(bb)
+	return out

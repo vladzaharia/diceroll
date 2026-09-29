@@ -11,8 +11,8 @@ func test_profile_store_round_trip() -> void:
 	var p := Profile.fresh()
 	p.crowns = 57
 	p.sigils = 3
-	p.grant("gear", "helm")
-	p.gear["helm"] = 2
+	p.grant("gear", "armor")
+	p._ranks()["armor"] = 2
 	p.loadout.mode = "short"
 	assert_true(ProfileStore.save(p, PATH), "saved")
 	var q := ProfileStore.load_profile(PATH)
@@ -37,9 +37,9 @@ func test_station_states() -> void:
 	assert_true(not bool(CampInfo.station_state(p, "workshop").locked), "Workshop open")
 	assert_true(not bool(CampInfo.station_state(p, "arcade").locked), "Arcade open")
 	assert_eq(String(CampInfo.station_state(p, "armory").text), "Finish your first run.")
-	p.grant("gear", "helm")
+	p.grant("gear", "armor")
 	p.grant("pets", "pumpkin_sprite")
-	assert_true(not bool(CampInfo.station_state(p, "armory").locked), "Armory opens with the Helm")
+	assert_true(not bool(CampInfo.station_state(p, "armory").locked), "Armory opens with the Armor rank")
 	assert_true(not bool(CampInfo.station_state(p, "pet_den").locked), "Pet Den opens with a pet")
 
 
@@ -61,7 +61,7 @@ func test_nearest_goals() -> void:
 	for x in g:
 		assert_true(int(x.cur) < int(x.need), "goal not met yet: %s" % x.title)
 	# a Crowns goal appears once gear is unlocked and not affordable
-	p.grant("gear", "helm")
+	p.grant("gear", "armor")
 	var has_crowns := false
 	for x in CampInfo.nearest_goals(p, 3):
 		if String(x.icon) == "crown":
@@ -86,13 +86,13 @@ func test_run_bank_loop() -> void:
 	for e in bank:
 		types.append(String(e.type))
 	assert_true(types.has("run_banked"), "banked")
-	assert_true(p.owns("gear", "helm"), "first run unlocks the Helm")
+	assert_true(p.owns("gear", "armor"), "first run unlocks the Armor rank")
 	assert_true(p.owns("pets", "pumpkin_sprite"), "lap 5 unlocks the Pumpkin Sprite")
 	assert_true(p.crowns > 0, "a loss pays Crowns")
 	assert_eq(int(p.records.runs), 1)
 	ProfileStore.save(p, PATH)
 	var q := ProfileStore.load_profile(PATH)
-	assert_true(q.owns("gear", "helm") and q.crowns == p.crowns, "persisted")
+	assert_true(q.owns("gear", "armor") and q.crowns == p.crowns, "persisted")
 	ProfileStore.delete(PATH)
 
 

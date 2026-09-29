@@ -10,17 +10,18 @@ extends RefCounted
 ##  camp_reveal     the build-out moments after a fresh profile's first run (use --frames)
 ##  camp_life       camp life on --profile=stage_2|stage_3|max (default stage_3): campers walk,
 ##                  spar, chat and tinker, pets roam (use --frames; --clean hides the UI)
-##  ui_armory / ui_workshop / ui_petden / ui_arcade / ui_run_setup   a Camp screen open
+##  ui_workshop / ui_petden / ui_arcade / ui_run_setup   a Camp screen open (the Armory's
+##                  scenarios live in ui/camp/armory_ui_scenarios.gd)
 ##                  (--profile=fresh|mid|max, default mid; --scroll=N scrolls the screen)
 ##  ui_results_win / ui_results_loss   the results screen after banking a run (the loss is a
 ##                  fresh profile's first run: milestone unlock cards; the win a mid profile)
 ##  flow_first_run  title -> PLAY -> Camp (welcome) -> START RUN -> setup -> START -> route
 ##                  card, one shot per step: <shot>_step_NN.png
 
-const NAMES := ["camp_raw", "camp_first", "camp_mid", "camp_max", "ui_armory", "ui_workshop", "ui_petden", "ui_arcade",
+const NAMES := ["camp_raw", "camp_first", "camp_mid", "camp_max", "ui_workshop", "ui_petden", "ui_arcade",
 	"ui_run_setup", "ui_results_win", "ui_results_loss", "flow_first_run", "camp_stage_0", "camp_stage_1", "camp_stage_2",
 	"camp_stage_3", "camp_reveal", "camp_life"]
-const SCREENS := {"ui_armory": "armory", "ui_workshop": "workshop", "ui_petden": "pet_den", "ui_arcade": "arcade",
+const SCREENS := {"ui_workshop": "workshop", "ui_petden": "pet_den", "ui_arcade": "arcade",
 	"ui_run_setup": "setup"}
 
 
