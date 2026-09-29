@@ -308,6 +308,15 @@ static func _front() -> void:
 				Dressing.lying(g, TX + "pickaxe.gltf", Vector3(0, 0, 0), 30.0, 0.75)
 				Props.put(g, RES + "Iron_Nuggets.gltf", Vector3(-0.45, 0, 0.1), 0.0, 0.55)
 	Dressing.front_row(fill, 4, 0.7)
+	# two lanterns set on the ground at the front corners (warm pools of light on the camera side)
+	for sx in [-1.0, 1.0]:
+		var x: float = sx * (Dressing.extent - 0.6)
+		var z := Dressing.extent + 1.4
+		if Dressing.fits(x, z, 0.45, 0.8):
+			var g := Dressing.group("GroundLantern", x, z, 0.45)
+			Props.put(g, TX + "lantern.gltf", Vector3.ZERO, 0.0, 0.62)
+			Props.put(g, RES + "Containers_Crate_Small_Grey.gltf", Vector3(0.5 * sx, 0, -0.2), 20.0, 0.5)
+			Biome.flicker_light(Dressing.d, g.position + Vector3(0, 0.7, 0.2), LAMP, 1.2, 4.0).set_meta("prescaled", true)
 
 
 # --- set pieces ----------------------------------------------------------------------------------------

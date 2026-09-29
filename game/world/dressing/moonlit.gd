@@ -57,6 +57,10 @@ static func dress(root: Node3D, d: Node3D, c: Node3D) -> void:
 		for z in [-e + 0.6, -e * 0.45, -0.4]:
 			_tree(pal, side * (h - 1.3 + Dressing.rng.randf_range(-0.3, 0.2)), z + Dressing.rng.randf_range(-0.6, 0.6),
 				Dressing.chance(0.5), 0.64 + Dressing.rng.randf_range(0.0, 0.14))
+		# the wood closing in beside the ring toward the back
+		for z in [-e * 0.75, -e * 0.3]:
+			_tree(pal, side * (e + 1.7 + Dressing.rng.randf_range(0.0, 0.4)), z + Dressing.rng.randf_range(-0.5, 0.5),
+				Dressing.chance(0.6), 0.5 + Dressing.rng.randf_range(0.0, 0.1))
 		for z in [-e * 0.7, -e * 0.1, e * 0.35, e * 0.8]:
 			_bush(pal, side * (e + 0.9 + Dressing.rng.randf_range(0.0, 1.2)), z + Dressing.rng.randf_range(-0.8, 0.8), 0.55)
 		for z in [e * 0.55, e * 0.95]:

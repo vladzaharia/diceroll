@@ -210,12 +210,15 @@ static func tent(g: Node3D, cloth: Color, k := 1.0) -> Node3D:
 	n.name = "Tent"
 	n.scale = Vector3.ONE * k
 	g.add_child(n)
-	var body := MeshInstance3D.new()
-	var pm := PrismMesh.new()
-	pm.size = Vector3(1.7, 1.25, 1.9)
-	body.mesh = BiomeBlocks.solid(pm, cloth, 0.03, 13, cloth.darkened(0.3))
-	body.position.y = 0.62
-	n.add_child(body)
+	# two sloped hide panels meeting at the ridge
+	for sx in [-1.0, 1.0]:
+		var panel := MeshInstance3D.new()
+		var bx := BoxMesh.new()
+		bx.size = Vector3(0.06, 1.5, 1.9)
+		panel.mesh = BiomeBlocks.solid(bx, cloth.darkened(0.32 if sx > 0 else 0.0), 0.02, 13 + int(sx))
+		panel.position = Vector3(sx * 0.42, 0.62, 0)
+		panel.rotation.z = sx * deg_to_rad(34.0)
+		n.add_child(panel)
 	var door := MeshInstance3D.new()
 	var dm := PrismMesh.new()
 	dm.size = Vector3(0.62, 0.8, 0.02)

@@ -73,7 +73,7 @@ const LOOKS := {
 		"sky_bottom": Color(0.03, 0.025, 0.035), "sky_glow": Color(1.0, 0.62, 0.3),
 		"glow_strength": 0.25, "stars": 0.0,
 		"fog": Color(0.07, 0.06, 0.07), "fog_density": 0.012, "fog_height_density": 0.0,
-		"ambient": Color(0.52, 0.5, 0.62), "ambient_energy": 0.42,
+		"ambient": Color(0.52, 0.5, 0.62), "ambient_energy": 0.5,
 		"key": Color(1.0, 0.82, 0.62), "key_energy": 0.85, "key_rot": Vector3(-62.0, -28.0, 0.0),
 		"fill": Color(0.45, 0.62, 0.9), "fill_energy": 0.35,
 		"exposure": 1.05, "saturation": 1.12, "contrast": 1.1, "glow": 0.45,
@@ -146,7 +146,7 @@ const TERRAIN := {
 	"magma": {"floor": [["stone_dark", 1]], "top": ["stone_dark"], "fill": "stone_dark",
 		"tint": Color(1, 1, 1), "shader": "basalt", "channel": true},
 	"mines": {"floor": [["stone_dark", 1]], "floor_shader": "cave", "top": ["stone_dark", "stone", "stone_dark"],
-		"fill": "stone_dark", "tint": Color(1, 1, 1), "raise_tint": Color(0.62, 0.6, 0.66)},
+		"fill": "stone_dark", "tint": Color(1, 1, 1), "raise_tint": Color(0.86, 0.83, 0.92)},
 	"warcamp": {"floor": [["dirt", 1]], "floor_shader": "mud", "path": "gravel", "top": ["dirt"],
 		"fill": "dirt", "tint": Color(1, 1, 1), "raise_tint": Color(0.82, 0.7, 0.6)},
 	"ruins": {"floor": [["dirt", 1]], "floor_shader": "sand", "top": ["stone"], "fill": "stone",
@@ -466,7 +466,7 @@ const GROUNDS := {
 	# Sunscorched Ruins: bleached sand in soft drifts
 	"sand": {"top_a": Color(0.84, 0.69, 0.47), "top_b": Color(0.95, 0.84, 0.62), "speck_color": Color(0.74, 0.58, 0.38),
 		"side_color": Color(0.74, 0.5, 0.34), "patch_scale": 0.1, "speck_amount": 0.18, "speck_scale": 2.2,
-		"roughness": 0.95, "lip": 0.3},
+		"roughness": 0.95, "lip": 0.3, "ripple": 1.0},
 	# Moonlit Woods: a cool night meadow (teal-green under moonlight)
 	"night_meadow": {"top_a": Color(0.13, 0.3, 0.22), "top_b": Color(0.22, 0.42, 0.28), "speck_color": Color(0.1, 0.22, 0.18),
 		"side_color": Color(0.22, 0.18, 0.24), "patch_scale": 0.12, "speck_amount": 0.3, "speck_scale": 1.6, "lip": 0.22},

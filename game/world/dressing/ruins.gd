@@ -53,7 +53,7 @@ static func dress(root: Node3D, d: Node3D, c: Node3D) -> void:
 		"border", Vector2(0.4, 0.9), Color(0.86, 0.68, 0.46, 0.7))
 	Dressing.scatter([H + "bone_A.gltf", H + "bone_B.gltf", H + "bone_C.gltf", SKP + "Skeleton_Arrow_Broken_Half.gltf"],
 		int(12 * s), "all", Vector2(0.5, 0.8), BONE)
-	BiomeBlocks.scatter_tufts(d, Color(0.72, 0.62, 0.32), int(26 * s * s))
+	BiomeBlocks.scatter_tufts(d, Color(0.72, 0.62, 0.32), int(60 * s * s))
 	match Dressing.kit(0):
 		0:
 			tomb_gate(c)
