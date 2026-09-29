@@ -1,0 +1,449 @@
+# Release: tag vX.Y.Z[-pre] (or run manually) -> builds every platform, writes release notes
+# (git-cliff + Claude), checksums, a build manifest and the signed auto-updater manifests, and
+# publishes a GitHub Release. Store uploads are opt-in via repository variables (ENABLE_*).
+# Linux runners do everything except the Apple builds (macOS minutes cost ~10x). docs/RELEASE.md
+name: Release
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to build (e.g. 0.2.0 or 0.2.0-rc.1); the tag v<version> is created on publish
+        required: true
+      publish:
+        description: Publish a GitHub Release (otherwise artifacts only)
+        type: boolean
+        default: true
+
+concurrency:
+  group: release-${{ github.ref }}-${{ inputs.version }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  GODOT_VERSION: "4.7.2"
+
+jobs:
+  # ------------------------------------------------------------------------------------------
+  prepare:
+    name: Version + release notes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      short: ${{ steps.v.outputs.short_version }}
+      build: ${{ steps.v.outputs.build }}
+      channel: ${{ steps.v.outputs.channel }}
+      prerelease: ${{ steps.v.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Resolve version
+        id: v
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then v="$INPUT_VERSION"; else v="${GITHUB_REF_NAME#v}"; fi
+          python3 tools/ci/stamp_version.py --version "$v" --print --github-output
+      - name: Developer changelog (git-cliff)
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          pip install -q git-cliff
+          mkdir -p build/release-notes
+          # Tag push: HEAD is the tag -> --current; manual run: preview as the new tag.
+          if git describe --exact-match --tags HEAD >/dev/null 2>&1; then range=(--current); else range=(--unreleased --tag "v$VERSION"); fi
+          git-cliff --config cliff.toml "${range[@]}" --strip header -o build/release-notes/CHANGELOG_RELEASE.md
+          cat build/release-notes/CHANGELOG_RELEASE.md
+      - name: Player-facing notes (Claude; falls back to the changelog without a key)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          pip install -q anthropic
+          # On a tag push HEAD is the tag itself; notes cover the previous v* tag..HEAD.
+          python3 tools/ci/changelog_llm.py --version "$VERSION" --changelog build/release-notes/CHANGELOG_RELEASE.md --out build/release-notes
+          {
+            echo "### Release notes ($(jq -r .source build/release-notes/release_notes.json))"
+            cat build/release-notes/RELEASE_NOTES.md
+          } >>"$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-notes
+          path: build/release-notes
+          retention-days: 30
+
+  # ------------------------------------------------------------------------------------------
+  desktop-web:
+    name: Linux, Windows, Web, content pack
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-diceroll
+        id: setup
+        with:
+          godot-version: ${{ env.GODOT_VERSION }}
+          templates: desktop
+          age-key: ${{ secrets.ASSETS_AGE_KEY }}
+          deploy-key: ${{ secrets.ASSETS_DEPLOY_KEY }}
+      - name: Require assets
+        if: steps.setup.outputs.assets != 'true'
+        run: |
+          echo "::error::release builds need the private asset bundles (ASSETS_AGE_KEY / ASSETS_DEPLOY_KEY)"
+          exit 1
+      - name: Stamp version
+        env:
+          V: ${{ needs.prepare.outputs.version }}
+        run: python3 tools/ci/stamp_version.py --version "$V" --distribution github
+      - name: Export
+        run: |
+          tools/export.sh linux
+          tools/export.sh linux-arm64
+          tools/export.sh windows
+          tools/export.sh pck
+      - name: Export Web (itch.io / static hosting build)
+        env:
+          V: ${{ needs.prepare.outputs.version }}
+        run: |
+          python3 tools/ci/stamp_version.py --version "$V" --distribution web
+          tools/export.sh web
+      - name: Package
+        env:
+          V: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          for d in linux-x86_64 linux-arm64; do
+            tar -C build -czf "dist/Diceroll-$V-$d.tar.gz" --transform "s|^$d|Diceroll-$V-$d|" "$d"
+          done
+          (cd build && mv windows "Diceroll-$V-windows-x86_64" && zip -qr "../dist/Diceroll-$V-windows-x86_64.zip" "Diceroll-$V-windows-x86_64")
+          (cd build/web && zip -qr "../../dist/Diceroll-$V-web.zip" .)
+          cp build/pck/Diceroll-desktop.pck "dist/Diceroll-$V-desktop.pck"
+          ls -la dist
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist-desktop-web
+          path: dist/
+          retention-days: 7
+          compression-level: 0
+
+  # ------------------------------------------------------------------------------------------
+  android:
+    name: Android (APK + AAB)
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+      - uses: ./.github/actions/setup-diceroll
+        id: setup
+        with:
+          godot-version: ${{ env.GODOT_VERSION }}
+          templates: desktop
+          age-key: ${{ secrets.ASSETS_AGE_KEY }}
+          deploy-key: ${{ secrets.ASSETS_DEPLOY_KEY }}
+      - name: Require assets
+        if: steps.setup.outputs.assets != 'true'
+        run: |
+          echo "::error::release builds need the private asset bundles"
+          exit 1
+      - name: Release keystore (optional)
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            printf '%s' "$KEYSTORE_B64" | base64 --decode >"$RUNNER_TEMP/release.keystore"
+            {
+              echo "GODOT_ANDROID_KEYSTORE_RELEASE_PATH=$RUNNER_TEMP/release.keystore"
+              echo "GODOT_ANDROID_KEYSTORE_RELEASE_USER=$KEY_ALIAS"
+              echo "GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD=$KEY_PASSWORD"
+            } >>"$GITHUB_ENV"
+          else
+            echo "::warning::no ANDROID_KEYSTORE_BASE64: APK/AAB are signed with a throwaway debug key (sideload only; Play rejects it)"
+          fi
+      - name: Export
+        env:
+          V: ${{ needs.prepare.outputs.version }}
+        run: |
+          python3 tools/ci/stamp_version.py --version "$V" --distribution play
+          tools/export.sh android
+          tools/export.sh android-aab
+          mkdir -p dist
+          cp build/android/Diceroll.apk "dist/Diceroll-$V-android.apk"
+          cp build/android/Diceroll.aab "dist/Diceroll-$V-android.aab"
+          rm -f "$RUNNER_TEMP/release.keystore"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist-android
+          path: dist/
+          retention-days: 7
+          compression-level: 0
+
+  # ------------------------------------------------------------------------------------------
+  apple:
+    name: macOS + iOS/iPadOS
+    needs: prepare
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-diceroll
+        id: setup
+        with:
+          godot-version: ${{ env.GODOT_VERSION }}
+          templates: apple
+          age-key: ${{ secrets.ASSETS_AGE_KEY }}
+          deploy-key: ${{ secrets.ASSETS_DEPLOY_KEY }}
+      - name: Require assets
+        if: steps.setup.outputs.assets != 'true'
+        run: |
+          echo "::error::release builds need the private asset bundles"
+          exit 1
+      - name: macOS (universal .app -> signed/notarized when secrets exist -> .zip + .dmg)
+        env:
+          V: ${{ needs.prepare.outputs.version }}
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          python3 tools/ci/stamp_version.py --version "$V" --distribution github
+          tools/export.sh macos
+          tools/ci/macos_package.sh build/macos/Diceroll.app "$V" dist
+      - name: iOS / iPadOS (signed .ipa with Apple secrets, else unsigned + Simulator)
+        env:
+          V: ${{ needs.prepare.outputs.version }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          python3 tools/ci/stamp_version.py --version "$V" --distribution appstore
+          tools/ci/ios_build.sh "$V" dist
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist-apple
+          path: dist/
+          retention-days: 7
+          compression-level: 0
+
+  # ------------------------------------------------------------------------------------------
+  publish:
+    name: GitHub Release
+    needs: [prepare, desktop-web, android, apple]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      V: ${{ needs.prepare.outputs.version }}
+      REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: dist-*
+          path: dist
+          merge-multiple: true
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-notes
+          path: notes
+      - name: Checksums, build manifest, updater manifests
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+          CHANNEL: ${{ needs.prepare.outputs.channel }}
+        run: |
+          set -euo pipefail
+          python3 tools/ci/update_manifest.py --version "$V" --dist dist --channel "$CHANNEL" \
+            --release-url "$REPO_URL/releases/download/v$V" --notes notes/store/android_whats_new.txt --out channels
+          python3 - <<'EOF'
+          import hashlib, json, os, pathlib, subprocess
+          dist = pathlib.Path("dist")
+          files = {p.name: {"sha256": hashlib.sha256(p.read_bytes()).hexdigest(), "bytes": p.stat().st_size}
+                   for p in sorted(dist.iterdir()) if p.is_file()}
+          lock = json.loads(pathlib.Path("tools/ci/assets.lock.json").read_text())
+          manifest = {
+              "name": "Diceroll", "version": os.environ["V"], "commit": os.environ["GITHUB_SHA"],
+              "ref": os.environ["GITHUB_REF"], "run": f"{os.environ['REPO_URL']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+              "godot": os.environ["GODOT_VERSION"], "asset_lock_hash": lock.get("lock_hash"),
+              "asset_units": {k: v["sha256"][:16] for k, v in sorted(lock["units"].items())},
+              "notes_source": json.loads(pathlib.Path("notes/release_notes.json").read_text()).get("source"),
+              "artifacts": files,
+          }
+          (dist / f"Diceroll-{os.environ['V']}-build-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+          EOF
+          (cd dist && sha256sum -- * > SHA256SUMS.txt && cat SHA256SUMS.txt)
+          cp notes/store/ios_whats_new.txt "dist/Diceroll-$V-whats-new-ios.txt"
+          cp notes/store/android_whats_new.txt "dist/Diceroll-$V-whats-new-android.txt"
+          cat notes/RELEASE_NOTES.md >release_body.md
+          # shellcheck disable=SC2016
+          printf '\n---\n**Downloads**: macOS (.dmg/.zip, universal), Windows x86_64, Linux x86_64 and arm64, Web (itch.io-ready zip), Android APK (sideload) and AAB, iOS/iPadOS.\nVerify with `sha256sum -c SHA256SUMS.txt`. Built from %s with Godot %s.\n' "${GITHUB_SHA::7}" "$GODOT_VERSION" >>release_body.md
+      - name: Create GitHub Release
+        if: github.event_name == 'push' || inputs.publish
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v${{ needs.prepare.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: Diceroll ${{ needs.prepare.outputs.version }}
+          body_path: release_body.md
+          prerelease: ${{ needs.prepare.outputs.prerelease == 'true' }}
+          make_latest: ${{ needs.prepare.outputs.prerelease != 'true' }}
+          files: dist/*
+          fail_on_unmatched_files: true
+      - name: Update the updater channels (rolling release "channels")
+        if: github.event_name == 'push' || inputs.publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ls channels
+          if ! gh release view channels -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create channels -R "$GITHUB_REPOSITORY" --prerelease --latest=false \
+              --title "Update channels (auto-updater manifests)" \
+              --notes "Signed manifests read by the in-game updater (game/update). Updated by every release; do not delete."
+          fi
+          gh release upload channels -R "$GITHUB_REPOSITORY" --clobber channels/*
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ needs.prepare.outputs.version }}
+          path: |
+            dist/SHA256SUMS.txt
+            dist/*-build-manifest.json
+            channels/
+          retention-days: 30
+
+  # ------------------------------------------------------------------------------------------
+  # Store flows: all disabled unless the repository variable is set to 'true'.
+  testflight:
+    name: TestFlight (iOS/iPadOS)
+    needs: [prepare, apple]
+    if: vars.ENABLE_APPSTORE == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist-apple
+          path: dist
+      - name: Require a signed .ipa
+        env:
+          V: ${{ needs.prepare.outputs.version }}
+        run: test -f "dist/Diceroll-$V-ios.ipa"
+      - uses: apple-actions/upload-testflight-build@v5
+        with:
+          app-path: dist/Diceroll-${{ needs.prepare.outputs.version }}-ios.ipa
+          issuer-id: ${{ secrets.APPLE_API_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPLE_API_KEY_ID }}
+          api-private-key: ${{ secrets.APPLE_API_KEY_P8 }}
+      # "What's new" for TestFlight/App Store: notes/store/ios_whats_new.txt (paste or automate
+      # with fastlane deliver; see docs/RELEASE.md).
+
+  google-play:
+    name: Play Console (internal track)
+    needs: [prepare, android]
+    if: vars.ENABLE_PLAY == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist-android
+          path: dist
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-notes
+          path: notes
+      - name: Play release notes (whatsnew-en-US, <= 500 chars)
+        run: mkdir -p whatsnew && cp notes/store/android_whats_new.txt whatsnew/whatsnew-en-US
+      - uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: gg.vlad.diceroll
+          releaseFiles: dist/Diceroll-${{ needs.prepare.outputs.version }}-android.aab
+          track: ${{ vars.PLAY_TRACK || 'internal' }}
+          status: ${{ vars.PLAY_STATUS || 'draft' }}
+          whatsNewDirectory: whatsnew
+
+  itch:
+    name: itch.io (butler)
+    needs: [prepare, desktop-web, apple]
+    if: vars.ENABLE_ITCH == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+      ITCH_TARGET: ${{ vars.ITCH_TARGET }} # e.g. vladzaharia/diceroll
+      V: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: dist-*
+          path: dist
+          merge-multiple: true
+      - name: Push channels
+        run: |
+          set -euo pipefail
+          curl -fsSL -o butler.zip https://broth.itch.zone/butler/linux-amd64/LATEST/archive/default
+          unzip -q butler.zip && chmod +x butler
+          # The desktop zips are the GitHub builds: their in-game updater only stages content
+          # packs in user://, which is harmless next to the itch app's own updates.
+          ./butler push "dist/Diceroll-$V-web.zip" "$ITCH_TARGET:web" --userversion "$V"
+          ./butler push "dist/Diceroll-$V-windows-x86_64.zip" "$ITCH_TARGET:windows" --userversion "$V"
+          ./butler push "dist/Diceroll-$V-linux-x86_64.tar.gz" "$ITCH_TARGET:linux" --userversion "$V"
+          ./butler push "dist/Diceroll-$V-macos.zip" "$ITCH_TARGET:mac" --userversion "$V"
+
+  steam:
+    name: Steam (steamcmd)
+    needs: [prepare, desktop-web, apple]
+    if: vars.ENABLE_STEAM == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      V: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: dist-*
+          path: dist
+          merge-multiple: true
+      - name: Unpack depots
+        run: |
+          mkdir -p depots/windows depots/linux depots/macos
+          unzip -q "dist/Diceroll-$V-windows-x86_64.zip" -d depots/windows
+          tar -xzf "dist/Diceroll-$V-linux-x86_64.tar.gz" -C depots/linux
+          unzip -q "dist/Diceroll-$V-macos.zip" -d depots/macos
+      - uses: game-ci/steam-deploy@v3
+        with:
+          username: ${{ secrets.STEAM_USERNAME }}
+          configVdf: ${{ secrets.STEAM_CONFIG_VDF }}
+          appId: ${{ vars.STEAM_APP_ID }}
+          buildDescription: v${{ needs.prepare.outputs.version }}
+          rootPath: depots
+          depot1Path: windows
+          depot2Path: linux
+          depot3Path: macos
+          releaseBranch: ${{ vars.STEAM_BRANCH || 'beta' }}

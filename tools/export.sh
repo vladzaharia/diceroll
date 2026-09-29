@@ -150,10 +150,13 @@ do_ios() {
 	fi
 
 	local cfg=Release; [ $MODE = debug ] && cfg=Debug
+	# A generic destination builds without any installed simulator runtime (CI); --run needs one.
+	local dest="generic/platform=iOS Simulator"
+	[ $RUN = 1 ] && dest="platform=iOS Simulator,name=$DEVICE"
 	local xlog="$ROOT/build/ios_xcodebuild.log"
 	step "xcodebuild $cfg for iOS Simulator ($DEVICE), log: $xlog"
 	if ! xcodebuild -project "$proj" -scheme Diceroll -configuration $cfg -sdk iphonesimulator \
-		-destination "platform=iOS Simulator,name=$DEVICE" -derivedDataPath "$ROOT/build/ios_dd" \
+		-destination "$dest" -derivedDataPath "$ROOT/build/ios_dd" \
 		CODE_SIGNING_ALLOWED=NO build >"$xlog" 2>&1; then
 		grep -E "error:|Undefined symbols|referenced from" "$xlog" | head -20 >&2
 		die "xcodebuild failed (see $xlog)"

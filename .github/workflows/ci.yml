@@ -1,0 +1,285 @@
+# CI: static checks for everyone (forks included); tests, balance smoke and screenshots only when
+# the private asset bundles are available (secrets exist on this repo's own branches, never on
+# fork PRs). Docs-only changes skip the heavy jobs. See docs/RELEASE.md.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 6 * * *" # nightly full screenshot matrix
+  workflow_dispatch:
+    inputs:
+      full:
+        description: Full screenshot matrix
+        type: boolean
+        default: true
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  GODOT_VERSION: "4.7.2"
+
+jobs:
+  # ------------------------------------------------------------------------------------------
+  plan:
+    name: Plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.changes.outputs.code }}
+      assets: ${{ steps.secrets.outputs.assets }}
+      full: ${{ steps.matrix.outputs.full }}
+      scenarios: ${{ steps.matrix.outputs.scenarios }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Changed paths
+        id: changes
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          code=true
+          if [ "$GITHUB_EVENT_NAME" = pull_request ] || [ "$GITHUB_EVENT_NAME" = push ]; then
+            if [ -n "$BASE" ] && git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+              changed="$(git diff --name-only "$BASE" HEAD)"
+              echo "$changed"
+              # Docs, markdown, media and community files never need the game to run.
+              if [ -n "$changed" ] && ! grep -qvE '^(docs/|\.github/ISSUE_TEMPLATE/|[^/]+\.md$|LICENSE|\.gitleaks\.toml$)' <<<"$changed"; then
+                code=false
+              fi
+            fi
+          fi
+          echo "code=$code" >>"$GITHUB_OUTPUT"
+          echo "code changes: $code"
+      - name: Secrets available?
+        id: secrets
+        env:
+          AGE: ${{ secrets.ASSETS_AGE_KEY }}
+        run: |
+          if [ -n "$AGE" ]; then echo "assets=true" >>"$GITHUB_OUTPUT"; else
+            echo "assets=false" >>"$GITHUB_OUTPUT"
+            echo "::notice::No asset secrets (fork PR?): tests and screenshots are skipped; static checks still run."
+          fi
+      - name: Screenshot matrix
+        id: matrix
+        env:
+          FULL_INPUT: ${{ inputs.full }}
+        run: |
+          full=false
+          if [ "$GITHUB_EVENT_NAME" = schedule ] || [ "$GITHUB_REF" = refs/heads/main ] || [ "$FULL_INPUT" = true ]; then full=true; fi
+          if [ "$full" = true ]; then list=tools/ci/scenarios_all.txt; else list=tools/ci/scenarios_quick.txt; fi
+          if [ "$full" = true ]; then
+            scenarios="$(grep -v '^#' "$list" | jq -R . | jq -cs .)"
+          else
+            # PRs: one shard with all quick scenarios.
+            scenarios='["quick"]'
+          fi
+          { echo "full=$full"; echo "scenarios=$scenarios"; } >>"$GITHUB_OUTPUT"
+          echo "full=$full scenarios=$scenarios"
+
+  # ------------------------------------------------------------------------------------------
+  static:
+    name: Static checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Repository guard (no third-party assets, keys or big files)
+        run: tools/ci/check_repo.sh
+      - name: Secret scan (gitleaks)
+        env:
+          GITLEAKS_VERSION: "8.30.1"
+        run: |
+          curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar -xz -C "$RUNNER_TEMP" gitleaks
+          "$RUNNER_TEMP/gitleaks" git --no-banner --redact --config .gitleaks.toml .
+      - name: actionlint
+        run: |
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.12/scripts/download-actionlint.bash) 1.7.12 "$RUNNER_TEMP"
+          "$RUNNER_TEMP/actionlint" -color
+      - name: shellcheck
+        run: shellcheck -S warning tools/*.sh tools/ci/*.sh tools/git-hooks/* tests/run.sh
+      - name: Python tooling
+        run: |
+          sudo apt-get install -y -qq age >/dev/null
+          python3 -m py_compile tools/ci/*.py
+          tools/ci/selftest.sh
+
+  # ------------------------------------------------------------------------------------------
+  test:
+    name: Scripts, tests, balance smoke
+    needs: plan
+    if: needs.plan.outputs.code == 'true' && needs.plan.outputs.assets == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-diceroll
+        with:
+          godot-version: ${{ env.GODOT_VERSION }}
+          age-key: ${{ secrets.ASSETS_AGE_KEY }}
+          deploy-key: ${{ secrets.ASSETS_DEPLOY_KEY }}
+      - name: Assets match the lock
+        run: python3 tools/ci/assets.py verify
+      - name: Script compile check
+        run: |
+          godot --headless --path . -s ui/check_scripts.gd 2>&1 | tee "$RUNNER_TEMP/check.log"
+          grep -q UI_SCRIPTS_OK "$RUNNER_TEMP/check.log"
+          ! grep -E "SCRIPT ERROR|Parse Error" "$RUNNER_TEMP/check.log"
+      - name: Dice tray check
+        run: |
+          godot --headless --path . -s game/dice/check_dice_tray.gd 2>&1 | tee "$RUNNER_TEMP/tray.log"
+          ! grep -E "SCRIPT ERROR|Parse Error" "$RUNNER_TEMP/tray.log"
+      - name: Unit tests
+        run: ./tests/run.sh
+      - name: Balance sim smoke (50 runs per class, 0 errors)
+        run: godot --headless --path . -s tools/sim.gd -- --runs=50 --class=all --seed=1
+
+  # ------------------------------------------------------------------------------------------
+  shots:
+    name: Screenshots (${{ matrix.scenario }})
+    needs: plan
+    if: needs.plan.outputs.code == 'true' && needs.plan.outputs.assets == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: ${{ fromJSON(needs.plan.outputs.scenarios) }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Xvfb + Mesa lavapipe (software Vulkan)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends xvfb mesa-vulkan-drivers libvulkan1 >/dev/null
+      - uses: ./.github/actions/setup-diceroll
+        with:
+          godot-version: ${{ env.GODOT_VERSION }}
+          age-key: ${{ secrets.ASSETS_AGE_KEY }}
+          deploy-key: ${{ secrets.ASSETS_DEPLOY_KEY }}
+      - name: Shader cache
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.local/share/godot/app_userdata/Diceroll/shader_cache
+            ~/.local/share/godot/app_userdata/Diceroll/vulkan
+          key: shaders-lavapipe-${{ env.GODOT_VERSION }}-${{ hashFiles('**/*.gdshader') }}-${{ github.sha }}
+          restore-keys: shaders-lavapipe-${{ env.GODOT_VERSION }}-
+      - name: Render
+        env:
+          SCENARIO: ${{ matrix.scenario }}
+          FULL: ${{ needs.plan.outputs.full }}
+        run: |
+          if [ "$SCENARIO" = quick ]; then
+            tools/ci/shoot_ci.sh --set=quick --out=build/shots
+          else
+            tools/ci/shoot_ci.sh --set=all --scenarios="$SCENARIO" --out=build/shots
+          fi
+      - name: Upload shard
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: shots-${{ matrix.scenario }}
+          path: |
+            build/shots/*.png
+            build/shots/results.tsv
+            build/shots/logs/
+          retention-days: 7
+          if-no-files-found: warn
+
+  # ------------------------------------------------------------------------------------------
+  shots-report:
+    name: Screenshot report
+    needs: [plan, shots]
+    if: always() && needs.shots.result != 'skipped'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: shots-*
+          path: build/shards
+      - name: Merge shards
+        run: |
+          mkdir -p build/report/logs
+          printf 'scenario\tdevice\tresolution\tstatus\tseconds\n' >build/report/results.tsv
+          for d in build/shards/*/; do
+            cp "$d"/*.png build/report/ 2>/dev/null || true
+            cp -r "$d"/logs/. build/report/logs/ 2>/dev/null || true
+            tail -n +2 "$d/results.tsv" >>build/report/results.tsv 2>/dev/null || true
+          done
+      - name: Baseline from the latest main run (report-only)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run_id="$(gh run list -R "$GITHUB_REPOSITORY" -w CI -b main -s success -L 1 --json databaseId -q '.[0].databaseId' || true)"
+          if [ -n "$run_id" ] && [ "$run_id" != "$GITHUB_RUN_ID" ]; then
+            gh run download "$run_id" -R "$GITHUB_REPOSITORY" -n shots-baseline -D build/baseline || echo "no baseline artifact"
+          fi
+      - uses: ./.github/actions/setup-diceroll
+        with:
+          godot-version: ${{ env.GODOT_VERSION }}
+          assets: "false"
+          import: "false"
+      - name: Visual diff + contact sheet
+        run: |
+          # A throwaway project so the diff script doesn't load the game's autoloads.
+          tmp="$RUNNER_TEMP/diffproj" && mkdir -p "$tmp" && touch "$tmp/project.godot"
+          cp tools/ci/img_diff.gd "$tmp/"
+          if [ -d build/baseline ]; then
+            godot --headless --path "$tmp" -s img_diff.gd -- --current="$PWD/build/report" --baseline="$PWD/build/baseline" --out="$PWD/build/report/diff"
+          fi
+          python3 tools/ci/contact_sheet.py build/report --title "Diceroll screenshots ${GITHUB_SHA::7}"
+          cat build/report/summary.md >>"$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: shots-report
+          path: build/report
+          retention-days: 14
+      - name: Publish baseline (main)
+        if: github.ref == 'refs/heads/main' && needs.plan.outputs.full == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: shots-baseline
+          path: build/report/*.png
+          retention-days: 30
+      - name: Fail on broken shots
+        run: |
+          if tail -n +2 build/report/results.tsv | awk -F'\t' '$4 != "ok"' | grep -q .; then
+            echo "::error::some screenshots failed (see the shots-report artifact)"; exit 1
+          fi
+
+  # ------------------------------------------------------------------------------------------
+  export-smoke:
+    name: Export smoke (Linux, Windows, Web)
+    needs: plan
+    if: needs.plan.outputs.code == 'true' && needs.plan.outputs.assets == 'true' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-diceroll
+        with:
+          godot-version: ${{ env.GODOT_VERSION }}
+          templates: desktop
+          age-key: ${{ secrets.ASSETS_AGE_KEY }}
+          deploy-key: ${{ secrets.ASSETS_DEPLOY_KEY }}
+      - run: python3 tools/ci/stamp_version.py --distribution dev
+      - run: tools/export.sh linux
+      - run: tools/export.sh windows
+      - run: tools/export.sh web

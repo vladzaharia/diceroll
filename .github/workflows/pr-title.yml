@@ -1,0 +1,38 @@
+# PR titles become squash-merge commit messages, so they must be Conventional Commits
+# (docs/CONVENTIONAL_COMMITS.md). Uses `pull_request` (not pull_request_target): it only reads
+# the event payload, so fork PRs work with the read-only token.
+name: PR title
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  conventional:
+    name: Conventional Commit title
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: amannn/action-semantic-pull-request@v6
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          types: |
+            feat
+            fix
+            perf
+            balance
+            refactor
+            docs
+            test
+            build
+            ci
+            chore
+            style
+            revert
+          requireScope: false
+          subjectPattern: ^(?![A-Z]).+$
+          subjectPatternError: The subject "{subject}" should start with a lowercase letter.
