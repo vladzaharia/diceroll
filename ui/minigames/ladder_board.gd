@@ -343,7 +343,7 @@ func _play_push() -> void:
 		t.tween_property(self, "_die_rot", 0.22 * (1.0 if k % 2 == 0 else -1.0) * (1.0 - k * 0.18), dur(0.07))
 	t.tween_property(self, "_die_rot", 0.0, dur(0.07))
 	await t.finished
-	float_text(_die_c + Vector2(0, _die_s * 1.2), "SAME - GO AGAIN", Color("e6ecff"), int(clampf(18 * _u, 14, 36)), 1.0)
+	float_text(_die_c + Vector2(0, _die_s * 0.2), "SAME - GO AGAIN", Color("e6ecff"), int(clampf(18 * _u, 14, 36)), 1.0)
 	await wait(0.35)
 
 
@@ -491,7 +491,7 @@ func _draw_stage() -> void:
 		glow(c + _die_off, ds * 1.2, _die_flash)
 	_die3d(c + _die_off + Vector2(0, bob), ds, _die_val, _die_rot + (sin(time * 1.3) * 0.04 if idle else 0.0), _die_sq)
 	# the die's value, big, under it (readable at a glance)
-	if not _die_spin:
+	if not _busy:
 		var nf := int(clampf(ds * 0.24, 16.0, 60.0))
 		text_c(c + Vector2(0, ds * 0.86), "ROLLED %d" % _die_val if not _over() else "LAST ROLL %d" % _die_val, int(nf * 0.62), UiPalette.TEXT_DIM, int(3 * u))
 	# history strip
