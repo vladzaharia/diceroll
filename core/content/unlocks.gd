@@ -13,7 +13,7 @@ extends RefCounted
 const KINDS := ["classes", "biomes", "bosses", "minibosses", "pets", "minigames", "packs", "gear", "potions", "features"]
 
 const SIGIL_PRICE := {
-	"classes": 4, "biomes": 3, "bosses": 2, "minibosses": 2, "pets": 3, "minigames": 3, "packs": 3, "gear": 2, "potions": 2,
+	"classes": 8, "biomes": 5, "bosses": 4, "minibosses": 4, "pets": 6, "minigames": 6, "packs": 6, "gear": 4, "potions": 4,
 }
 
 ## A fresh profile. Classes: Knight only (all four when the profile's lock_classes flag is off).
@@ -115,45 +115,45 @@ const MILESTONES := [
 		"unlocks": [["pets", "pumpkin_sprite"]]},
 	{"id": "wanderer", "run": 2, "desc": "Complete 20 laps in total.", "cond": {"stat": "laps", "min": 20},
 		"unlocks": [["gear", "blade"], ["biomes", "crypt"]]},
-	{"id": "brawler", "run": 3, "desc": "Win 55 fights in total.", "cond": {"stat": "fights", "min": 55},
+	{"id": "brawler", "run": 3, "desc": "Win 45 fights in total.", "cond": {"stat": "fights", "min": 45},
 		"unlocks": [["classes", "barbarian"]]},
-	{"id": "gate_crasher", "run": 4, "desc": "Reach the mini-boss 3 times.", "cond": {"stat": "minibosses_reached", "min": 3},
+	{"id": "gate_crasher", "run": 4, "desc": "Reach the mini-boss twice.", "cond": {"stat": "minibosses_reached", "min": 2},
 		"unlocks": [["packs", "gamblers_kit"], ["gear", "boots"]]},
 	{"id": "arcade_regular", "run": 5, "desc": "Play 14 minigames.", "cond": {"stat": "minigames", "min": 14},
 		"unlocks": [["minigames", "fossil_hunter"]]},
-	{"id": "deep_delver", "run": 6, "desc": "Reach the third biome in 5 runs.", "cond": {"stat": "act3_runs", "min": 5},
+	{"id": "deep_delver", "run": 7, "desc": "Reach the third biome in 7 runs.", "cond": {"stat": "act3_runs", "min": 7},
 		"unlocks": [["biomes", "frost"], ["potions", "stoneskin"]]},
-	{"id": "boss_seen", "run": 6, "desc": "Reach the final boss 4 times.", "cond": {"stat": "bosses_reached", "min": 4},
+	{"id": "boss_seen", "run": 6, "desc": "Reach the final boss 5 times.", "cond": {"stat": "bosses_reached", "min": 5},
 		"unlocks": [["pets", "skull_buddy"], ["gear", "charm"], ["features", "potion_belt"]]},
 	{"id": "frostbitten", "run": 8, "desc": "Visit Frostpeak.", "cond": {"stat": "frost_visits", "min": 1},
 		"unlocks": [["packs", "cold_steel"]]},
-	{"id": "champion", "run": 8, "desc": "Defeat 6 mini-bosses.", "cond": {"stat": "minibosses_killed", "min": 6},
+	{"id": "champion", "run": 10, "desc": "Defeat 7 mini-bosses.", "cond": {"stat": "minibosses_killed", "min": 7},
 		"unlocks": [["classes", "mage"], ["minibosses", "mini_grave_mage"]]},
-	{"id": "straight_talk", "run": 9, "desc": "Score 30 Straights.", "cond": {"stat": "straights", "min": 30},
+	{"id": "straight_talk", "run": 11, "desc": "Score 70 Straights.", "cond": {"stat": "straights", "min": 70},
 		"unlocks": [["packs", "numerology"]]},
-	{"id": "arcade_fan", "run": 10, "desc": "Play 40 minigames.", "cond": {"stat": "minigames", "min": 40},
+	{"id": "arcade_fan", "run": 13, "desc": "Play 40 minigames.", "cond": {"stat": "minigames", "min": 40},
 		"unlocks": [["minigames", "bubble_breaker"], ["features", "loadout_slot"]]},
-	{"id": "plague", "run": 10, "desc": "Kill 25 enemies with Poison.", "cond": {"stat": "poison_kills", "min": 25},
+	{"id": "plague", "run": 14, "desc": "Kill 30 enemies with Poison.", "cond": {"stat": "poison_kills", "min": 30},
 		"unlocks": [["pets", "lantern_ghost"]]},
-	{"id": "victor", "run": 11, "desc": "Win a run.", "cond": {"stat": "wins", "min": 1},
+	{"id": "victor", "run": 5, "desc": "Win a run.", "cond": {"stat": "wins", "min": 1},
 		"unlocks": [["packs", "colossus"], ["biomes", "magma"], ["bosses", "boss_cinder_king"], ["bosses", "boss_magma_golem"]]},
-	{"id": "tinkerer", "run": 12, "desc": "Use 900 combat rerolls.", "cond": {"stat": "rerolls", "min": 900},
+	{"id": "tinkerer", "run": 12, "desc": "Use 1,100 combat rerolls.", "cond": {"stat": "rerolls", "min": 1100},
 		"unlocks": [["packs", "storm"], ["potions", "reroll_tonic"]]},
-	{"id": "veteran", "run": 14, "desc": "Win 2 runs, or play 14.", "cond": {"any": [{"stat": "wins", "min": 2}, {"stat": "runs", "min": 14}]},
+	{"id": "veteran", "run": 15, "desc": "Win 8 runs, or play 15.", "cond": {"any": [{"stat": "wins", "min": 8}, {"stat": "runs", "min": 15}]},
 		"unlocks": [["classes", "rogue"]]},
-	{"id": "patience", "run": 15, "desc": "Keep 1,200 dice unrerolled.", "cond": {"stat": "kept", "min": 1200},
+	{"id": "patience", "run": 16, "desc": "Keep 2,000 dice unrerolled.", "cond": {"stat": "kept", "min": 2000},
 		"unlocks": [["pets", "crystal_wisp"]]},
-	{"id": "throne_breaker", "run": 16, "desc": "Win at the Bone Throne twice.", "cond": {"stat": "throne_wins", "min": 2},
+	{"id": "throne_breaker", "run": 17, "desc": "Win at the Bone Throne 5 times.", "cond": {"stat": "throne_wins", "min": 5},
 		"unlocks": [["bosses", "boss_bone_warden"], ["minibosses", "mini_bone_champion"]]},
-	{"id": "stonewall", "run": 17, "desc": "Gain 2,500 Block.", "cond": {"stat": "block", "min": 2500},
+	{"id": "stonewall", "run": 19, "desc": "Gain 2,800 Block.", "cond": {"stat": "block", "min": 2800},
 		"unlocks": [["pets", "guard_die"], ["potions", "cleanse"]]},
-	{"id": "banker", "run": 18, "desc": "Cash out the Treasury 30 times.", "cond": {"stat": "cashouts", "min": 30},
+	{"id": "banker", "run": 18, "desc": "Cash out the Treasury 40 times.", "cond": {"stat": "cashouts", "min": 40},
 		"unlocks": [["pets", "coin_mimic"]]},
-	{"id": "warden_slayer", "run": 19, "desc": "Defeat 16 mini-bosses.", "cond": {"stat": "minibosses_killed", "min": 16},
+	{"id": "warden_slayer", "run": 22, "desc": "Defeat 13 mini-bosses.", "cond": {"stat": "minibosses_killed", "min": 13},
 		"unlocks": [["minibosses", "mini_frost_warden"], ["minibosses", "mini_briar_beast"], ["minibosses", "mini_cinder_brute"]]},
-	{"id": "archmage", "run": 20, "desc": "Win with the Mage.", "cond": {"stat": "mage_wins", "min": 1},
+	{"id": "archmage", "run": 20, "desc": "Win 3 runs with the Mage.", "cond": {"stat": "mage_wins", "min": 3},
 		"unlocks": [["packs", "pyromancy"]]},
-	{"id": "rune_lord", "run": 22, "desc": "Start 3 fights with 5 dice that all carry runes.", "cond": {"stat": "full_runes", "min": 3},
+	{"id": "rune_lord", "run": 24, "desc": "In 15 runs, fight with 5 dice that all carry runes.", "cond": {"stat": "full_runes", "min": 15},
 		"unlocks": [["packs", "resonance"]]},
 ]
 
@@ -168,14 +168,14 @@ static func milestone(id: String) -> Dictionary:
 ## Bought with Camp.buy_upgrade(track, id). `requires` names a feature unlock (milestone).
 const UPGRADES := {
 	"workshop": {
-		"whetstone": {"name": "Whetstone", "desc": "Start every run with 1 Face Raise.", "cost": {"crowns": 80}},
+		"whetstone": {"name": "Whetstone", "desc": "Start every run with 1 Face Raise.", "cost": {"crowns": 100}},
 		"starter_kit": {"name": "Starter Kit", "desc": "Choose the kind of your second starting die: a sidegrade (Standard, Low, Odd).", "cost": {"crowns": 40}},
 	},
 	"armory": {
-		"potion_belt": {"name": "Third Potion Slot", "desc": "The potion belt holds 3.", "cost": {"crowns": 120}, "requires": "potion_belt"},
+		"potion_belt": {"name": "Third Potion Slot", "desc": "The potion belt holds 3.", "cost": {"crowns": 150}, "requires": "potion_belt"},
 	},
 	"arcade": {
-		"loadout_slot": {"name": "Third Minigame Slot", "desc": "Equip 3 minigames per run.", "cost": {"crowns": 150}, "requires": "loadout_slot"},
+		"loadout_slot": {"name": "Third Minigame Slot", "desc": "Equip 3 minigames per run.", "cost": {"crowns": 200}, "requires": "loadout_slot"},
 	},
 }
 

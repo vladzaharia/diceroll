@@ -3,8 +3,9 @@ extends RefCounted
 ## Canonical profiles for the sim, tests and screenshots (tools/sim.gd --profile=...).
 ##   fresh  a brand-new profile: Knight only, starter pack, Glade/Hollow/Throne, no pet,
 ##          Scratch-off + Claw Machine, belt 2 with 1 Healing Draught, no gear
-##   mid    about runs 10-14 of a typical campaign: 3 classes, 5 biomes, 4 packs, gear L3-4
-##          with the L4 traits, Skull Buddy at XP level 4, 3 minigames owned (2 equipped)
+##   mid    run 10 of a typical campaign (tools/sim.gd --campaign --snapshot=10, realistic bot):
+##          3 classes, all biomes, 5 packs, gear L3-4 with the L4 traits, belt 2, Whetstone and
+##          Starter Kit, Pumpkin Sprite at XP level 5, 3 minigames owned (2 equipped)
 ##   max    everything unlocked and maxed: all packs/classes/biomes/bosses, gear L8 with traits,
 ##          every pet L10, every minigame mastered, all Crowns upgrades, 3 minigame slots
 ## Ascension is 0 in every preset; pass the level separately (profile.ascension.selected).
@@ -24,19 +25,20 @@ static func get_preset(name: String, asc := 0) -> Dictionary:
 static func mid() -> Profile:
 	var p := Profile.fresh()
 	var grants := {
-		"classes": ["barbarian", "mage"], "biomes": ["crypt", "frost"], "minibosses": ["mini_grave_mage"],
+		"classes": ["barbarian", "mage"], "biomes": ["crypt", "frost", "magma"], "minibosses": ["mini_grave_mage"],
+		"bosses": ["boss_cinder_king", "boss_magma_golem"],
 		"pets": ["pumpkin_sprite", "skull_buddy"], "minigames": ["fossil_hunter"],
-		"packs": ["gamblers_kit", "cold_steel", "numerology"], "gear": ["helm", "blade", "boots", "charm"],
-		"potions": ["stoneskin"], "features": ["potion_belt"],
+		"packs": ["gamblers_kit", "cold_steel", "numerology", "colossus"], "gear": ["helm", "blade", "boots", "charm"],
+		"potions": ["stoneskin", "reroll_tonic"], "features": ["potion_belt"],
 	}
 	for kind in grants:
 		for id in grants[kind]:
 			p.grant(kind, id)
-	p.gear = {"helm": 4, "blade": 4, "boots": 3, "charm": 2}
-	p.pet_xp = {"pumpkin_sprite": 12, "skull_buddy": 30}
-	p.minigame_plays = {"scratch_off": 20, "claw_machine": 20, "fossil_hunter": 8}
-	p.upgrades = {"potion_belt": 1}
-	p.loadout = {"class": "knight", "mode": "standard", "minigames": ["fossil_hunter", "claw_machine"], "pet": "skull_buddy"}
+	p.gear = {"helm": 4, "blade": 4, "boots": 4, "charm": 3}
+	p.pet_xp = {"pumpkin_sprite": 150, "skull_buddy": 5}
+	p.minigame_plays = {"scratch_off": 12, "claw_machine": 12, "fossil_hunter": 6}
+	p.upgrades = {"whetstone": 1, "starter_kit": 1}
+	p.loadout = {"class": "knight", "mode": "standard", "minigames": ["fossil_hunter", "claw_machine"], "pet": "pumpkin_sprite"}
 	p.crowns = 0
 	return p
 
@@ -59,7 +61,7 @@ static func maxed() -> Profile:
 	for id in MinigameDefs.IDS:
 		p.minigame_plays[id] = int(MinigameDefs.MASTERY_PLAYS.back())
 	p.upgrades = {"whetstone": 1, "starter_kit": 1, "potion_belt": 1, "loadout_slot": 1}
-	p.starter_kind = "odd"
-	p.loadout = {"class": "knight", "mode": "standard", "minigames": ["fossil_hunter", "claw_machine", "bubble_breaker"], "pet": "skull_buddy"}
+	p.starter_kind = "standard"
+	p.loadout = {"class": "knight", "mode": "standard", "minigames": ["fossil_hunter", "claw_machine", "bubble_breaker"], "pet": "pumpkin_sprite"}
 	p.ascension = {"unlocked": UnlockDefs.MAX_ASCENSION, "selected": 0}
 	return p

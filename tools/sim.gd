@@ -24,6 +24,8 @@ extends SceneTree
 const MAX_COMMANDS := 20000
 
 var total_errors := 0
+## --snapshot=N (campaign): print each profile's state after run N.
+var snapshot_run := 0
 var policy := "greedy"
 var rules: AutoRules
 var decide_us := 0
@@ -99,6 +101,8 @@ func _init() -> void:
 			campaign = arg.substr(11).to_int()
 		elif arg.begins_with("--campaigns="):
 			campaigns = arg.substr(12).to_int()
+		elif arg.begins_with("--snapshot="):
+			snapshot_run = arg.substr(11).to_int()
 		elif arg.begins_with("--scopes="):
 			scopes = Array(arg.substr(9).split(",", false))
 		elif arg.begins_with("--real-heur="):
@@ -418,6 +422,10 @@ func _campaign(n: int, m: int, seed0: int, board: int, mode: String) -> void:
 						first_run[key] = []
 					(first_run[key] as Array).append(r + 1)
 			spent = p.records.crowns_earned - p.crowns
+			if snapshot_run == r + 1:
+				print("snapshot run %d: gear=%s upgrades=%s pets=%s pet_lv=%s classes=%s packs=%s minigames=%s potions=%s crowns=%d sigils=%d asc=%s" % [
+					r + 1, str(p.gear), str(p.upgrades), str(p.unlocks.pets), str(p.pet_xp), str(p.unlocks.classes),
+					str(p.unlocks.packs), str(p.unlocks.minigames), str(p.unlocks.potions), p.crowns, p.sigils, str(p.ascension)])
 			if not got_max and spent >= sink:
 				got_max = true
 				maxed_at.append(r + 1)

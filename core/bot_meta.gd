@@ -274,7 +274,10 @@ static func _spend_rank(it: Dictionary) -> float:
 	if int(c.get("sigils", 0)) > 0:
 		var order := ["classes", "packs", "pets", "minigames", "biomes", "potions", "gear", "minibosses", "bosses"]
 		return 10000.0 + order.find(String(it.kind)) * 10.0 + int(c.sigils)
-	return float(c.get("crowns", 0))
+	# one-off Camp upgrades (belt, whetstone, starter kit, 3rd slot) count at half price, so
+	# they get bought alongside the gear levels instead of after them
+	var cr := float(c.get("crowns", 0))
+	return cr * 0.5 if String(it.cmd[0]) == "buy_upgrade" else cr
 
 # ------------------------------------------------------------------ AUTO (Bot.decide)
 

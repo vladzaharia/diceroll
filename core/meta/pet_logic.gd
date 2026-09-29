@@ -113,13 +113,13 @@ static func fire_at_attack(run: RunState, c: CombatState) -> Array[Dictionary]:
 					ev.append({"type": "status", "target": j, "status": "poison", "value": int(c.enemies[j].poison), "source": "pet"})
 		"guard_die":
 			var pips := run.rng.randi_range(1, 6)
-			var b := pips + 1 + PetDefs.block_bonus(lvl)
+			var b := pips + PetDefs.block_bonus(lvl)
 			run.block += b
 			run.stats.block_gained = int(run.stats.get("block_gained", 0)) + b
 			ev.append(_acted(run, "block", b, "hero"))
 			ev.append({"type": "block_gained", "target": "hero", "amount": b, "total": run.block, "source": "pet", "roll": pips})
 			if lvl >= 5:
-				c.pet_block_carry = b
+				c.pet_block_carry = b / 2
 			if lvl >= 10 and pips == 6 and c.alive(c.target):
 				c.enemies[c.target].frozen = true
 				ev.append({"type": "status", "target": c.target, "status": "frozen", "value": 1, "source": "pet"})

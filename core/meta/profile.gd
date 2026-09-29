@@ -238,7 +238,7 @@ func _count(st: Dictionary, victory: bool) -> void:
 	add.call("cashouts", int(st.get("cashouts", 0)))
 	add.call("block", int(st.get("block_gained", 0)))
 	add.call("straights", int(st.get("straights", 0)))
-	add.call("full_runes", int(st.get("full_rune_fights", 0)))
+	add.call("full_runes", 1 if int(st.get("full_rune_fights", 0)) > 0 else 0)
 	add.call("minibosses_reached", 1 if bool(st.get("miniboss_reached", false)) else 0)
 	add.call("minibosses_killed", (st.get("minibosses_killed", []) as Array).size())
 	add.call("bosses_reached", 1 if bool(st.get("boss_reached", false)) else 0)
