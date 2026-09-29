@@ -1,7 +1,7 @@
 # Asset credits
 
-Everything under `assets/` is produced by `tools/import_assets.sh` (KayKit + music from
-`~/Downloads`; `--fetch` downloads fonts and Kenney audio). Each pack folder keeps its
+Everything under `assets/` except `icon/` is produced by `tools/import_assets.sh` from the
+git-ignored `third_party/` store (see docs/ASSETS.md; `--fetch` downloads fonts and Kenney audio). Each pack folder keeps its
 original license file.
 
 ## 3D models and animations: KayKit by Kay Lousberg (CC0 1.0)
