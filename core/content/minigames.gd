@@ -13,6 +13,8 @@ extends RefCounted
 const PAR := 0.85
 ## Skill band: rewards move at most this much around median (user decision: 15%).
 const SKILL_BAND := 0.15
+## Luck games move rewards even less (Fossil Hunter is a luck dig: no hints).
+const SKILL_BAND_BY_ID := {"fossil_hunter": 0.05}
 const TIER_SILVER := 0.8
 const TIER_GOLD := 1.2
 
@@ -21,8 +23,8 @@ const MASTERY_PLAYS := [3, 8, 15, 25]
 const MASTERY_BONUS := 0.025
 
 const DEFS := {
-	"fossil_hunter": {"name": "Fossil Hunter", "skill": "60:40", "signature": "new_die",
-		"desc": "Dig a 5x5 plot for two hidden fossils (3 and 2 long). 7 digs. Dug cells show the distance to the nearest fossil.",
+	"fossil_hunter": {"name": "Fossil Hunter", "skill": "20:80", "signature": "new_die",
+		"desc": "Dig a 7x7 site for three buried fossils (4, 3 and 2 long) and a few treasures. 10 digs, no hints: follow the bones you hit.",
 		"signature_desc": "Gold: a new die of an unlocked kind."},
 	"bubble_breaker": {"name": "Bubble Breaker", "skill": "80:20", "signature": "reroll_boost",
 		"desc": "Pop clusters of 3+ same-coloured bubbles on a 6x6 board. 5 taps. Bigger clusters score more.",
@@ -38,7 +40,7 @@ const DEFS := {
 const IDS := ["fossil_hunter", "bubble_breaker", "scratch_off", "claw_machine"]
 
 ## Median score per game (calibrated: see balance.md "Minigame calibration").
-const MEDIAN := {"fossil_hunter": 5.0, "bubble_breaker": 17.0, "scratch_off": 10.0, "claw_machine": 10.0}
+const MEDIAN := {"fossil_hunter": 8.0, "bubble_breaker": 17.0, "scratch_off": 10.0, "claw_machine": 10.0}
 
 ## Reward options by tier (the player picks one). Gold amounts are x gold_scale(lap) x skill
 ## mult x mastery bonus.
@@ -65,8 +67,9 @@ static func tier_for(ratio: float) -> String:
 		return "silver"
 	return "bronze"
 
-static func skill_mult(ratio: float) -> float:
-	return clampf(ratio, 1.0 - SKILL_BAND, 1.0 + SKILL_BAND)
+static func skill_mult(ratio: float, id := "") -> float:
+	var band := float(SKILL_BAND_BY_ID.get(id, SKILL_BAND))
+	return clampf(ratio, 1.0 - band, 1.0 + band)
 
 static func mastery_level(plays: int) -> int:
 	var l := 1

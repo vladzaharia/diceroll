@@ -1,18 +1,25 @@
 class_name FossilHunter
 extends Minigame
-## Fossil Hunter (Minesweeper-lite): a 5x5 plot hides two fossils, 3 and 2 cells long (straight,
-## never overlapping). DIGS digs; action args [x, y] (0..4). Every dug empty cell shows a
-## distance hint: the Manhattan distance to the nearest fossil cell.
-## Public: cells[i] = "?" not dug · "." empty (see hints[i]) · "hit" part of an unfinished
-## fossil · "bone" part of a fully uncovered fossil; hints[i] = distance or -1.
-## Score: 1 per fossil cell dug + 2 per complete fossil (max 9). Fossil positions stay hidden.
+## Fossil Hunter (luck dig, no hints): a 7x7 dig site hides three fossils, 4, 3 and 2 cells
+## long (straight, never overlapping), and a few single treasures (a gem, two coin pouches).
+## DIGS digs; action args [x, y] (0..6). A dig only reveals what is in that cell: nothing,
+## a piece of a fossil, or a treasure. Nothing else is ever told (no distances, no counts
+## per area), so finding things is luck; following a bone you uncovered is the only read.
+## Public: cells[i] = "?" not dug · "." empty · "hit" part of an unfinished fossil · "bone" part
+## of a fully uncovered fossil · "gem" / "coin" a treasure; fossils [{size, found}];
+## treasures [{kind, found}] (kinds are known up front, where they are is not).
+## Score: 1 per fossil cell dug + the fossil's size again when it is complete (4 / 3 / 2) +
+## TREASURE points (gem 3, coin 2). Hidden: fossil and treasure positions.
 
-const W := 5
-const H := 5
-const SIZES := [3, 2]
-const DIGS := 7
+const W := 7
+const H := 7
+const SIZES := [4, 3, 2]
+const TREASURES := ["gem", "coin", "coin"]
+const TREASURE_POINTS := {"gem": 3, "coin": 2}
+const DIGS := 10
 
-## Hidden: fossil index per cell (-1 = empty). dug: 0/1 per cell.
+## Hidden: per cell, fossil index (0..), or TREASURE_BASE + treasure index, or -1 (empty).
+const TREASURE_BASE := 100
 var cells: Array[int] = []
 var dug: Array[int] = []
 
@@ -27,7 +34,7 @@ func _setup() -> void:
 	dug.fill(0)
 	for f in SIZES.size():
 		var size := int(SIZES[f])
-		for attempt in 200:
+		for attempt in 400:
 			var horiz := rng.randi_range(0, 1) == 0
 			var x := rng.randi_range(0, W - (size if horiz else 1))
 			var y := rng.randi_range(0, H - (1 if horiz else size))
@@ -42,6 +49,12 @@ func _setup() -> void:
 				for s in spots:
 					cells[s] = f
 				break
+	for t in TREASURES.size():
+		for attempt in 400:
+			var i := rng.randi_range(0, W * H - 1)
+			if cells[i] == -1:
+				cells[i] = TREASURE_BASE + t
+				break
 
 func _action(args: Array) -> Dictionary:
 	if args.size() < 2:
@@ -55,21 +68,15 @@ func _action(args: Array) -> Dictionary:
 		return {"error": "already dug"}
 	dug[i] = 1
 	actions_left -= 1
-	var f := cells[i]
-	var info := {"x": x, "y": y, "hit": f >= 0, "complete": 0, "hint": -1 if f >= 0 else hint(i)}
-	if f >= 0 and is_complete(f):
-		info.complete = int(SIZES[f])
-		if found() == SIZES.size():
-			done = true
+	var c := cells[i]
+	var info := {"x": x, "y": y, "hit": c >= 0 and c < TREASURE_BASE, "complete": 0, "treasure": ""}
+	if c >= TREASURE_BASE:
+		info.treasure = String(TREASURES[c - TREASURE_BASE])
+	elif c >= 0 and is_complete(c):
+		info.complete = int(SIZES[c])
+	if found() == SIZES.size() and treasures_found() == TREASURES.size():
+		done = true
 	return {"info": info}
-
-## Manhattan distance from cell i to the nearest fossil cell.
-func hint(i: int) -> int:
-	var best := 99
-	for j in cells.size():
-		if cells[j] >= 0:
-			best = mini(best, absi(j % W - i % W) + absi(j / W - i / W))
-	return best
 
 func is_complete(f: int) -> bool:
 	for i in cells.size():
@@ -84,36 +91,53 @@ func found() -> int:
 			n += 1
 	return n
 
-func hits() -> int:
+func treasures_found() -> int:
 	var n := 0
 	for i in cells.size():
-		if cells[i] >= 0 and dug[i] == 1:
+		if cells[i] >= TREASURE_BASE and dug[i] == 1:
 			n += 1
 	return n
 
 func score() -> float:
-	return float(hits() + 2 * found())
+	var s := 0
+	for i in cells.size():
+		if dug[i] == 0 or cells[i] < 0:
+			continue
+		if cells[i] >= TREASURE_BASE:
+			s += int(TREASURE_POINTS[TREASURES[cells[i] - TREASURE_BASE]])
+		else:
+			s += 1
+	for f in SIZES.size():
+		if is_complete(f):
+			s += int(SIZES[f])
+	return float(s)
 
 func _public() -> Dictionary:
 	var view: Array = []
-	var hints: Array = []
 	for i in cells.size():
+		var c := cells[i]
 		if dug[i] == 0:
 			view.append("?")
-			hints.append(-1)
-		elif cells[i] < 0:
+		elif c < 0:
 			view.append(".")
-			hints.append(hint(i))
+		elif c >= TREASURE_BASE:
+			view.append(String(TREASURES[c - TREASURE_BASE]))
 		else:
-			view.append("bone" if is_complete(cells[i]) else "hit")
-			hints.append(-1)
+			view.append("bone" if is_complete(c) else "hit")
 	var fossils: Array = []
 	for f in SIZES.size():
 		fossils.append({"size": int(SIZES[f]), "found": is_complete(f)})
-	return {"w": W, "h": H, "cells": view, "hints": hints, "fossils": fossils, "found": found()}
+	var treasures: Array = []
+	for t in TREASURES.size():
+		var got := false
+		for i in cells.size():
+			if cells[i] == TREASURE_BASE + t and dug[i] == 1:
+				got = true
+		treasures.append({"kind": String(TREASURES[t]), "found": got})
+	return {"w": W, "h": H, "cells": view, "fossils": fossils, "treasures": treasures, "found": found()}
 
 func _save() -> Dictionary:
-	return {"cells": Array(cells), "dug": Array(dug)}
+	return {"cells": cells.duplicate(), "dug": dug.duplicate()}
 
 func _load(d: Dictionary) -> void:
 	cells = Minigame.ints(d.get("cells", []))

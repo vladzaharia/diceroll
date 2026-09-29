@@ -156,6 +156,12 @@ Upgrades are the whole growth curve now: the old level-up drafts gave about 17 p
   bronze, 0.8 to 1.2 is silver, and 1.2+ is gold. Gold rewards scale by ±15% (the skill band).
   AUTO takes the par result of 0.85 (silver) without playing. The run is saved when a minigame
   starts (`minigame_started.save_point`).
+- **Fossil Hunter is a luck dig (user decision, no Minesweeper hints):** 7x7 site, three fossils
+  (4, 3, 2 long) plus a gem (3 pts) and two coin pouches (2 pts), 10 digs; a dig reveals only its
+  own cell. Score = fossil cells dug + each complete fossil's size again + treasure points.
+  MEDIAN 8 = the follow-the-bone bot's median (3,000 boards: q25 6, q75 10; tiers 32% bronze /
+  36% silver / 31% gold; random digging medians 3). Its gold rewards move only ±5% with the
+  score (`MinigameDefs.SKILL_BAND_BY_ID`), the others ±15%.
 
 ### Ascension (global, 10 levels, max profile, realistic bot, standard mode)
 

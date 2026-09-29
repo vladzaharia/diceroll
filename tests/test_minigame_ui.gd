@@ -103,14 +103,64 @@ func test_scratch_matches() -> void:
 ## Fossil Hunter: bone cells link to orthogonal neighbours of the same public kind.
 func test_fossil_bone_links() -> void:
 	var cells: Array = []
-	cells.resize(25)
+	cells.resize(49)
 	cells.fill("?")
-	cells[6] = "bone"
-	cells[7] = "bone"
 	cells[8] = "bone"
-	cells[12] = "hit"
-	assert_eq(MgLogic.bone_links(cells, 7, 5), [true, false, true, false])  # left, up, right, down
-	assert_eq(MgLogic.bone_links(cells, 12, 5), [false, false, false, false])
+	cells[9] = "bone"
+	cells[10] = "bone"
+	cells[16] = "hit"
+	assert_eq(MgLogic.bone_links(cells, 9, 7), [true, false, true, false])  # left, up, right, down
+	assert_eq(MgLogic.bone_links(cells, 16, 7), [false, false, false, false])
+
+
+## Fossil Hunter (luck dig): the public state carries no hints, only dug cells; a dig reveals
+## just its own cell; a mid-game save resumes identically; scores match the documented rule.
+func test_fossil_luck_dig_rules() -> void:
+	for s in 30:
+		var m := Minigames.create("fossil_hunter", 4000 + s * 31, 1) as FossilHunter
+		var st := m.public_state()
+		assert_true(not st.has("hints"), "no hints")
+		assert_eq(int(st.w), 7)
+		assert_eq((st.cells as Array).count("?"), 49)
+		assert_eq(m.actions_left, FossilHunter.DIGS)
+		# hidden layout: 4 + 3 + 2 fossil cells and the treasures
+		var fossil_cells := 0
+		var treasure_cells := 0
+		for c in m.cells:
+			if c >= FossilHunter.TREASURE_BASE:
+				treasure_cells += 1
+			elif c >= 0:
+				fossil_cells += 1
+		assert_eq(fossil_cells, 9)
+		assert_eq(treasure_cells, FossilHunter.TREASURES.size())
+		var k := 0
+		while not m.done and m.actions_left > 0:
+			var before: Array = m.public_state().cells
+			var c := BotMeta.fossil_pick(m.public_state())
+			var res := m.action([c % 7, c / 7])
+			assert_true(res.has("info"))
+			var after: Array = m.public_state().cells
+			var changed := 0
+			for i in 49:
+				if String(before[i]) != String(after[i]) and not (String(before[i]) == "hit" and String(after[i]) == "bone"):
+					changed += 1
+			assert_eq(changed, 1, "one dig reveals one cell")
+			k += 1
+			if k == 4:
+				var copy := Minigames.from_dict(JSON.parse_string(JSON.stringify(m.to_dict())))
+				assert_eq(JSON.stringify(copy.public_state()), JSON.stringify(m.public_state()), "mid-game save")
+		# score = fossil cells + completion bonus (size) + treasure points
+		var want := 0
+		var pub := m.public_state()
+		for i in 49:
+			match String(pub.cells[i]):
+				"hit", "bone": want += 1
+				"gem": want += 3
+				"coin": want += 2
+		for f: Dictionary in pub.fossils:
+			if bool(f.found):
+				want += int(f.size)
+		assert_eq(int(m.score()), want)
 
 
 ## A full scripted play of each game through GameFlow reaches the reward and the board.

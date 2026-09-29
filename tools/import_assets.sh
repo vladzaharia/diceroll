@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
-# Copies the KayKit subsets, music beds and licenses Diceroll needs from ~/Downloads
-# into assets/. Idempotent: rsync only copies what changed; music is transcoded once.
-# Fonts and Kenney SFX are downloaded (see assets/CREDITS.md) with --fetch.
+# Populates the game's runtime asset folders (assets/kaykit, assets/audio, assets/fonts)
+# from the central, git-ignored third-party store in third_party/ (see docs/ASSETS.md).
+# Nothing third-party is committed; a fresh clone needs third_party/ filled in first.
+# Idempotent: rsync only copies what changed; music is transcoded once.
+# --fetch downloads fonts / Kenney SFX into third_party/ if they're missing there.
 #
 # Usage: tools/import_assets.sh [--fetch]   (run from anywhere)
 set -euo pipefail
 
-SRC="${DOWNLOADS:-$HOME/Downloads}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+TP="${THIRD_PARTY:-$ROOT/third_party}"
+SRC="$TP/kaykit"
 DST="$ROOT/assets"
 KK="$DST/kaykit"
 
@@ -70,11 +73,36 @@ for c in yellow red blue; do
 done
 lic "$PLAT" "$KK/platformer"
 
+echo "== Minigames (WP-E2): dig treasures, claw prizes, dig tools (EXTRA packs: never commit these)"
+RB="KayKit_ResourceBits_1.0_EXTRA"
+rb_keep=""
+for f in Gem_Large Gem_Medium Gem_Small Gems_Pile_Small Gems_Chest Money_Pile_Small Money_Coins_Stack_Medium Gold_Nugget_Large; do
+	rb_keep="$rb_keep --include=$f.gltf --include=$f.bin"
+done
+# shellcheck disable=SC2086
+sync "$SRC/$RB/Assets/gltf" "$KK/resources" $rb_keep --include='resource_bits_texture.png' --exclude='*'
+lic "$RB" "$KK/resources"
+TX="KayKit_RPGToolsBits_1.0_EXTRA"
+tx_keep=""
+for f in pickaxe magnifying_glass map_rolled trowel lantern shovel; do
+	tx_keep="$tx_keep --include=$f.gltf --include=$f.bin"
+done
+# shellcheck disable=SC2086
+sync "$SRC/$TX/Assets/gltf" "$KK/tools_extra" $tx_keep --include='tools_bits_texture.png' --exclude='*'
+lic "$TX" "$KK/tools_extra"
+MM="KayKit_Mystery_Monthly_Series_4"
+sync "$SRC/$MM/11 - May 2024 - Clown/assets/gltf" "$KK/mystery/clown" --include='balloon_dog_*' --include='clown_ball.*' \
+	--include='clown_texture.png' --exclude='*'
+mkdir -p "$KK/mystery/figures"
+cp -f "$SRC/$MM/12 - June 2024 - Robot/characters/Robot_One.glb" "$KK/mystery/figures/Robot_One.glb"
+cp -f "$SRC/$MM/6 - December 2023 - Action Figure/character/gltf/ActionFigure.glb" "$KK/mystery/figures/ActionFigure.glb"
+lic "$MM" "$KK/mystery"
+
 echo "== Music beds (mixkit, re-encoded to 96 kbps mp3 to keep the repo lean)"
 MUS="$DST/audio/music"
 mkdir -p "$MUS"
 for name in zanarkand-forest-169 spirit-in-the-woods-2-147 ambient-251 vastness-184 nature-meditation-345; do
-	in="$SRC/mixkit-$name.mp3"
+	in="$TP/music/mixkit/mixkit-$name.mp3"
 	out="$MUS/mixkit-$name.mp3"
 	[ -f "$in" ] || { echo "missing $in" >&2; exit 1; }
 	if [ ! -f "$out" ] || [ "$in" -nt "$out" ]; then
@@ -87,8 +115,8 @@ for name in zanarkand-forest-169 spirit-in-the-woods-2-147 ambient-251 vastness-
 done
 
 if [ "${1:-}" = "--fetch" ]; then
-	echo "== Fonts (Google Fonts GitHub, OFL)"
-	FON="$DST/fonts"
+	echo "== Fonts (Google Fonts GitHub, OFL) -> third_party/fonts"
+	FON="$TP/fonts"
 	mkdir -p "$FON"
 	GF="https://raw.githubusercontent.com/google/fonts/main/ofl"
 	[ -f "$FON/Fredoka-Variable.ttf" ] || curl -fsSL -o "$FON/Fredoka-Variable.ttf" "$GF/fredoka/Fredoka%5Bwdth,wght%5D.ttf"
@@ -96,7 +124,7 @@ if [ "${1:-}" = "--fetch" ]; then
 	[ -f "$FON/OFL-Fredoka.txt" ] || curl -fsSL -o "$FON/OFL-Fredoka.txt" "$GF/fredoka/OFL.txt"
 	[ -f "$FON/OFL-LilitaOne.txt" ] || curl -fsSL -o "$FON/OFL-LilitaOne.txt" "$GF/lilitaone/OFL.txt"
 
-	echo "== Kenney SFX packs (CC0) -> assets/audio/sfx/<pack>/"
+	echo "== Kenney SFX packs (CC0) -> third_party/kenney/<pack>/"
 	TMP="$(mktemp -d)"
 	# pack name, then an optional egrep filter of the .ogg basenames to keep (default: all).
 	for spec in "casino-audio" "rpg-audio" "impact-sounds" "interface-sounds" \
@@ -104,7 +132,7 @@ if [ "${1:-}" = "--fetch" ]; then
 		"digital-audio:(powerUp2|powerUp7|phaseJump1|zapThreeToneUp)"; do
 		pack="${spec%%:*}"
 		filter="."; [ "$spec" != "$pack" ] && filter="${spec#*:}"
-		out="$DST/audio/sfx/$pack"
+		out="$TP/kenney/$pack"
 		[ -d "$out" ] && continue
 		url="$(curl -fsSL "https://kenney.nl/assets/$pack" | grep -oE 'https://kenney.nl/media/pages/assets/[^"]+\.zip' | head -1)"
 		[ -n "$url" ] || { echo "no zip url for $pack" >&2; continue; }
@@ -116,5 +144,9 @@ if [ "${1:-}" = "--fetch" ]; then
 	done
 	rm -rf "$TMP" 2>/dev/null || true
 fi
+
+echo "== Fonts and Kenney SFX (third_party -> assets)"
+sync "$TP/fonts" "$DST/fonts"
+sync "$TP/kenney" "$DST/audio/sfx"
 
 du -sh "$DST"
