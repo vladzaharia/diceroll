@@ -208,6 +208,115 @@ The campaign's win rate by run is about 45–55% over runs 1–5, 55–70% over 
 - `Bot.danger_lo/hi` (0.8 / 1.2): the greedy bot rerolls away from fights that would cost about
   that share of its HP in two enemy turns.
 
+### New biomes (2026-09-29: Deep Mines, Orc Warcamp, Sunscorched Ruins, Moonlit Woods)
+
+Design: docs/design/2026-09-29-new-biomes.md. Tiers are now 3/3/4 (glade, crypt, mines ·
+hollow, frost, warcamp · throne, magma, ruins, moonlit): 36 standard routes, 6 final bosses, and
+a Short Road whose second biome is drawn from tier 2 ∪ tier 3 (21 routes). All numbers below are
+the realistic bot, 28-tile board, A0, measured with `tools/sim.gd` shards (seed per shard; the
+route sweep forces each route with `--route=` so every route plays the same seeds).
+
+**Shipped numbers** (the design's starting values in brackets):
+
+| thing | value |
+|---|---|
+| Deep Mines | ore 15 gold (× lap gold scale) or 1 Face Raise, then a cave-in trap; ore refills to 3 per lap unless 6 traps stand; mix `{ore: 3}` [`chest −1` dropped] |
+| Rock Golem (Mines elite) | HP **24** [42], block 12 → attack **11** [13], thorns |
+| Orc Warcamp | **+1** attack per standing drum [+2] (capped with Frenzy and Rally at +8); drum smash **14** gold [10]; a drum is rebuilt only once **every** drum is smashed [while fewer than 2 stand]; mix `{drum: 2}` [+1 enemy −1 event]; early pool orc_raider, wolf_bandit, bandit, skeleton_archer; late pool orc_raider, orc_drummer, wolf_bandit, skeleton_warrior |
+| Orc Warchief | rally **2** [3] |
+| Sunscorched Ruins | heat **8%** [5%] at each lap end unless you landed on an oasis that lap, never lethal; oasis heal **5%** [8%]; early pool bone_cutthroat, skeleton_warrior, bone_knight, cultist; late pool bone_cutthroat, bone_golem, bone_knight, brute |
+| Moonlit Woods | as designed: Half moon transforms at ≤65%, Full lap (13; Short Road 8) pre-transformed, +1 elite, moon rune chest, fight gold ×1.5 |
+| The Hollow (old biome) | event heal **5%** [8%]; early pool skeleton_archer → werewolf |
+| Short Road finale HP | tier-3 second biome **×0.65** [0.75]; Moonlit ×0.72; Hollow ×0.88, Frost ×0.85, Warcamp ×0.68 (`short_boss_hp`) |
+
+**Final bosses.** Before this pass the old four ranged from 42% (Bone Warden) to 84% (Cinder
+King) boss-win at max, so the route spread was about ±15 pp before any new content. Every boss
+was retuned toward the Lich (unchanged, so the fresh route keeps its numbers):
+
+| boss | HP (was) | other changes | boss-win% (max, 36-route sweep) |
+|---|---|---|---|
+| The Lich | 1650 | – | 73.3 |
+| Bone Warden | **1000** (1150) | phase 2 summons 1 warrior (was 2) | 70.6 |
+| Cinder King | **1560** (1200) | – | 71.0 |
+| Magma Golem | **960** (800) | – | 70.0 |
+| Sand Colossus (new) | **1180** [1250] | bury 2 (curse + 10 Block per die), pierce in phase 2 | 72.6 |
+| The Moon King (new) | **900** [1300] | Moonfall **34** [40]; phase 2 drain 16 / attack 22 / attack 18 [18/24/20]; meter 0→4, clouds cap 2 | 69.7 |
+
+Mean 71.2; every boss within ±2.1 pp (target ±5). The Moon King's meter makes it much deadlier
+per HP point than its stat line: at 1300 HP it won 30–39%.
+
+**Standard routes, max profile** (600 runs per route, 21,600 runs; overall **60.6%**, baseline
+main before this work 60.6%). Win% (delta vs the 60.6 route mean):
+
+| tier 1 / tier 2 | throne | magma | ruins | moonlit |
+|---|---|---|---|---|
+| glade / hollow | 61.5 (+0.9) | 64.2 (+3.6) | 63.5 (+2.9) | 68.3 (+7.7) |
+| glade / frost | 61.7 (+1.1) | 60.8 (+0.2) | 65.7 (+5.1) | 66.3 (+5.7) |
+| glade / warcamp | 60.2 (−0.4) | 60.2 (−0.4) | 59.8 (−0.8) | 58.3 (−2.3) |
+| crypt / hollow | 63.5 (+2.9) | 61.2 (+0.6) | 65.0 (+4.4) | 66.0 (+5.4) |
+| crypt / frost | 57.7 (−2.9) | 60.2 (−0.4) | 58.3 (−2.3) | 59.3 (−1.3) |
+| crypt / warcamp | 55.0 (−5.6) | 57.5 (−3.1) | 56.8 (−3.8) | 60.5 (−0.1) |
+| mines / hollow | 59.5 (−1.1) | 61.5 (+0.9) | 59.3 (−1.3) | 64.5 (+3.9) |
+| mines / frost | 59.5 (−1.1) | 62.5 (+1.9) | 60.0 (−0.6) | 60.3 (−0.3) |
+| mines / warcamp | 52.8 (−7.8) | 56.8 (−3.8) | 57.7 (−2.9) | 55.2 (−5.4) |
+
+23 of 36 routes are within ±3 pp (range −7.8 to +7.7; before the pass −23 to +25). At 600 runs a
+route's standard error is about 2 pp, so about 5 routes land outside ±3 pp by noise alone; the
+rest is the additive tier-1 + tier-2 spread (Warcamp and Hollow). Biome marginals (routes
+containing the biome) vs their tier mean:
+
+| tier | biome | win% | Δ tier | reached boss% | boss-win% |
+|---|---|---|---|---|---|
+| 1 | glade | 62.5 | +2.0 | 86.8 | 72.0 |
+| 1 | crypt | 60.1 | −0.5 | 84.8 | 70.8 |
+| 1 | mines | 59.1 | −1.4 | 82.9 | 71.3 |
+| 2 | hollow | 63.2 | +2.6 | 86.5 | 73.0 |
+| 2 | frost | 61.0 | +0.4 | 86.1 | 70.9 |
+| 2 | warcamp | 57.6 | −3.0 | 82.0 | 70.2 |
+| 3 | throne | 59.0 | −1.6 | 79.7 | 74.1 |
+| 3 | magma | 60.5 | −0.1 | 85.8 | 70.5 |
+| 3 | ruins | 60.7 | +0.1 | 86.8 | 69.9 |
+| 3 | moonlit | 62.1 | +1.5 | 87.1 | 71.3 |
+
+**Twists alone** (`--twist=off`, same seeds, 800 runs each, max): Mines −1.8 pp (the ore choice vs
+no ore tiles), Warcamp −3.0, Ruins −0.9, Moonlit +0.7. All within ±4 pp.
+
+**Short Road** (21 routes × 600 runs, max, overall **59.3%**; before: 58.8% on the 4 old routes):
+
+| tier 1 | hollow | frost | warcamp | throne | magma | ruins | moonlit |
+|---|---|---|---|---|---|---|---|
+| glade | 63.3 (+4.0) | 62.5 (+3.2) | 65.5 (+6.2) | 60.2 (+0.8) | 63.0 (+3.7) | 59.5 (+0.2) | 57.2 (−2.2) |
+| crypt | 58.5 (−0.8) | 58.8 (−0.5) | 60.0 (+0.7) | 57.8 (−1.5) | 55.5 (−3.8) | 57.2 (−2.2) | 56.8 (−2.5) |
+| mines | 60.2 (+0.8) | 59.5 (+0.2) | 60.0 (+0.7) | 57.0 (−2.3) | 57.8 (−1.5) | 60.8 (+1.5) | 55.0 (−4.3) |
+
+15 of 21 within ±3 pp; tier-2 finales average 60.9% vs tier-3 finales 58.2% (2.7 pp apart, target
+≤ 3). The Short Road now also spawns its mini-boss at lap 6 (it never did: lap 6 is a biome change,
+which skipped the mutation that places it).
+
+**Profile bands** (standard mode): fresh **39.4%** (800; target 30–40; the fresh route is
+unchanged), max **60.6%** (55–65), max A10 **21.2%** (480; 20–30), mid **40.2%** (810; target
+45–50, **out of band**). Mid was already 44.4% on main before this work (other in-flight changes);
+the rest comes from the Cinder King and Magma Golem, the soft bosses mid used to lean on (mid owns
+only the Lich, the Cinder King and the Magma Golem). Fixing mid needs either a stronger mid preset
+or a mid-specific lever; lowering every boss would push max above 65%.
+
+**Deaths by lap** (max, standard): L3 0.7×, L5 1.9×, L6 0.04×, L13 1.4×, L14 2.8×, L15 4.2× the
+per-lap average. The late spike is structural and older than this work (main before it: L14 3.7×,
+L15 4.7×). The two laps the design flagged are fine: Moonlit's Full lap (13) has fewer deaths than
+the Throne's lap 13 (58 vs 160 per 5,400 runs), and Warcamp lap 6 has 8 deaths in 7,200 runs.
+
+**Campaign** (`--campaign=40 --campaigns=8`, realistic): Mines median run 9 (target 8), Warcamp 11
+(12), Moonlit 17 (17), Ruins 22 (21), all within ±2 runs. With the current class table (Mage 14,
+Rogue 15) no median run unlocks two majors. Milestones: `prospector` = 20 Treasury cash-outs or 12
+runs (17 cash-outs landed on run 8, the same run as Frostpeak), `warpath` = 380 kills or 16 runs,
+`night_walker` = 16 act-3 runs or 22 runs, `sun_seeker` = **4** different final bosses or **22**
+runs (3 bosses came by run 11: a first win unlocks the Cinder King and Magma Golem at run 1).
+
+**Sim dials added:** `--twist=off[:<biome>,...]`, `--route=<t1>,<second>` with `--mode=short`,
+`--enemy-hp=<id>:<mult>`, `--moon=max:N,tide:N,clouds:N,fall:N`, `--bnum=<BiomeDefs number>:<v>`
+(ORE_GOLD, MINES_TRAP_CAP, DRUM_RALLY, DRUM_GOLD, WARCAMP_DRUMS, HEAT_PCT, OASIS_HEAL_PCT). The sim
+prints per-biome (`#biome`), per-boss (`#boss`) and death-lap (`#dlap`) lines for shard sums.
+
 ## History (earlier passes)
 
 Re-run the sim with:
@@ -373,6 +482,10 @@ How AUTO decides (all scoring in "PV points" ~ one damage per combat turn for th
   with a 15 ms max. With 16 sims running in parallel the max per call rose to ~50–65 ms.
 
 ## Biomes and routes (`core/content/biomes.gd`)
+
+> Since 2026-09-29 the tiers are 3/3/4 with four new biomes, 36 routes and 6 final bosses; see
+> "New biomes" under Current balance for the new biomes, the retuned bosses and the Short Road.
+> The tables below describe the six original biomes.
 
 Each run draws one biome per tier with the run Rng (`run.route`, serialised), then its mini-boss
 from the tier-2 biome's candidates and its final boss from the tier-3 biome's candidates
