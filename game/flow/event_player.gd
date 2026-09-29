@@ -19,6 +19,8 @@ func _init(controller: GameController) -> void:
 
 
 func play(events: Array) -> void:
+	if c.condensed():
+		events = condense(events)
 	for ev: Dictionary in events:
 		if not is_instance_valid(c) or not c.is_inside_tree() or c.aborting:
 			return
@@ -28,6 +30,26 @@ func play(events: Array) -> void:
 
 func _wait(t: float) -> void:
 	await c.wait(t)
+
+
+## 4x: merges consecutive damage events on the same target from the same source (and the
+## same attacker) into one beat and one number: amounts / blocked add up, the last event's
+## hp / block stand, lethal if any was.
+static func condense(events: Array) -> Array:
+	var out: Array = []
+	for ev: Dictionary in events:
+		if String(ev.get("type", "")) == "damage" and not out.is_empty():
+			var prev: Dictionary = out[-1]
+			if String(prev.get("type", "")) == "damage" and str(prev.get("target")) == str(ev.get("target")) \
+					and String(prev.get("source", "")) == String(ev.get("source", "")) \
+					and int(prev.get("attacker", -1)) == int(ev.get("attacker", -1)) and not bool(prev.get("lethal", false)):
+				var m := ev.duplicate()
+				m["amount"] = int(prev.get("amount", 0)) + int(ev.get("amount", 0))
+				m["blocked"] = int(prev.get("blocked", 0)) + int(ev.get("blocked", 0))
+				out[-1] = m
+				continue
+		out.append(ev)
+	return out
 
 
 func _one(ev: Dictionary) -> void:
@@ -352,7 +374,9 @@ func _hero_moved(ev: Dictionary) -> void:
 		c.rig.follow(c.board.hero)
 		await c.board.teleport_hero(int(path[0]))
 	else:
-		c.rig.follow(c.board.hero)
+		# 4x: short hops keep the overview camera still (no follow swoop)
+		if not (c.condensed() and path.size() <= 4):
+			c.rig.follow(c.board.hero)
 		await c.board.hop_hero(path, 0.3 / c.speed)
 	c.clear_view()
 	await _wait(0.15)

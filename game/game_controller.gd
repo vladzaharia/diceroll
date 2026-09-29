@@ -15,6 +15,8 @@ extends Node
 signal idle(phase: int)
 ## Emitted when a run's events have been played for its end (victory or defeat).
 signal run_over(victory: bool)
+## Emitted when the player (not AUTO) issues a command: AUTO turns itself off.
+signal manual_command(cmd: String)
 
 const SAVE_PATH := "user://save.json"
 const LIGHT_EVENTS := ["die_marked", "target_changed"]
@@ -28,6 +30,10 @@ var tray: DiceTray
 var ui: UiRoot
 var overlay: GameOverlay
 var player: EventPlayer
+## AUTO (game/auto/auto_pilot.gd): plays Bot.decide steps while enabled.
+var auto: AutoPilot
+## Set by AutoPilot around its own run_command call (anything else counts as manual).
+var from_auto := false
 
 ## Presentation speed (1x / 2x from settings; play_auto uses 3x).
 var speed := 1.0
@@ -88,6 +94,8 @@ func _ready() -> void:
 	overlay.modal_check = any_modal_open
 
 	player = EventPlayer.new(self)
+	auto = AutoPilot.new(self)
+	add_child(auto)
 	set_speed(SettingsPanel.game_speed())
 	get_viewport().size_changed.connect(_layout_tray)
 	_layout_tray()
@@ -97,6 +105,7 @@ func _ready() -> void:
 
 func show_title() -> void:
 	mode = "title"
+	auto.set_enabled(false)
 	get_tree().paused = false
 	flow = null
 	busy = false
@@ -146,6 +155,7 @@ func continue_run() -> bool:
 func start(f: GameFlow) -> void:
 	flow = f
 	mode = "run"
+	auto.set_enabled(false)
 	busy = false
 	in_combat = false
 	get_tree().paused = false
@@ -224,6 +234,10 @@ func _on_menu(action: String, arg: Variant) -> void:
 			leave_to_title()
 		"speed":
 			set_speed(float(arg))
+		"auto":
+			auto.set_enabled(bool(arg))
+		"auto_rules":
+			auto.set_rules(arg)
 
 
 ## Returns to the title. If events are still playing, playback stops at the next event
@@ -238,9 +252,16 @@ func leave_to_title() -> void:
 
 func set_speed(s: float) -> void:
 	speed = maxf(s, 0.25)
-	tray.speed_scale = speed
+	# 4x also condenses beats: a quicker tray throw, shorter overlay holds (see wait())
+	tray.speed_scale = speed * (1.3 if condensed() else 1.0)
 	stage.speed = speed
-	overlay.speed = speed
+	overlay.speed = speed * (1.35 if condensed() else 1.0)
+	ui.auto_hud.set_speed(speed)
+
+
+## True at 4x: repeated beats merge, long holds shorten, short hops keep the camera still.
+func condensed() -> bool:
+	return speed >= 3.9
 
 
 func pause() -> void:
@@ -252,8 +273,12 @@ func pause() -> void:
 
 ## Runs a GameFlow command and plays its events. Ignored while events play.
 func run_command(cmd: String, args: Array = []) -> void:
+	var manual := not from_auto
+	from_auto = false
 	if busy or flow == null or mode != "run" or flow.is_over():
 		return
+	if manual:
+		manual_command.emit(cmd)
 	if not flow.has_method(cmd):
 		push_warning("GameController: unknown command %s" % cmd)
 		return
@@ -298,6 +323,8 @@ func play_events(evs: Array) -> void:
 func wait(t: float) -> void:
 	if t <= 0.0:
 		return
+	if condensed() and t > 0.6:
+		t = 0.6 + (t - 0.6) * 0.5
 	await get_tree().create_timer(t / speed, false).timeout
 
 

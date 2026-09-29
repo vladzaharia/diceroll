@@ -1,13 +1,15 @@
 class_name SettingsPanel
 extends UiModal
 ## Settings: Master / Music / SFX volume (via the Audio autoload, which persists them) and
-## game speed 1× / 2× (persisted in user://settings.cfg [game] speed).
+## game speed 1× / 2× / 4× (persisted in user://settings.cfg [game] speed).
 ## Emits speed_changed(speed) and closed (from UiModal) when DONE is pressed.
 
 signal speed_changed(speed: float)
 signal done_pressed
+signal auto_settings_pressed
 
 const CFG := "user://settings.cfg"
+const SPEEDS := [1.0, 2.0, 4.0]
 
 var _sliders: Dictionary = {}
 var _values: Dictionary = {}
@@ -40,15 +42,20 @@ func _build() -> void:
 	var sl := UiTheme.label("Game speed", 30, UiPalette.TEXT, true, 0)
 	sl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sp.add_child(sl)
-	for s in [1.0, 2.0]:
+	for s in SPEEDS:
 		var b := GameButton.make("%d×" % int(s), "", GameButton.Kind.SECONDARY, 30)
 		b.toggle_mode = true
 		b.toggle_primary = true
 		b.min_height = 84
-		b.pad_x = 26
+		b.pad_x = 20
 		b.pressed.connect(_set_speed.bind(s))
 		sp.add_child(b)
 		_speed_btns.append(b)
+	var auto := GameButton.make("AUTO SETTINGS", "auto", GameButton.Kind.SECONDARY, 28)
+	auto.icon_tint = AutoButton.ACCENT
+	auto.min_height = 84
+	auto.pressed.connect(func() -> void: auto_settings_pressed.emit())
+	body.add_child(auto)
 	body.add_child(UiTheme.spacer(6))
 	var done := GameButton.make("DONE", "check", GameButton.Kind.PRIMARY, 36)
 	done.icon_tint = UiPalette.TEXT_DARK
@@ -95,7 +102,7 @@ func refresh(_flow: GameFlow = null) -> void:
 		(_values[bus] as Label).text = "%d%%" % int(round(vol * 100))
 	var sp := game_speed()
 	for i in _speed_btns.size():
-		_speed_btns[i].set_pressed_no_signal(is_equal_approx(sp, [1.0, 2.0][i]))
+		_speed_btns[i].set_pressed_no_signal(is_equal_approx(sp, SPEEDS[i]))
 		_speed_btns[i].call("_refresh")
 
 

@@ -21,6 +21,7 @@ var _center: Control
 var _scroll: ScrollContainer
 var _inner: MarginContainer
 var _is_open := false
+var _close_tween: Tween
 var _relayout_queued := false
 
 
@@ -77,6 +78,9 @@ func set_title(t: String, color: Variant = null) -> void:
 
 
 func open() -> void:
+	# reopened while closing (e.g. two drafts back to back): cancel the close
+	if _close_tween and _close_tween.is_valid():
+		_close_tween.kill()
 	visible = true
 	_is_open = true
 	_layout()
@@ -113,10 +117,13 @@ func close(free_after := false) -> void:
 	_is_open = false
 	_frame.pivot_offset = _frame.size * 0.5
 	var t := create_tween().set_parallel(true)
+	_close_tween = t
 	t.tween_property(scrim, "modulate:a", 0.0, 0.16)
 	t.tween_property(_frame, "modulate:a", 0.0, 0.14)
 	t.tween_property(_frame, "scale", Vector2(0.92, 0.92), 0.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	await t.finished
+	if _is_open:
+		return
 	visible = false
 	closed.emit()
 	if free_after:
