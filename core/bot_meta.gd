@@ -278,6 +278,65 @@ static func choose_loadout(p: Profile) -> Array:
 			pet = id
 	return [mg, pet]
 
+## Trinket preference of the campaign bot (a player equips the trinket they like best): the
+## Compass once its board reroll is on (Trinket R6), else the Coin Purse, the Tankard...
+const TRINKET_PREF := ["compass", "coin_purse", "tankard", "lantern", "healers_flask", "traders_map", "skeleton_key", "loaded_die"]
+## "Best by table" (--kit=best, expert): per slot, the items in preference order (the measured
+## per-item deltas at max, docs/plans/balance.md Armory; one-handed weapons first so the shield
+## stays); a slot keeps the kit piece when nothing listed is owned.
+const BEST := {
+	"weapon": ["wand", "dagger", "hand_axe", "spear", "greatsword"],
+	"offhand": ["round_shield", "spiked_shield"],
+	"head": ["bandit_mask", "ninja_headband"],
+	"body": ["knight_plate", "hooded_robe", "druid_robe"],
+}
+const BEST_TRINKETS := ["coin_purse", "traders_map", "healers_flask", "compass", "lantern", "tankard"]
+
+## Camp commands that equip the campaign bot's trinkets for class `cid` (kit pieces stay).
+static func equip_cmds(p: Profile, cid: String) -> Array:
+	var want := _trinkets(p)
+	var lo := p.loadout_for(cid)
+	var out: Array = []
+	if want.size() > 0 and String(lo.trinket) != String(want[0]):
+		out.append(["equip_item", cid, "trinket", want[0], ""])
+	if want.size() > 1 and p.has_pouch() and String(lo.trinket2) != String(want[1]):
+		out.append(["equip_item", cid, "trinket2", want[1], ""])
+	return out
+
+static func _trinkets(p: Profile) -> Array:
+	var order: Array = []
+	for id in TRINKET_PREF:
+		if p.owns_item(String(id)):
+			order.append(String(id))
+	if order.has("compass") and p.rank("trinket") < ItemDefs.COMPASS_REROLL_RANK:
+		order.erase("compass")
+		order.insert(mini(1, order.size()), "compass")
+	return order
+
+## The expert loadout for class `cid`: BEST per slot (else the kit; the Dino Suit stays), trinkets
+## by BEST_TRINKETS.
+static func best_loadout(p: Profile, cid: String) -> Dictionary:
+	var lo := p.loadout_for(cid)
+	for slot in BEST:
+		if ItemDefs.LOCKED_ARMOR.has(cid) and slot in ["head", "body"]:
+			continue
+		for id in BEST[slot]:
+			if p.owns_item(String(id)) and ItemDefs.fits(String(id), String(slot)):
+				if slot in ["weapon", "offhand", "head"]:
+					lo[slot] = {"id": String(id), "variant": String(id)}
+				else:
+					lo[slot] = String(id)
+				break
+	var t: Array = []
+	for id in BEST_TRINKETS:
+		if p.owns_item(String(id)):
+			t.append(String(id))
+	if t.size() > 0:
+		lo["trinket"] = t[0]
+	if t.size() > 1 and p.has_pouch():
+		lo["trinket2"] = t[1]
+	return lo
+
 ## Spends Crowns and Sigils greedily: the cheapest affordable item each step, Sigil unlocks in
 ## CLASS -> PACK -> PET -> MINIGAME -> BIOME order, gear traits keep their default. A player who
 ## just got a major unlock (class, pet or biome) from a milestone enjoys it before buying another

@@ -771,6 +771,29 @@ class CombatModel:
 	var kill_value := 0.0    # Necromancer: worth of a kill beyond the enemy itself (a Bone die)
 	var pretend_mask := 0    # Monster Kid: dice whose ★ face (Die.PRETEND) acts as Wild
 	var wild_rune_mask := 0  # dice with the Wild rune (with pretend dice they share the Wild cap)
+	# Armory items (ItemLogic; _item_model): combo-conditional flats and multipliers, Crush,
+	# kept/rerolled/low/runed dice pips, per-target flats (Rampage stickiness, Hunter, Shiv),
+	# a factor (First Strike, Ambush) and Aegis Block
+	var it_on := false
+	var it_pair_flat := 0.0
+	var it_tp_flat := 0.0
+	var it_high_flat := 0.0
+	var it_set_mult := 0.0
+	var it_spark := 0.0
+	var it_mult := 0.0
+	var it_crush := 0.0
+	var it_kept := 0
+	var it_rer := 0
+	var it_rer_flat := 0.0
+	var it_low := 0.0
+	var it_ones := 0.0
+	var it_rune_pip := 0.0
+	var it_rune_max := 0
+	var it_flat := 0.0
+	var it_bonus := 0.0
+	var it_factor := 1.0
+	var it_aegis := 0.0
+	var it_t_flat := PackedFloat64Array()
 	var e_boo := PackedByteArray()      # BOO! effect per enemy: 0 none (brave), 1 cower, 2 cower/flee, 3 weaken
 	var e_max := PackedFloat64Array()   # max HP per enemy (flee threshold)
 	var ne := 0
@@ -998,7 +1021,60 @@ class CombatModel:
 				gold += 1.0
 		if straight and code == Bot.C_STRAIGHT:
 			flat += Balance.PASSIVE_STRAIGHT_DAMAGE
-		var fac := factor * (aim if (aim_ok and rer == 0) else 1.0)
+		var ifac := 1.0
+		if it_on:
+			match code:
+				Bot.C_PAIR:
+					flat += it_pair_flat
+				Bot.C_TWO_PAIR:
+					flat += it_pair_flat + it_tp_flat
+				Bot.C_HIGH:
+					flat += it_high_flat
+				Bot.C_SET, Bot.C_FULL:
+					mult += it_set_mult
+			if code != Bot.C_HIGH and code != Bot.C_STRAIGHT and it_aegis > 0.0:
+				var sv := 0
+				for i in n:
+					if ((gm >> i) & 1) == 1 and eff[i] > sv:
+						sv = eff[i]
+				guard += floorf(sv * it_aegis)
+			if it_spark > 0.0 and mult >= 2.0:
+				mult += it_spark
+			mult += it_mult
+			if it_crush > 0.0:
+				var hi := -1
+				for i in n:
+					if ((gm >> i) & 1) == 1 and rune[i] != Bot.R_HEAVY and (hi < 0 or eff[i] > eff[hi]):
+						hi = i
+				if hi >= 0:
+					flat += floorf(eff[hi] * it_crush + 0.0001)
+			var kept := 0
+			var rr := 0
+			var lows := 0
+			var ones := 0
+			var runed := 0
+			for i in n:
+				if ((rer >> i) & 1) == 1:
+					rr += 1
+				else:
+					kept += 1
+				if eff[i] == 1 or eff[i] == 2:
+					lows += 1
+				if eff[i] == 1:
+					ones += 1
+				if ((gm >> i) & 1) == 1 and rune[i] != 0:
+					runed += 1
+			if it_kept > 0 and kept >= it_kept:
+				flat += 1.0
+			if it_rer > 0 and rr >= it_rer:
+				flat += it_rer_flat
+			if ones > 0:
+				flat += it_ones
+			flat += mini(runed, it_rune_max) * it_rune_pip + it_bonus + it_flat
+			if lows >= 2:
+				flat += it_low
+			ifac = it_factor
+		var fac := factor * ifac * (aim if (aim_ok and rer == 0) else 1.0)
 		var total := int(floor(((sum + bonus) * mult + flat) * fac)) + atk
 		var heal_extra := float(Balance.PASSIVE_FULL_HOUSE_HEAL) if (fh_party and code == Bot.C_FULL) else 0.0
 		var best := -INF
@@ -1013,7 +1089,7 @@ class CombatModel:
 				b[k] = e_block[k]
 			var dealt := 0.0
 			var progress := 0.0
-			var d0 := _hit(t, float(total))
+			var d0 := _hit(t, float(total) + (it_t_flat[t] if t < it_t_flat.size() else 0.0))
 			dealt += d0
 			if pierce_carry and h[t] <= 0.0:
 				var over := floorf(((ceilf(total / 2.0) if e_ward[t] == 1 else float(total)) - e_block[t] - e_hp[t]) * ClassLogic.RANGER_PIERCE_PCT)
@@ -1196,7 +1272,70 @@ static func _combat_model(f: GameFlow, rules: AutoRules) -> CombatModel:
 			bool(e.frozen), CombatState.has_trait(e, "thorns"))
 	_moon_model(cm, c)
 	_class_model(cm, run, c)
+	_item_model(cm, run, c)
 	return cm
+
+## Armory items in the combat model (c == null: the pool-value model, no fight yet). The Spark
+## and Tome only count on their turn; Rampage makes the current target worth its stacks.
+static func _item_model(cm: CombatModel, run: RunState, c: CombatState) -> void:
+	if ItemLogic.items(run).is_empty():
+		return
+	cm.it_on = true
+	var first := c == null or int(c.item_state.get("attacks", 0)) == 0
+	var live := func(item: String) -> bool:
+		return c == null or ItemLogic.use_left(run, c, item)
+	cm.it_pair_flat = ItemLogic.n(run, "sword", "flat") if live.call("sword") else 0.0
+	cm.it_high_flat = ItemLogic.n(run, "crossbow", "flat") * (1.5 if ItemLogic.sec(run, "crossbow_arbalest") else 1.0)
+	if ItemLogic.sec(run, "sword_rapier"):
+		cm.it_high_flat += floorf(cm.it_pair_flat * 0.5)
+	if ItemLogic.sec(run, "axe_twinbit"):
+		cm.it_tp_flat = 3.0
+	cm.it_set_mult = ItemLogic.n(run, "greatsword", "mult")
+	if c == null or int(c.item_state.get("spark", 0)) == 0:
+		cm.it_spark = ItemLogic.n(run, "wand", "mult")
+	if c != null and int(c.item_state.get("attacks", 0)) == 2:
+		cm.it_mult = ItemLogic.n(run, "spellbook", "mult")
+	elif c == null:
+		cm.it_mult = ItemLogic.n(run, "spellbook", "mult") * 0.3
+	if ItemLogic.has(run, "warhammer") and live.call("warhammer"):
+		cm.it_crush = ItemLogic.crush_mult(run) - 1.0
+	if live.call("parrying_dagger"):
+		cm.it_kept = ItemLogic.ni(run, "parrying_dagger", "dice")
+	if live.call("katana"):
+		cm.it_rer = ItemLogic.ni(run, "katana", "dice")
+		cm.it_rer_flat = ItemLogic.n(run, "katana", "flat")
+	if live.call("claws"):
+		cm.it_low = ItemLogic.n(run, "claws", "per")
+	cm.it_ones = 1.0 if ItemLogic.sec(run, "claws_knuckles") else 0.0
+	if live.call("arcane_staff"):
+		cm.it_rune_pip = ItemLogic.n(run, "arcane_staff", "pip")
+		cm.it_rune_max = ItemLogic.ni(run, "arcane_staff", "max")
+	if live.call("oath_shield"):
+		cm.it_aegis = ItemLogic.n(run, "oath_shield", "x")
+	cm.it_flat = 4.0 if ItemLogic.sec(run, "axe_cleaver") else 0.0
+	if run.hp * 2 < run.max_hp:
+		cm.it_flat += ItemLogic.n(run, "bear_hat", "flat")
+	cm.it_flat += float(run.item_state.get("soul", 0))
+	cm.it_bonus = float(run.item_state.get("dominion", 0))
+	if first:
+		cm.it_factor *= maxf(1.0, ItemLogic.n(run, "spear", "factor") + (ItemLogic.n(run, "spear", "boss") if c != null and c.boss else 0.0))
+		if int(run.item_state.get("ambush", 0)) > 0:
+			cm.it_factor *= maxf(1.0, ItemLogic.n(run, "bandit_mask", "factor"))
+	if c == null:
+		return
+	cm.it_t_flat.resize(cm.ne)
+	cm.it_t_flat.fill(0.0)
+	for k in cm.ne:
+		var i: int = cm.e_idx[k]
+		var e: Dictionary = c.enemies[i]
+		var f := 0.0
+		if ItemLogic.has(run, "great_axe") and (int(c.item_state.get("rampage_t", -1)) == i or ItemLogic.sec(run, "axe_golem")):
+			f += int(c.item_state.get("rampage", 0)) * ItemLogic.n(run, "great_axe", "per")
+		if ItemLogic.has(run, "ranger_tunic") and int(e.hp) >= int(e.max_hp):
+			f += ItemLogic.n(run, "ranger_tunic", "flat")
+		if ItemLogic.sec(run, "dagger_bone") and int(e.poison) > 0:
+			f += 2.0
+		cm.it_t_flat[k] = f
 
 ## The Moon King (new biomes): 1s push the moon meter back, so keep them when it is high. The
 ## worth of a 1 is the Moonrise / Moonfall damage it delays (full when the meter would fill at the
@@ -1249,9 +1388,14 @@ static func _class_model(cm: CombatModel, run: RunState, c: CombatState, dice: A
 ## Rerolls the plan may count on: the Ninja's likely refunds make a reroll cost less than 1.
 static func _plan_budget(f: GameFlow) -> int:
 	var c := f.combat
+	var extra := 0
+	if ItemLogic.has(f.run, "ninja_headband"):
+		# Focus: a single-die reroll may come back
+		var key := "focus_turn" if ItemLogic.ni(f.run, "ninja_headband", "per_turn") > 0 else "focus"
+		extra = 1 if int(c.item_state.get(key, 0)) < ItemLogic.ni(f.run, "ninja_headband", "uses") else 0
 	if HeroDefs.mechanic(f.run.class_id) == "shadow_step":
-		return c.rerolls_left + int(ceil((ClassLogic.NINJA_REFUNDS_PER_TURN - c.refunds_this_turn) * 0.5))
-	return c.rerolls_left
+		return c.rerolls_left + extra + int(ceil((ClassLogic.NINJA_REFUNDS_PER_TURN - c.refunds_this_turn) * 0.5))
+	return c.rerolls_left + extra
 
 ## Private samples: face index per (sample, die) from an Rng seeded by `seed`.
 static func _samples(seed: int, ns: int) -> PackedInt32Array:
@@ -1441,6 +1585,8 @@ static func _combat_key(f: GameFlow, rules: AutoRules) -> int:
 	if HeroDefs.mechanic(f.run.class_id) != "":
 		# class state only for the new classes (the old four keep their exact noise stream)
 		k = hash([k, f.run.class_id, c.oath, c.rerolls_used_this_turn, c.refunds_this_turn])
+	if not ItemLogic.items(f.run).is_empty():
+		k = hash([k, c.item_state, f.run.item_state])
 	return k
 
 static func _enemy_name(f: GameFlow, i: int) -> String:
@@ -1575,6 +1721,7 @@ static func _pv_model(dice: Array, passives: Array, run: RunState, rules: AutoRu
 	cm.set_dice(dice)
 	cm.set_passives(passives, g, false)
 	_class_model(cm, run, null, dice)
+	_item_model(cm, run, null)
 	if passives.has("opening_salvo"):
 		cm.factor *= 1.0 + (Balance.PASSIVE_DAMAGE_MULT - 1.0) * 0.4 # first turn of ~2.5
 	cm.atk = a

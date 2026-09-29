@@ -4,13 +4,24 @@ extends RefCounted
 ## layer owns the file (user://profile.json) and uses to_dict()/from_dict() (or to_json /
 ## from_json). Mutations go through Camp (command -> events), except apply_run_result().
 ##
-## Schema (version 2; version-1 files load through the tolerant loader, see from_dict):
+## Schema (version 3; version-1 and -2 files load through the tolerant loader, see from_dict):
 ##   crowns:int, sigils:int
 ##   flags: {lock_classes: bool (default true: a fresh profile has the Knight only)}
 ##   unlocks: {classes, biomes, bosses, minibosses, pets, minigames, packs, gear, potions,
-##             features}: owned ids, in content order (UnlockDefs.all_ids)
+##             features}: owned ids, in content order (UnlockDefs.all_ids). "gear" holds the
+##             Armory rank groups the player may craft (weapon, offhand, armor, trinket).
 ##   disabled: {runes, kinds, passives}: pool-toggled-off ids (<= 25% of each pool)
-##   gear: {slot: level 0..8} for unlocked pieces; gear_traits: {slot: {"4": id, "8": id}}
+##   armory (v3, docs/design/2026-09-29-armory-items.md §7.4):
+##     ranks: {weapon, offhand, armor, trinket: 0..8}, pouch: 0|1 (the 2nd trinket slot),
+##     owned: [item ids] (ItemDefs.IDS order), variants: {item: [crafted variant ids]} (the
+##     Standard is implicit), blueprints: {item: [unlocked, not yet crafted]},
+##     mastery: {item: fights won with it equipped}, feats: [ItemDefs.FEATS ids reached],
+##     equipped: {class: {weapon: {id, variant}, offhand: {id, variant}, head: {id, variant},
+##                body: id, trinket: id, trinket2: id, back: id}} ("" = empty; a missing class
+##                uses its signature kit), appearance: {class: {head: id|"own"|"hidden", body: id|"own"}},
+##     seen_new: [item / variant ids not yet seen in the Armory]
+##   gear / gear_traits (v2) are gone: `gear` is a read-only legacy view of the ranks
+##   ({helm: armor, blade: weapon, boots: offhand, charm: trinket}); from_dict migrates them.
 ##   upgrades: {whetstone, starter_kit, potion_belt, loadout_slot: 0|1}; starter_kind: String
 ##   pet_xp: {pet: fights won while equipped}; pet_bought: {pet: bought level 6..10}
 ##   minigame_plays: {minigame: plays} (mastery)
@@ -26,20 +37,39 @@ extends RefCounted
 ##   cosmetics (v2): {owned: {class: [skin ids]} ("default" implicit), equipped: {class: skin},
 ##             prestige: {class: bool} (A10 overlay toggle), unseen: ["class:skin"] (Wardrobe dots)}
 
-const VERSION := 2
+const VERSION := 3
 
 const COUNTERS := ["runs", "laps", "fights", "minigames", "rerolls", "kept", "poison_kills", "cashouts", "block",
 	"straights", "minibosses_reached", "minibosses_killed", "bosses_reached", "wins", "act2_runs", "act3_runs",
 	"frost_visits", "throne_wins", "mage_wins", "full_runes", "face_edits", "kills", "hollow_events",
-	"freezes", "sets3", "rune_triggers", "potions"]
+	"freezes", "sets3", "rune_triggers", "potions", "high_rollers", "skeleton_kills"]
 
 var crowns: int = 0
 var sigils: int = 0
 var flags: Dictionary = {}
 var unlocks: Dictionary = {}
 var disabled: Dictionary = {}
-var gear: Dictionary = {}
-var gear_traits: Dictionary = {}
+var armory: Dictionary = {}
+## Legacy (v2) view of the Armory ranks by old piece: {helm, blade, boots, charm} for the owned
+## rank groups. Writing a level sets the matching rank (old callers and fixtures).
+var gear: Dictionary:
+	get:
+		var out := {}
+		for old in ItemDefs.LEGACY_GROUP:
+			var g := String(ItemDefs.LEGACY_GROUP[old])
+			if owns("gear", g):
+				out[old] = rank(g)
+		return out
+	set(v):
+		for old in v:
+			if ItemDefs.LEGACY_GROUP.has(String(old)):
+				_ranks()[String(ItemDefs.LEGACY_GROUP[old])] = clampi(int(v[old]), 0, ItemDefs.RANK_MAX)
+## Legacy (v2) trait choices: always empty (the traits live on as item rules).
+var gear_traits: Dictionary:
+	get:
+		return {}
+	set(_v):
+		pass
 var upgrades: Dictionary = {}
 var starter_kind: String = ""
 var pet_xp: Dictionary = {}
@@ -60,8 +90,12 @@ static func fresh(lock_classes := true) -> Profile:
 	if not lock_classes:
 		p.unlocks.classes = HeroDefs.IDS.duplicate()
 	p.disabled = {"runes": [], "kinds": [], "passives": []}
-	p.gear = {}
-	p.gear_traits = {}
+	p.armory = fresh_armory()
+	for cid in p.unlocks.classes:
+		p.grant_kit(String(cid))
+	for id in ItemDefs.STARTER_ITEMS:
+		p.grant_item(String(id))
+	p.armory.seen_new = []
 	p.upgrades = {}
 	p.loadout = {"class": "knight", "mode": "standard", "minigames": (UnlockDefs.STARTER.minigames as Array).duplicate(), "pet": ""}
 	p.ascension = {"unlocked": 0, "selected": 0}
@@ -82,6 +116,10 @@ static func fresh(lock_classes := true) -> Profile:
 # ------------------------------------------------------------------ queries
 
 func owns(kind: String, id: String) -> bool:
+	if kind == "items":
+		return owns_item(id)
+	if kind == "gear" and ItemDefs.LEGACY_GROUP.has(id):
+		id = String(ItemDefs.LEGACY_GROUP[id])
 	return (unlocks.get(kind, []) as Array).has(id)
 
 func class_allowed(id: String) -> bool:
@@ -110,21 +148,13 @@ func loadout_slots() -> int:
 func potion_cap() -> int:
 	return mini(Balance.POTION_MAX_CAP, Balance.POTION_CAP + int(upgrades.get("potion_belt", 0)))
 
+## Legacy: an old gear piece's level is its rank group's rank (a group id works too).
 func gear_level(slot: String) -> int:
-	return int(gear.get(slot, 0))
+	return rank(String(ItemDefs.LEGACY_GROUP.get(slot, slot)))
 
-## Active gear traits (the chosen option per unlocked tier).
+## Legacy: gear traits are gone (their effects are item rules now).
 func active_traits() -> Array:
-	var out: Array = []
-	for slot in GearDefs.SLOTS:
-		var lvl := gear_level(slot)
-		var t: Dictionary = gear_traits.get(slot, {})
-		for tier in ["4", "8"]:
-			if lvl >= int(tier):
-				var opts := GearDefs.trait_options(slot, tier)
-				var pick := String(t.get(tier, opts[0]))
-				out.append(pick if opts.has(pick) else String(opts[0]))
-	return out
+	return []
 
 func counter(stat: String) -> int:
 	match stat:
@@ -144,12 +174,15 @@ func counter(stat: String) -> int:
 			return (unlocks.get("classes", []) as Array).size()
 	return int((records.get("counters", {}) as Dictionary).get(stat, 0))
 
-## True once every Crowns sink is maxed: owned gear at L8, every Crowns upgrade bought and every
-## owned pet at L10 (skins can then be bought for SkinDefs.BUY_PRICE Crowns).
+## True once every Crowns sink is maxed: the four Armory ranks at R8 and the Belt Pouch, every
+## Crowns upgrade bought and every owned pet at L10 (skins can then be bought for
+## SkinDefs.BUY_PRICE Crowns). Items and variants don't count (they are collections).
 func crowns_capped() -> bool:
-	for slot in GearDefs.SLOTS:
-		if gear_level(slot) < GearDefs.MAX_LEVEL:
+	for g in ItemDefs.GROUPS:
+		if rank(String(g)) < ItemDefs.RANK_MAX:
 			return false
+	if int(armory.get("pouch", 0)) < 1:
+		return false
 	for track in UnlockDefs.UPGRADES:
 		for id in UnlockDefs.UPGRADES[track]:
 			if int(upgrades.get(id, 0)) < 1:
@@ -214,8 +247,14 @@ func can_afford(cost: Dictionary) -> bool:
 		return false
 	return crowns >= int(cost.get("crowns", 0)) and sigils >= int(cost.get("sigils", 0))
 
-## Adds an unlock (no cost). Returns false if already owned or unknown.
+## Adds an unlock (no cost). Returns false if already owned or unknown. "items" grants an
+## Armory item; a class also brings its signature kit (§6); a legacy gear piece id (helm,
+## blade, boots, charm) grants its rank group.
 func grant(kind: String, id: String) -> bool:
+	if kind == "items":
+		return grant_item(id)
+	if kind == "gear" and ItemDefs.LEGACY_GROUP.has(id):
+		id = String(ItemDefs.LEGACY_GROUP[id])
 	if owns(kind, id) or not UnlockDefs.all_ids(kind).has(id):
 		return false
 	var owned: Array = []
@@ -223,8 +262,8 @@ func grant(kind: String, id: String) -> bool:
 		if x == id or owns(kind, String(x)):
 			owned.append(x)
 	unlocks[kind] = owned
-	if kind == "gear" and not gear.has(id):
-		gear[id] = 0
+	if kind == "classes":
+		grant_kit(id)
 	return true
 
 # ------------------------------------------------------------------ run results
@@ -273,6 +312,7 @@ func apply_run_result(stats: Dictionary) -> Dictionary:
 		records.loss_streak = int(records.get("loss_streak", 0)) + 1
 	_count(stats, victory)
 	_class_records(stats, cls)
+	var arm := _armory_result(stats, victory, cls)
 	# first-time Sigils
 	var firsts: Array = []
 	var s := 0
@@ -315,7 +355,7 @@ func apply_run_result(stats: Dictionary) -> Dictionary:
 				unlocked.append([String(u[0]), String(u[1])])
 	var skins := check_skins()
 	return {"crowns": c, "sigils": s, "firsts": firsts, "milestones": hit, "unlocked": unlocked, "ascension_unlocked": unlocked_asc,
-		"skins_unlocked": skins}
+		"skins_unlocked": skins, "blueprints": arm.blueprints, "items_unlocked": arm.items, "mastery": arm.mastery}
 
 ## Per-class and per-boss records (skins, class milestones, Bestiary).
 func _class_records(st: Dictionary, cls: String) -> void:
@@ -333,6 +373,11 @@ func _class_records(st: Dictionary, cls: String) -> void:
 	bbc[cls] = mine
 	records.boss_kills = bk
 	records.bosses_by_class = bbc
+	var kb: Dictionary = records.get("kills_by_id", {})
+	var sk: Dictionary = st.get("kills_by_id", {})
+	for id in sk:
+		kb[String(id)] = int(kb.get(String(id), 0)) + int(sk[id])
+	records.kills_by_id = kb
 	var seen: Dictionary = records.get("seen", {"enemies": [], "affixes": []})
 	for k in [["seen_enemies", "enemies"], ["seen_affixes", "affixes"]]:
 		var have: Array = seen.get(k[1], [])
@@ -385,6 +430,8 @@ func _count(st: Dictionary, victory: bool) -> void:
 	add.call("sets3", int(st.get("sets3", 0)))
 	add.call("rune_triggers", int(st.get("rune_triggers", 0)))
 	add.call("potions", int(st.get("potions_used", 0)))
+	add.call("high_rollers", int(st.get("high_rollers", 0)))
+	add.call("skeleton_kills", int(st.get("skeleton_kills", 0)))
 	records.counters = c
 
 ## [current, needed] toward a milestone condition, for progress bars: every form of _cond ({stat},
@@ -435,8 +482,8 @@ func _cond(cond: Dictionary) -> bool:
 func to_dict() -> Dictionary:
 	return {
 		"version": VERSION, "crowns": crowns, "sigils": sigils, "flags": flags.duplicate(true),
-		"unlocks": unlocks.duplicate(true), "disabled": disabled.duplicate(true), "gear": gear.duplicate(true),
-		"gear_traits": gear_traits.duplicate(true), "upgrades": upgrades.duplicate(true), "starter_kind": starter_kind,
+		"unlocks": unlocks.duplicate(true), "disabled": disabled.duplicate(true), "armory": armory.duplicate(true),
+		"upgrades": upgrades.duplicate(true), "starter_kind": starter_kind,
 		"pet_xp": pet_xp.duplicate(true), "pet_bought": pet_bought.duplicate(true),
 		"minigame_plays": minigame_plays.duplicate(true), "loadout": loadout.duplicate(true),
 		"ascension": ascension.duplicate(true), "milestones": milestones.duplicate(), "records": records.duplicate(true),
@@ -467,17 +514,10 @@ static func from_dict(d: Dictionary) -> Profile:
 			if UnlockDefs.all_ids(kind).has(String(id)):
 				a.append(String(id))
 		p.disabled[kind] = a
-	var g: Dictionary = d.get("gear", {})
-	for s in GearDefs.SLOTS:
-		if p.owns("gear", s):
-			p.gear[s] = clampi(int(g.get(s, 0)), 0, GearDefs.MAX_LEVEL)
-	var gt: Dictionary = d.get("gear_traits", {})
-	for s in gt:
-		if GearDefs.DEFS.has(String(s)):
-			var t := {}
-			for tier in gt[s]:
-				t[String(tier)] = String(gt[s][tier])
-			p.gear_traits[String(s)] = t
+	if int(d.get("version", 1)) >= 3 or d.has("armory"):
+		p._load_armory(d.get("armory", {}))
+	else:
+		p._migrate_gear(d.get("gear", {}), d.get("gear_traits", {}))
 	p.upgrades = _int_map(d.get("upgrades", {}))
 	p.starter_kind = String(d.get("starter_kind", ""))
 	p.pet_xp = _int_map(d.get("pet_xp", {}))
@@ -580,3 +620,369 @@ static func to_json(p: Profile) -> String:
 static func from_json(text: String) -> Profile:
 	var v: Variant = JSON.parse_string(text)
 	return Profile.from_dict(v if v is Dictionary else {})
+
+# ------------------------------------------------------------------ Armory (v3)
+
+static func fresh_armory() -> Dictionary:
+	var ranks := {}
+	for g in ItemDefs.GROUPS:
+		ranks[g] = 0
+	return {"ranks": ranks, "pouch": 0, "owned": [], "variants": {}, "blueprints": {}, "mastery": {}, "feats": [],
+		"equipped": {}, "appearance": {}, "seen_new": []}
+
+func _ranks() -> Dictionary:
+	if not armory.has("ranks"):
+		armory["ranks"] = fresh_armory().ranks
+	return armory.ranks
+
+## Rank of a group (weapon | offhand | armor | trinket): 0..8.
+func rank(group: String) -> int:
+	return int((armory.get("ranks", {}) as Dictionary).get(group, 0))
+
+func has_pouch() -> bool:
+	return int(armory.get("pouch", 0)) >= 1
+
+func owns_item(id: String) -> bool:
+	return (armory.get("owned", []) as Array).has(id)
+
+## Crafted variants of an item, the Standard (the item id) first when the item is owned.
+func owned_variants(item: String) -> Array:
+	var out: Array = [item] if owns_item(item) else []
+	for v in (armory.get("variants", {}) as Dictionary).get(item, []):
+		out.append(String(v))
+	return out
+
+func owns_variant(item: String, variant: String) -> bool:
+	if variant == "" or variant == item:
+		return owns_item(item)
+	return ((armory.get("variants", {}) as Dictionary).get(item, []) as Array).has(variant)
+
+func has_blueprint(item: String, variant: String) -> bool:
+	return ((armory.get("blueprints", {}) as Dictionary).get(item, []) as Array).has(variant)
+
+func item_mastery(item: String) -> int:
+	return int((armory.get("mastery", {}) as Dictionary).get(item, 0))
+
+## Adds an item to the collection (no cost). False if already owned or unknown.
+func grant_item(id: String) -> bool:
+	if not ItemDefs.has(id) or owns_item(id):
+		return false
+	var owned: Array = []
+	for x in ItemDefs.IDS:
+		if x == id or owns_item(String(x)):
+			owned.append(x)
+	armory["owned"] = owned
+	_new(id)
+	return true
+
+## Adds a crafted variant (no cost; the base item comes with it). False if already owned.
+func grant_variant(item: String, variant: String) -> bool:
+	if not ItemDefs.is_variant_of(variant, item):
+		return false
+	grant_item(item)
+	if owns_variant(item, variant):
+		return false
+	var vs: Dictionary = armory.get("variants", {})
+	var have: Array = vs.get(item, [])
+	have.append(variant)
+	vs[item] = have
+	armory["variants"] = vs
+	var bp: Dictionary = armory.get("blueprints", {})
+	if bp.has(item):
+		(bp[item] as Array).erase(variant)
+	_new(variant)
+	return true
+
+## Unlocks a variant blueprint (craftable). False if already a blueprint or crafted.
+func add_blueprint(item: String, variant: String) -> bool:
+	if not ItemDefs.VARIANTS.has(variant) or owns_variant(item, variant) or has_blueprint(item, variant):
+		return false
+	var bp: Dictionary = armory.get("blueprints", {})
+	var have: Array = bp.get(item, [])
+	have.append(variant)
+	bp[item] = have
+	armory["blueprints"] = bp
+	_new(variant)
+	return true
+
+func _new(id: String) -> void:
+	var sn: Array = armory.get("seen_new", [])
+	if not sn.has(id):
+		sn.append(id)
+	armory["seen_new"] = sn
+
+## A class's signature kit (§6), including its signature variant (the Necromancer's Bone Staff).
+func grant_kit(class_id: String) -> void:
+	for id in ItemDefs.kit_items(class_id):
+		grant_item(String(id))
+	for kv in ItemDefs.kit_variants(class_id):
+		grant_variant(String(kv[0]), String(kv[1]))
+
+## The class's default loadout: its kit (owned pieces only), the Tankard if owned, no 2nd trinket.
+func default_loadout(class_id: String) -> Dictionary:
+	var k: Dictionary = ItemDefs.KITS.get(class_id, {})
+	var out := {}
+	for slot in ["weapon", "offhand", "head"]:
+		var e: Array = k.get(slot, ["", ""])
+		var id := String(e[0])
+		var v := String(e[1]) if owns_variant(id, String(e[1])) else id
+		out[slot] = {"id": id if owns_item(id) else "", "variant": v if owns_item(id) else ""}
+	var body := String(k.get("body", ""))
+	out["body"] = body if owns_item(body) else ""
+	out["trinket"] = "tankard" if owns_item("tankard") else ""
+	out["trinket2"] = ""
+	var back := String(k.get("back", ""))
+	out["back"] = back if owns_item(back) else ""
+	return out
+
+## The class's effective loadout: the stored choice (or the default kit), validated: owned items
+## and variants only, the right slot, two-handed weapons drop hand off-hands, the Monster Kid's
+## Head/Body stay the Dino Suit (and nobody else wears it), the 2nd trinket needs the Belt Pouch
+## and can't repeat the 1st. Shape: {weapon: {id, variant}, offhand, head: {id, variant},
+## body: id, trinket: id, trinket2: id, back: id} ("" = empty).
+func loadout_for(class_id: String) -> Dictionary:
+	var eq: Dictionary = (armory.get("equipped", {}) as Dictionary).get(class_id, {})
+	var base := default_loadout(class_id)
+	var out := {}
+	for slot in ["weapon", "offhand", "head"]:
+		var e: Variant = eq.get(slot, base[slot])
+		var id := String(e.get("id", "")) if e is Dictionary else String(e)
+		var v := String(e.get("variant", id)) if e is Dictionary else id
+		if id != "" and (not owns_item(id) or not ItemDefs.fits(id, slot)):
+			id = ""
+		if id != "" and not owns_variant(id, v):
+			v = id
+		out[slot] = {"id": id, "variant": v if id != "" else ""}
+	for slot in ["body", "trinket", "trinket2", "back"]:
+		var e2: Variant = eq.get(slot, base[slot])
+		var id2 := String(e2.get("id", "")) if e2 is Dictionary else String(e2)
+		if id2 != "" and (not owns_item(id2) or not ItemDefs.fits(id2, slot)):
+			id2 = ""
+		out[slot] = id2
+	var w: Dictionary = out.weapon
+	if String(w.id) != "" and ItemDefs.hands(String(w.id), String(w.variant)) >= 2 and ItemDefs.hand_mount(String(out.offhand.id)):
+		out["offhand"] = {"id": "", "variant": ""}
+	var locked := String(ItemDefs.LOCKED_ARMOR.get(class_id, ""))
+	if locked != "":
+		out["head"] = {"id": "", "variant": ""}
+		out["body"] = locked if owns_item(locked) else ""
+	elif String(out.body) != "" and String(ItemDefs.def(String(out.body)).get("class_only", "")) not in ["", class_id]:
+		out["body"] = ""
+	if not has_pouch() or String(out.trinket2) == String(out.trinket):
+		out["trinket2"] = ""
+	return out
+
+## The run-time items of a class: {slot: {id, variant, tier}} for stat slots whose item is active
+## (tier >= 1). The Dino Suit sits in "body" (it covers the head too).
+func resolve_items(class_id: String) -> Dictionary:
+	var lo := loadout_for(class_id)
+	var out := {}
+	for slot in ItemDefs.STAT_SLOTS:
+		var e: Variant = lo[slot]
+		var id := String(e.id) if e is Dictionary else String(e)
+		var v := String(e.variant) if e is Dictionary else id
+		if id == "":
+			continue
+		var t := ItemDefs.tier_for(id, slot, class_id, rank(String(ItemDefs.GROUP_OF[slot])))
+		if t > 0:
+			out[slot] = {"id": id, "variant": v, "tier": t}
+	return out
+
+## Appearance of a class: {head: id | "own" | "hidden", body: id | "own"} (defaults: the class's
+## own look; the Paladin's head hidden).
+func appearance_of(class_id: String) -> Dictionary:
+	var d: Dictionary = (ItemDefs.APPEARANCE_DEFAULT.get(class_id, {}) as Dictionary)
+	var a: Dictionary = (armory.get("appearance", {}) as Dictionary).get(class_id, {})
+	return {"head": String(a.get("head", d.get("head", "own"))), "body": String(a.get("body", d.get("body", "own")))}
+
+## True when a feat's condition is met by the records (counters, kills) or by this run's stats
+## (boss kills with an item equipped, wins with an item at an ascension, class wins).
+func feat_met(feat: String, st: Dictionary = {}) -> bool:
+	var cond: Dictionary = (ItemDefs.FEATS.get(feat, {}) as Dictionary).get("cond", {})
+	if cond.has("counter"):
+		return counter(String(cond.counter)) >= int(cond.min)
+	if cond.has("kills"):
+		return int((records.get("kills_by_id", {}) as Dictionary).get(String(cond.kills), 0)) >= int(cond.min)
+	if st.is_empty():
+		return false
+	var lo: Dictionary = st.get("loadout", {})
+	var with_item := func(item: String) -> bool:
+		for slot in lo:
+			if String((lo[slot] as Dictionary).get("id", "")) == item:
+				return true
+		return false
+	var victory := bool(st.get("victory", false))
+	if cond.has("boss"):
+		var killed: Array = (st.get("bosses_killed", []) as Array) + (st.get("minibosses_killed", []) as Array)
+		return killed.has(String(cond.boss)) and with_item.call(String(cond["with"]))
+	if cond.has("win_with"):
+		return victory and int(st.get("asc", 0)) >= int(cond.asc) and with_item.call(String(cond.win_with))
+	if cond.has("class_win"):
+		return victory and String(st.get("class_id", "")) == String(cond.class_win) and int(st.get("asc", 0)) >= int(cond.asc)
+	return false
+
+## Banks the Armory part of a run: mastery for every equipped base item (+ fights won), then
+## blueprints (mastery thresholds, feats) and feat Back items. Returns {blueprints: [[item,
+## variant, source]], items: [[id, source]], mastery: {item: total}}.
+func _armory_result(st: Dictionary, _victory: bool, _cls: String) -> Dictionary:
+	var bps: Array = []
+	var its: Array = []
+	var ms := {}
+	var fights := int(st.get("item_fights", 0))
+	var lo: Dictionary = st.get("loadout", {})
+	var mastery: Dictionary = armory.get("mastery", {})
+	var done := {}
+	for slot in lo:
+		var id := String((lo[slot] as Dictionary).get("id", ""))
+		if id == "" or done.has(id) or fights <= 0:
+			continue
+		done[id] = true
+		mastery[id] = int(mastery.get(id, 0)) + fights
+		ms[id] = int(mastery[id])
+	armory["mastery"] = mastery
+	var feats: Array = armory.get("feats", [])
+	for f in ItemDefs.FEATS:
+		if not feats.has(f) and feat_met(String(f), st):
+			feats.append(f)
+	armory["feats"] = feats
+	for v in ItemDefs.VARIANTS:
+		var vd: Dictionary = ItemDefs.VARIANTS[v]
+		var item := String(vd.item)
+		var u: Dictionary = vd.unlock
+		var src := ""
+		var need := int(u.get("mastery", u.get("or_mastery", 0)))
+		if need > 0 and item_mastery(item) >= need:
+			src = "mastery"
+		elif u.has("feat") and feats.has(String(u.feat)):
+			src = "feat"
+		if src != "" and add_blueprint(item, String(v)):
+			bps.append([item, String(v), src])
+	for b in ItemDefs.BACK_FEATS:
+		if feats.has(String(ItemDefs.BACK_FEATS[b])) and grant_item(String(b)):
+			its.append([String(b), "feat"])
+	return {"blueprints": bps, "items": its, "mastery": ms}
+
+# ------------------------------------------------------------------ Armory serialisation
+
+## Loads a v3 armory (tolerant: unknown ids dropped, ranks clamped). Kits granted by the owned
+## classes stay owned.
+func _load_armory(a: Dictionary) -> void:
+	var r: Dictionary = a.get("ranks", {})
+	for g in ItemDefs.GROUPS:
+		_ranks()[g] = clampi(int(r.get(g, 0)), 0, ItemDefs.RANK_MAX)
+	armory["pouch"] = 1 if int(a.get("pouch", 0)) >= 1 else 0
+	for id in a.get("owned", []):
+		grant_item(String(id))
+	var vs: Dictionary = a.get("variants", {})
+	for item in vs:
+		for v in vs[item]:
+			grant_variant(String(item), String(v))
+	var bp: Dictionary = a.get("blueprints", {})
+	for item in bp:
+		for v in bp[item]:
+			add_blueprint(String(item), String(v))
+	var ms := {}
+	var am: Dictionary = a.get("mastery", {})
+	for item in am:
+		if ItemDefs.has(String(item)):
+			ms[String(item)] = int(am[item])
+	armory["mastery"] = ms
+	var feats: Array = []
+	for f in a.get("feats", []):
+		if ItemDefs.FEATS.has(String(f)) and not feats.has(String(f)):
+			feats.append(String(f))
+	armory["feats"] = feats
+	var eq := {}
+	var ae: Dictionary = a.get("equipped", {})
+	for cid in ae:
+		if not HeroDefs.DATA.has(String(cid)):
+			continue
+		var e: Dictionary = ae[cid]
+		var row := {}
+		for slot in ["weapon", "offhand", "head"]:
+			if e.has(slot):
+				var x: Variant = e[slot]
+				var id := String(x.get("id", "")) if x is Dictionary else String(x)
+				row[slot] = {"id": id, "variant": String(x.get("variant", id)) if x is Dictionary else id}
+		for slot in ["body", "trinket", "trinket2", "back"]:
+			if e.has(slot):
+				var y: Variant = e[slot]
+				row[slot] = String(y.get("id", "")) if y is Dictionary else String(y)
+		eq[String(cid)] = row
+	armory["equipped"] = eq
+	var ap := {}
+	var aa: Dictionary = a.get("appearance", {})
+	for cid in aa:
+		var row2 := {}
+		for k in ["head", "body"]:
+			if (aa[cid] as Dictionary).has(k):
+				row2[k] = String(aa[cid][k])
+		ap[String(cid)] = row2
+	armory["appearance"] = ap
+	var sn: Array = []
+	for x in a.get("seen_new", []):
+		sn.append(String(x))
+	armory["seen_new"] = sn
+
+## v1/v2 gear -> v3 (§7.5, one-time, no refunds): levels become ranks (blade -> Weapon, helm ->
+## Armor, boots -> Off-hand, charm -> Trinket); owned pieces grant the items that carry their
+## traits; the chosen traits' trinkets auto-equip for every class (slot 1 by the old level order,
+## the Compass first when the old Boots had the R6 board reroll, with the Trinket rank raised to 6
+## so the reroll survives); the Belt Pouch is free when the old Boots and Charm were both L5+; the
+## Opener trait grants the Spear.
+func _migrate_gear(g: Dictionary, gt: Dictionary) -> void:
+	for old in ItemDefs.LEGACY_GROUP:
+		var grp := String(ItemDefs.LEGACY_GROUP[old])
+		if g.has(old):
+			grant("gear", grp)
+			_ranks()[grp] = clampi(int(g[old]), 0, ItemDefs.RANK_MAX)
+	var grants := {"helm": ["round_shield", "tankard"], "blade": ["sword", "hand_axe", "crossbow"],
+		"boots": ["compass", "lantern"], "charm": ["coin_purse", "traders_map", "healers_flask"]}
+	for old in grants:
+		if g.has(old):
+			for id in grants[old]:
+				grant_item(String(id))
+	# chosen traits -> the trinket that carries each, weighted by the old piece's level
+	var carrier := {"helm_lap_heal": "tankard", "helm_campfire": "tankard", "boots_portal": "compass",
+		"boots_pair_pick": "compass", "boots_sure_foot": "lantern", "boots_treasury_step": "coin_purse",
+		"charm_cheap_restock": "traders_map", "charm_free_restock": "traders_map", "charm_shop_potion": "healers_flask",
+		"charm_treasury": "coin_purse"}
+	var cands: Array = [] # [level, item]
+	for old in ["boots", "charm", "helm"]:
+		var lvl := int(g.get(old, 0))
+		var t: Dictionary = gt.get(old, {})
+		for tier in ["4", "8"]:
+			if lvl < int(tier):
+				continue
+			var opts := GearDefs.trait_options(old, tier)
+			var pick := String(t.get(tier, opts[0]))
+			if not opts.has(pick):
+				pick = String(opts[0])
+			if carrier.has(pick):
+				cands.append([lvl, String(carrier[pick])])
+	if String((gt.get("blade", {}) as Dictionary).get("8", "")) == "blade_boss_opener" and int(g.get("blade", 0)) >= 8:
+		grant_item("spear")
+	cands.sort_custom(func(a, b): return int(a[0]) > int(b[0]))
+	var order: Array = []
+	if int(g.get("boots", 0)) >= GearDefs.BOOTS_REROLL_LEVEL and owns_item("compass"):
+		order.append("compass")
+	for cnd in cands:
+		if not order.has(String(cnd[1])):
+			order.append(String(cnd[1]))
+	if int(g.get("boots", 0)) >= 5 and int(g.get("charm", 0)) >= 5:
+		armory["pouch"] = 1
+	if int(g.get("boots", 0)) >= GearDefs.BOOTS_REROLL_LEVEL and owns_item("compass"):
+		# the old Boots' board reroll moves to the Compass, which needs Trinket R6 in slot 1
+		grant("gear", "trinket")
+		_ranks()["trinket"] = maxi(rank("trinket"), ItemDefs.COMPASS_REROLL_RANK)
+	if order.is_empty():
+		return
+	var eq: Dictionary = armory.get("equipped", {})
+	for cid in unlocks.get("classes", []):
+		var lo := loadout_for(String(cid))
+		lo["trinket"] = String(order[0])
+		if has_pouch() and order.size() > 1:
+			lo["trinket2"] = String(order[1])
+		eq[String(cid)] = lo
+	armory["equipped"] = eq
+	armory["seen_new"] = []

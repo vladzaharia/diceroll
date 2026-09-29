@@ -6,7 +6,9 @@ extends RefCounted
 ##
 ## RunState.meta ({} = legacy run, no meta layer):
 ##   asc:int, asc_keys:[UnlockDefs.ASCENSION keys], catchup:float,
-##   hp:int, atk:int, lap_rerolls:int, hazard_mult:float, gold_pct:float, traits:[gear trait ids],
+##   hp:int, atk:int, lap_rerolls:int, hazard_mult:float, gold_pct:float, traits:[] (legacy),
+##   items:{slot: {id, variant, tier}} (Armory items with tier >= 1; ItemLogic), back:id,
+##   appearance:{head, body}, ranks:{weapon, offhand, armor, trinket},
 ##   potion_cap:int, potions:int (start), potion_types:[ids unlocked for shops],
 ##   whetstone:int, starter_kind:String, pet:{id, level} | {},
 ##   minigames:[loadout ids], mastery:{id: level},
@@ -14,7 +16,9 @@ extends RefCounted
 
 static func build(profile_dict: Dictionary, class_id := "") -> Dictionary:
 	var p := Profile.from_dict(profile_dict)
-	var g := GearDefs.stats(p.gear)
+	var cid := class_id if class_id != "" else String(p.loadout.get("class", "knight"))
+	var items := p.resolve_items(cid)
+	var g := armory_stats(p.armory.get("ranks", {}), items)
 	var asc := int(p.ascension.get("selected", 0))
 	var keys := UnlockDefs.ascension_keys(asc)
 	var pet := {}
@@ -33,7 +37,9 @@ static func build(profile_dict: Dictionary, class_id := "") -> Dictionary:
 		"asc": asc, "asc_keys": keys,
 		"catchup": Economy.catchup(int(p.records.get("loss_streak", 0))),
 		"hp": int(g.max_hp), "atk": int(g.atk), "lap_rerolls": int(g.lap_rerolls),
-		"hazard_mult": float(g.hazard_mult), "gold_pct": float(g.gold_pct), "traits": p.active_traits(),
+		"hazard_mult": float(g.hazard_mult), "gold_pct": float(g.gold_pct), "traits": [],
+		"items": items, "back": String(p.loadout_for(cid).back), "appearance": p.appearance_of(cid),
+		"ranks": (p.armory.get("ranks", {}) as Dictionary).duplicate(),
 		"potion_cap": cap, "potions": mini(potions, cap), "potion_types": Array(p.unlocks.potions),
 		"whetstone": int(p.upgrades.get("whetstone", 0)),
 		"starter_kind": p.starter_kind if int(p.upgrades.get("starter_kit", 0)) >= 1 else "",
@@ -44,6 +50,27 @@ static func build(profile_dict: Dictionary, class_id := "") -> Dictionary:
 		"skin": p.equipped_skin(class_id) if class_id != "" else "default",
 		"prestige": p.prestige_on(class_id) if class_id != "" else false,
 	}
+
+## Run stats from the Armory: base stats (ATK at Weapon R8, HP per Armor rank), item max HP
+## (Steel Greatsword, Golem Axe, Bone Bulwark), the Compass's board reroll (Trinket R6+, slot 1),
+## the Lantern's hazard cut and the Coin Purse's gold. {max_hp, atk, lap_rerolls, hazard_mult, gold_pct}.
+static func armory_stats(ranks: Dictionary, items: Dictionary) -> Dictionary:
+	var b := ItemDefs.base_stats(ranks)
+	var hp := int(b.max_hp)
+	for slot in items:
+		var v := String(items[slot].get("variant", ""))
+		hp += int(ItemDefs.sec_num(v, "max_hp"))
+	var t1: Dictionary = items.get("trinket", {})
+	var reroll := 1 if String(t1.get("id", "")) == "compass" and int(ranks.get("trinket", 0)) >= ItemDefs.COMPASS_REROLL_RANK else 0
+	var haz := 1.0
+	var gold := 0.0
+	for slot in ["trinket", "trinket2"]:
+		var e: Dictionary = items.get(slot, {})
+		if String(e.get("id", "")) == "lantern":
+			haz = 1.0 - ItemDefs.num("lantern", "pct", int(e.tier))
+		if String(e.get("id", "")) == "coin_purse":
+			gold = ItemDefs.num("coin_purse", "gold", int(e.tier))
+	return {"max_hp": hp, "atk": int(b.atk), "lap_rerolls": reroll, "hazard_mult": haz, "gold_pct": gold}
 
 ## Normalises a meta config loaded from JSON (ints stay ints, arrays hold Strings).
 static func normalize(m: Dictionary) -> Dictionary:
@@ -59,6 +86,22 @@ static func normalize(m: Dictionary) -> Dictionary:
 	out.skin = String(out.get("skin", "default"))
 	out.prestige = bool(out.get("prestige", false))
 	out.starter_kind = String(out.get("starter_kind", ""))
+	var its := {}
+	var src_items: Dictionary = out.get("items", {})
+	for slot in src_items:
+		var e: Dictionary = src_items[slot]
+		its[String(slot)] = {"id": String(e.id), "variant": String(e.get("variant", e.id)), "tier": int(e.tier)}
+	if its.is_empty() and not (out.get("traits", []) as Array).is_empty():
+		its = _legacy_items(out.traits)
+	out.items = its
+	out.back = String(out.get("back", ""))
+	var ap: Dictionary = out.get("appearance", {})
+	out.appearance = {"head": String(ap.get("head", "own")), "body": String(ap.get("body", "own"))}
+	var rk := {}
+	var src_r: Dictionary = out.get("ranks", {})
+	for k in src_r:
+		rk[String(k)] = int(src_r[k])
+	out.ranks = rk
 	for k in ["asc_keys", "traits", "potion_types", "minigames", "biomes", "bosses", "minibosses"]:
 		out[k] = _strings(out.get(k, []))
 	var pet: Dictionary = out.get("pet", {})
@@ -73,6 +116,20 @@ static func normalize(m: Dictionary) -> Dictionary:
 	for k in ["runes", "kinds", "passives"]:
 		pools[k] = _strings(ps.get(k, []))
 	out.pools = pools
+	return out
+
+## A pre-Armory save's gear traits as items (tier II Standard pieces), so a run saved before the
+## update keeps roughly the same bonuses.
+static func _legacy_items(traits: Array) -> Dictionary:
+	var map := {"blade_pair": ["weapon", "sword"], "blade_high": ["weapon", "crossbow"], "blade_boss_opener": ["weapon", "spear"],
+		"blade_overflow": ["weapon", "hand_axe"], "helm_bulwark": ["offhand", "round_shield"], "helm_last_stand": ["offhand", "round_shield"],
+		"helm_lap_heal": ["trinket", "tankard"], "helm_campfire": ["trinket", "tankard"], "boots_portal": ["trinket2", "compass"],
+		"boots_pair_pick": ["trinket2", "compass"], "charm_cheap_restock": ["trinket", "traders_map"]}
+	var out := {}
+	for t in traits:
+		var m: Array = map.get(String(t), [])
+		if not m.is_empty() and not out.has(m[0]):
+			out[String(m[0])] = {"id": String(m[1]), "variant": String(m[1]), "tier": 2}
 	return out
 
 static func _strings(a: Variant) -> Array:
@@ -95,7 +152,8 @@ static func apply_start(r: RunState) -> void:
 	for k in mini(int(m.potions), r.potion_cap):
 		r.belt.append("healing")
 	r.potions = r.belt.size()
-	r.lap_rerolls = r.lap_reroll_refill()
+	# the Compass's board reroll starts with the 2nd biome (the pets' per-lap perk starts at once)
+	r.lap_rerolls = r.lap_reroll_refill(false)
 	r.skin = String(m.get("skin", "default"))
 	r.skin_prestige = bool(m.get("prestige", false))
 	var sk := String(m.starter_kind)

@@ -63,6 +63,9 @@ var cursed_faces: Array[Dictionary] = []
 ## Sunscorched Ruins: the lap in which the hero landed on an oasis (0 = none); that lap's heat is
 ## skipped.
 var cooled_lap: int = 0
+## Armory item state across fights (ItemLogic): ambush (primed), dominion (stacks), soul (bonus),
+## key_act (Skeleton Key's first chest), last_stand (used). All ints.
+var item_state: Dictionary = {}
 
 ## opts (all optional, for scenarios/tests): route:[tier1, tier2, tier3], miniboss:id, boss:id.
 ## opts.mode: "standard" (default) | "short".
@@ -285,20 +288,23 @@ func has_pet(id: String) -> bool:
 func has_asc(key: String) -> bool:
 	return (meta.get("asc_keys", []) as Array).has(key)
 
-## True when gear trait `id` (GearDefs.TRAIT_DEFS) is active.
-func has_trait(id: String) -> bool:
-	return (meta.get("traits", []) as Array).has(id)
+## Legacy (profile v2) gear traits: always false since the Armory items replaced them (kept so
+## old callers compile; old saves map their traits to items in MetaRun.normalize).
+func has_trait(_id: String) -> bool:
+	return false
+
+## The equipped Armory item of a slot: {id, variant, tier} ({} = empty or inactive).
+func item(slot: String) -> Dictionary:
+	return (meta.get("items", {}) as Dictionary).get(slot, {})
 
 func lap_heal_pct() -> float:
 	if meta.is_empty():
 		return Balance.LAP_HEAL_PCT
 	var p := UnlockDefs.ASC_LAP_HEAL if has_asc("lap_heal") else Balance.LAP_HEAL_PCT
-	if has_trait("helm_lap_heal"):
-		p += float(GearDefs.TRAIT_BONUS.helm_lap_heal)
-	return p
+	return p + ItemLogic.lap_heal_pct(self)
 
 func potion_pct() -> float:
-	return UnlockDefs.ASC_POTION_HEAL if has_asc("potions") else Balance.POTION_HEAL_PCT
+	return (UnlockDefs.ASC_POTION_HEAL if has_asc("potions") else Balance.POTION_HEAL_PCT) + ItemLogic.potion_heal_bonus(self)
 
 ## Damage multiplier for traps and lava (Boots, A8).
 func hazard_mult() -> float:
@@ -314,9 +320,10 @@ func gold_bonus(amount: int) -> int:
 		return amount
 	return int(round(amount * (1.0 + p)))
 
-## Board reroll pool refill when a lap starts. Boots (meta.lap_rerolls) refill only when a new
-## biome starts (and at run start); unused Boots rerolls carry over within the biome. The
-## Crystal Wisp perk adds +1 for each lap (lost if unused).
+## Board reroll pool refill when a lap starts. The Compass's reroll (meta.lap_rerolls) refills
+## only when a new biome starts (from the 2nd biome: MetaRun.apply_start starts the pool empty);
+## unused Compass rerolls carry over within the biome. The Crystal Wisp perk adds +1 for each lap
+## (lost if unused).
 func lap_reroll_refill(new_biome := true) -> int:
 	var boots := int(meta.get("lap_rerolls", 0))
 	var kept := boots if new_biome else mini(lap_rerolls, boots)
@@ -371,7 +378,7 @@ func max_dice() -> int:
 	return Balance.MAX_DICE + (1 if has_passive("extra_hand") else 0)
 
 ## Called when a hit would drop HP to 0 or below: Phoenix Feather (once per act) then Second
-## Wind (once per run) leave the hero at 1 HP, then the Helm's Last Stand trait (once per run,
+## Wind (once per run) leave the hero at 1 HP, then the Round Shield III's Last Stand (once per run,
 ## only if HP before the hit was above 50%: pass it as `hp_before`). Returns the passive or
 ## trait that saved them, or "".
 func survive_lethal(hp_before := -1) -> String:
@@ -383,7 +390,7 @@ func survive_lethal(hp_before := -1) -> String:
 		passive_state["second_wind_used"] = true
 		hp = 1
 		return "second_wind"
-	if has_trait("helm_last_stand") and int(pet_state.get("last_stand", 0)) == 0 and hp_before * 2 > max_hp:
+	if ItemLogic.last_stand(self) and int(pet_state.get("last_stand", 0)) == 0 and hp_before * 2 > max_hp:
 		pet_state["last_stand"] = 1
 		hp = 1
 		return "last_stand"
@@ -419,7 +426,7 @@ func to_dict() -> Dictionary:
 		"route": Array(route), "miniboss_id": miniboss_id, "boss_id": boss_id, "chill": chill,
 		"meta": meta.duplicate(true), "mode": mode, "belt": Array(belt), "potions": potions, "potion_cap": potion_cap,
 		"pet_state": pet_state.duplicate(true), "lap_rerolls": lap_rerolls, "cursed_faces": cursed_faces.duplicate(true),
-		"cooled_lap": cooled_lap,
+		"cooled_lap": cooled_lap, "item_state": item_state.duplicate(true),
 		"skin": skin, "skin_prestige": skin_prestige, "turret": turret.to_dict() if turret != null else null,
 	}
 
@@ -469,6 +476,9 @@ static func from_dict(d: Dictionary) -> RunState:
 	r.potion_cap = int(d.get("potion_cap", 0))
 	r.lap_rerolls = int(d.get("lap_rerolls", 0))
 	r.cooled_lap = int(d.get("cooled_lap", 0))
+	var ist: Dictionary = d.get("item_state", {})
+	for k in ist:
+		r.item_state[String(k)] = int(ist[k])
 	r.skin = String(d.get("skin", "default"))
 	if d.get("turret") != null:
 		r.turret = Die.from_dict(d.turret)
