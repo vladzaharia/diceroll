@@ -2,12 +2,570 @@
 
 Numbers live in `core/content/` (`balance.gd`, `heroes.gd`, `enemies.gd`, `biomes.gd`,
 `dice_kinds.gd`, `passives.gd`, `shop.gd`, `events.gd`, and the meta tables `economy.gd`,
-`gear.gd`, `pets.gd`, `potions.gd`, `minigames.gd`, `unlocks.gd`), `core/runes.gd`,
-`core/combo.gd` and the profile presets in `core/meta/presets.gd`.
+`items.gd` (the Armory; `gear.gd` is legacy, read only for the v2 migration), `pets.gd`,
+`potions.gd`, `minigames.gd`, `unlocks.gd`), `core/runes.gd`, `core/combo.gd`,
+`core/item_logic.gd` and the profile presets in `core/meta/presets.gd`.
+
+## Armory (2026-09-29: the real-item Armory, `wp-armory-core`)
+
+This section is authoritative for the Armory and for the profile bands: the four abstract gear
+pieces and their traits are gone, so the band table of the combined section below describes
+the old gear. Design: `docs/design/2026-09-29-armory-items.md`. Code: `core/content/items.gd`
+(`ItemDefs`), `core/item_logic.gd` (`ItemLogic`), `Profile.armory` (v3), the Camp commands,
+`MetaRun.build` (`meta.items`), `tools/sim.gd` (`--armory`, `--variant`, `--kit`, `--item`).
+
+### How this was measured
+
+- Realistic policy, A0, standard mode, 28-tile board. Band rows: 600 runs per class (seeds
+  1001, 2001, …, 6001 × 100); A10: 300 runs per class.
+- **The realistic loadout** is each class's default kit (§6 of the design, with the signature
+  variants) and the Tankard. At max the Belt Pouch is bought but empty. This is the design's
+  "default kit on realistic". The expert bot can pick `BotMeta.best_loadout` (`--kit=best`).
+- **Item rows** equip the item for every class (`--armory=<slot>:<item>`, Standard variant,
+  tier III at max; the kit piece of its own class gets its affinity) and compare with the slot
+  left empty (`--strip=slot:<slot>`). They use 200 runs per class (seeds 1001 and 2001), so
+  2,200 runs per item. Weapons and off-hands are measured with both hand slots empty, so a
+  two-handed weapon never costs a shield. The difference of two rows carries about ±1.4 pp of
+  noise.
+- **Variant rows**: 100 runs per class (seed 1001, 1,100 runs), against the Standard on the
+  same seed (about ±2.8 pp).
+
+### Results
+
+| class | fresh | mid | max | max A10 |
+|---|---|---|---|---|
+| Knight | 37.2 | 51.2 | 69.0 | 23.7 |
+| Barbarian | 39.8 | 44.0 | 61.2 | 22.3 |
+| Paladin | 40.7 | 52.3 | 59.7 | 21.0 |
+| Mage | 40.5 | 52.8 | 63.3 | 23.0 |
+| Ranger | 36.2 | 46.7 | 67.0 | 21.7 |
+| Rogue | 37.2 | 47.7 | 64.7 | 28.7 |
+| Ninja | 38.5 | 47.7 | 66.7 | 30.0 |
+| Druid | 38.2 | 43.5 | 61.3 | 16.3 |
+| Engineer | 41.2 | 46.7 | 59.7 | 26.3 |
+| Necromancer | 38.0 | 47.5 | 59.5 | 22.7 |
+| Monster Kid | 42.2 | 46.5 | 57.8 | 18.7 |
+| **average** | **39.1** | **47.9** | **62.7** | **23.1** |
+| before (old gear) | 39.0 | 45.3 | 62.8 | 22.7 |
+| target | 30–40 | 45–50 | 55–65 | 20–30 |
+| spread | −2.9 / +3.1 | −4.4 / +4.9 | −4.9 / +6.3 | −6.8 / +6.9 |
+
+- **Fresh is exactly the combined-section table.** Every rank starts at R0, so the owned
+  Knight kit and Tankard do nothing yet. The seeds match, so every row is identical.
+- **Mid: 45.3 → 47.9**, the middle of its band. Every class is within ±5 pp.
+  - The Mage (+4.9) is near the edge on these seeds. Six more shards (seeds 7001–12001) read
+    48.0, so the pooled estimate is 50.4 (+2.5).
+  - The Druid is the low end (−4.4), as it was before (−3.3). The Barbarian (−3.9) lost the
+    old Blade trait's uncapped +1 on every Pair.
+  - A Druid Robe with Bark III at 3 lifted the Druid by only +0.8 but read +3.8 as a generic
+    body piece, so it stays at 2.
+- **Max: 62.8 → 62.7**, inside the band.
+  - The max spread moved from −3.8 / +6.2 to −4.9 / +6.3: the Knight has Last Stand, the only
+    max-only kit rule left; the Monster Kid, Necromancer and Paladin are low.
+  - The ±5 pp rule covers fresh and mid only. The order at mid is different (the Paladin tops
+    mid and sits near the bottom of max), so fixing max would move mid.
+- **A10: 22.7 → 23.1.**
+- **The whole armory** is +8.8 pp at max (noarmory 53.9 → 62.7), within the design's +15
+  budget:
+  - The Armor HP base stat (+2 at R8) reads +3.9 (base 57.8 with every slot empty).
+  - The kit and the Tankard add +4.9.
+  - The expert loadout (`--kit=best`) reads 67.1, +4.4 over the realistic kit.
+- **The campaign** (8 fresh profiles × 40 runs, realistic) had no errors, and the class unlock
+  medians are unchanged: Paladin 8, Mage 10.5, Ranger 11.5, Rogue 15, Ninja 20, Druid 25,
+  Engineer 26, Necromancer 29.5, Monster Kid 28.5.
+  - `bone_collector` fires at a median of run 22.
+  - At run 10 the bot holds R3 in every rank. It has also bought most Back pieces and a few
+    items; the mid preset keeps R4, the old gear-L4 spend.
+  - The Crowns sink is now 14,170: ranks 2,920, pouch 400, shop items, every blueprint, and
+    the old upgrades and pets.
+
+### What the design's starting numbers did, and the levers used
+
+The design's numbers, played by the realistic bot, put **max at 80.0%** (band 55–65).
+
+- **One slot removed at a time** from that full kit:
+  - weapon −5.6
+  - body −3.4
+  - off-hand −2.9
+  - Belt Pouch (Coin Purse II) −2.1
+  - head −1.9
+  - Removing the Compass raised max by 3.6.
+- **One slot added at a time** to the base (ranks R8, every slot empty, 61.0): weapon +9,
+  off-hand +4, body +4, head +2.7, Compass +5.7.
+
+Four findings drove the rework:
+
+1. **Flat damage and Block are worth far more than the design assumed.**
+   - The R8 +1 ATK alone was +4.4 pp; the design budgeted 2–3 pp for ATK and HP together.
+   - A Block of 1 on turn 1 of every fight is about +2 pp.
+   - A "+1 pip" before the multiplier is worth the whole combo multiplier (×2–4).
+   - At the design's numbers the Knight's head and body alone were +11 pp, and the Smoke
+     Bomb's −30% on the first hit was +12.7.
+2. **The Compass's tie-break is a trap.**
+   - "Value ties move the higher value" is the old Boots trait *Pathfinder's Eye*, which the
+     old max preset had. It is **−5 pp**: faster moves skip tiles, so a run has fewer fights,
+     less XP and less gold.
+   - The lower value instead is +5 pp, which would make it a must-pick.
+   - The old max band hid this −5 pp. Without it, +1 ATK, +4 HP and the Compass reroll alone
+     reach 66.
+3. **Mid is the binding constraint.** Affinity puts a mid profile's kit (R4 = tier II, +1) at
+   tier III, the same as max. Mid sits nearer 50%, where every item is worth the most, so the
+   items can add only about +3 pp there.
+4. **Every-attack rules are what decides boss fights** (10+ attacks), so those were cut
+   hardest. Once-a-fight rules are cheap.
+
+Levers, in the order applied (each one measured):
+
+| lever | design | now |
+|---|---|---|
+| Weapon rank base stat | +1 ATK at R8 | none (`ItemDefs.ATK_BONUS` = 0; measured +4.4 pp) |
+| Armor rank base stat | +0.5 max HP per rank, cap +4 | +0.25 per rank, cap +2 (the design's own "Armor HP" lever, in reverse) |
+| item "pips" (Crush, Flow, Channel, Steady, Dominion, Brawn, Brawl, Light, Silent) | before the multiplier | after the multiplier |
+| per-attack or per-turn rules (Twin Edge, Crush, Flow, Channel, Scrap, Steady, Aegis, Vow, Blessed, Reap, Barrage, Poise, Nimble, Steadfast, Radiant) | every attack or turn | `uses` per fight (mostly 1, 2 at III for a few) |
+| count-rule Standards (Dagger, Katana, Druid Staff, Parrying Dagger, Ninja Headband, Wrench, Wizard Hat) | Block 2 on turn 1 each | Block 1 on turn 1 of elite, mini-boss and boss fights, not stacking (every fight was +2–4 pp, above every variant) |
+| Plated / Thick Hide / Bulwark | Block every turn / 3-5-7 | Block 1 on turn 1 / turns 1–3 / turn 1 |
+| Compass | ties move the higher value; board reroll per biome from R6 | no tie-break; Portal +2/+3/+4; the reroll starts with the 2nd biome (2 per run) |
+| Smoke Bomb | −30/50/70% of the first hit | −20/25/30%, at most 1 |
+| Healer's Flask | potions +5% / +10% | +3% at III only |
+| Mage Robe | Ember/Thunder +1/2/3, Venom +1/1/2 | Ember +1, Thunder +1 at III, no Venom |
+| Wrench | Forge +1 / raises 18 / Forge +2 | Face Raises 22/20/20, no Forge edits (the Engineer was +11 pp at mid) |
+| Paladin Cuirass / Helm | heal every Pair / every set | Two Pair or better / Three of a Kind or better, once per fight |
+| Engineer Goggles | dice and Face Raises −10/15/20% | dice only, −5/10/10% |
+| Tankard | lap +0.5/1/1.5%, campfires +10% at III | lap +0.5/0.5/1%, campfires +5% at III (+2.8 pp before) |
+| variants | see §5 | Sun Staff once per fight (+15.9 → +1.2); Zweihander 25% → 5% (+7.6 → +0.5); Cleaver has no reroll or HP cost (−7.6 → 0); Tower Shield keeps the full Bulwark on turn 2; the Plank Shield has no Bulwark cost; the Golem Axe is −1 max HP; the Bone Crossbow's Reload is once per fight; the Bone Quiver poisons 1 |
+| realistic max preset | (the doc's example: Compass III + Coin Purse II) | the default kit + Tankard, Belt Pouch empty |
+
+The final numbers are in the item table below.
+- Most kit rules now read "1 per fight".
+- Tier I and III often carry the same numbers, because the budget leaves no room for three
+  integer steps. Where the tiers differ, it is in `uses`, `turns`, `stacks`, `max` or the
+  fractional rules.
+
+### Per-item deltas (max, tier III, vs the slot empty)
+
+Rows marked † were re-measured after a fix (seed 1001 only: 1,100 runs, ±2.8 pp); the values before the fix are in brackets.
+
+| weapon (vs no weapon and no off-hand, 62.1) | Δ pp |
+|---|---|
+| Wand | +3.3 |
+| Druid Staff † | +3.3 (+4.8) |
+| Greatsword | +3.0 |
+| Spear | +3.0 |
+| Hand Axe | +3.0 |
+| Hunting Bow | +1.4 |
+| Katana | +1.2 |
+| Scythe | +1.2 |
+| Wrench | +0.9 |
+| Dagger † | +0.5 (+3.2) |
+| Arming Sword | +0.5 |
+| Warhammer | +0.3 |
+| Claws | +0.0 |
+| Great Axe | −0.0 |
+| Arcane Staff | −0.1 |
+| Crossbow | −0.8 |
+
+| off-hand (same baseline) | Δ pp |
+|---|---|
+| Spiked Shield | +1.9 |
+| Round Shield | +1.9 |
+| Parrying Dagger † | +1.5 (+0.6) |
+| Oath Shield | +0.8 |
+| Quiver | +0.7 |
+| Smoke Bomb † | +0.0 (+12.7) |
+| Shuriken | −0.3 |
+| Spellbook | −0.5 |
+
+| head (vs no head, 63.3) | Δ pp |
+|---|---|
+| Ninja Headband † | +2.8 (+2.3) |
+| Bandit Mask | +2.4 |
+| Paladin Helm | +1.3 |
+| Wizard Hat | +1.2 |
+| Knight Helm | +1.1 |
+| Engineer Goggles | +1.1 |
+| Bear Hat | +1.0 |
+| Bone Crown | +0.8 |
+
+| body (vs no body, 61.9) | Δ pp |
+|---|---|
+| Knight Plate | +2.6 |
+| Hooded Robe | +2.2 |
+| Druid Robe | +2.1 |
+| Engineer Overalls | +1.9 |
+| Rogue Leathers | +1.8 |
+| Mage Robe † | +1.5 (+3.3) |
+| Ranger Tunic | +1.3 |
+| Ninja Gi | +1.1 |
+| Paladin Cuirass | +0.9 |
+| Barbarian Harness | +0.8 |
+
+| trinket, slot 1 (vs empty, 62.9) | Δ pp |
+|---|---|
+| Coin Purse | +3.2 |
+| Trader's Map | +1.9 |
+| Healer's Flask † | +1.8 (+5.8) |
+| Compass | +1.6 |
+| Lantern | +1.2 |
+| Tankard | +0.9 |
+| Skeleton Key | +0.4 |
+| Loaded Die | −0.2 |
+
+| Belt Pouch, slot 2 (vs empty, Tankard in slot 1, 63.7) | Δ pp |
+|---|---|
+| Lantern | +1.5 |
+| Loaded Die | +1.2 |
+| Coin Purse | −0.1 |
+| Compass | −1.2 (no reroll in slot 2) |
+
+- **No must-pick.** Every item is inside its design cap within the noise: weapon ≤ 4,
+  off-hand ≤ 3, head ≤ 2, body ≤ 2, trinket 1 ≤ 3 (Compass ≤ 6) and trinket 2 ≤ 2.
+  - The Knight Plate (+2.6) and Ninja Headband (+2.8) sit 0.6–0.8 pp over, well inside the
+    ±1.4 pp noise.
+  - The four outliers were fixed (the † rows).
+- **Horizontal spread per slot** (budget ≤ 4 pp):
+  - weapon 4.1 pp (Wand +3.3 to Crossbow −0.8)
+  - off-hand 2.4 pp
+  - head 2.0 pp
+  - body 1.8 pp
+  - trinket 3.4 pp
+- **Items that read ~0 are class tools, not generic upgrades.** When every class carries them:
+  - The Crossbow needs a High Roller.
+  - The Arcane Staff needs runed dice.
+  - The Great Axe needs repeated hits on one target.
+  - The Claws need low dice.
+- **Affinity check** (a signature piece at II vs the best non-signature piece at mid): not
+  measured separately. At mid the kit is tier III and every class sits within ±5 pp.
+
+### Variants (vs the Standard of the same item, seed 1001; ±2.8 pp)
+
+| item | Standard | variants (Δ pp vs the Standard) |
+|---|---|---|
+| Arming Sword | 62.7 | Training +0.8, Knight's +2.7, Saber +1.5, Rapier −0.4, Flame +1.8, Frost −1.3 |
+| Greatsword | 66.3 | Steel +0.6, Zweihander † +0.5 (+7.6) |
+| Hand Axe | 65.6 | Twinbit +0.5, Cleaver † −3.8 (−7.6 with the reroll cost, −5.0 with −2 HP), Bone −0.5 |
+| Great Axe | 61.7 | War −0.2, Jagged +3.4, Golem −2.1 (at −3 HP; now −1) |
+| Warhammer | 63.9 | Smith +0.2, Morningstar −0.5, Club +0.4, Mallet +0.8, Bone −2.2 |
+| Spear | 66.5 | Halberd +2.1, Trident +0.0 |
+| Scythe | 66.1 | Bone −1.0 |
+| Dagger † | 61.5 | Leaf −0.3, Venom +2.9, Bone +1.8 |
+| Arcane Staff | 63.3 | Quarterstaff +1.1, Frost +2.6, Sun † +1.2 (+15.9), Bone +2.0 |
+| Druid Staff † | 64.3 | Living −0.4 |
+| Wand | 67.2 | Sapphire −3.1, Orb −2.3 |
+| Hunting Bow | 63.0 | Short −0.5, Composite +0.9, Long +1.7 |
+| Crossbow | 59.2 | Arbalest +2.0, Bone † +2.9 (+4.3) |
+| Claws | 62.5 | Knuckles +2.2, Gauntlet +1.6 |
+| Round Shield | 63.5 | Plank † +1.2 (−2.2), Heraldic +1.7, Tower † −0.4 (−5.0), Bone +2.5 |
+| Spiked Shield | 63.8 | Dragon −0.5, Bone Bulwark +2.2 |
+| Parrying Dagger † | 62.5 | Sai +0.6 |
+| Quiver | 61.7 | Bone † +1.2 (+3.9) |
+| Knight Helm | 63.8 | Bone +0.0 |
+| Wizard Hat | 66.2 | Grave −1.0 |
+| Bandit Mask | 67.8 | Grave Hood +0.2 |
+| Ninja Headband † | 66.3 | Ninja Mask −2.0 |
+
+- Within each base type, every variant but three is within 3 pp of its Standard.
+- **The three exceptions** are borderline at this noise level:
+  - the Jagged Axe (+3.4)
+  - the Wand's Standard vs the Sapphire Wand (3.1 apart)
+  - the Cleaver (−3.8). It is now the base rule plus +2 on turn 1, a strict upgrade apart from
+    the Standard's ×1.2 Cleave, so most of that gap is noise.
+- **Spreads above 3 pp** are all under 1.5× the noise of a single row:
+  - the Arming Sword (Knight's +2.7 to Frost −1.3)
+  - the Round Shield
+  - the Great Axe
+
+### Deviations from the design doc (and why)
+
+- **Numbers:** everything above. The design calls them starting values for the sim, and the
+  bands decide.
+- **Content counts:** the §0 summary says 36 weapon and 14 off-hand variants, but its own §5
+  tables list 55 and 16. The tables were implemented.
+- **Standards:**
+  - The Wizard Hat's Standard is a count-rule Standard (Block), because Arcana counts turns.
+  - The ×1.2 Standard still scales the fractional rules: multipliers, factors, percents,
+    Crush and the Volley.
+  - With small integers ×1.2 often rounds back to the same number, e.g. the Arcane Staff and
+    Twin Edge.
+- **Compass:**
+  - The tie-break is removed (measured −5 pp; the "lower" version was +5 pp).
+  - The board reroll starts with the 2nd biome.
+  - Migration raises the Trinket rank to 6 for anyone whose old Boots had the reroll, so it
+    survives migration day.
+- **Base stats:** no +1 ATK at R8, and the Armor HP is halved (+2 max).
+- **Rule shapes:**
+  - Per-attack and per-turn rules have a per-fight limit, and item pips add after the
+    multiplier.
+  - The Mage Robe, Wrench, Goggles, Smoke Bomb (a cap), Healer's Flask, Paladin Cuirass and
+    Paladin Helm are reshaped (see the levers table).
+  - The Cleaver lost its ⚖ costs: every reroll or max-HP cost measured −5 to −8 pp.
+- **Dino Suit:** its weaken is −35/40/40%, because the class's BOO! is already −35%, not the
+  design's −30%.
+- **Variant rules:** the Great Mallet and the Arbalest are two-handed, as designed. The Bone
+  Mace's "armored enemy" is an enemy with Block.
+- **Back items:**
+  - **Bone Collector** is a milestone (`bone_collector`, 300 skeletons) that grants the three
+    skeleton cloaks.
+  - The Orc Warpack and the Bear Pelt come from feats (`ItemDefs.BACK_FEATS`).
+  - The Bear Pelt's Large-rig fit test is presentation work; core only grants it.
+- **Migration:**
+  - Only trinket traits auto-equip, for every owned class. The weapon, off-hand and head trait
+    carriers are granted but not equipped: a Sword on every class would replace its signature
+    kit.
+  - The Opener trait grants the Spear. The Belt Pouch is free when the old Boots and Charm
+    were both L5+.
+  - Old in-run saves map their traits to tier-II items (`MetaRun._legacy_items`).
+- **`crowns_capped()`** (skins for Crowns) needs the four ranks at R8 and the Belt Pouch.
+  Items and variants are collections and don't count.
+- **Old UI shims:** `Profile.gear` (read-only legacy view), `Camp.level_gear` (maps to
+  `rank_up`) and `CampInfo` names for the rank groups keep the current Armory modal compiling
+  until the presentation pass replaces it. `set_trait` returns an error.
+
+### Sim flags (`tools/sim.gd`)
+
+- `--armory=<slot>:<item>[:<variant>],…` equips an item for every class. The sim grants it,
+  and `trinket2` buys the Belt Pouch.
+- `--variant=<item>:<variant>` switches every class holding the item to that variant.
+- `--kit=best` uses `BotMeta.best_loadout`: `BotMeta.BEST` per slot, then `BEST_TRINKETS`,
+  from the table above.
+- `--item=<item>.<key>=I/II/III` or `<variant>.<key>=v` overrides numbers (`ItemDefs.TUNE`).
+- `--strip=armory|gear` sets every rank to R0 with no pouch.
+- `--strip=atk|hp|affinity|pouch` switches off one part: the ATK or HP base stat, affinity,
+  or the pouch.
+- `--strip=slot:<slot>` empties a slot for every class.
+- `--strip=rank:<group>:<n>` sets one rank.
+- The campaign bot equips `BotMeta.TRINKET_PREF` (Compass first once Trinket R6 turns its
+  reroll on) and buys ranks, items and crafts from `Camp.catalog()`.
+- `tools/items_table.gd` prints the item tables below.
+
+### Item numbers (I / II / III; the Standard's ×1.2 not applied; `ItemDefs.ITEMS`)
+
+| weapon | rule | I | II | III | Standard |
+|---|---|---|---|---|---|
+| Arming Sword | Twin Edge: Pair or Two Pair: +1 damage after the multiplier (1 per fight). | flat 1, uses 1 | flat 1, uses 1 | flat 1, uses 1 | base numbers x1.2. |
+| Greatsword | Great Arc: Three of a Kind or better: combo multiplier +0.1. | mult 0.05 | mult 0.05 | mult 0.1 | base numbers x1.2. |
+| Hand Axe | Cleave: A kill carries 20% of the excess damage to the next enemy. | pct 0.1 | pct 0.15 | pct 0.2 | base numbers x1.2. |
+| Great Axe | Rampage: Each consecutive attack on the same target: +1 damage, stacking to 3; resets on a target change or kill. | per 1, stacks 1 | per 1, stacks 2 | per 1, stacks 3 | base numbers x1.2. |
+| Warhammer | Crush: The highest die in the scoring group (never a Heavy die) counts x1.25; the extra pips add after the multiplier (1 per fight). | crush 1.15, uses 1 | crush 1.2, uses 1 | crush 1.25, uses 1 | base numbers x1.2. |
+| Spear | First Strike: The first attack of each fight deals x1.05 (x1.1 against a final boss). | factor 1.02, boss 0.03 | factor 1.03, boss 0.03 | factor 1.05, boss 0.05 | base numbers x1.2. |
+| Scythe | Reap: The first kill of each fight heals 1. | heal 1, uses 1 | heal 1, uses 1 | heal 1, uses 1 | base numbers x1.2. |
+| Dagger | Quick Hands: +1 combat reroll on turns 1-1. | turns 1 | turns 1 | turns 1 | Block 1 on turn 1 of elite and boss fights (doesn't stack). |
+| Katana | Flow: A turn with 2+ dice rerolled: +1 damage after the multiplier (1 per fight). | dice 2, flat 1, uses 1 | dice 2, flat 1, uses 1 | dice 2, flat 1, uses 1 | Block 1 on turn 1 of elite and boss fights (doesn't stack). |
+| Arcane Staff | Channel: Runed dice in the scoring group: +1 damage each after the multiplier (max 1; 1 per fight). | pip 1, max 1, uses 1 | pip 1, max 1, uses 1 | pip 1, max 1, uses 1 | base numbers x1.2. |
+| Druid Staff | Grove: At each biome change, raise the lowest face of 1 dice by 1. | dice 1 | dice 1 | dice 1 | Block 1 on turn 1 of elite and boss fights (doesn't stack). |
+| Wand | Spark: The first attack each fight with a multiplier of 2+: +0.15 multiplier. | mult 0.05 | mult 0.1 | mult 0.15 | base numbers x1.2. |
+| Hunting Bow | Opening Volley: At fight start, shoot a random enemy for 2 (+15% per lap after the first). | dmg 1 | dmg 1 | dmg 2 | base numbers x1.2. |
+| Crossbow | Deadshot: High Roller: +2 damage after the multiplier. | flat 1 | flat 1 | flat 2 | base numbers x1.2. |
+| Claws | Scrap: 2+ dice showing 1 or 2: +2 damage after the multiplier (2 per fight). | dice 2, per 1, uses 1 | dice 2, per 1, uses 2 | dice 2, per 2, uses 2 | base numbers x1.2. |
+| Wrench | Tinker: Shop Face Raises cost 20. | edits 0, raise_price 22 | edits 0, raise_price 20 | edits 0, raise_price 20 | Block 1 on turn 1 of elite and boss fights (doesn't stack). |
+
+| offhand | rule | I | II | III | Standard |
+|---|---|---|---|---|---|
+| Round Shield | Bulwark: Block 1 on turn 1. Tier III: Last Stand (once per run, survive a lethal hit at 1 HP from above 50%). | block 1, last_stand 0 | block 1, last_stand 0 | block 1, last_stand 1 | base numbers x1.2. |
+| Spiked Shield | Thorns: An enemy whose attack hits you or your Block takes 1. | thorns 1 | thorns 1 | thorns 1 | base numbers x1.2. |
+| Oath Shield | Aegis: A Pair or better grants Block = the set's value x0.2 (1 per fight). | x 0.1, uses 1 | x 0.15, uses 1 | x 0.2, uses 1 | base numbers x1.2. |
+| Parrying Dagger | Steady: Keep 3+ dice unrerolled: +1 damage after the multiplier (1 per fight). | dice 3, uses 1 | dice 3, uses 1 | dice 3, uses 1 | Block 1 on turn 1 of elite and boss fights (doesn't stack). |
+| Spellbook | Tome: The 3rd attack of each fight: combo multiplier +0.1. | mult 0.05 | mult 0.05 | mult 0.1 | base numbers x1.2. |
+| Quiver | Spare Arrows: Every 3rd attack also shoots a random enemy for 2 (+15% per lap after the first). | dmg 1 | dmg 1 | dmg 2 | base numbers x1.2. |
+| Smoke Bomb | Vanish: The first enemy attack of each fight deals 30% less (max 1). | pct 0.2, max 1 | pct 0.25, max 1 | pct 0.3, max 1 | base numbers x1.2. |
+| Shuriken | Barrage: Each rerolled die deals 1 to a random enemy, max 1 per fight. | dmg 1, max 1 | dmg 1, max 1 | dmg 1, max 1 | base numbers x1.2. |
+
+| head | rule | I | II | III | Standard |
+|---|---|---|---|---|---|
+| Knight Helm | Steadfast: When a rune or item gives you Block: +1 more (once per turn, 1 turn(s) per fight). | extra 1, uses 1 | extra 1, uses 1 | extra 1, uses 1 | base numbers x1.2. |
+| Paladin Helm | Vow: Three of a Kind or better heals 1, 1 time(s) per fight. | heal 1, uses 1 | heal 1, uses 1 | heal 1, uses 1 | base numbers x1.2. |
+| Wizard Hat | Arcana: On turns 1-1 the first rune trigger fires twice (never re-doubles Resonance or Rune Echo). | turns 1 | turns 1 | turns 1 | Block 1 on turn 1 of elite and boss fights (doesn't stack). |
+| Bear Hat | Ferocity: Below 50% HP: +2 damage. | flat 1 | flat 2 | flat 2 | base numbers x1.2. |
+| Engineer Goggles | Appraise: Shop dice cost 10% less. | pct 0.05 | pct 0.1 | pct 0.1 | base numbers x1.2. |
+| Ninja Headband | Focus: A reroll of exactly one die is free, 1 per fight. | uses 1, per_turn 0 | uses 1, per_turn 0 | uses 1, per_turn 0 | Block 1 on turn 1 of elite and boss fights (doesn't stack). |
+| Bandit Mask | Ambush: After a board move on doubles, the next fight's first attack deals x1.04. | factor 1.02 | factor 1.03 | factor 1.04 | base numbers x1.2. |
+| Bone Crown | Dominion: Each kill: +1 damage on your next attack, stacking to 2. | max 1 | max 2 | max 2 | base numbers x1.2. |
+
+| body | rule | I | II | III | Standard |
+|---|---|---|---|---|---|
+| Knight Plate | Plated: Block 1 at the start of combat turns 1-1. | block 1, turns 1 | block 1, turns 1 | block 1, turns 1 |  |
+| Paladin Cuirass | Blessed: Two Pair or better heals 1, 1 time(s) per fight. | heal 1, uses 1 | heal 1, uses 1 | heal 1, uses 1 |  |
+| Barbarian Harness | Brawn: Heavy dice in the attack: +1 damage each after the multiplier (max 2). | pips 1, dice 2 | pips 1, dice 2 | pips 1, dice 2 |  |
+| Mage Robe | Rune-woven: Ember deals +1; tier III: Thunder too. | dmg 1, thunder 0, poison 0 | dmg 1, thunder 0, poison 0 | dmg 1, thunder 1, poison 0 |  |
+| Rogue Leathers | Nimble: Keep 2+ dice all turn: bank +1 reroll, 1 time(s) per fight. | max 1 | max 1 | max 1 |  |
+| Ranger Tunic | Hunter: +1 damage against enemies at full HP. | flat 1 | flat 1 | flat 1 |  |
+| Ninja Gi | Poise: A reroll that creates a match heals 1, max 1 per fight. | max 1 | max 1 | max 1 |  |
+| Druid Robe | Bark: Completing a lap heals +2 HP. | heal 1 | heal 2 | heal 2 |  |
+| Engineer Overalls | Patchwork: After each fight won, heal 1. | heal 1 | heal 1 | heal 1 |  |
+| Hooded Robe | Shroud: Poison you apply +2. | poison 1 | poison 1 | poison 2 |  |
+| Dino Suit | Thick Hide: Block 1 on combat turns 1-3; BOO!'s boss weaken becomes 40%. | block 1, turns 1, weaken 0.35 | block 1, turns 2, weaken 0.4 | block 1, turns 3, weaken 0.4 |  |
+
+| trinket | rule | I | II | III | Standard |
+|---|---|---|---|---|---|
+| Tankard | Hearty: Lap heal +1%; tier III: campfires heal +5% more. | lap 0.005, campfire 0 | lap 0.005, campfire 0 | lap 0.01, campfire 0.05 |  |
+| Compass | Wayfinder: Portal range +4; Trinket rank 6+ (slot 1 only): +1 board reroll in each biome after the first. | portal 2, pair_pick 0 | portal 3, pair_pick 0 | portal 4, pair_pick 0 |  |
+| Lantern | Lamplight: Traps, lava and heat hurt 50% less; tier III: dodge traps and ice on 3+. | pct 0.2, dodge 0 | pct 0.35, dodge 0 | pct 0.5, dodge 3 |  |
+| Coin Purse | Thrift: Gold +8%; tier II: passing the Treasury banks +5; tier III: cash-outs x1.25. | gold 0.03, treasury_step 0, cashout 1 | gold 0.05, treasury_step 3, cashout 1 | gold 0.08, treasury_step 5, cashout 1.25 |  |
+| Trader's Map | Haggle: Restocks cost 7; tier II: 1 free restock per shop; tier III: shops +1 item. | restock 7, free 0, items 0 | restock 7, free 1, items 0 | restock 7, free 1, items 1 |  |
+| Healer's Flask | Apothecary: Every shop offers a potion; tier III: potions heal +3%. | heal 0 | heal 0 | heal 0.03 |  |
+| Skeleton Key | Unlock: Chest runes: 1 of 4; tier II: chest gold x1.25; tier III: the first chest per biome is a rune chest. | choices 4, gold 1, first_rune 0 | choices 4, gold 1.25, first_rune 0 | choices 4, gold 1.25, first_rune 1 |  |
+| Loaded Die | Weighted: At the first combat roll of each fight, 2 dice showing 0 or 1 reroll free. | dice 1 | dice 1 | dice 2 |  |
+
+| variant | base | secondary | unlock | craft |
+|---|---|---|---|---|
+| Training Sword (`sword_training`) | Arming Sword | Lesson: While you have 3 dice or fewer: +1 combat reroll on turn 1. | Win 15 fights with the Arming Sword equipped. | 60 Crowns / 2 Sigils |
+| Knight's Sword (`sword_knight`) | Arming Sword | Guarded: Scoring a Pair also grants 2 Block. | Win 45 fights with the Arming Sword equipped. | 90 Crowns / 2 Sigils |
+| Saber (`sword_saber`) | Arming Sword | Slash: Pairs also hit a second enemy for 25% of the attack. | Win 90 fights with the Arming Sword equipped. | 120 Crowns / 2 Sigils |
+| Rapier (`sword_rapier`) | Arming Sword | Precision: High Roller also counts for Twin Edge at half value. | Score 200 High Rollers. | 120 Crowns / 2 Sigils |
+| Flame Sword (`sword_flame`) | Arming Sword | Burning: Each 6 in a scoring Pair deals 3 to all enemies. | Defeat the Cinder King with a Sword equipped. | 120 Crowns / 2 Sigils |
+| Frost Cleaver (`sword_frost`) | Arming Sword | Chill: A Pair of 1s or 2s Freezes the target (once per fight). | Defeat the Frost Warden with a Sword equipped. | 120 Crowns / 2 Sigils |
+| Steel Greatsword (`greatsword_plain`) | Greatsword | Steel: +3 max HP; Great Arc -0.05. | Win 15 fights with the Greatsword equipped. | 60 Crowns / 2 Sigils |
+| Zweihander (`greatsword_zwei`) | Greatsword | Reach: Three of a Kind or better also splashes 5% to the other enemies. | Win 45 fights with the Greatsword equipped. | 90 Crowns / 2 Sigils |
+| Twinbit Axe (`axe_twinbit`) | Hand Axe | Double Chop: Two Pair: +3 damage after the multiplier. | Win 15 fights with the Hand Axe equipped. | 60 Crowns / 2 Sigils |
+| Cleaver (`axe_cleaver`) | Hand Axe | Butcher: +2 damage on turn 1. | Win 45 fights with the Hand Axe equipped. | 90 Crowns / 2 Sigils |
+| Bone Axe (`axe_bone`) | Hand Axe | Grisly: Cleave's carried damage also applies 2 Poison. | Defeat 300 skeletons. | 120 Crowns / 2 Sigils |
+| War Axe (`axe_war`) | Great Axe | Frenzy: Rampage stacks to 4. | Win 15 fights with the Great Axe equipped. | 60 Crowns / 2 Sigils |
+| Jagged Axe (`axe_jagged`) | Great Axe | Bleed: Each Rampage stack also applies 1 Poison. | Win 45 fights with the Great Axe equipped. | 90 Crowns / 2 Sigils |
+| Golem Axe (`axe_golem`) | Great Axe | Crushing: Rampage resets only on a kill (not on a target change); -1 max HP. | Defeat the Bone Golem 10 times. | 120 Crowns / 2 Sigils |
+| Smith's Hammer (`hammer_smith`) | Warhammer | Tempered: A Crush die showing 6 counts +1 pip more. | Win 15 fights with the Warhammer equipped. | 60 Crowns / 2 Sigils |
+| Morningstar (`hammer_morningstar`) | Warhammer | Spikes: Crush also deals 3 to a random other enemy. | Win 45 fights with the Warhammer equipped. | 90 Crowns / 2 Sigils |
+| Spiked Club (`hammer_club`) | Warhammer | Rend: Crush applies 2 Poison. | Win 90 fights with the Warhammer equipped. | 120 Crowns / 2 Sigils |
+| Great Mallet (`hammer_mallet`) | Warhammer | Heavy Swing: Two-handed; Crush +0.3 more. | Win a run with a Warhammer at A3+. | 120 Crowns / 2 Sigils |
+| Bone Mace (`hammer_bone`) | Warhammer | Bonebreak: Crush against an enemy with Block ignores 50% of it. | Defeat the Bone Champion 3 times. | 120 Crowns / 2 Sigils |
+| Halberd (`spear_halberd`) | Spear | Sweep: The First Strike attack splashes 25% to all other enemies. | Win 15 fights with the Spear equipped. | 60 Crowns / 2 Sigils |
+| Golden Trident (`spear_trident`) | Spear | Gilded: +3 gold per kill. | Win a run with a Spear. | 120 Crowns / 2 Sigils |
+| Bone Scythe (`scythe_bone`) | Scythe | Harvest: Kills also give +1 pet charge. | Win 15 fights with the Scythe equipped. | 60 Crowns / 2 Sigils |
+| Leaf Dagger (`dagger_leaf`) | Dagger | Light: Keep 2+ dice on turn 1: +1 damage. | Win 15 fights with the Dagger equipped. | 60 Crowns / 2 Sigils |
+| Venom Dagger (`dagger_venom`) | Dagger | Venom: Attacks with a Pair apply 2 Poison. | Win 45 fights with the Dagger equipped. | 90 Crowns / 2 Sigils |
+| Bone Shiv (`dagger_bone`) | Dagger | Shiv: +2 damage against poisoned enemies. | Kill 100 enemies with Poison. | 120 Crowns / 2 Sigils |
+| Quarterstaff (`staff_quarter`) | Arcane Staff | Unbound: Channel also counts one un-runed die in the group (+1 damage). | Win 15 fights with the Arcane Staff equipped. | 60 Crowns / 2 Sigils |
+| Frost Staff (`staff_frost`) | Arcane Staff | Rime: A runed die showing 1 Freezes the target (once per fight). | Win 45 fights with the Arcane Staff equipped. | 90 Crowns / 2 Sigils |
+| Sun Staff (`staff_sun`) | Arcane Staff | Radiant: Each runed die in the group heals 1 (max 1 per fight). | Defeat the Lich with an Arcane Staff. | 120 Crowns / 2 Sigils |
+| Bone Staff (`staff_bone`) | Arcane Staff | Soul: Each kill adds +1 damage to your next attack (max +3). | Comes with the Necromancer; or win 90 fights with the Arcane Staff. | 120 Crowns / 2 Sigils |
+| Living Staff (`staff_living`) | Druid Staff | Bloom: Each Grove raise also heals 3. | Win 15 fights with the Druid Staff equipped. | 60 Crowns / 2 Sigils |
+| Sapphire Wand (`wand_sapphire`) | Wand | Focus: The Spark turn also banks +1 reroll. | Win 15 fights with the Wand equipped. | 60 Crowns / 2 Sigils |
+| Orb Wand (`wand_orb`) | Wand | Hex: The Spark attack also applies 3 Poison. | Win 45 fights with the Wand equipped. | 90 Crowns / 2 Sigils |
+| Short Bow (`bow_short`) | Hunting Bow | Quick Draw: The Volley also fires on turn 2 at half damage. | Win 15 fights with the Hunting Bow equipped. | 60 Crowns / 2 Sigils |
+| Composite Bow (`bow_composite`) | Hunting Bow | Piercing: The Volley and Spare Arrows ignore Block. | Win 45 fights with the Hunting Bow equipped. | 90 Crowns / 2 Sigils |
+| Longbow (`bow_long`) | Hunting Bow | Marksman: The Volley targets the highest-HP enemy and deals +25%. | Win at A3+ with a Hunting Bow. | 120 Crowns / 2 Sigils |
+| Arbalest (`crossbow_arbalest`) | Crossbow | Arbalest: Two-handed; Deadshot +50%. | Win 15 fights with the Crossbow equipped. | 60 Crowns / 2 Sigils |
+| Bone Crossbow (`crossbow_bone`) | Crossbow | Reload: A Deadshot kill banks +1 reroll for next turn (once per fight). | Win 45 fights with the Crossbow equipped. | 90 Crowns / 2 Sigils |
+| Knuckles (`claws_knuckles`) | Claws | Brawl: A die showing 1: +1 damage. | Win 15 fights with the Claws equipped. | 60 Crowns / 2 Sigils |
+| Gauntlet (`claws_gauntlet`) | Claws | Guard: Each die showing 1 or 2 also gives 1 Block. | Win 45 fights with the Claws equipped. | 90 Crowns / 2 Sigils |
+| Plank Shield (`shield_plank`) | Round Shield | Light: +1 combat reroll on turn 1. | Win 15 fights with the Round Shield equipped. | 60 Crowns / 2 Sigils |
+| Heraldic Shield (`shield_heraldic`) | Round Shield | Rally: Bulwark Block left after turn 1 carries into turn 2. | Win 45 fights with the Round Shield equipped. | 90 Crowns / 2 Sigils |
+| Tower Shield (`shield_tower`) | Round Shield | Wall: Bulwark also on turn 2; -1 reroll on turn 1. | Win 90 fights with the Round Shield equipped. | 120 Crowns / 2 Sigils |
+| Bone Buckler (`shield_bone`) | Round Shield | Rattle: Bulwark Block broken by an attack deals 2 back. | Defeat 300 skeletons. | 120 Crowns / 2 Sigils |
+| Dragon Shield (`shield_dragon`) | Spiked Shield | Scorch: Thorns also apply 1 Poison. | Defeat the Magma Golem with a Spiked Shield. | 120 Crowns / 2 Sigils |
+| Bone Bulwark (`shield_bone_large`) | Spiked Shield | Bulk: +4 max HP; Thorns -1. | Win 15 fights with the Spiked Shield equipped. | 60 Crowns / 2 Sigils |
+| Sai (`parry_sai`) | Parrying Dagger | Catch: A fully blocked enemy attack banks +1 reroll for next turn. | Win 15 fights with the Parrying Dagger equipped. | 60 Crowns / 2 Sigils |
+| Bone Quiver (`quiver_bone`) | Quiver | Barbed: Spare Arrows apply 1 Poison. | Win 15 fights with the Quiver equipped. | 60 Crowns / 2 Sigils |
+| Bone Helm (`helm_bone`) | Knight Helm | Horned: Thorns 1 while you have Block. | Defeat 300 skeletons. | 120 Crowns / 2 Sigils |
+| Grave Hat (`hat_grave`) | Wizard Hat | Grave Magic: The doubled Arcana trigger also heals 1. | Win 15 fights with the Wizard Hat equipped. | 60 Crowns / 2 Sigils |
+| Grave Hood (`hood_grave`) | Bandit Mask | Ambush Poison: The Ambush attack applies 2 Poison. | Win 15 fights with the Bandit Mask equipped. | 60 Crowns / 2 Sigils |
+| Ninja Mask (`ninja_mask`) | Ninja Headband | Silent: A Focus reroll also adds +1 damage to this turn's attack. | Win 15 fights with the Ninja Headband equipped. | 60 Crowns / 2 Sigils |
+
+### API for presentation (Armory core; 2026-09-29)
+
+Everything is in `core/`. The ids match `game/actors/item_mounts.gd` (a test checks it).
+
+**Data (`ItemDefs`, `core/content/items.gd`).**
+- `ItemDefs.IDS` (display order), `ITEMS[id]` = `{name, slot, hands, mount, style, model,
+  affinity, std, effect: {rule, name, desc, n, scale}, cosmetic}`. Back items have
+  `effect: {}` and `cosmetic: true` (show "Style").
+- `VARIANTS[vid]` = `{item, name, model, sec, sec_name, desc, unlock, [hands], n}`. The Standard
+  variant's id is the item id.
+- Slots `SLOTS` (weapon, offhand, head, body, trinket, trinket2, back); rank groups `GROUPS`
+  (weapon, offhand, armor, trinket); `GROUP_OF[slot]`.
+- Helpers: `name_of(id)` (items and variants), `slot_of`, `fits(id, slot)`, `of_slot(slot)`,
+  `variants_of(item)`, `base_of(id)`, `hands(item, variant)`, `hand_mount(item)`,
+  `style(item, variant)`, `affinity(item, class)`, `rank_tier(rank)`,
+  `tier_for(item, slot, class, rank)`, `num(item, key, tier, variant)`,
+  `rule_text(item, tier, variant)` (the rule with that tier's numbers), `std_text(item)`,
+  `sec_of(variant)`, `unlock_text(variant)`, `craft_cost(variant, sigils)`,
+  `price(item, owned_classes, sigils)`, `kit_items(class)`, `kit_class(item)`,
+  `rank_cost(rank)`, `base_stats(ranks)`.
+- Tables: `KITS` (class kits, §6), `APPEARANCE_DEFAULT`, `LOCKED_ARMOR` (Monster Kid →
+  Dino Suit), `FEATS`, `BACK_FEATS`, `PRICES`, `MASTERY` (15/45/90), `CRAFT_COSTS`,
+  `RANK_COSTS`, `POUCH_COST` (400), `POUCH_RANK` (5), `COMPASS_REROLL_RANK` (6), `SKELETONS`.
+
+**Profile v3 (`Profile.armory`).**
+- `{ranks, pouch, owned, variants, blueprints, mastery, feats, equipped, appearance, seen_new}`.
+  Version 1 and 2 files migrate on load (`_migrate_gear`, §7.5).
+- Queries: `rank(group)`, `has_pouch()`, `owns_item(id)` (also `owns("items", id)`),
+  `owned_variants(item)`, `owns_variant(item, v)`, `has_blueprint(item, v)`,
+  `item_mastery(item)`, `default_loadout(class)`, `loadout_for(class)` (validated:
+  `{weapon: {id, variant}, offhand, head, body, trinket, trinket2, back}`),
+  `resolve_items(class)` (`{slot: {id, variant, tier}}`, active items only),
+  `appearance_of(class)` (`{head, body}`), `feat_met(feat, run_stats)`.
+- Legacy: `gear` is a read-only view of the ranks (`helm` = armor, `blade` = weapon, `boots` =
+  offhand, `charm` = trinket); `gear_traits` and `active_traits()` are empty; `grant("gear",
+  "helm")` grants the Armor rank group.
+- `records.counters` gains `high_rollers` and `skeleton_kills`; `records.kills_by_id` counts
+  every enemy id defeated (feats).
+- `apply_run_result()` returns `blueprints: [[item, variant, "mastery"|"feat"]]`,
+  `items_unlocked: [[id, source]]` and `mastery: {item: fights}`.
+
+**Camp commands** (`camp.apply([...])` replay names in brackets):
+- `rank_up(group)` ["rank_up", group]; `buy_pouch()` ["buy_pouch"]
+- `buy_item(id, currency = "crowns"|"sigils")` ["buy_item", id, currency]
+- `craft_variant(item, variant, currency)` ["craft_variant", item, variant, currency]
+- `equip_item(class, slot, id, variant = "")` ["equip_item", class, slot, id, variant]; id ""
+  empties the slot; `unequip_item(class, slot)`
+- `set_appearance(class, slot, value)` (head: item | "own" | "hidden"; body: item | "own")
+- `mark_items_seen()`
+- `variant_chips(item)`: the variant picker rows `{id, name, secondary, desc, state:
+  owned|craftable|locked, unlock, cost, mastery: [fights, needed]}`
+- Legacy: `level_gear(helm|blade|boots|charm)` maps to `rank_up`; `set_trait` is an error.
+- `catalog()` lists `rank_up`, `buy_pouch`, `buy_item` (Crowns) and `craft_variant` entries.
+
+**Camp events.**
+- `upgrade_bought {track: "armory", id: group | "pouch", level}`
+- `item_unlocked {id, source: crowns | sigils | feat}`; milestone items come as
+  `unlocked {kind: "items", id, source: "milestone"}`
+- `variant_crafted {item, variant, source: crowns | sigils}`
+- `blueprint_unlocked {item, variant, source: mastery | feat}`
+- `mastery_changed {item, fights, next}` (next = the next threshold, 0 when all are done)
+- `item_equipped {class, slot, id, variant, loadout}`, `appearance_set {class, slot, value}`,
+  `items_seen {}`
+- `run_banked` carries `blueprints` and `items_unlocked`.
+
+**Unlocks.** `UnlockDefs.all_ids("gear")` = the rank groups. Milestones grant items with
+`["items", id]`: `wanderer` (Hand Axe, Coin Purse), `gate_crasher` (Compass, Lantern),
+`boss_seen` (Crossbow, Healer's Flask), `bone_collector` (new: 300 skeletons → the three
+skeleton cloaks). A class unlock grants its kit.
+
+**Run.**
+- `run.meta.items` = `{slot: {id, variant, tier}}`; `meta.back`, `meta.appearance`,
+  `meta.ranks`. `RunState.item(slot)`.
+- `GameFlow.loadout_info()` = `{items: {slot: {id, variant, tier, name, variant_name, rule,
+  text, secondary, style, hands}}, back, appearance, style}` (style = the weapon's attack
+  style; "" = the class default).
+- `RunState.item_state` (ambush, dominion, soul, key_act) and `CombatState.item_state` (this
+  fight's counters) are serialised.
+- `game_over.stats` gains `loadout` (`{slot: {id, variant}}`), `item_fights`, `high_rollers`,
+  `skeleton_kills` and `kills_by_id`.
+
+**Run events.**
+- `item_triggered {id: base item, variant, slot, effect, value, ...}` for every rule that
+  fires. Effects: the rule ids (twin_edge, great_arc, cleave, rampage, crush, first_strike,
+  reap, quick_hands, flow, channel, grove, spark, opening_volley, deadshot, scrap, tinker,
+  bulwark, thorns, aegis, steady, tome, spare_arrows, vanish, barrage, steadfast, vow, arcana,
+  ferocity, focus, ambush, ambush_ready, dominion, dominion_stack, plated, blessed, brawn,
+  hunter, poise, patchwork, thick_hide, treasury_step, cashout, weighted), the variants'
+  secondaries (lesson, guarded, slash, burning, chill, reach, double_chop, grisly, bleed,
+  spikes, rend, bonebreak, sweep, gilded, harvest, light, venom, shiv, unbound, rime,
+  radiant, soul, soul_stack, bloom, wand_focus, hex, quick_draw via opening_volley with
+  share 0.5, reload, brawl, guard, rally, wall, rattle, scorch, catch, barbed, horned,
+  grave_magic, ambush_poison, silent) and "standard" (the count-based Standard's Block).
+  Extras: `enemy_idx`, `die_idx`, `stacks`, `dice`, `kept`, `rerolls_left`, `banked`,
+  `treasury`, `share`.
+- Effects also use the usual events: `block_gained {source: "item"}`,
+  `hp_changed {source: "item"}`, `damage {source: "item" | "cleave" | "thorns"}`,
+  `status {source: "item"}`, `gold_changed {source: "item"}`,
+  `dice_rolled {context: "combat", source: "loaded_die"}`, `face_changed {source: "grove"}`.
+- A fight can end before turn 1 (the Opening Volley): `combat_won` right after
+  `combat_started`.
+- `passive_triggered {id: "last_stand"}` when the Round Shield III saves the hero.
 
 ## Current balance (2026-09-29 combined: 11 classes + new biomes)
 
-This section is authoritative. It covers the merge of the 11-class work (`main`) with the new
+This section is authoritative except for the profile bands and the gear, which the Armory
+section above replaces. It covers the merge of the 11-class work (`main`) with the new
 biomes (`wp-b2-new-biomes`). Both sections below it are kept as history: the 11-class pass was
 tuned against the old final bosses, and the new-biomes pass never saw the new classes. Where
 either disagrees with this section, this section wins. Designs:

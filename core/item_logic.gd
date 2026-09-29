@@ -263,8 +263,6 @@ static func turn_start(run: RunState, c: CombatState, prev_block: int) -> Array[
 		out.append(ev(run, "round_shield", "light", 1))
 	if t == 1 and sec(run, "shield_tower"):
 		rr += int(ItemDefs.sec_num("shield_tower", "rerolls"))
-	if t == 1 and sec(run, "axe_cleaver"):
-		rr += int(ItemDefs.sec_num("axe_cleaver", "rerolls"))
 	c.rerolls_left = maxi(0, c.rerolls_left + rr)
 	# Block
 	if has(run, "round_shield"):
@@ -700,8 +698,11 @@ static func after_hit(run: RunState, c: CombatState, tgt0: int, total: int, soak
 		out.append_array(nb)
 	if sec(run, "wand_sapphire") and int(c.item_state.get("spark_now", 0)) == 1:
 		out.append_array(bank_reroll(run, "wand", "wand_focus"))
-	if sec(run, "crossbow_bone") and int(c.item_state.get("deadshot_now", 0)) == 1 and killed:
-		out.append_array(bank_reroll(run, "crossbow", "reload"))
+	if sec(run, "crossbow_bone") and int(c.item_state.get("deadshot_now", 0)) == 1 and killed and int(c.item_state.get("reload", 0)) == 0:
+		var rl := bank_reroll(run, "crossbow", "reload")
+		if not rl.is_empty():
+			c.item_state["reload"] = 1
+		out.append_array(rl)
 	# Spare Arrows: every 3rd attack of the fight
 	var attacks := int(c.item_state.get("attacks", 0)) + 1
 	c.item_state["attacks"] = attacks

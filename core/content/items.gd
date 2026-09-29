@@ -351,12 +351,12 @@ const VARIANTS := {
 	"greatsword_plain": {"item": "greatsword", "name": "Steel Greatsword", "model": "sword_2handed", "sec": "steel", "sec_name": "Steel",
 		"desc": "+3 max HP; Great Arc -0.05.", "unlock": {"mastery": 15}, "n": {"max_hp": 3, "mult": -0.05}},
 	"greatsword_zwei": {"item": "greatsword", "name": "Zweihander", "model": "sword_E", "sec": "reach", "sec_name": "Reach",
-		"desc": "Three of a Kind or better also splashes 10% to the other enemies.", "unlock": {"mastery": 45}, "n": {"pct": 0.1}},
+		"desc": "Three of a Kind or better also splashes 5% to the other enemies.", "unlock": {"mastery": 45}, "n": {"pct": 0.05}},
 	# Hand Axe
 	"axe_twinbit": {"item": "hand_axe", "name": "Twinbit Axe", "model": "axe_A", "sec": "double_chop", "sec_name": "Double Chop",
 		"desc": "Two Pair: +3 damage after the multiplier.", "unlock": {"mastery": 15}, "n": {"flat": 3}},
 	"axe_cleaver": {"item": "hand_axe", "name": "Cleaver", "model": "axe_C", "sec": "butcher", "sec_name": "Butcher",
-		"desc": "-1 combat reroll on turn 1; +2 damage on turn 1.", "unlock": {"mastery": 45}, "n": {"rerolls": -1, "flat": 2}},
+		"desc": "+2 damage on turn 1.", "unlock": {"mastery": 45}, "n": {"flat": 2}},
 	"axe_bone": {"item": "hand_axe", "name": "Bone Axe", "model": "Skeleton_Axe", "sec": "grisly", "sec_name": "Grisly",
 		"desc": "Cleave's carried damage also applies 2 Poison.", "unlock": {"feat": "skeletons_300"}, "n": {"poison": 2}},
 	# Great Axe
@@ -421,7 +421,7 @@ const VARIANTS := {
 	"crossbow_arbalest": {"item": "crossbow", "name": "Arbalest", "model": "crossbow_2handed", "sec": "arbalest", "sec_name": "Arbalest",
 		"desc": "Two-handed; Deadshot +50%.", "unlock": {"mastery": 15}, "hands": 2, "n": {"pct": 0.5}},
 	"crossbow_bone": {"item": "crossbow", "name": "Bone Crossbow", "model": "Skeleton_Crossbow", "sec": "reload", "sec_name": "Reload",
-		"desc": "A Deadshot kill banks +1 reroll for next turn.", "unlock": {"mastery": 45}, "n": {"rerolls": 1}},
+		"desc": "A Deadshot kill banks +1 reroll for next turn (once per fight).", "unlock": {"mastery": 45}, "n": {"rerolls": 1}},
 	# Claws
 	"claws_knuckles": {"item": "claws", "name": "Knuckles", "model": "fistweapon_A", "sec": "brawl", "sec_name": "Brawl",
 		"desc": "A die showing 1: +1 damage.", "unlock": {"mastery": 15}, "n": {}},
@@ -429,7 +429,7 @@ const VARIANTS := {
 		"desc": "Each die showing 1 or 2 also gives 1 Block.", "unlock": {"mastery": 45}, "n": {"block": 1}},
 	# Round Shield
 	"shield_plank": {"item": "round_shield", "name": "Plank Shield", "model": "shield_A", "sec": "light", "sec_name": "Light",
-		"desc": "+1 combat reroll on turn 1; Bulwark -2.", "unlock": {"mastery": 15}, "n": {"rerolls": 1, "block": -2}},
+		"desc": "+1 combat reroll on turn 1.", "unlock": {"mastery": 15}, "n": {"rerolls": 1, "block": 0}},
 	"shield_heraldic": {"item": "round_shield", "name": "Heraldic Shield", "model": "shield_B", "sec": "rally", "sec_name": "Rally",
 		"desc": "Bulwark Block left after turn 1 carries into turn 2.", "unlock": {"mastery": 45}, "n": {}},
 	"shield_tower": {"item": "round_shield", "name": "Tower Shield", "model": "shield_C", "sec": "wall", "sec_name": "Wall",
@@ -446,7 +446,7 @@ const VARIANTS := {
 		"desc": "A fully blocked enemy attack banks +1 reroll for next turn.", "unlock": {"mastery": 15}, "n": {"rerolls": 1}},
 	# Quiver
 	"quiver_bone": {"item": "quiver", "name": "Bone Quiver", "model": "Skeleton_Quiver", "sec": "barbed", "sec_name": "Barbed",
-		"desc": "Spare Arrows apply 2 Poison.", "unlock": {"mastery": 15}, "n": {"poison": 2}},
+		"desc": "Spare Arrows apply 1 Poison.", "unlock": {"mastery": 15}, "n": {"poison": 1}},
 	# Heads
 	"helm_bone": {"item": "knight_helm", "name": "Bone Helm", "model": "Skeleton_Warrior_Helmet", "sec": "horned", "sec_name": "Horned",
 		"desc": "Thorns 1 while you have Block.", "unlock": {"feat": "skeletons_300"}, "n": {"dmg": 1}},
@@ -624,7 +624,7 @@ static func rule_text(item: String, tier: int, variant := "") -> String:
 	var t := maxi(1, tier)
 	for key in (eff.get("n", {}) as Dictionary):
 		var v := num(item, String(key), t, variant)
-		s = s.replace("{%s%%}" % key, "%d%%" % int(round(v * 100.0)))
+		s = s.replace("{%s%%}" % key, "%s%%" % _fmt(snappedf(v * 100.0, 0.1)))
 		s = s.replace("{%s}" % key, _fmt(v))
 	if item == "spear":
 		s = s.replace("{boss_factor}", _fmt(num(item, "factor", t, variant) + num(item, "boss", t, variant)))
@@ -633,7 +633,7 @@ static func rule_text(item: String, tier: int, variant := "") -> String:
 static func _fmt(v: float) -> String:
 	if is_equal_approx(v, round(v)):
 		return str(int(round(v)))
-	return String.num(v, 2).rstrip("0").rstrip(".")
+	return String.num(v, 3).rstrip("0").rstrip(".")
 
 ## What the Standard variant adds, as text.
 static func std_text(item: String) -> String:
