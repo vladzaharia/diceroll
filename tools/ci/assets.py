@@ -98,13 +98,23 @@ def file_sha(p: Path) -> str:
     return h.hexdigest()
 
 
+def content_sha(p: Path) -> str:
+    """sha256 of a unit file for the unit hash. Godot writes a random `uid=` line into each .import
+    file the first time a checkout imports it, so the same asset gets a different uid in every
+    worktree; the game loads assets by path, so that line is left out of the hash."""
+    if p.name.endswith(".import"):
+        lines = p.read_bytes().splitlines(keepends=True)
+        return hashlib.sha256(b"".join(l for l in lines if not l.startswith(b"uid="))).hexdigest()
+    return file_sha(p)
+
+
 def unit_hash(path: Path, suffixes) -> tuple[str, int, int]:
     """Returns (hash, file count, plaintext bytes) of a unit folder."""
     h = hashlib.sha256()
     n = size = 0
     for p in unit_files(path, suffixes):
         rel = p.relative_to(path).as_posix()
-        h.update(f"{rel}\t{file_sha(p)}\n".encode())
+        h.update(f"{rel}\t{content_sha(p)}\n".encode())
         n += 1
         size += p.stat().st_size
     return h.hexdigest(), n, size
