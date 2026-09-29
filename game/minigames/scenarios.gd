@@ -237,7 +237,10 @@ class _Driver extends Node:
 						break
 				_click(o + cb.size * 0.5)
 			_:
-				if not await b.scripted_input(a, self):
+				# (assign first: `if not await b.scripted_input(...)` miscompiles in 4.7.2 when the
+				# override awaits)
+				var ok: bool = await b.scripted_input(a, self)
+				if not ok:
 					print("MG_INPUT_UNSUPPORTED %s %s" % [id, str(a)])
 					return false
 		for k in 160:
