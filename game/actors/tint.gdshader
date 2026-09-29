@@ -14,6 +14,7 @@ uniform vec4 emission : source_color = vec4(0.0, 0.0, 0.0, 1.0);
 uniform vec4 crack_color : source_color = vec4(0.0);
 uniform float crack_scale = 7.0;
 uniform float crack_energy = 2.5;
+uniform float crack_sparsity = 0.45;
 
 varying vec3 obj_pos;
 
@@ -22,19 +23,22 @@ vec3 hash3(vec3 p) {
 	return fract(sin(p) * 43758.5453);
 }
 
-float crack_edge(vec3 p) {
+// x: F2 - F1 (distance to a cell edge), y: hash of the nearest cell
+vec2 crack_edge(vec3 p) {
 	vec3 n = floor(p);
 	vec3 f = fract(p);
 	float f1 = 8.0;
 	float f2 = 8.0;
+	float h = 0.0;
 	for (int k = -1; k <= 1; k++)
 	for (int j = -1; j <= 1; j++)
 	for (int i = -1; i <= 1; i++) {
 		vec3 g = vec3(float(i), float(j), float(k));
-		float d = length(g + hash3(n + g) - f);
-		if (d < f1) { f2 = f1; f1 = d; } else if (d < f2) { f2 = d; }
+		vec3 r = hash3(n + g);
+		float d = length(g + r - f);
+		if (d < f1) { f2 = f1; f1 = d; h = r.z; } else if (d < f2) { f2 = d; }
 	}
-	return f2 - f1;
+	return vec2(f2 - f1, h);
 }
 
 void vertex() {
@@ -50,8 +54,9 @@ void fragment() {
 	METALLIC = metallic;
 	EMISSION = emission.rgb;
 	if (crack_color.a > 0.0) {
-		float e = crack_edge(obj_pos * crack_scale);
-		float c = 1.0 - smoothstep(0.0, 0.09, e);
+		vec2 ce = crack_edge(obj_pos * crack_scale);
+		// thin seams, and only around some plates: reads as a few deliberate cracks
+		float c = (1.0 - smoothstep(0.0, 0.05, ce.x)) * step(crack_sparsity, ce.y);
 		float beat = 0.8 + 0.2 * sin(TIME * 2.0 + obj_pos.y * 6.0);
 		ALBEDO = mix(ALBEDO, crack_color.rgb * 0.5, c);
 		EMISSION += crack_color.rgb * c * crack_energy * beat * crack_color.a;

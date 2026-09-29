@@ -35,17 +35,20 @@ const DEFS := {
 	"brute": {"model": "mannequin_large", "tint": Color(0.46, 0.56, 0.32), "strength": 0.95, "scale": 1.05,
 		"gear": {}, "clips": {}},
 	# --- biome regulars -------------------------------------------------------------------------
-	"thorn_sprite": {"model": "mannequin", "tint": Color(0.42, 0.74, 0.3), "strength": 0.92, "scale": 0.8,
-		"emission": Color(0.02, 0.07, 0.0), "gear": {}, "clips": {"attack": "Melee_Unarmed_Attack_Punch_A"},
-		"extras": ["leaf_crown", "leaf_motes"], "light": Color(0.5, 1.0, 0.4)},
-	"wolf_bandit": {"model": "rogue_hooded", "tint": Color(0.45, 0.32, 0.22), "strength": 0.6, "scale": 1.0,
-		"gear": {}, "clips": {}, "extras": ["fur_collar", "wolf_ears"]},
+	"thorn_sprite": {"model": "mannequin", "tint": Color(0.38, 0.64, 0.27), "strength": 0.92, "scale": 0.8,
+		"emission": Color(0.01, 0.03, 0.0), "gear": {}, "clips": {"attack": "Melee_Unarmed_Attack_Punch_A"},
+		"extras": ["leaf_crown", "leaf_shoulders", "leaf_motes"], "light": Color(0.5, 1.0, 0.4), "eyes": Color(1.0, 0.95, 0.5)},
+	"wolf_bandit": {"model": "rogue_hooded", "tint": Color(0.45, 0.31, 0.2), "strength": 0.8, "scale": 1.0,
+		"gear": {}, "clips": {}, "extras": ["fur_collar", "wolf_ears"],
+		"parts": {"Cape": [Color(0.56, 0.54, 0.54), 0.92], "Head": [Color(0.5, 0.48, 0.47), 0.85],
+			"Mask": [Color(0.2, 0.16, 0.14), 0.9]}},
 	"hollow_wisp": {"model": "mannequin", "tint": Color(0.45, 1.0, 0.86), "strength": 0.92, "scale": 1.0,
 		"gear": {}, "clips": {"attack": "Ranged_Magic_Shoot"}, "ghost": true, "extras": ["float", "wisp_trail"],
 		"light": Color(0.4, 1.0, 0.85), "eyes": Color(0.8, 1.0, 0.95)},
 	"frost_skeleton": {"model": "mannequin", "tint": Color(0.72, 0.87, 1.0), "strength": 0.92, "scale": 1.05,
 		"emission": Color(0.02, 0.05, 0.1), "skeleton": true, "gear": {"handslot.r": ADV + "axe_1handed.gltf"},
-		"clips": {"attack": "Melee_1H_Attack_Chop"}, "extras": ["shoulder_ice", "frost_mist"], "eyes": Color(0.5, 0.9, 1.0)},
+		"clips": {"attack": "Melee_1H_Attack_Chop"}, "extras": ["shoulder_ice", "frost_mist"], "eyes": Color(0.5, 0.9, 1.0),
+		"skull_tint": Color(0.7, 0.86, 1.0)},
 	"ice_archer": {"model": "mannequin", "tint": Color(0.86, 0.94, 1.0), "strength": 0.92, "scale": 1.0,
 		"emission": Color(0.03, 0.06, 0.1), "gear": {"handslot.r": ADV + "crossbow_1handed.gltf"},
 		"clips": {"attack": "Ranged_1H_Shoot"}, "extras": ["ice_crown", "frost_mist"]},
@@ -53,8 +56,8 @@ const DEFS := {
 		"emission": Color(0.03, 0.0, 0.05), "gear": {"handslot.r": ADV + "sword_1handed.gltf",
 		"handslot.l": ADV + "shield_spikes.gltf"}, "clips": {"attack": "Melee_1H_Attack_Chop"},
 		"parts": {"Cape": [Color(0.3, 0.12, 0.42), 0.9]}, "eyes": Color(0.8, 0.45, 1.0)},
-	"ember_imp": {"model": "mannequin", "tint": Color(0.16, 0.12, 0.12), "strength": 0.95, "scale": 0.75,
-		"emission": Color(0.25, 0.07, 0.01), "cracks": Color(1.0, 0.45, 0.1, 1.0), "gear": {},
+	"ember_imp": {"model": "mannequin", "tint": Color(0.2, 0.13, 0.12), "strength": 0.95, "scale": 0.75,
+		"emission": Color(0.4, 0.11, 0.02), "cracks": Color(1.0, 0.45, 0.1, 1.0), "gear": {},
 		"clips": {"attack": "Melee_Unarmed_Attack_Punch_A"}, "extras": ["horns", "head_flame"],
 		"light": Color(1.0, 0.5, 0.15), "eyes": Color(1.0, 0.8, 0.3)},
 	"magma_brute": {"model": "mannequin_large", "tint": Color(0.14, 0.12, 0.13), "strength": 0.95, "scale": 1.1,
@@ -66,20 +69,23 @@ const DEFS := {
 		"handslot.l": ADV + "shield_spikes_color.gltf"}, "clips": {"attack": "Melee_2H_Attack_Chop"},
 		"pumpkin": true, "pumpkin_scale": 0.8, "aura": Color(1.0, 0.5, 0.12), "miniboss": true},
 	"mini_bone_champion": {"model": "knight", "tint": Color(0.93, 0.9, 0.8), "strength": 0.82, "scale": 1.5,
-		"emission": Color(0.02, 0.02, 0.04), "gear": {"handslot.r": ADV + "axe_2handed.gltf"},
-		"clips": {"attack": "Melee_2H_Attack_Chop"}, "parts": {"Cape": [Color(0.24, 0.22, 0.3), 0.9]},
-		"eyes": Color(0.6, 0.85, 1.0), "extras": ["bone_pauldrons"], "aura": Color(0.75, 0.85, 1.0), "miniboss": true},
-	"mini_grave_mage": {"model": "mage", "tint": Color(0.14, 0.3, 0.22), "strength": 0.78, "scale": 1.5,
-		"emission": Color(0.02, 0.1, 0.05), "gear": {"handslot.r": ADV + "staff.gltf", "handslot.l": ADV + "spellbook_open.gltf"},
+		"emission": Color(0.02, 0.02, 0.04), "gear": {"handslot.r": ADV + "axe_2handed.gltf",
+		"handslot.l": ADV + "shield_round.gltf"}, "clips": {"attack": "Melee_2H_Attack_Chop"},
+		"parts": {"Cape": [Color(0.24, 0.22, 0.3), 0.9]}, "hide": ["HelmetVisor"],
+		"skull_face": "Knight_Head", "eyes": Color(0.55, 0.85, 1.0), "extras": ["bone_pauldrons", "stone_plates"],
+		"aura": Color(0.75, 0.85, 1.0), "miniboss": true},
+	"mini_grave_mage": {"model": "mage", "tint": Color(0.12, 0.26, 0.2), "strength": 0.82, "scale": 1.5,
+		"emission": Color(0.01, 0.06, 0.03), "parts": {"Hat": [Color(0.1, 0.12, 0.12), 0.9], "Cape": [Color(0.2, 0.5, 0.3), 0.85]}, "gear": {"handslot.r": ADV + "staff.gltf", "handslot.l": ADV + "spellbook_open.gltf"},
 		"clips": {"attack": "Ranged_Magic_Spellcasting"}, "skull_under_hat": true, "eyes": Color(0.45, 1.0, 0.6),
-		"extras": ["hand_flame_green"], "aura": Color(0.35, 1.0, 0.55), "miniboss": true},
+		"extras": ["hand_flame_green", "grave_candles"], "aura": Color(0.35, 1.0, 0.55), "miniboss": true},
 	"mini_frost_warden": {"model": "knight", "tint": Color(0.64, 0.82, 1.0), "strength": 0.85, "scale": 1.5,
 		"emission": Color(0.03, 0.07, 0.12), "gear": {"handslot.r": ADV + "sword_2handed_color.gltf"},
 		"clips": {"attack": "Melee_2H_Attack_Chop"}, "parts": {"Cape": [Color(0.9, 0.96, 1.0), 0.9]},
 		"extras": ["ice_crown", "shoulder_ice", "frost_mist"], "eyes": Color(0.6, 0.95, 1.0),
 		"aura": Color(0.55, 0.88, 1.0), "miniboss": true},
-	"mini_briar_beast": {"model": "mannequin_large", "tint": Color(0.3, 0.5, 0.22), "strength": 0.92, "scale": 1.4,
-		"emission": Color(0.01, 0.04, 0.0), "gear": {}, "clips": {}, "extras": ["thorns_back", "leaf_shoulders", "leaf_motes"],
+	"mini_briar_beast": {"model": "mannequin_large", "tint": Color(0.27, 0.42, 0.19), "strength": 0.95, "scale": 1.4,
+		"emission": Color(0.0, 0.0, 0.0), "gear": {}, "clips": {},
+		"extras": ["bush_head", "thorns_back", "thorns_front", "leaf_shoulders", "leaf_motes", "bramble_ring"],
 		"eyes": Color(1.0, 0.85, 0.3), "aura": Color(0.55, 1.0, 0.35), "miniboss": true},
 	"mini_cinder_brute": {"model": "mannequin_large", "tint": Color(0.12, 0.1, 0.1), "strength": 0.95, "scale": 1.4,
 		"cracks": Color(1.0, 0.45, 0.1, 1.0), "gear": {"handslot.r": WPN + "hammer_B.gltf"}, "clips": {},
@@ -90,7 +96,7 @@ const DEFS := {
 		"emission": Color(0.03, 0.0, 0.05), "gear": {"handslot.r": ADV + "sword_2handed.gltf"},
 		"clips": {"attack": "Melee_2H_Attack_Chop"}, "parts": {"Cape": [Color(0.32, 0.1, 0.45), 0.92]},
 		"extras": ["bone_pauldrons", "skull_crest"], "eyes": Color(0.85, 0.5, 1.0), "light": Color(0.7, 0.4, 1.0),
-		"boss": true},
+		"skull_face": "Knight_Head", "hide": ["HelmetVisor"], "boss": true},
 	"boss_hollow_king": {"model": "barbarian", "tint": Color(0.45, 0.3, 0.22), "strength": 0.3, "scale": 1.6,
 		"gear": {}, "clips": {}, "boss": true, "pumpkin": true},
 	"boss_lich": {"model": "mage", "tint": Color(0.5, 0.28, 0.85), "strength": 0.75, "scale": 1.6,
@@ -99,11 +105,12 @@ const DEFS := {
 	"boss_cinder_king": {"model": "barbarian", "tint": Color(0.2, 0.12, 0.1), "strength": 0.78, "scale": 1.6,
 		"emission": Color(0.12, 0.03, 0.0), "cracks": Color(1.0, 0.5, 0.12, 0.8),
 		"gear": {"handslot.r": ADV + "axe_2handed.gltf"}, "clips": {"attack": "Melee_2H_Attack_Chop"},
-		"hide": ["BearHat"], "extras": ["crown", "shoulder_flames", "embers"], "eyes": Color(1.0, 0.8, 0.3),
+		"hide": ["BearHat"], "extras": ["crown", "head_flame", "shoulder_flames", "embers"], "eyes": Color(1.0, 0.8, 0.3),
 		"light": Color(1.0, 0.5, 0.15), "boss": true},
 	"boss_magma_golem": {"model": "mannequin_large", "tint": Color(1.0, 0.42, 0.1), "strength": 0.85, "scale": 1.8,
 		"emission": Color(0.7, 0.2, 0.02), "cracks": Color(1.0, 0.8, 0.35, 0.8), "gear": {}, "clips": {},
-		"extras": ["rock_shell", "embers"], "eyes": Color(1.0, 0.85, 0.4), "light": Color(1.0, 0.45, 0.12),
+		"extras": ["rock_shell", "embers"], "eyes": Color(1.0, 0.85, 0.4), "eyes_offset": Vector3(0, 0.02, 0.12),
+		"hide": ["MannequinLarge_Head"], "light": Color(1.0, 0.45, 0.12),
 		"boss": true},
 }
 
@@ -118,6 +125,17 @@ static func is_boss(id: String) -> bool:
 
 static func is_miniboss(id: String) -> bool:
 	return bool(def(id).get("miniboss", false))
+
+
+## Height of the HUD above the feet, in unit-scale model units (big rigs and crowns are taller).
+static func hud_height(id: String) -> float:
+	var d := def(id)
+	var h := 2.2 * scale_of(id)
+	if String(d.model) == "mannequin_large":
+		h *= 1.42
+	if "crown" in d.get("extras", []) or "skull_crest" in d.get("extras", []) or "bush_head" in d.get("extras", []):
+		h += 0.35 * scale_of(id)
+	return h
 
 
 ## Scale multiplier relative to a normal unit (bosses 1.6).
@@ -157,20 +175,32 @@ static func create(id: String, full := true) -> Character:
 	var cracks: Color = d.get("cracks", Color(0, 0, 0, 0))
 	if cracks.a > 0.0:
 		ch.tint_params["crack_color"] = cracks
-		ch.tint_params["crack_scale"] = 5.0 if String(d.model) == "mannequin_large" else 7.0
+		ch.tint_params["crack_scale"] = float(d.get("crack_scale", 3.2 if String(d.model) == "mannequin_large" else 4.2))
+		# board previews are tiny: fewer, simpler cracks so the figure keeps its silhouette
+		ch.tint_params["crack_sparsity"] = 0.45 if full else 0.7
 	for n in d.get("hide", []):
 		_hide_meshes(ch, String(n))
 	retint(ch, id)
 	if bool(d.get("skeleton", false)):
-		_skull_head(ch)
+		var sk := _skull_head(ch)
+		if d.has("skull_tint"):
+			if sk:
+				Props.tint(sk, d.skull_tint, 0.6, Color(d.skull_tint) * 0.12)
 	if bool(d.get("skeleton_head", false)):
 		_skull_head(ch, true)
 	if bool(d.get("skull_under_hat", false)):
 		_skull_under_hat(ch)
+	if d.has("skull_face"):
+		_hide_meshes(ch, String(d.skull_face))
+		var sf := ch.attach("head", "res://assets/kaykit/halloween/skull.gltf")
+		if sf:
+			sf.scale = Vector3.ONE * 0.86
+			sf.position = Vector3(0, 0.02, 0.12)
+			Props.tint(sf, Color(0.94, 0.9, 0.8), 0.5)
 	if bool(d.get("pumpkin", false)):
 		_pumpkin_head(ch, float(d.get("pumpkin_scale", 0.62)))
 	if d.has("eyes"):
-		_eyes(ch, d.eyes)
+		_eyes(ch, d.eyes, d.get("eyes_offset", Vector3.ZERO))
 	for e in d.get("extras", []):
 		_extra(ch, id, String(e), full)
 	if full:
@@ -274,7 +304,7 @@ static func _cone(parent: Node3D, pos: Vector3, r: float, h: float, mat: Materia
 
 
 ## Two small glowing eyes on the face (skulls, visors, spirits).
-static func _eyes(ch: Character, color: Color) -> void:
+static func _eyes(ch: Character, color: Color, offset := Vector3.ZERO) -> void:
 	var head := _socket(ch, "head")
 	if head == null:
 		return
@@ -305,7 +335,7 @@ static func _eyes(ch: Character, color: Color) -> void:
 		sm.rings = 4
 		e.mesh = sm
 		e.material_override = m
-		e.position = Vector3(sx * dx, y, z)
+		e.position = Vector3(sx * dx, y, z) + offset
 		e.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		head.add_child(e)
 
@@ -382,7 +412,7 @@ static func _extra(ch: Character, id: String, kind: String, full: bool) -> void:
 			var h := _socket(ch, "head")
 			var m := _mat(Color(0.12, 0.08, 0.08), Color(0.3, 0.08, 0.0))
 			for sx in [-1.0, 1.0]:
-				_cone(h, Vector3(sx * 0.28, 0.82, 0.05), 0.1, 0.36, m, Vector3(0.3, 0, -sx * 0.55))
+				_cone(h, Vector3(sx * 0.3, 0.85, 0.05), 0.14, 0.52, m, Vector3(0.25, 0, -sx * 0.6))
 		"head_flame":
 			if full:
 				var h := _socket(ch, "head")
@@ -426,6 +456,70 @@ static func _extra(ch: Character, id: String, kind: String, full: bool) -> void:
 			var h := _socket(ch, "head")
 			var sk := Props.put(h, Props.HAL + "skull.gltf", Vector3(0, 1.0, 0.05), 0.0, 0.36)
 			sk.name = "Crest"
+		"bush_head":
+			_hide_meshes(ch, "Head")
+			var h := _socket(ch, "head")
+			var leaf := Color(0.4, 0.62, 0.24)
+			_blob(h, Vector3(0, 0.46, 0.0), 0.62, leaf, 71, Vector3(1.1, 0.95, 1.0))
+			for i in 8:
+				var a := TAU * i / 8.0
+				_blob(h, Vector3(cos(a) * 0.52, 0.6 + 0.14 * (i % 2), sin(a) * 0.44), 0.3,
+					leaf.lightened(0.07 * (i % 3)), 80 + i, Vector3(1.0, 0.8, 1.0))
+			var m := _mat(Color(0.5, 0.3, 0.14))
+			for i in 7:
+				var a := lerpf(-2.4, 2.4, float(i) / 6.0)
+				_cone(h, Vector3(sin(a) * 0.55, 0.85 + 0.12 * (i % 2), cos(a) * 0.36 - 0.08), 0.09, 0.5, m,
+					Vector3(-0.5 * cos(a), 0, sin(a) * 0.9))
+			# a dark maw and two glowing eyes peering out of the bush
+			var eye := StandardMaterial3D.new()
+			eye.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			eye.albedo_color = Color(1.0, 0.86, 0.3)
+			for sx in [-1.0, 1.0]:
+				var e := MeshInstance3D.new()
+				var sm := SphereMesh.new()
+				sm.radius = 0.075
+				sm.height = 0.1
+				e.mesh = sm
+				e.material_override = eye
+				e.position = Vector3(sx * 0.2, 0.5, 0.6)
+				h.add_child(e)
+		"thorns_front":
+			var m := _mat(Color(0.52, 0.32, 0.15))
+			for b in ["upperarm.l", "upperarm.r", "upperleg.l", "upperleg.r"]:
+				var s := _socket(ch, b)
+				if s:
+					for k in 3:
+						var a := float(k) * 2.1
+						_cone(s, Vector3(cos(a) * 0.2, 0.1 + 0.14 * k, sin(a) * 0.2), 0.08, 0.42, m,
+							Vector3(sin(a) * 1.2, 0, -cos(a) * 1.2))
+			var c := _socket(ch, "chest")
+			for k in 5:
+				var x := lerpf(-0.36, 0.36, float(k) / 4.0)
+				_cone(c, Vector3(x, 0.3 + 0.14 * (k % 2), 0.42), 0.09, 0.44, m, Vector3(1.3, 0, 0))
+		"stone_plates":
+			pass
+		"bramble_ring":
+			# Thorns trait: a ring of brambles on the ground around the figure
+			var ring := Node3D.new()
+			ring.name = "Brambles"
+			ch.add_child(ring)
+			var m := _mat(Color(0.4, 0.24, 0.12))
+			var vine := _mat(Color(0.22, 0.36, 0.14))
+			for k in 14:
+				var a := TAU * k / 14.0
+				var r := 1.15 + 0.08 * float(k % 3)
+				_blob(ring, Vector3(cos(a) * r, 0.08, sin(a) * r), 0.16, Color(0.24, 0.38, 0.15).lightened(0.05 * (k % 2)), 120 + k,
+					Vector3(1.3, 0.6, 1.0))
+				_cone(ring, Vector3(cos(a) * r, 0.2, sin(a) * r), 0.06, 0.36 + 0.12 * float(k % 2), m,
+					Vector3(sin(a) * 0.5, 0, -cos(a) * 0.5))
+			ring.set_meta("vine", vine)
+		"grave_candles":
+			if full:
+				for k in 3:
+					var a := TAU * k / 3.0 + 0.5
+					var cd := Props.put(ch, Props.HAL + "candle_triple.gltf", Vector3(cos(a) * 0.9, 0, sin(a) * 0.9), 0.0, 0.5)
+					cd.name = "Candle%d" % k
+					Biome.flame(cd, Vector3(0, 0.5, 0), Color(0.45, 1.0, 0.55), 0.12, 4)
 		"crown":
 			_crown(ch)
 		"rock_shell":
@@ -467,14 +561,18 @@ static func _crown(ch: Character) -> void:
 ## Grey faceted rock plates over the Golem's glowing body; each piece is tagged so shatter()
 ## can throw them off.
 static func _rock_shell(ch: Character) -> void:
-	var rock := Color(0.36, 0.33, 0.35)
+	var rock := Color(0.52, 0.47, 0.46)
+	# sized for the Large rig (its chest is ~2 units wide): plates sit proud of the body so the
+	# lava glow shows only in the gaps between them
 	var pieces := {
-		"chest": [[Vector3(0, 0.35, 0.18), 0.52, Vector3(1.2, 0.95, 0.8)], [Vector3(0, 0.4, -0.2), 0.5, Vector3(1.2, 1.0, 0.7)]],
-		"spine": [[Vector3(0, 0.1, 0.22), 0.44, Vector3(1.2, 0.7, 0.7)]],
-		"head": [[Vector3(0, 0.62, -0.05), 0.46, Vector3(1.15, 0.8, 1.0)]],
-		"upperarm.l": [[Vector3(0, 0.15, 0), 0.34, Vector3.ONE]], "upperarm.r": [[Vector3(0, 0.15, 0), 0.34, Vector3.ONE]],
-		"lowerarm.l": [[Vector3(0, 0.2, 0), 0.26, Vector3(0.9, 1.2, 0.9)]], "lowerarm.r": [[Vector3(0, 0.2, 0), 0.26, Vector3(0.9, 1.2, 0.9)]],
-		"upperleg.l": [[Vector3(0, -0.2, 0.05), 0.28, Vector3(1.0, 1.3, 1.0)]], "upperleg.r": [[Vector3(0, -0.2, 0.05), 0.28, Vector3(1.0, 1.3, 1.0)]],
+		"chest": [[Vector3(0, 0.3, 0.42), 0.62, Vector3(1.35, 1.0, 0.62)], [Vector3(0, 0.45, -0.4), 0.62, Vector3(1.3, 1.0, 0.6)],
+			[Vector3(0.55, 0.7, 0.05), 0.42, Vector3.ONE], [Vector3(-0.55, 0.7, 0.05), 0.42, Vector3.ONE]],
+		"spine": [[Vector3(0, 0.05, 0.4), 0.5, Vector3(1.3, 0.7, 0.62)]],
+		"head": [[Vector3(0, 0.36, 0.02), 0.46, Vector3(1.0, 0.9, 1.0)]],
+		"upperarm.l": [[Vector3(0, 0.2, 0), 0.44, Vector3.ONE]], "upperarm.r": [[Vector3(0, 0.2, 0), 0.44, Vector3.ONE]],
+		"lowerarm.l": [[Vector3(0, 0.3, 0), 0.36, Vector3(0.95, 1.2, 0.95)]], "lowerarm.r": [[Vector3(0, 0.3, 0), 0.36, Vector3(0.95, 1.2, 0.95)]],
+		"upperleg.l": [[Vector3(0, -0.25, 0.08), 0.34, Vector3(1.0, 1.3, 1.0)]], "upperleg.r": [[Vector3(0, -0.25, 0.08), 0.34, Vector3(1.0, 1.3, 1.0)]],
+		"lowerleg.l": [[Vector3(0, -0.2, 0.1), 0.3, Vector3(1.0, 1.2, 1.0)]], "lowerleg.r": [[Vector3(0, -0.2, 0.1), 0.3, Vector3(1.0, 1.2, 1.0)]],
 	}
 	var k := 0
 	for b in pieces:
@@ -484,8 +582,10 @@ static func _rock_shell(ch: Character) -> void:
 		for p in pieces[b]:
 			var mi := _blob(s, p[0], float(p[1]), rock.lightened(0.05 * (k % 3)), 200 + k, p[2])
 			mi.name = "Shell%d" % k
-			mi.add_to_group("golem_shell")
-			mi.set_meta("shell", true)
+			if b != "head":
+				# the rock head stays on after the shatter (the eyes live on it)
+				mi.add_to_group("golem_shell")
+				mi.set_meta("shell", true)
 			k += 1
 
 
@@ -524,7 +624,7 @@ static func shatter(ch: Character) -> void:
 			"gravity": Vector3(0, -9, 0), "size": 0.3, "color": Color(1.0, 0.5, 0.15), "tex": "spark", "spread": 80.0})
 
 
-static func _skull_head(ch: Character, replace := false) -> void:
+static func _skull_head(ch: Character, replace := false) -> Node3D:
 	if replace:
 		for m in ch.model.find_children("*", "MeshInstance3D", true, false):
 			var n := String(m.name).to_lower()
@@ -534,6 +634,7 @@ static func _skull_head(ch: Character, replace := false) -> void:
 	if p:
 		p.scale = Vector3.ONE * (1.0 if replace else 1.12)
 		p.position = Vector3(0, 0.05 if replace else 0.02, 0.06)
+	return p
 
 
 ## Grave Mage: a skull face under the mage's own hat (the hat keeps the silhouette).

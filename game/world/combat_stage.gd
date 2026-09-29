@@ -212,10 +212,7 @@ func _add(d: Dictionary, i: int, n: int, rise_delay := -1.0) -> void:
 
 
 func _hud_height(id: String) -> float:
-	var h := 2.2 * UNIT_SCALE * EnemyLooks.scale_of(id)
-	if id == "brute":
-		h *= 1.2
-	return h + 0.35
+	return EnemyLooks.hud_height(id) * UNIT_SCALE + 0.35
 
 
 func _rise(ch: Character, id: String, hud: UnitHud, delay: float) -> void:
