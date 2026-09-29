@@ -133,6 +133,14 @@ static func particle_texture(kind: String) -> Texture2D:
 				"flame":
 					var q := Vector2(p.x * (1.2 + p.y * 0.6), p.y)
 					a = pow(clampf(1.0 - q.length(), 0.0, 1.0), 1.2)
+				"butterfly":
+					# two rounded wing pairs around a thin body (top wings bigger)
+					var ax := absf(p.x)
+					var up := Vector2((ax - 0.42) / 0.46, (p.y + 0.22) / 0.5).length()
+					var lo := Vector2((ax - 0.34) / 0.32, (p.y - 0.36) / 0.34).length()
+					var wing := clampf((1.0 - minf(up, lo)) * 6.0, 0.0, 1.0)
+					var body := clampf((1.0 - Vector2(p.x / 0.07, p.y / 0.6).length()) * 6.0, 0.0, 1.0)
+					a = maxf(wing * (0.75 + 0.25 * clampf(1.0 - minf(up, lo), 0.0, 1.0) * 3.0), body)
 			img.set_pixel(x, y, Color(1, 1, 1, a))
 	img.generate_mipmaps()
 	var t := ImageTexture.create_from_image(img)

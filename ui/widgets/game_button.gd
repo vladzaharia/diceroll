@@ -41,7 +41,12 @@ var toggle_primary := false
 var sfx_id := "click"
 
 var _content: HBoxContainer
+## The icon sits in a holder sized to its visible glyph (the SVGs carry transparent margins),
+## so [glyph + gap + label] centres as one unit and icon-only buttons centre the glyph exactly.
+var _icon_box: Control
 var _icon: TextureRect
+## True only while the finger / mouse is actually down (a toggled-on button doesn't sink).
+var _held := false
 var _label: Label
 var _sub: Label
 var _hover := false
@@ -69,14 +74,20 @@ static func round_icon(p_icon: String, px := 88.0) -> GameButton:
 func _ready() -> void:
 	focus_mode = Control.FOCUS_NONE
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	_content = UiTheme.hbox(12)
+	_content = UiTheme.hbox(10)
 	_content.alignment = BoxContainer.ALIGNMENT_CENTER
+	_content.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_content)
+	_icon_box = Control.new()
+	_icon_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_icon_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_content.add_child(_icon_box)
 	_icon = TextureRect.new()
 	_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_content.add_child(_icon)
+	_icon_box.add_child(_icon)
+	_content.sort_children.connect(_align_icon)
 	var col := UiTheme.vbox(-4)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	_content.add_child(col)
@@ -114,7 +125,7 @@ func _apply_icon() -> void:
 	if _icon == null:
 		return
 	if icon_name == "":
-		_icon.visible = false
+		_icon_box.visible = false
 		update_minimum_size()
 		return
 	var px := icon_px if icon_px > 0 else int(font_size * 1.15)
@@ -122,9 +133,59 @@ func _apply_icon() -> void:
 	if tint == null and kind in [Kind.ROUND, Kind.SECONDARY, Kind.GHOST]:
 		tint = null
 	_icon.texture = UiIcons.tex(icon_name, px * 2, tint)
-	_icon.custom_minimum_size = Vector2(px, px)
-	_icon.visible = true
+	_icon.size = Vector2(px, px)
+	var g := _glyph_rect(_icon.texture)
+	_icon_box.custom_minimum_size = Vector2(maxf(px * g.size.x, 1.0), px)
+	_icon_box.visible = true
 	update_minimum_size()
+	_align_icon()
+
+
+static var _glyph_cache: Dictionary = {}
+
+
+## The visible (non-transparent) part of an icon texture, as fractions of its size.
+static func _glyph_rect(t: Texture2D) -> Rect2:
+	if t == null:
+		return Rect2(0, 0, 1, 1)
+	var id := t.get_instance_id()
+	if _glyph_cache.has(id):
+		return _glyph_cache[id]
+	var img := t.get_image()
+	var r := Rect2(0, 0, 1, 1)
+	if img != null and not img.is_empty():
+		if img.is_compressed():
+			img.decompress()
+		var u := img.get_used_rect()
+		if u.size.x > 0 and u.size.y > 0:
+			var sz := Vector2(img.get_width(), img.get_height())
+			r = Rect2(Vector2(u.position) / sz, Vector2(u.size) / sz)
+	_glyph_cache[id] = r
+	return r
+
+
+## Places the glyph inside its holder: left edge flush (the holder is glyph-wide) and
+## vertically centred on the label's cap height (or on the button face when icon-only).
+func _align_icon() -> void:
+	if _icon == null or not _icon_box.visible:
+		return
+	var px := _icon.size.x
+	var g := _glyph_rect(_icon.texture)
+	_icon.position.x = -g.position.x * px
+	var glyph_mid := (g.position.y + g.size.y * 0.5) * px
+	var target := _icon_box.size.y * 0.5
+	if _label and _label.visible and _label.label_settings:
+		var ls := _label.label_settings
+		var asc := ls.font.get_ascent(ls.font_size)
+		var cap := ls.font_size * 0.7
+		# label line box top in holder coordinates
+		var col := _label.get_parent() as Control
+		var top := col.position.y + _label.position.y - _icon_box.position.y
+		var lh := _label.size.y
+		var line_h := asc + ls.font.get_descent(ls.font_size)
+		top += (lh - line_h) * 0.5
+		target = top + asc - cap * 0.5
+	_icon.position.y = target - glyph_mid
 
 
 func _get_minimum_size() -> Vector2:
@@ -156,10 +217,12 @@ func _sink() -> float:
 
 
 func _is_down() -> bool:
-	return get_draw_mode() == DRAW_PRESSED or get_draw_mode() == DRAW_HOVER_PRESSED
+	# not get_draw_mode(): a toggled-on button reports PRESSED but must not sink
+	return _held and (get_draw_mode() == DRAW_PRESSED or get_draw_mode() == DRAW_HOVER_PRESSED or is_hovered())
 
 
 func _on_down() -> void:
+	_held = true
 	_refresh()
 	if _tween and _tween.is_valid():
 		_tween.kill()
@@ -168,6 +231,7 @@ func _on_down() -> void:
 
 
 func _on_up() -> void:
+	_held = false
 	_refresh()
 	if _tween and _tween.is_valid():
 		_tween.kill()
@@ -183,6 +247,7 @@ func _refresh() -> void:
 		_sub.label_settings = UiTheme.label_settings(maxi(18, int(font_size * 0.52)), Color(tc, 0.85), false, 0, UiPalette.OUTLINE, false, 600)
 		_icon.modulate = Color(1, 1, 1, 0.45) if disabled else Color.WHITE
 	_place_content()
+	_align_icon.call_deferred()
 	queue_redraw()
 
 

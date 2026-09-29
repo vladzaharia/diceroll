@@ -16,7 +16,7 @@ extends Control
 ## shop_buy[i, die], shop_reroll, shop_leave, forge_apply[die, face, op, src], event_choose[i].
 signal command(name: String, args: Array)
 ## Navigation: new_run, continue, class_chosen(class_id), back_to_title, resume, pause,
-## abandon, speed(float).
+## abandon, speed(float), auto(bool), auto_rules(AutoRules).
 signal menu(action: String, arg: Variant)
 
 var title: TitleScreen
@@ -35,6 +35,10 @@ var portal: PortalBanner
 var pause: PauseMenu
 var settings: SettingsPanel
 var summary: SummaryScreen
+var route_card: RouteCard
+## AUTO / speed layer (speed pill, AUTO toggle, reason ticker, highlights) and its settings.
+var auto_hud: AutoHud
+var auto_settings: AutoSettingsPanel
 
 var _flow: GameFlow
 var _modals: Array[UiModal] = []
@@ -60,7 +64,11 @@ func _init() -> void:
 	class_select = ClassSelect.new()
 	pause = PauseMenu.new()
 	settings = SettingsPanel.new()
-	for c in [board_hud, combat_hud, portal, banner, draft, passive, rune_assign, shop, forge, event, summary, inspector, title, class_select, pause, settings]:
+	route_card = RouteCard.new()
+	auto_hud = AutoHud.new()
+	auto_hud.setup(self)
+	auto_settings = AutoSettingsPanel.new()
+	for c in [board_hud, combat_hud, portal, banner, draft, passive, rune_assign, shop, forge, event, summary, auto_hud, inspector, title, class_select, route_card, pause, settings, auto_settings]:
 		add_child(c)
 	_modals = [draft, passive, rune_assign, shop, forge, event, summary]
 	board_hud.visible = false
@@ -96,6 +104,13 @@ func _init() -> void:
 		pause.close()
 		menu.emit("abandon", null))
 	settings.speed_changed.connect(func(s: float) -> void: menu.emit("speed", s))
+	settings.auto_settings_pressed.connect(open_auto_settings)
+	auto_hud.auto_toggled.connect(func(on: bool) -> void: menu.emit("auto", on))
+	auto_hud.speed_picked.connect(func(s: float) -> void:
+		SettingsPanel.set_game_speed(s)
+		menu.emit("speed", s))
+	auto_hud.settings_requested.connect(open_auto_settings)
+	auto_settings.rules_changed.connect(func(r: AutoRules) -> void: menu.emit("auto_rules", r))
 	summary.new_run_pressed.connect(func() -> void: menu.emit("new_run", null))
 	summary.title_pressed.connect(func() -> void: menu.emit("back_to_title", null))
 
@@ -135,9 +150,23 @@ func open_pause() -> void:
 	menu.emit("pause", null)
 
 
+## Run-start route card; returns when BEGIN is pressed (or after `auto_close` seconds).
+func show_route(flow: GameFlow, auto_close := 0.0) -> void:
+	route_card.auto_close = auto_close
+	route_card.refresh(flow)
+	route_card.open()
+	await route_card.begin_pressed
+
+
 func open_settings() -> void:
 	settings.refresh()
 	settings.open()
+
+
+func open_auto_settings() -> void:
+	auto_settings.rules = AutoConfig.load_rules()
+	auto_settings.refresh()
+	auto_settings.open()
 
 
 ## Opens the die inspector on pool die `idx`.
@@ -198,7 +227,7 @@ func sync(flow: GameFlow) -> void:
 	if want:
 
 		want.call("refresh", flow)
-		if not want.visible:
+		if not want.is_open():
 			want.open()
 
 

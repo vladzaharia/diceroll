@@ -19,6 +19,8 @@ func _init(controller: GameController) -> void:
 
 
 func play(events: Array) -> void:
+	if c.condensed():
+		events = condense(events)
 	for ev: Dictionary in events:
 		if not is_instance_valid(c) or not c.is_inside_tree() or c.aborting:
 			return
@@ -28,6 +30,26 @@ func play(events: Array) -> void:
 
 func _wait(t: float) -> void:
 	await c.wait(t)
+
+
+## 4x: merges consecutive damage events on the same target from the same source (and the
+## same attacker) into one beat and one number: amounts / blocked add up, the last event's
+## hp / block stand, lethal if any was.
+static func condense(events: Array) -> Array:
+	var out: Array = []
+	for ev: Dictionary in events:
+		if String(ev.get("type", "")) == "damage" and not out.is_empty():
+			var prev: Dictionary = out[-1]
+			if String(prev.get("type", "")) == "damage" and str(prev.get("target")) == str(ev.get("target")) \
+					and String(prev.get("source", "")) == String(ev.get("source", "")) \
+					and int(prev.get("attacker", -1)) == int(ev.get("attacker", -1)) and not bool(prev.get("lethal", false)):
+				var m := ev.duplicate()
+				m["amount"] = int(prev.get("amount", 0)) + int(ev.get("amount", 0))
+				m["blocked"] = int(prev.get("blocked", 0)) + int(ev.get("blocked", 0))
+				out[-1] = m
+				continue
+		out.append(ev)
+	return out
 
 
 func _one(ev: Dictionary) -> void:
@@ -93,7 +115,14 @@ func _one(ev: Dictionary) -> void:
 				Fx.damage_number(c.world_parent(), c.hero_pos() + Vector3.UP * 1.8, -amount, false, Fx.HERO_DAMAGE_COLOR)
 				await _wait(0.45)
 		"trap":
-			await _trap(ev)
+			if bool(ev.get("ice", false)):
+				await BiomeBeats.trap_ice(c, ev)
+			else:
+				await _trap(ev)
+		"lava":
+			await BiomeBeats.lava(c, ev)
+		"enemy_healed":
+			await BiomeBeats.enemy_healed(c, ev)
 		"duel":
 			var mine: Array = ev.player
 			var theirs: Array = ev.npc
@@ -211,6 +240,8 @@ func _one(ev: Dictionary) -> void:
 			c.overlay.toast("A minion rises!", "skull", UiPalette.TEXT)
 			await _wait(0.7)
 		"boss_phase":
+			if int(ev.enemy_idx) < c.stage.enemy_count():
+				c.stage.set_enemy(int(ev.enemy_idx), {"traits": ev.get("traits", []), "phase": int(ev.phase)})
 			c.rig.shake(0.9, 0.6)
 			Fx.flash(c, Color(0.8, 0.2, 0.3, 0.45), 0.5)
 			var nm := String(c.stage.data[int(ev.enemy_idx)].get("name", "The boss")) if int(ev.enemy_idx) < c.stage.data.size() else "The boss"
@@ -343,7 +374,9 @@ func _hero_moved(ev: Dictionary) -> void:
 		c.rig.follow(c.board.hero)
 		await c.board.teleport_hero(int(path[0]))
 	else:
-		c.rig.follow(c.board.hero)
+		# 4x: short hops keep the overview camera still (no follow swoop)
+		if not (c.condensed() and path.size() <= 4):
+			c.rig.follow(c.board.hero)
 		await c.board.hop_hero(path, 0.3 / c.speed)
 	c.clear_view()
 	await _wait(0.15)
@@ -465,7 +498,9 @@ func _game_over(ev: Dictionary) -> void:
 		Audio.play_sfx("win")
 		c.board.hero.play_once("cheer", "idle")
 		Fx.level_up(c.world_parent(), c.hero_pos())
-		c.overlay.announce("VICTORY!", "The Bone Throne is yours", UiPalette.GOLD_BRIGHT, 1.4)
+		var r := c.flow.run
+		c.overlay.announce("VICTORY!", "%s is yours" % BiomeDefs.name_of(String(r.route[2]) if r.route.size() >= 3 else "throne"),
+			UiPalette.GOLD_BRIGHT, 1.4)
 	else:
 		Audio.play_sfx("lose")
 		c.board.hero.play_once("death", "")
@@ -525,6 +560,8 @@ func _damage(ev: Dictionary) -> void:
 	if tgt is String:
 		# enemy hits hero
 		var attacker := int(ev.get("attacker", -1))
+		if BiomeBeats.hero_damage(c, ev):
+			attacker = -1
 		if attacker >= 0:
 			await c.stage.enemy_attack(attacker)
 		await c.stage.hero_hit(amount, blocked)
@@ -562,6 +599,7 @@ func _damage(ev: Dictionary) -> void:
 			await c.stage.enemy_hit(i, amount, false, blocked)
 	if ev.has("hp"):
 		c.stage.set_enemy(i, {"hp": int(ev.hp), "block": int(ev.get("block", 0))})
+	BiomeBeats.enemy_damage(c, ev)
 
 
 func _block(ev: Dictionary) -> void:
@@ -575,6 +613,9 @@ func _block(ev: Dictionary) -> void:
 		return
 	var i := int(tgt)
 	c.stage.set_enemy(i, {"block": int(ev.get("total", 0))})
+	if String(ev.get("source", "")) == "shatter":
+		await BiomeBeats.shatter(c, i)
+		return
 	if amount > 0 and i < c.stage.enemy_count():
 		var ch: Character = c.stage.enemies[i]
 		ch.play_once("block" if ch.has_anim("block") else "hit", EnemyLooks.clip(String(c.stage.data[i].get("id", "")), "idle"), 0.08)
@@ -588,6 +629,8 @@ func _status(ev: Dictionary) -> void:
 	var st := String(ev.status)
 	var v := int(ev.get("value", 0))
 	if tgt is String:
+		if await BiomeBeats.hero_status(c, ev):
+			return
 		match st:
 			"curse":
 				if bool(ev.get("pending", false)):

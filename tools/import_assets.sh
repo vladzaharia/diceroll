@@ -51,6 +51,17 @@ lic "KayKit_FantasyWeaponsBits_1.0_FREE" "$KK/weapons"
 sync "$SRC/KayKit_RPGToolsBits_1.0_FREE/Assets/gltf" "$KK/tools"
 lic "KayKit_RPGToolsBits_1.0_FREE" "$KK/tools"
 
+echo "== KayKit BlockBits terrain cubes (Glade / Frostpeak / Magma biomes and the ice / lava tiles)"
+BB="KayKit_BlockBits_1.0_FREE"
+bb_keep=""
+for b in grass dirt dirt_with_grass gravel_with_grass sand_with_grass snow dirt_with_snow grass_with_snow \
+	gravel_with_snow stone stone_dark gravel lava tree tree_with_snow glass water wood; do
+	bb_keep="$bb_keep --include=$b.gltf --include=$b.bin"
+done
+# shellcheck disable=SC2086
+sync "$SRC/$BB/Assets/gltf" "$KK/blocks" $bb_keep --include='block_bits_texture.png' --exclude='*'
+lic "$BB" "$KK/blocks"
+
 echo "== KayKit Platformer pickups (star/heart/diamond, yellow + red + blue)"
 PLAT="KayKit_Platformer_Pack_1.0_FREE"
 for c in yellow red blue; do

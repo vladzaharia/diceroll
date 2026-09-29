@@ -31,11 +31,17 @@ var _tip_tween: Tween
 var _act_chip: PanelContainer
 var _act := 1
 var _lap := 1
+## The run's biome ids per tier (lap chip colour and tooltip); empty = legacy act colours.
+var route: Array = []
 var _block_label: Label
 var _row: HBoxContainer
 var _scrim: TextureRect
 var _hp_wrap: Control
 var _block := 0
+## Burn stacks on the hero (Magma): a flame badge with the count, left of the block shield.
+var burn_badge: Control
+var _burn_label: Label
+var _burn := 0
 
 
 func _init() -> void:
@@ -77,6 +83,17 @@ func _init() -> void:
 	_block_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_block_label.size = Vector2(62, 56)
 	block_badge.add_child(_block_label)
+	burn_badge = Control.new()
+	burn_badge.name = "Burn"
+	burn_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	burn_badge.visible = false
+	_hp_wrap.add_child(burn_badge)
+	burn_badge.add_child(UiIcons.rect("intent_burn", 54, Color("ff8a3a")))
+	_burn_label = UiTheme.label("0", 24, UiPalette.TEXT, true, 6)
+	_burn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_burn_label.position = Vector2(0, 12)
+	_burn_label.size = Vector2(54, 44)
+	burn_badge.add_child(_burn_label)
 	_hp_wrap.resized.connect(_place_hp)
 
 	var chips := UiTheme.hbox(10)
@@ -165,6 +182,19 @@ func _place_hp() -> void:
 	heart.size = Vector2(58, 58)
 	block_badge.position = Vector2(s.x - 62, (s.y - 62) * 0.5)
 	block_badge.size = Vector2(62, 62)
+	burn_badge.position = Vector2(s.x - (122.0 if block_badge.visible else 60.0), (s.y - 54) * 0.5)
+	burn_badge.size = Vector2(54, 54)
+
+
+## Burn stacks on the hero (0 hides the badge).
+func set_burn(v: int, animate := false) -> void:
+	var was := _burn
+	_burn = maxi(v, 0)
+	burn_badge.visible = _burn > 0
+	_burn_label.text = str(_burn)
+	_place_hp()
+	if animate and _burn > was:
+		UiTheme.pop(burn_badge, 1.3, 0.3)
 
 
 ## Full sync from the flow (no animation).
@@ -176,8 +206,10 @@ func refresh(flow: GameFlow, animate := false) -> void:
 	var prev := Balance.xp_for_level(run.level - 1) if run.level > 1 else 0
 	var need := Balance.xp_for_level(run.level)
 	level_badge.set_level(run.level, float(run.xp - prev) / float(maxi(1, need - prev)), animate)
+	route = Array(run.route)
 	set_lap(run.act, run.lap)
 	set_block(run.block if flow.phase == GameFlow.Phase.COMBAT else 0, animate)
+	set_burn(flow.combat.hero_burn if flow.phase == GameFlow.Phase.COMBAT and flow.combat else 0)
 	set_passives(Array(run.passives))
 
 
@@ -188,6 +220,7 @@ func copy_from(o: HudTop) -> void:
 	gold.set_value(o.gold.value, false)
 	treasury.set_value(o.treasury.value, false)
 	level_badge.set_level(o.level_badge.level, o.level_badge.xp_frac, false)
+	route = o.route
 	set_lap(o._act, o._lap)
 	set_passives(o._passive_ids)
 
@@ -205,10 +238,10 @@ func set_lap(act: int, lap: int) -> void:
 	_act = act
 	_lap = lap
 	var final := lap >= Balance.TOTAL_LAPS
-	var bc: Color = BIOME_COLORS[clampi(act - 1, 0, 2)]
+	var bc := biome_color(act)
 	act_label.text = "FINAL LAP" if final else "LAP %d/%d" % [lap, Balance.TOTAL_LAPS]
 	act_label.label_settings = UiTheme.label_settings(22, UiPalette.HP_BRIGHT if final else bc.lerp(UiPalette.GOLD_BRIGHT, 0.45), true, 5)
-	_act_chip.tooltip_text = "%s  ·  Act %s  ·  Lap %d of %d" % [SummaryScreen.ACT_NAMES[clampi(act - 1, 0, 2)],
+	_act_chip.tooltip_text = "%s  ·  Tier %s  ·  Lap %d of %d" % [biome_name(act),
 		ROMAN[clampi(act - 1, 0, 3)], lap, Balance.TOTAL_LAPS]
 	var sb := UiTheme.panel_box("pill").duplicate() as StyleBoxFlat
 	sb.border_color = Color(bc, 0.7)
@@ -306,10 +339,23 @@ func set_block(v: int, animate := false) -> void:
 		UiTheme.pop(block_badge, 1.3, 0.3)
 
 
+## Accent colour / name of the biome at tier `act` on this run's route.
+func biome_color(act: int) -> Color:
+	if act >= 1 and act <= route.size():
+		return UiPalette.biome_color(String(route[act - 1]))
+	return BIOME_COLORS[clampi(act - 1, 0, 2)]
+
+
+func biome_name(act: int) -> String:
+	if act >= 1 and act <= route.size():
+		return BiomeDefs.name_of(String(route[act - 1]))
+	return String(SummaryScreen.ACT_NAMES[clampi(act - 1, 0, 2)])
+
+
 func _set_laps(act: int, lap: int) -> void:
 	UiTheme.clear(lap_pips)
 	var first := int(Balance.BIOME_LAPS[clampi(act - 1, 0, Balance.BIOME_LAPS.size() - 1)])
-	var bc: Color = BIOME_COLORS[clampi(act - 1, 0, 2)]
+	var bc := biome_color(act)
 	for i in Balance.LAPS_PER_ACT:
 		var n := first + i
 		var dot := _Pip.new()
@@ -338,6 +384,11 @@ func on_event(ev: Dictionary, flow: GameFlow) -> void:
 				set_block(maxi(int(ev.get("total", flow.run.block)), 0), true)
 		"combat_turn_started":
 			set_block(0)
+		"status":
+			if str(ev.get("target", "")) == "hero" and String(ev.get("status", "")) == "burn":
+				set_burn(int(ev.get("value", 0)), true)
+		"combat_started":
+			set_burn(0)
 		"board_rolled":
 			if int(ev.get("treasury_added", 0)) <= 0:
 				treasury.set_value(int(ev.get("treasury", flow.run.treasury)), true)
@@ -348,6 +399,7 @@ func on_event(ev: Dictionary, flow: GameFlow) -> void:
 			var xp := int(ev.get("xp", flow.run.xp))
 			level_badge.set_level(lv, float(xp - prev) / float(maxi(1, need - prev)), true)
 		"combat_won":
+			set_burn(0)
 			show_xp(flow.run.xp, true)
 		"lap_completed":
 			if not bool(ev.get("boss", false)):

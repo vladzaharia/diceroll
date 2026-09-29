@@ -4,3 +4,9 @@
 /export/
 .DS_Store
 .claude/
+
+# ~/.gitignore has "Icon" (macOS Icon\r files); case-insensitive FS makes it match icon/ dirs
+!assets/icon/
+!assets/icon/**
+!tools/icon/
+!tools/icon/**

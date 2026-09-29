@@ -500,6 +500,83 @@ P["midas_fist"] = (union([rrect(3.6, 5.4, 3.6, 5.6, 1.8), rrect(7.2, 4.6, 3.6, 5
                    + fill("M3.4 11.6c2.8-.4 6-.2 8.6.8a1.9 1.9 0 0 1-.6 3.7c-2.6-.3-5.4-.1-8 .6z")
                    + coin(18.2, 16.8, 4.4))
 
+
+# ---------------------------------------------------------------- biome intents, traits and statuses
+CROSS = "M9.3 3.4h5.4a.8.8 0 0 1 .8.8v5h5a.8.8 0 0 1 .8.8v5.4a.8.8 0 0 1-.8.8h-5v5a.8.8 0 0 1-.8.8H9.3a.8.8 0 0 1-.8-.8v-5h-5a.8.8 0 0 1-.8-.8V10a.8.8 0 0 1 .8-.8h5v-5a.8.8 0 0 1 .8-.8z"
+ICONS["intent_heal"] = fill(CROSS) + shade("M12 3.4h2.7a.8.8 0 0 1 .8.8v5h5a.8.8 0 0 1 .8.8v5.4a.8.8 0 0 1-.8.8h-5v5a.8.8 0 0 1-.8.8H12z", 0.14) + hl("M5 11h4.2M11 5v4")
+
+FANG = "M3.4 3.6h9.8a.6.6 0 0 1 .6.7L10.2 13a1.4 1.4 0 0 1-2.6 0L2.8 4.3a.6.6 0 0 1 .6-.7z"
+ICONS["intent_drain"] = (fill(FANG) + shade("M8.3 3.6h4.9a.6.6 0 0 1 .6.7L10.2 13a1.4 1.4 0 0 1-1.9.8z", 0.16)
+                         + f'<path d="M8.9 14.2c1 1.4 1.6 2.2 1.6 3a1.6 1.6 0 0 1-3.2 0c0-.8.6-1.6 1.6-3z" fill="{RED}" stroke="{O}" stroke-width="1.1"/>'
+                         + heart(17.2, 16.6, 0.5))
+
+ICONS["intent_burn"] = ICONS["flame"]
+
+ICONS["intent_chill"] = (g("".join(SWORD), "translate(-1.6 2.2) scale(0.86)")
+                         + g(lines(snow, 2.1), "translate(13.6 1.2) scale(0.44)"))
+
+ICONS["intent_scorch"] = (die(2.8, 8.2, 13.0, 1, 0, False, 0.0)
+                          + f'<path d="M5.6 17.4l3-2.4M9.2 19l1.6-2.2" stroke="{O}" stroke-opacity="0.55" stroke-width="1.1" stroke-linecap="round"/>'
+                          + g(fill(FLAME) + '<path d="M12 12.9c1.5 1.5 2.7 2.7 2.7 4.4a2.7 2.7 0 0 1-5.4 0c0-1.7 1.2-2.9 2.7-4.4z" fill="#fff" fill-opacity="0.55"/>',
+                              "translate(10.2 -0.6) scale(0.6)"))
+
+ICONS["trait_armor"] = (fill(SHIELD) + shade("M12 2.9v18.3c4.4-1.4 7.6-5 7.6-9.7V5.8z")
+                        + f'<path d="M4.4 9.4h15.2M5 14.2h14M12 3.2v6.2M8.2 9.4v4.8M15.8 9.4v4.8M12 14.2v6.4" fill="none" stroke="{O}" stroke-width="1.3" stroke-linecap="round"/>')
+
+thorn = star_pts(12, 12, 10.6, 7.2, 10, -90)
+ICONS["trait_thorns"] = (f'<path d="{poly(thorn)} M12 7.2a4.8 4.8 0 1 0 0 9.6a4.8 4.8 0 1 0 0-9.6z" fill="{F}" fill-rule="evenodd" stroke="{O}" stroke-width="{SW}" stroke-linejoin="round"/>'
+                         + f'<circle cx="12" cy="12" r="6.2" fill="none" stroke="{O}" stroke-opacity="0.35" stroke-width="1"/>')
+
+ICONS["trait_ward"] = (fill("M2.8 18.4a9.2 9.2 0 0 1 18.4 0z") + shade("M12 9.2a9.2 9.2 0 0 1 9.2 9.2H12z", 0.14)
+                       + fill("M1.8 18.4h20.4v2.6H1.8z") + hl("M6.4 14.6a6 6 0 0 1 3.6-3.8", 1.4, 0.8)
+                       + sparkle(18.6, 4.4, 2.4, GOLD, 1.0))
+
+ICONS["trait_pierce"] = (fill(SHIELD) + shade("M12 2.9v18.3c4.4-1.4 7.6-5 7.6-9.7V5.8z")
+                         + f'<path d="M12.6 3.4l-2.2 5 2.8 2.6-2.6 4.4 1.2 5.6" fill="none" stroke="{O}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>')
+
+# ---------------------------------------------------------------- biome emblems (route card, pause, summary)
+ICONS["biome_glade"] = (fill("M10.5 13.6h3v7.6h-3z")
+                        + union(['<circle cx="12" cy="8.6" r="6.2"/>', '<circle cx="7" cy="12" r="4.2"/>', '<circle cx="17" cy="12" r="4.2"/>'])
+                        + shade("M16.6 4.4a6.2 6.2 0 0 1 4.6 7.6 4.2 4.2 0 0 1-6.4 3.2c3-2.2 3.6-6.6 1.8-10.8z", 0.16)
+                        + hl("M8 7.6a4.4 4.4 0 0 1 3-3", 1.3, 0.7))
+
+ICONS["biome_crypt"] = (fill("M4.6 21.2V10a7.4 7.4 0 0 1 14.8 0v11.2z") + shade("M12 2.6a7.4 7.4 0 0 1 7.4 7.4v11.2H12z", 0.14)
+                        + f'<path d="M8.6 21.2v-7.2a3.4 3.4 0 0 1 6.8 0v7.2z" fill="{O}"/>'
+                        + f'<path d="M4.6 12.4h3M16.4 12.4h3M4.6 16.6h3M16.4 16.6h3" stroke="{O}" stroke-opacity="0.45" stroke-width="1.1"/>')
+
+PUMP = ['<ellipse cx="12" cy="14" rx="4.2" ry="6.6"/>', '<ellipse cx="7.6" cy="14" rx="4.8" ry="6.2"/>',
+        '<ellipse cx="16.4" cy="14" rx="4.8" ry="6.2"/>']
+ICONS["biome_hollow"] = (lines(["M12 7.6c0-2 .8-3.6 2.6-4.4"], 2.2) + union(PUMP)
+                         + f'<path d="M12 7.8v12.4M7.6 8.4c-1.4 2.4-1.4 8.8 0 11.2M16.4 8.4c1.4 2.4 1.4 8.8 0 11.2" fill="none" stroke="{O}" stroke-opacity="0.35" stroke-width="1"/>'
+                         + dark("M7.6 12.2l2 1.8H6.8zM16.4 12.2l.8 1.8h-2.8zM7.4 16.4h9.2l-1.2 2-1.4-1-1.3 1.2-1.3-1.2-1.4 1z"))
+
+MOUNT = poly([(1.6, 20.6), (8.8, 6.2), (12.2, 11.6), (15.4, 7.4), (22.4, 20.6)])
+ICONS["biome_frost"] = (fill(MOUNT) + shade(poly([(8.8, 6.2), (12.2, 11.6), (10.6, 20.6), (1.6, 20.6)]), 0.0)
+                        + shade(poly([(15.4, 7.4), (22.4, 20.6), (13.6, 20.6)]), 0.16)
+                        + f'<path d="M8.8 6.2l2.4 4.8-1.4-.6-1 1.2-1-1.4-1.2.8z" fill="#fff" stroke="{O}" stroke-width="0.9" stroke-linejoin="round"/>'
+                        + f'<path d="M15.4 7.4l2 3.8-1.2-.5-.9 1-.9-1.1-.9.4z" fill="#fff" stroke="{O}" stroke-width="0.9" stroke-linejoin="round"/>')
+
+ICONS["biome_throne"] = ICONS["rune_gilded"]
+
+ICONS["biome_magma"] = (fill("M2.4 20.8l6.4-11.4h6.4l6.4 11.4z") + shade("M12 9.4h3.2l6.4 11.4H12z", 0.16)
+                        + f'<path d="M9 9.4h6l-1.2 3.6 1.8 3.4-2.6-1.6-1.6 3 .4-4.8-2.2 1z" fill="{GOLD}" stroke="{O}" stroke-width="1" stroke-linejoin="round"/>'
+                        + f'<path d="M10.2 9.2c.2-1.4 1-2 1.8-2s1.6.6 1.8 2" fill="{RED}" stroke="{O}" stroke-width="1"/>'
+                        + circ(8.4, 4.6, 1.3, RED) + circ(15.8, 3.6, 1.1, GOLD) + circ(12.2, 2.4, 0.9, RED))
+
+# ---------------------------------------------------------------- AUTO (looping arrow + play)
+def auto_icon():
+    a0, a1, r = -58, 222, 8.0
+    path, (x1, y1) = arc(12, 12, r, a0, a1)
+    t = math.radians(a1)
+    tx, ty = -math.sin(t), math.cos(t)          # clockwise tangent at the arc end
+    nx, ny = math.cos(t), math.sin(t)           # outward normal
+    tip = (x1 + tx * 3.4, y1 + ty * 3.4)
+    head = poly([tip, (x1 + nx * 3.2 - tx * 0.6, y1 + ny * 3.2 - ty * 0.6), (x1 - nx * 3.2 - tx * 0.6, y1 - ny * 3.2 - ty * 0.6)])
+    return lines([path], 2.5, [head]) + fill("M10 8.4v7.2l5.8-3.6z")
+
+
+ICONS["auto"] = auto_icon()
+
 for pid, body in P.items():
     ICONS["passive_" + pid] = body
 

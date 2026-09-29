@@ -33,6 +33,12 @@ static func exists(icon: String) -> bool:
 static func default_color(icon: String) -> Color:
 	if icon.begins_with("rune_"):
 		return UiPalette.rune_color(icon.substr(5))
+	if icon.begins_with("biome_"):
+		return UiPalette.biome_color(icon.substr(6))
+	if icon.begins_with("trait_"):
+		var tk := icon.substr(6)
+		if UiPalette.TRAIT.has(tk):
+			return UiPalette.TRAIT[tk][1]
 	if icon.begins_with("intent_"):
 		var k := icon.substr(7)
 		if UiPalette.INTENT.has(k):
@@ -90,6 +96,10 @@ static func rune_icon(rune: String) -> String:
 
 static func intent_icon(kind: String) -> String:
 	return String(UiPalette.INTENT.get(kind, ["intent_aim"])[0])
+
+
+static func biome_icon(id: String) -> String:
+	return "biome_" + id if exists("biome_" + id) else "flag"
 
 
 static func class_icon(class_id: String) -> String:

@@ -15,6 +15,8 @@ extends Node
 signal idle(phase: int)
 ## Emitted when a run's events have been played for its end (victory or defeat).
 signal run_over(victory: bool)
+## Emitted when the player (not AUTO) issues a command: AUTO turns itself off.
+signal manual_command(cmd: String)
 
 const SAVE_PATH := "user://save.json"
 const LIGHT_EVENTS := ["die_marked", "target_changed"]
@@ -28,6 +30,10 @@ var tray: DiceTray
 var ui: UiRoot
 var overlay: GameOverlay
 var player: EventPlayer
+## AUTO (game/auto/auto_pilot.gd): plays Bot.decide steps while enabled.
+var auto: AutoPilot
+## Set by AutoPilot around its own run_command call (anything else counts as manual).
+var from_auto := false
 
 ## Presentation speed (1x / 2x from settings; play_auto uses 3x).
 var speed := 1.0
@@ -88,6 +94,8 @@ func _ready() -> void:
 	overlay.modal_check = any_modal_open
 
 	player = EventPlayer.new(self)
+	auto = AutoPilot.new(self)
+	add_child(auto)
 	set_speed(SettingsPanel.game_speed())
 	get_viewport().size_changed.connect(_layout_tray)
 	_layout_tray()
@@ -97,6 +105,7 @@ func _ready() -> void:
 
 func show_title() -> void:
 	mode = "title"
+	auto.set_enabled(false)
 	get_tree().paused = false
 	flow = null
 	busy = false
@@ -126,6 +135,11 @@ func new_run(class_id: String, seed := -1) -> void:
 	if seed < 0:
 		seed = int(Time.get_unix_time_from_system()) % 1000000 + randi() % 1000
 	start(GameFlow.new_run(class_id, seed))
+	# a new road every run: show it before the first roll
+	busy = true
+	await wait(0.45)
+	await ui.show_route(flow)
+	busy = false
 
 
 func continue_run() -> bool:
@@ -141,6 +155,7 @@ func continue_run() -> bool:
 func start(f: GameFlow) -> void:
 	flow = f
 	mode = "run"
+	auto.set_enabled(false)
 	busy = false
 	in_combat = false
 	get_tree().paused = false
@@ -152,7 +167,7 @@ func start(f: GameFlow) -> void:
 	board.hero_class = f.run.class_id
 
 	board.hero_idx = f.run.pos
-	board.build(f.run.act, f.run.board.to_dict().tiles)
+	board.build(f.run.biome(), f.run.board.to_dict().tiles)
 	if f.phase == GameFlow.Phase.BOARD_READY:
 		rig.home(board.hero, true)
 	else:
@@ -167,7 +182,7 @@ func start(f: GameFlow) -> void:
 		show_move_target(t, steps if steps > 0 or f.board_move == 0 else f.run.board.size(), f.is_board_double())
 	if f.phase == GameFlow.Phase.PORTAL:
 		player._show_portal(f.offer)
-	Audio.play_music("act%d" % f.run.act)
+	Audio.play_music(f.run.biome())
 	overlay.set_black(true)
 	overlay.fade_in(0.5)
 	if f.phase == GameFlow.Phase.COMBAT and f.combat != null:
@@ -219,6 +234,10 @@ func _on_menu(action: String, arg: Variant) -> void:
 			leave_to_title()
 		"speed":
 			set_speed(float(arg))
+		"auto":
+			auto.set_enabled(bool(arg))
+		"auto_rules":
+			auto.set_rules(arg)
 
 
 ## Returns to the title. If events are still playing, playback stops at the next event
@@ -233,9 +252,16 @@ func leave_to_title() -> void:
 
 func set_speed(s: float) -> void:
 	speed = maxf(s, 0.25)
-	tray.speed_scale = speed
+	# 4x also condenses beats: a quicker tray throw, shorter overlay holds (see wait())
+	tray.speed_scale = speed * (1.3 if condensed() else 1.0)
 	stage.speed = speed
-	overlay.speed = speed
+	overlay.speed = speed * (1.35 if condensed() else 1.0)
+	ui.auto_hud.set_speed(speed)
+
+
+## True at 4x: repeated beats merge, long holds shorten, short hops keep the camera still.
+func condensed() -> bool:
+	return speed >= 3.9
 
 
 func pause() -> void:
@@ -247,8 +273,12 @@ func pause() -> void:
 
 ## Runs a GameFlow command and plays its events. Ignored while events play.
 func run_command(cmd: String, args: Array = []) -> void:
+	var manual := not from_auto
+	from_auto = false
 	if busy or flow == null or mode != "run" or flow.is_over():
 		return
+	if manual:
+		manual_command.emit(cmd)
 	if not flow.has_method(cmd):
 		push_warning("GameController: unknown command %s" % cmd)
 		return
@@ -293,6 +323,8 @@ func play_events(evs: Array) -> void:
 func wait(t: float) -> void:
 	if t <= 0.0:
 		return
+	if condensed() and t > 0.6:
+		t = 0.6 + (t - 0.6) * 0.5
 	await get_tree().create_timer(t / speed, false).timeout
 
 
@@ -435,7 +467,7 @@ func _boss_intro(tile: int, enemies: Array) -> void:
 		await get_tree().process_frame
 	stage.reframe()
 	overlay.vignette(0.0, 0.8)
-	Audio.play_music("act3", 1.2)
+	Audio.play_music(flow.run.biome(), 1.2)
 	ui.combat_hud.visible = true
 	ui.combat_hud.modulate.a = 0.0
 	var ht := ui.combat_hud.create_tween()
@@ -487,33 +519,35 @@ func change_biome(ev: Dictionary) -> void:
 	var act := int(ev.get("act", flow.run.act))
 	var lap := int(ev.get("lap", flow.run.lap))
 	var pos := int(ev.get("pos", flow.run.pos))
+	var bid := String(ev.get("biome", flow.run.biome()))
 	var tiles: Array = ev.board.tiles
 	stage.clear()
 	in_combat = false
 	rig.overview(board.ring_bounds())
 	await wait(0.25)
 	await board.sink_wave(pos, 0.9 / speed)
-	var look := Biome.look(act)
+	var look := Biome.look(bid)
 	Audio.play_sfx("portal")
 	var vs := get_viewport().get_visible_rect().size
 	var centre := hero_screen(0.8) / Vector2(maxf(vs.x, 1.0), maxf(vs.y, 1.0))
 	await overlay.dissolve(true, Color(look.sky_top).lerp(Color(look.sky_glow), 0.25), Color(look.sky_glow), 0.7, centre)
 	board.hero_idx = pos
-	board.build(act, tiles)
+	board.build(bid, tiles)
 	board.hide_tiles()
 	rig.overview(board.ring_bounds(), true)
-	Audio.play_music("act%d" % act, 1.2)
+	Audio.play_music(bid, 1.2)
 	await wait(0.15)
 	centre = hero_screen(0.8) / Vector2(maxf(vs.x, 1.0), maxf(vs.y, 1.0))
 	overlay.dissolve(false, Color(look.sky_top), Color(look.sky_glow), 0.9, centre)
 
 	await wait(0.25)
 	board.rise_wave(pos, 1.1 / speed)
-	var name := String(SummaryScreen.ACT_NAMES[clampi(act - 1, 0, 2)])
-	overlay.announce(name.to_upper(), "Lap %d of %d  ·  Act %s" % [lap, Balance.TOTAL_LAPS, ["I", "II", "III"][clampi(act - 1, 0, 2)]],
-		Color(look.sky_glow).lerp(UiPalette.GOLD_BRIGHT, 0.5), 1.6)
+	var name := String(ev.get("biome_name", BiomeDefs.name_of(bid)))
+	var tier: String = ["I", "II", "III"][clampi(act - 1, 0, 2)]
+	overlay.biome_card(bid, name, "Tier %s  ·  Lap %d of %d" % [tier, lap, Balance.TOTAL_LAPS],
+		String(ev.get("biome_desc", BiomeDefs.desc_of(bid))), 2.2)
 	Audio.play_sfx("fanfare")
-	await wait(1.9)
+	await wait(2.6)
 
 
 # --- input -----------------------------------------------------------------------------------
