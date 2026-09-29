@@ -597,6 +597,56 @@ ICONS["biome_magma"] = (fill("M2.4 20.8l6.4-11.4h6.4l6.4 11.4z") + shade("M12 9.
                         + f'<path d="M10.2 9.2c.2-1.4 1-2 1.8-2s1.6.6 1.8 2" fill="{RED}" stroke="{O}" stroke-width="1"/>'
                         + circ(8.4, 4.6, 1.3, RED) + circ(15.8, 3.6, 1.1, GOLD) + circ(12.2, 2.4, 0.9, RED))
 
+# ---------------------------------------------------------------- 2026-09-29 biomes + their twists
+TEAL = "#5FE0D0"
+SAND = "#F2CF8A"
+SILVER = "#E6ECFF"
+# Deep Mines: a glowing gem vein in a rock with a pickaxe
+ICONS["biome_mines"] = (lines(["M4.2 4.4l8.6 8.6"], 2.2)
+                        + fill("M2.6 6.2c2.2-3 6.8-3.8 9.6-2.2-3.4-.2-6.6.6-9.6 2.2z")
+                        + fill("M2.4 21.2l2.6-7.4 5-3.2 5.6 1.2 4.4 4.6.6 4.8z") + shade("M15.6 11.8l4.4 4.6.6 4.8H12z", 0.16)
+                        + f'<path d="M9.6 14.2l2.4-3.2 2.4 3.2-2.4 4.2z" fill="{TEAL}" stroke="{O}" stroke-width="1.1" stroke-linejoin="round"/>'
+                        + f'<path d="M15.4 16.6l1.6-1.8 1.4 2-1.5 2.4z" fill="{GOLD}" stroke="{O}" stroke-width="1" stroke-linejoin="round"/>'
+                        + hl("M10.8 13.8l1.2-1.6", 1.0, 0.8))
+# Orc Warcamp: a war tent with a blood-red pennant
+ICONS["biome_warcamp"] = (lines(["M12 2.8v4.2"], 1.8)
+                          + f'<path d="M12.4 2.8l5 1.6-5 1.8z" fill="{RED}" stroke="{O}" stroke-width="1.1" stroke-linejoin="round"/>'
+                          + fill("M12 6.6l9.4 14.6H2.6z") + shade("M12 6.6l9.4 14.6H12z", 0.16)
+                          + f'<path d="M12 12.4l-3 8.8h6z" fill="{O}"/>'
+                          + f'<path d="M6.6 15.2l2.6-1.6M17.4 15.2l-2.6-1.6" stroke="{O}" stroke-opacity="0.45" stroke-width="1.1"/>')
+# Sunscorched Ruins: a broken column under a white-gold sun
+ICONS["biome_ruins"] = (circ(17.2, 6.4, 3.6, GOLD)
+                        + fill("M4.4 21.2v-1.8h11.2v1.8zM5.4 19.4V9.8l2.2-1.4 1.6 1.8 1.8-2.2 2.4 1.6 1.2-.6v10.4z")
+                        + shade("M12 8l2.4 1.6 1.2-.6v10.4H12z", 0.16)
+                        + f'<path d="M8 11.4v6.4M10.6 11v6.8M13.2 11.2v6.6" stroke="{O}" stroke-opacity="0.45" stroke-width="1.1"/>')
+# Moonlit Woods: a crescent moon and a star
+MOON = "M15.8 3.4a8.6 8.6 0 1 0 4.8 13.8 7 7 0 0 1-4.8-13.8z"
+ICONS["biome_moonlit"] = (fill(MOON) + shade("M20.6 17.2a8.6 8.6 0 0 1-15.2-1.4c3.6 2.6 10 3.2 15.2 1.4z", 0.16)
+                          + f'<path d="{poly(star_pts(18.2, 6.6, 2.6, 1.1))}" fill="{SILVER}" stroke="{O}" stroke-width="1" stroke-linejoin="round"/>'
+                          + hl("M6.6 9.4a6.4 6.4 0 0 1 3.4-4", 1.2, 0.6))
+# twist glyphs (HUD chip): the sun (Ruins heat), an oasis pool (cooled), ore and the war drum
+rays = []
+for k in range(8):
+    a = math.radians(k * 45)
+    rays.append(f"M{12 + 7.2 * math.cos(a):.2f} {12 + 7.2 * math.sin(a):.2f} L{12 + 10 * math.cos(a):.2f} {12 + 10 * math.sin(a):.2f}")
+ICONS["sun"] = lines(rays, 1.9) + circ(12, 12, 5.2) + shade("M15.7 8.3a5.2 5.2 0 0 1-7.4 7.4 5.2 5.2 0 0 0 7.4-7.4z", 0.18)
+ICONS["oasis"] = (fill("M2.6 17.4c0-2 4.2-3.4 9.4-3.4s9.4 1.4 9.4 3.4-4.2 3.4-9.4 3.4-9.4-1.4-9.4-3.4z")
+                  + lines(["M12.4 15.6c.4-3.4-.2-6.4-1.4-9"], 1.6)
+                  + f'<path d="M11 6.6c-2.2-1.6-5-1.2-6.6.8 2.4-.6 4.6-.4 6.6-.8zM11 6.6c1.4-2.2 4.4-3 6.8-1.8-2.6.2-4.8.8-6.8 1.8zM11 6.6c2.6-.4 5.2.8 6.2 3-2-1.4-4.2-2.2-6.2-3z" fill="#5CC46A" stroke="{O}" stroke-width="1" stroke-linejoin="round"/>'
+                  + hl("M6.4 17.2c1.6.6 3.4.8 5.6.8", 1.1, 0.7))
+ICONS["ore"] = (fill("M3 20.6l3.2-8.2 6-3 6.2 2.2 2.6 9z") + shade("M18.4 11.6l2.6 9h-8.6z", 0.16)
+                + f'<path d="M9.4 14.4l3-4.2 3 4.2-3 5z" fill="{TEAL}" stroke="{O}" stroke-width="1.1" stroke-linejoin="round"/>'
+                + f'<path d="M5.8 17.6l1.4-1.6 1.4 1.8-1.4 1.8z" fill="{GOLD}" stroke="{O}" stroke-width="1" stroke-linejoin="round"/>'
+                + hl("M11.4 13.2l1-1.4", 1.0, 0.8))
+ICONS["drum"] = ICONS["intent_rally"]
+# intents: Bury (a die sinking into sand) and Moonfall (a falling moon)
+ICONS["intent_bury"] = (die(6.2, 3.0, 11.6, 3, -12)
+                        + f'<path d="M1.8 15.6c3.2-1.8 6.6-1.8 10.2 0s7 1.8 10.2 0v5.6H1.8z" fill="{SAND}" stroke="{O}" stroke-width="{SW}" stroke-linejoin="round"/>'
+                        + f'<path d="M5 18.6c2-.8 4-.8 6 0M13.4 18.6c2-.8 4-.8 6 0" fill="none" stroke="{O}" stroke-opacity="0.45" stroke-width="1.1" stroke-linecap="round"/>')
+ICONS["intent_moonfall"] = (lines(["M4.4 2.4l3.2 5.6", "M9.2 1.8l2.4 4.4", "M2.2 7.4l2.6 3.8"], 1.4)
+                            + g(fill(MOON) + shade("M20.6 17.2a8.6 8.6 0 0 1-15.2-1.4c3.6 2.6 10 3.2 15.2 1.4z", 0.16),
+                                "translate(3.2 4.2) scale(0.8)"))
+
 # ---------------------------------------------------------------- AUTO (looping arrow + play)
 def auto_icon():
     a0, a1, r = -58, 222, 8.0

@@ -5,7 +5,7 @@ extends Node3D
 ## face the active camera every frame, so the layout stays screen-aligned and crisp.
 
 const INTENT_KINDS := {"attack": 0, "block": 1, "buff": 2, "curse": 3, "summon": 4, "aim": 6, "chaos": 7,
-	"heal": 8, "drain": 9, "burn": 10, "chill": 11, "scorch": 12, "rally": 2}
+	"heal": 8, "drain": 9, "burn": 10, "chill": 11, "scorch": 12, "rally": 2, "bury": 17, "moonfall": 18}
 ## Trait chips under the HP bar (intent_icon.gdshader kinds).
 const TRAIT_KINDS := {"armor": 13, "thorns": 14, "ward": 15, "pierce": 16}
 const INTENT_COLORS := {
@@ -15,6 +15,7 @@ const INTENT_COLORS := {
 	"burn": Color(0.95, 0.42, 0.12), "chill": Color(0.36, 0.68, 0.92), "scorch": Color(0.78, 0.28, 0.08),
 	"armor": Color(0.5, 0.5, 0.56), "thorns": Color(0.42, 0.62, 0.26), "ward": Color(0.56, 0.36, 0.86),
 	"pierce": Color(0.9, 0.4, 0.22), "rally": Color(0.86, 0.3, 0.12),
+	"bury": Color(0.78, 0.58, 0.28), "moonfall": Color(0.42, 0.44, 0.82),
 }
 ## Traits without a drawn chip kind use their affix badge glyph (frenzy on the Orc Raider).
 const TRAIT_ICONS := {"frenzy": "affix_frenzied", "ward_allies": "affix_warded"}
@@ -36,6 +37,14 @@ var _traits: Array = []
 var affix_badges: Array[MeshInstance3D] = []
 var affixes: Array = []
 var _affix_count: Label3D
+## The Moon King's moon meter (data keys moon / moon_max / moon_blood): a moon disc that fills
+## with the tide, pips for the tide steps; hidden for everyone else.
+var moon_badge: MeshInstance3D
+var _moon_mat: ShaderMaterial
+var _moon := -99
+var _moon_fill := 0.0
+var _moon_tween: Tween
+const MOON_SIZE := 0.64
 
 var _bar_mat: ShaderMaterial
 var _intent_mat: ShaderMaterial
@@ -89,6 +98,17 @@ func _init() -> void:
 	name_label.position = Vector3(0, 0.82, 0.01)
 	name_label.visible = false
 	add_child(name_label)
+	moon_badge = MeshInstance3D.new()
+	moon_badge.name = "MoonMeter"
+	moon_badge.mesh = Props.quad(MOON_SIZE)
+	_moon_mat = ShaderMaterial.new()
+	_moon_mat.shader = preload("res://game/world/shaders/moon_meter.gdshader")
+	_moon_mat.render_priority = 11
+	moon_badge.material_override = _moon_mat
+	moon_badge.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	moon_badge.position = Vector3(BAR_SIZE.x * 0.5 + 0.12, 0.5, 0.0)
+	moon_badge.visible = false
+	add_child(moon_badge)
 
 
 func _process(_dt: float) -> void:
@@ -140,6 +160,8 @@ func set_data(data: Dictionary, animate := true) -> void:
 		status_label.modulate = SkinRules.AFFIXES.frenzied.color
 	if data.has("traits"):
 		set_traits(data.traits)
+	if data.has("moon"):
+		set_moon(int(data.moon), int(data.get("moon_max", 4)), bool(data.get("moon_blood", false)), animate)
 	var nm := String(data.get("name", ""))
 	var mini := bool(data.get("miniboss", false))
 	name_label.visible = (boss or mini) and nm != ""
@@ -162,6 +184,31 @@ func set_intent(kind: String, value: int, animate := true) -> void:
 	if animate and key != _intent_key:
 		_punch(intent_badge, 1.35)
 	_intent_key = key
+
+
+## The moon meter: `value` of `max` tide steps (a negative start shows as empty), red in the blood
+## moon (phase 2). Animates the fill and punches on a change.
+func set_moon(value: int, max_v: int, blood := false, animate := true) -> void:
+	moon_badge.visible = true
+	_moon_mat.set_shader_parameter("pips", maxi(max_v, 1))
+	_moon_mat.set_shader_parameter("lit", clampi(value, 0, max_v))
+	_moon_mat.set_shader_parameter("blood", 1.0 if blood else 0.0)
+	var f := clampf(float(value) / float(maxi(max_v, 1)), 0.0, 1.0)
+	if _moon_tween:
+		_moon_tween.kill()
+	if animate and value != _moon and _moon != -99:
+		_moon_tween = create_tween()
+		_moon_tween.tween_method(_set_moon_fill, _moon_fill, f, 0.45).set_trans(Tween.TRANS_CUBIC)
+		_moon_tween.parallel().tween_method(func(v: float) -> void: _moon_mat.set_shader_parameter("pulse", v), 0.8, 0.0, 0.6)
+		_punch(moon_badge, 1.35)
+	else:
+		_set_moon_fill(f)
+	_moon = value
+
+
+func _set_moon_fill(v: float) -> void:
+	_moon_fill = v
+	_moon_mat.set_shader_parameter("fill", v)
 
 
 ## Trait chips (armor, thorns, ward, pierce) to the right of the HP bar.
@@ -256,7 +303,7 @@ func set_opacity(a: float) -> void:
 		_affix_count.outline_modulate.a = a
 	for c in trait_chips:
 		(c.material_override as ShaderMaterial).set_shader_parameter("opacity", a)
-	for m in [_bar_mat, _intent_mat, _block_mat]:
+	for m in [_bar_mat, _intent_mat, _block_mat, _moon_mat]:
 		(m as ShaderMaterial).set_shader_parameter("opacity", a)
 	for l in [hp_label, intent_label, block_label, status_label, name_label]:
 		(l as Label3D).modulate.a = a
