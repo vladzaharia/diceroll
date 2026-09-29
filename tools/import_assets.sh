@@ -275,20 +275,42 @@ cp -f "$SRC/$MM/12 - June 2024 - Robot/characters/Robot_One.glb" "$KK/mystery/fi
 cp -f "$SRC/$MM/6 - December 2023 - Action Figure/character/gltf/ActionFigure.glb" "$KK/mystery/figures/ActionFigure.glb"
 lic "$MM" "$KK/mystery"
 
-echo "== Music beds (mixkit, re-encoded to 96 kbps mp3 to keep the repo lean)"
+echo "== Music beds (CC0, OpenGameArt: RandomMind + cynicmusic) -> mp3, -16 LUFS"
+# out name | source dir under third_party/music | source file | trim (1 = strip leading/trailing
+# silence from full-length tracks; 0 = author's seamless loop version, left untouched).
+# Two-pass loudnorm (linear) to -16 LUFS integrated, -1.5 dBTP, then LAME VBR q4 (~165 kbps;
+# the LAME tag's delay/padding keeps loops gapless in Godot). Homebrew ffmpeg has no libvorbis.
 MUS="$DST/audio/music"
 mkdir -p "$MUS"
-for name in zanarkand-forest-169 spirit-in-the-woods-2-147 ambient-251 vastness-184 nature-meditation-345; do
-	in="$TP/music/mixkit/mixkit-$name.mp3"
-	out="$MUS/mixkit-$name.mp3"
+command -v ffmpeg >/dev/null || { echo "ffmpeg is required to import music" >&2; exit 1; }
+keep=" "
+while IFS='|' read -r name dir file trim; do
+	in="$TP/music/$dir/$file"
+	out="$MUS/$name.mp3"
+	keep="$keep$name.mp3 $name.mp3.import "
 	[ -f "$in" ] || { echo "missing $in" >&2; exit 1; }
-	if [ ! -f "$out" ] || [ "$in" -nt "$out" ]; then
-		if command -v ffmpeg >/dev/null; then
-			ffmpeg -loglevel error -y -i "$in" -vn -c:a libmp3lame -b:a 96k "$out"
-		else
-			cp -f "$in" "$out"
-		fi
-	fi
+	[ -f "$out" ] && [ ! "$in" -nt "$out" ] && continue
+	pre="anull"
+	[ "$trim" = 1 ] && pre="silenceremove=start_periods=1:start_threshold=-60dB,areverse,silenceremove=start_periods=1:start_threshold=-60dB,areverse"
+	m="$(ffmpeg -nostdin -hide_banner -nostats -i "$in" -af "$pre,loudnorm=I=-16:TP=-1.5:LRA=11:print_format=json" -f null - 2>&1)"
+	j() { echo "$m" | sed -n "s/.*\"$1\" : \"\([^\"]*\)\".*/\1/p" | tail -1; }
+	ln="loudnorm=I=-16:TP=-1.5:LRA=11:linear=true:measured_I=$(j input_i):measured_TP=$(j input_tp)"
+	ln="$ln:measured_LRA=$(j input_lra):measured_thresh=$(j input_thresh):offset=$(j target_offset)"
+	ffmpeg -nostdin -loglevel error -y -i "$in" -vn -af "$pre,$ln" -ar 44100 -c:a libmp3lame -q:a 4 "$out"
+done <<'EOF'
+bards-tale|randommind|Loop_The_Bards_Tale.wav|0
+old-tower-inn|randommind|Loop_The_Old_Tower_Inn.wav|0
+harvest-season|randommind|harvestseason.wav|1
+lament-for-a-warriors-soul|randommind|Lament_for_a_Warriors_Soul_REUPLOAD.mp3|1
+rising-moon|randommind|Rising_Moon_0.mp3|1
+medieval-battle|randommind|battle_1.wav|1
+dark-forest|cynicmusic|GameMusic_ForestTheme_24_0.mp3|1
+battle-theme-b|cynicmusic|battleThemeB.mp3|1
+battle-theme-a|cynicmusic|battleThemeA.mp3|1
+EOF
+# drop any retired beds so they can't ship in an export
+for f in "$MUS"/*; do
+	case "$keep" in *" ${f##*/} "*) ;; *) rm -f "$f" ;; esac
 done
 
 if [ "${1:-}" = "--fetch" ]; then

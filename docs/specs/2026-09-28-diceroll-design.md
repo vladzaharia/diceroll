@@ -139,7 +139,7 @@ Scaling: HP × (1 + 0.35·(act−1) + 0.1·(lap−1)), and attack scales the sam
 - **Lighting and post:** warm key light plus cool fill and soft shadows. Glow and filmic/AgX tonemap, per-act colour grading, subtle fog, ambient particles (dust, embers, fireflies). Forward+ on desktop, Mobile renderer on iOS.
 - **UI:** chunky rounded UI in the KayKit style: Fredoka / Lilita One (OFL, downloaded), dark translucent panels with warm gold accents, and big tappable buttons (≥88 px on phone). Floating damage numbers, HP bars over units, and intent icons over enemies.
 - **Juice:** hit-stop, camera shake on big combos, coins flying to the HUD counter, a screen flash for ×5+ combos, and tile pulse on landing.
-- **Audio:** Kenney CC0 packs (Casino for dice, RPG/Impact/Interface for UI and combat) plus the `mixkit-*.mp3` music beds found in Downloads, one per act. There are Master, Music and SFX volume settings.
+- **Audio:** Kenney CC0 packs (Casino for dice, RPG/Impact/Interface for UI and combat) plus CC0 music beds from OpenGameArt (RandomMind and cynicmusic): a title theme, a calm camp/event bed, one bed per biome and a tense boss theme. There are Master, Music and SFX volume settings.
 
 ## 11. Screens
 
@@ -266,6 +266,6 @@ Principles: no premium currency, no paid or random rolls for power. Every upgrad
   - **CI/CD:** tests, sims and a screenshot matrix on every change. Releases build macOS, iOS/iPadOS, Android, Windows, Linux and Web to GitHub Releases. Store uploads are disabled by default. The changelog comes from commits, with LLM player-facing notes.
   - **In-game auto-updates:** store updates plus an "update available" prompt on mobile; on desktop, signed PCK content patches and full binary updates, with rollback safety. Web always serves the latest. Steam and itch handle their own updates.
 - **Open source (Vlad):**
-  - The game repo `vladzaharia/diceroll` is **public** under the **MIT** licence (code and original art). Third-party assets are excluded and credited in THIRD_PARTY_NOTICES, and the README tells forks exactly which KayKit FREE/EXTRA packs to get. (All KayKit packs, including EXTRA, are CC0; they stay out of the public repo by choice, to respect the creator selling EXTRA. Only Mixkit music is non-redistributable.)
+  - The game repo `vladzaharia/diceroll` is **public** under the **MIT** licence (code and original art). Third-party assets are excluded and credited in THIRD_PARTY_NOTICES, and the README tells forks exactly which KayKit FREE/EXTRA packs to get. (All KayKit packs, including EXTRA, are CC0; they stay out of the public repo by choice, to respect the creator selling EXTRA. The music is CC0 too; no bundled asset is non-redistributable.)
   - The asset repo stays **private**.
   - History was rewritten (git-filter-repo) to purge previously tracked asset folders before publishing. A backup of the old `.git` is at `../diceroll-git-backup-20260929-0213`.
