@@ -109,7 +109,7 @@ class _GalleryCam extends Camera3D:
 			return
 		var cols := 3 if portrait else 6
 		var rows := 4 if portrait else 2
-		var gap := Vector2(1.3, 1.4) if portrait else Vector2(1.25, 1.5)
+		var gap := Vector2(1.3, 2.0) if portrait else Vector2(1.25, 2.2)
 		for k in pets.size():
 			var pet_i := k / 2
 			var lv_i := k % 2
@@ -117,7 +117,7 @@ class _GalleryCam extends Camera3D:
 			var row := (pet_i / cols) * 2 + lv_i
 			pets[k].position = Vector3((col - (cols - 1) * 0.5) * gap.x, 0.0, (row - (rows - 1) * 0.5) * gap.y)
 		var target := Vector3(0.0, 0.75, 0.2)
-		var dist := 12.5 if portrait else 12.0
-		var pitch := deg_to_rad(34.0 if portrait else 28.0)
+		var dist := 11.0 if portrait else 12.5
+		var pitch := deg_to_rad(46.0 if portrait else 42.0)
 		position = target + Vector3(0.0, sin(pitch), cos(pitch)) * dist
 		look_at(target)
