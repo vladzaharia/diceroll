@@ -9,9 +9,7 @@ extends RefCounted
 ##  boss_act1..3    boss fights (Bone Warden, Hollow King, Lich + minions)
 ##  fx_gallery      every FX firing in a loop on the act 1 board
 ##  board_<biome>   overview of a biome by id (glade, crypt, hollow, frost, throne, magma)
-##  enemy_gallery   enemy looks with their HUDs on the cleared act 1 island; --only=new|old|mini|
-##                  boss|size|all|<id,id,...> (default new), --pitch=deg, --shatter=1 (every
-##                  second Magma Golem in phase 2), --intents=1 (cycle intent kinds)
+##  enemy_gallery   moved to game/enemies/foe_scenarios.gd (served via game/actors/scenarios.gd)
 ##  combat_sequence full beat loop (attack, hit, death, enemy attack, hero hit, summon, end)
 ##  tiles_ice_lava  close-up of the Frostpeak ice and Magma lava tiles (--biome=frost|magma)
 ##  combat_hero_check  position check (headless ok): the hero fights from the fight's tile even
@@ -21,7 +19,7 @@ extends RefCounted
 
 const NAMES := ["board_glade", "board_crypt", "board_hollow", "board_frost", "board_throne", "board_magma",
 	"board_act1", "board_act2", "board_act3", "board_follow", "board_mutate", "board_portal", "combat_act1",
-	"combat_act2", "combat_act3", "boss_act1", "boss_act2", "boss_act3", "fx_gallery", "enemy_gallery", "combat_sequence",
+	"combat_act2", "combat_act3", "boss_act1", "boss_act2", "boss_act3", "fx_gallery", "combat_sequence",
 	"combat_hero_check", "tiles_ice_lava", "tiles_props"]
 
 
@@ -224,72 +222,11 @@ class _Driver extends Node3D:
 					pts.append(board.tile_global_position(k))
 				pts.append(board.tile_global_position(4) + Vector3.UP * 1.6)
 				rig.frame_points(pts, float(args.get("yaw", "90")), float(args.get("pitch", "40")), true)
-			"enemy_gallery":
-				_gallery(String(args.get("only", "new")))
 			"fx_gallery":
 				board.place_hero(3)
 				rig.follow(board.hero, true)
 				await get_tree().create_timer(maxf(wait - 0.5, 0.2)).timeout
 				_fx_all()
-
-	## Enemy looks in rows with their HUDs, on the cleared island. only: new | old | mini |
-	## boss | all | size (elite < mini < boss ladder) | comma-separated ids.
-	func _gallery(only: String) -> void:
-		var groups := {
-			"old": ["skeleton_minion", "skeleton_warrior", "skeleton_archer", "cultist", "bandit", "brute"],
-			"new": ["thorn_sprite", "wolf_bandit", "hollow_wisp", "frost_skeleton", "ice_archer", "bone_knight",
-				"ember_imp", "magma_brute"],
-			"mini": ["mini_bone_champion", "mini_pumpkin_knight", "mini_grave_mage", "mini_frost_warden",
-				"mini_briar_beast", "mini_cinder_brute"],
-			"boss": ["boss_bone_warden", "boss_lich", "boss_cinder_king", "boss_magma_golem", "boss_hollow_king"],
-			"size": ["brute", "mini_bone_champion", "mini_cinder_brute", "boss_lich", "boss_magma_golem"],
-		}
-		var ids: Array = EnemyLooks.DEFS.keys() if only == "all" else groups.get(only, Array(only.split(",")))
-		var kinds := ["attack", "heal", "drain", "burn", "chill", "scorch", "block", "buff", "curse", "summon"]
-		var per_row := 4 if only in ["new", "old"] else 3
-		if ids.size() <= 5 and only != "new":
-			per_row = ids.size()
-		var big := 1.0
-		for id in ids:
-			big = maxf(big, EnemyLooks.scale_of(String(id)))
-		var gap := 1.9 + 1.25 * big
-		var rows := int(ceil(float(ids.size()) / per_row))
-		var pts := PackedVector3Array()
-		for i in ids.size():
-			var id := String(ids[i])
-			var ch := EnemyLooks.create(id)
-			ch.scale = Vector3.ONE * CombatStage.UNIT_SCALE * EnemyLooks.scale_of(id)
-			var row := i / per_row
-			var in_row := mini(per_row, ids.size() - row * per_row)
-			var p := Vector3((float(i % per_row) - (in_row - 1) * 0.5) * gap, 0.05, (float(row) - (rows - 1) * 0.5) * gap * 1.5 + 1.5)
-			ch.position = p
-			add_child(ch)
-			var hud := UnitHud.new()
-			add_child(hud)
-			hud.position = p + Vector3.UP * (EnemyLooks.hud_height(id) * CombatStage.UNIT_SCALE + 0.35)
-			var ed := EnemyDefs.def(id)
-			var intent := {"kind": kinds[i % kinds.size()], "value": 5}
-			var pat: Array = ed.get("pattern", ed.get("phases", [[]])[0] if ed.has("phases") else [])
-			if not pat.is_empty() and not Shot.args.has("intents"):
-				# show the enemy's signature move (its first non-plain intent)
-				intent = (pat[0] as Dictionary).duplicate()
-				for q: Dictionary in pat:
-					if not String(q.kind) in ["attack", "block", "aim"]:
-						intent = q.duplicate()
-						break
-			hud.set_data({"hp": 10, "max_hp": 12, "block": 3 if i % 3 == 0 else 0, "boss": EnemyLooks.is_boss(id),
-				"miniboss": EnemyLooks.is_miniboss(id), "name": String(ed.get("name", id)), "intent": intent,
-				"traits": EnemyDefs.traits(id, 2 if id == "boss_magma_golem" and Shot.args.has("shatter") and i % 2 == 1 else 1)}, false)
-			if id == "boss_magma_golem" and Shot.args.has("shatter") and i % 2 == 1:
-				EnemyLooks.shatter(ch)
-			pts.append(p)
-			pts.append(p + Vector3.UP * (2.9 * EnemyLooks.scale_of(id)) + Vector3.BACK * -1.2)
-		for n in ["SetPiece", "InnerCorners"]:
-			if board.biome.has_node(n):
-				board.biome.get_node(n).visible = false
-		board.get_node("Tiles").visible = false
-		board.hero.visible = false
-		rig.frame_points(pts, 0.0, float(Shot.args.get("pitch", "30")), true)
 
 	func _process(_dt: float) -> void:
 		if Shot and Shot.args.has("perf") and Engine.get_process_frames() % 60 == 0:
