@@ -51,7 +51,7 @@ const DEFS := {
 	"fishing": {"name": "Fishing", "skill": "50:50", "signature": "potion_pair",
 		"desc": "Pick a spot, cast, and strike when the bobber plunges (not on a nibble). Deeper water, bigger fish, quicker bites. 3 casts.",
 		"signature_desc": "Gold: The Catch, a Healing Draught plus another potion."},
-	"lucky_wheel": {"name": "Lucky Wheel", "skill": "15:85", "signature": "passive_uncommon",
+	"lucky_wheel": {"name": "Lucky Wheel", "skill": "25:75", "signature": "passive_uncommon",
 		"desc": "Spin the prize wheel twice. As it slows, one tap on the brake can stop it a segment or two early.",
 		"signature_desc": "Gold: pick an uncommon passive."},
 	"high_low": {"name": "High-Low Ladder", "skill": "40:60", "signature": "high_roller",

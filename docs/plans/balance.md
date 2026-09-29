@@ -170,6 +170,53 @@ Upgrades are the whole growth curve now: the old level-up drafts gave about 17 p
   capsule held + 0.22 x depth (minigame Rng). 2 grabs. MEDIAN 10: a human-ish aimer (sigma 0.045)
   medians 10 (mean 10.6, q25 6, q75 15); perfect aim medians 17.
 
+### Minigames 2.0 (WP-E5, spec §16 "More minigames")
+
+Seven more Arcade games, all in `core/minigames/<id>.gd` (deterministic from the minigame Rng +
+inputs, public state only, save/load mid-game). Every MEDIAN below is calibrated with
+`tools/mg_calibrate.gd` (a human-like player with its own noise Rng, 2,000 games each; `--policy=
+expert|random` for the bounds), so median play = ratio 1.0 = silver at 1.0x, like the first four.
+E[value] = expected prize in gold equivalents (bronze 12, silver 25, gold 45 x skill band); the
+review's parity rule (±10% of the mean) holds for all seven new games (mean of all 11 = 29.2).
+
+| game | rules (one thumb) | MEDIAN | human q25-q75 | tiers b/s/g | E[value] | expert / random median | skill band | gold signature |
+|---|---|---|---|---|---|---|---|---|
+| Bubble Shooter | hex cluster 8 wide, 4 colours, 10 shots aimed with a quantised angle (121 steps, walls bounce); pop 3+ = 1/bubble, dropped = 2/bubble, clear +10 | 43 | 30-54 | 33/36/31 | 29.1 (-0.6%) | 55 / 10 | ±15% | Sharpshooter: +1 ATK (shrine value) |
+| Plinko | 8 peg rows, 9 shuffled buckets (1,1,2,2,3,3,5,6,10), pick a slot, 3 drops; golden peg x2 | 16 | 10-22 | 34/35/31 | 27.5 (-5.9%) | 17 / 11 | ±5% | Rare rune for a die |
+| Shell Game | 3 cups, 3 rounds: 5/8/11 swaps at 0.46/0.34/0.25 s; right pick 2/3/4, x2 within 1.2 s of the shuffle (Sharp Eye) | 11 | 8-14 | 30/35/34 | 30.3 (+3.5%) | 18 / 3 | ±15% | Heart Gem: +10 max HP (shrine value) |
+| Memory Match | 4x4, 8 pairs (faces 1-6, Star, Skull), 6 misses; 2 per pair, +1 per miss left on a clear | 9 | 6-12 | 33/32/35 | 30.2 (+3.4%) | 18 / 0 | ±15% | Mirror Forge: 2 edits, raise or mirror |
+| Fishing | 3 casts at shallows / reeds / deep; strike in the bite window (0.8/0.62/0.48 s), fake nibbles before; fish 1-10, perfect strike +1 | 11 | 7-14 | 33/41/26 | 27.1 (-7.2%) | 16 / 0 | ±10% | The Catch: Healing Draught + another potion |
+| Lucky Wheel | 12 shuffled segments (2..12), 2 spins, one brake tap in the last 1.1 s | 13 | 10-17 | 28/38/35 | 29.1 (-0.5%) | 16 / 10 | ±5% | Uncommon passive (1 of 3) |
+| High-Low Ladder | d6 higher/lower, ladder 2,5,6,7,9,11,14,18,24, safety rungs 0/1/3/5, push on equal, cash out any time | 6 | 5-7 | 21/54/24 | 28.2 (-3.5%) | 5 / 2 | ±10% | High Roller: every die's lowest face +1 |
+
+Notes: Memory Match's and High-Low's scores are lumpy (even pair scores; ladder rungs), so their
+MEDIAN sits between the two central outcomes (memory 8|10 -> 9; high-low's rungs map bust -> bronze,
+rungs 1-3 -> silver, 4+ -> gold). The human models: shooter best-looking shot 65% else a decent
+one, aim noise sd 2 steps; plinko best-odds slot 50%, above the top bucket 30%, random 20%;
+shell loses track per gem-moving swap 2.5/6/11% and taps at once 70% when sure; memory forgets
+a seen card with 0.97 x 0.9^turns; fishing deep 45% / reeds 35% / shallows 20%, fooled by a
+nibble 12%, reaction 0.34 ± 0.09 s; wheel brakes on the best window segment 65% (± 0.09 s);
+high-low cashes at a personal nerve (rung 4-7, or 2-4 when the die shows 3 or 4).
+The first four keep their numbers; for reference the same tool measures them at fossil 27.8,
+bubble breaker 38.0 (its bot always takes the biggest cluster: a perfect player), scratch-off
+21.9 (only 3.5% gold by design) and claw 32.4.
+
+**Arcade unlocks (minor unlocks, one milestone each, Sigils 6 as before):** the realistic
+campaign (`--campaign=30 --campaigns=8`) gets them at the median runs below, spread between the
+class/biome majors (never two minigames on one run).
+
+| minigame | milestone | condition | target run | campaign median |
+|---|---|---|---|---|
+| Plinko | arcade_newbie | Play 6 minigames | 2 | 2 |
+| (Fossil Hunter) | arcade_regular | Play 14 minigames | 5 | 4 |
+| High-Low Ladder | lucky_streak | Cash out the Treasury 12 times | 6 | 5 |
+| Fishing | angler | Complete 105 laps in total | 8 | 8 |
+| Memory Match | sharp_memory | Keep 1,350 dice unrerolled | 9 | 10 |
+| Bubble Shooter | arcade_ace | Play 30 minigames | 11 | 11 |
+| (Bubble Breaker) | arcade_fan | Play 40 minigames | 13 | 14 |
+| Shell Game | sleight_of_hand | Use 1,500 combat rerolls | 16 | 17 |
+| Lucky Wheel | high_roller | Play 56 minigames | 20 | 21 |
+
 ### Ascension (global, 10 levels, max profile, realistic bot, standard mode)
 
 | A | rule | win% |
