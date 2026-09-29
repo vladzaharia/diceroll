@@ -217,6 +217,16 @@ static func safe_margins(node: Node) -> Margins:
 	var m := Margins.new()
 	if node == null or not node.is_inside_tree():
 		return m
+	# Screenshot/device-matrix emulation: `--safe=top,bottom,left,right` as fractions of
+	# the view (e.g. an iPhone notch + home indicator) so desktop runs lay out like phones.
+	var emu := _emulated_safe()
+	if not emu.is_empty():
+		var v: Vector2 = node.get_viewport().get_visible_rect().size
+		m.top = maxf(EDGE, emu[0] * v.y)
+		m.bottom = maxf(EDGE, emu[1] * v.y)
+		m.left = maxf(EDGE, emu[2] * v.x)
+		m.right = maxf(EDGE, emu[3] * v.x)
+		return m
 	if not (OS.has_feature("mobile") or OS.has_feature("web_ios") or OS.has_feature("web_android")):
 		return m
 	var vp := node.get_viewport()
@@ -232,6 +242,20 @@ static func safe_margins(node: Node) -> Margins:
 	m.right = maxf(EDGE, (screen.x - safe.end.x) * k)
 	m.bottom = maxf(EDGE, (screen.y - safe.end.y) * k)
 	return m
+
+
+static var _safe_emu: Array = []
+static var _safe_emu_read := false
+
+static func _emulated_safe() -> Array:
+	if not _safe_emu_read:
+		_safe_emu_read = true
+		for a in OS.get_cmdline_user_args():
+			if a.begins_with("--safe="):
+				var parts := a.substr(7).split(",")
+				if parts.size() == 4:
+					_safe_emu = [float(parts[0]), float(parts[1]), float(parts[2]), float(parts[3])]
+	return _safe_emu
 
 
 ## Height of the dice-tray band at the bottom of the screen.
