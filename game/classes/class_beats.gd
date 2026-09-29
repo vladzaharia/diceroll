@@ -277,10 +277,30 @@ static func _boo(c: GameController, i: int) -> void:
 	HeroLook.boo_head(h, false)
 
 
+## How far the scare words float up: they start just under the enemy's HUD and must not drift into
+## its intent badge / HP bar.
+const SCARE_RISE := 0.15
+## The live "BOO!" word (so the scare word that follows can clear it instead of landing on it).
+static var _boo_label: WeakRef = null
+
+
 ## A big comic "BOO!" in world space that punches in and wobbles.
 static func _boo_word(c: GameController, pos: Vector3) -> void:
 	var l := Fx.popup_text(c.world_parent(), pos, "BOO!", SCARE.lightened(0.15), 1.5, true)
 	l.outline_modulate = Color(0.1, 0.2, 0.05, 1.0)
+	_boo_label = weakref(l)
+
+
+## Fades the BOO! word out fast (the scare result word takes over the spot).
+static func _clear_boo_word() -> void:
+	var l := _boo_label.get_ref() as Label3D if _boo_label else null
+	_boo_label = null
+	if l == null or not is_instance_valid(l):
+		return
+	var t := l.create_tween()
+	t.tween_property(l, "modulate:a", 0.0, 0.08)
+	t.parallel().tween_property(l, "outline_modulate:a", 0.0, 0.08)
+	t.tween_callback(l.queue_free)
 
 
 ## enemy_scared {enemy_idx, effect: cower | flee | weaken}.
@@ -292,25 +312,28 @@ static func enemy_scared(c: GameController, ev: Dictionary) -> void:
 	var ch: Character = st.enemies[i]
 	var eff := String(ev.get("effect", "cower"))
 	var top := st.enemy_position(i) + Vector3.UP * (EnemyLooks.hud_height(String(st.data[i].get("id", ""))) * CombatStage.UNIT_SCALE - 0.2)
+	_clear_boo_word()
 	match eff:
 		"cower":
 			st.set_enemy(i, {"cower": true, "brave": true})
 			_tremble(ch, 0.8)
 			ch.play_once("hit", EnemyLooks.clip(String(st.data[i].get("id", "")), "idle"), 0.05)
 			_sweat(st, st.enemy_position(i) + Vector3.UP * 1.4)
-			Fx.popup_text(st, top, "SCARED!", SCARE.lightened(0.1), 0.9, true)
+			Fx.popup_text(st, top, "SCARED!", SCARE.lightened(0.1), 0.9, true, SCARE_RISE)
 			await c.wait(0.45)
 		"weaken":
 			st.set_enemy(i, {"weakened": true, "brave": true})
 			_tremble(ch, 0.5)
 			_sweat(st, st.enemy_position(i) + Vector3.UP * 2.0)
-			Fx.popup_text(st, top, "SPOOKED! -%d%%" % int(round(ClassLogic.BOO_WEAKEN * 100.0)), SCARE.lightened(0.1), 0.85, true)
+			Fx.popup_text(st, top, "SPOOKED! -%d%%" % int(round(ClassLogic.BOO_WEAKEN * 100.0)), SCARE.lightened(0.1), 0.85, true, SCARE_RISE)
 			await c.wait(0.45)
 		"flee":
 			st.set_enemy(i, {"brave": true})
 			_tremble(ch, 0.35)
 			_sweat(st, st.enemy_position(i) + Vector3.UP * 1.4)
-			Fx.popup_text(st, top, "EEK!", SCARE.lightened(0.1), 1.0, true)
+			# the one word for the flee (enemy_fled that follows only runs it off): an "EEK!" here and
+			# a "FLED!" 0.3 s later drifted into each other and read "FLEER!"
+			Fx.popup_text(st, top, "FLEES!", SCARE.lightened(0.1), 1.0, true, SCARE_RISE)
 			await c.wait(0.3)
 
 
@@ -322,7 +345,6 @@ static func enemy_fled(c: GameController, ev: Dictionary) -> void:
 	var st := c.stage
 	var pos := st.enemy_position(i)
 	var g := int(ev.get("gold", 0))
-	Fx.popup_text(st, pos + Vector3.UP * 1.6, "FLED!", SCARE.lightened(0.2), 1.0)
 	if g > 0:
 		Fx.coin_burst(st, pos + Vector3.UP * 0.5, clampi(g / 2, 3, 8))
 		Audio.play_sfx("coin")

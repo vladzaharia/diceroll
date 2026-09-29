@@ -23,6 +23,11 @@ const GOLD := Color(1.0, 0.78, 0.3)
 ## Per-class body wash [colour, default-skin strength, other skins' strength]: the Necromancer's hooded-rogue
 ## palettes are bright, so a dusk-violet wash keeps him a grave-caller (never the Rogue).
 const SHADE := {"necromancer": [Color(0.25, 0.08, 0.38), 0.75, 0.3]}
+## The Necromancer's soul-green accent (ClassBeats.SOUL) on his crown and staff.
+const NECRO_GLOW := Color(0.45, 1.0, 0.7)
+## The Necromancer's hood scale (from behind the full-size hood hid the whole figure).
+const NECRO_HOOD := 0.8
+const BONE_SCALE := preload("res://game/actors/bone_scale.gd")
 static func color(class_id: String) -> Color:
 	return UiPalette.class_color(class_id)
 
@@ -40,6 +45,8 @@ static func create(class_id: String, skin := "default", prestige := false) -> Ch
 		var sh: Array = SHADE[class_id]
 		var k := float(sh[1]) if skin in ["", "default"] else float(sh[2])
 		ch.tint_where(func(mi: MeshInstance3D) -> bool: return mi.get_parent() == ch.skeleton, sh[0], k)
+		if class_id == "necromancer":
+			_grave_contrast(ch, skin in ["", "default"])
 	ch.set_meta("class_id", class_id)
 	ch.set_meta("skin", skin if skin != "" else "default")
 	if prestige:
@@ -47,6 +54,34 @@ static func create(class_id: String, skin := "default", prestige := false) -> Ch
 	if HeroDefs.mechanic(class_id) == "turret":
 		add_turret(ch, prestige and String(SkinDefs.def(class_id, "prestige").get("overlay", "")) == "gold_turret")
 	return ch
+
+
+## The Necromancer as seen from behind (the combat camera): under one wash the big hood and the
+## floor-length cape merged into a single grey column. A near-black grave-violet cape sets the lighter
+## hood apart, and a soul-green glow on the bone crown and the staff's skull keeps the grave-caller
+## (and his staff) readable from any side.
+static func _grave_contrast(ch: Character, default_skin: bool) -> void:
+	# the hood (and the crown on it) a touch smaller: the head bone is scaled after the animation
+	if ch.skeleton and ch.skeleton.find_bone("head") >= 0 and ch.skeleton.get_node_or_null("HoodScale") == null:
+		var m: SkeletonModifier3D = BONE_SCALE.new()
+		m.name = "HoodScale"
+		m.set("factor", NECRO_HOOD)
+		ch.skeleton.add_child(m)
+	ch.tint_where(func(mi: MeshInstance3D) -> bool: return String(mi.name).contains("_Cape"),
+		Color(0.08, 0.02, 0.12), 0.9 if default_skin else 0.6)
+	ch.tint_where(func(mi: MeshInstance3D) -> bool: return String(mi.name).contains("Necromancer_Crown"),
+		Color(0.93, 0.95, 0.88), 0.25, NECRO_GLOW * 0.3)
+	ch.tint_where(func(mi: MeshInstance3D) -> bool: return _held_in(mi, "handslot_r"),
+		Color(0.9, 1.0, 0.94), 0.15, NECRO_GLOW * 0.3)
+
+
+static func _held_in(mi: Node, slot: String) -> bool:
+	var p := mi.get_parent()
+	while p != null and not (p is Character):
+		if String(p.name).begins_with("Attach_" + slot):
+			return true
+		p = p.get_parent()
+	return false
 
 
 ## The Engineer's Clockwork Turret prop beside the hero (gold for the prestige skin).

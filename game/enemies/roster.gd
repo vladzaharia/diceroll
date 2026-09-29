@@ -364,7 +364,7 @@ const LOOKS := {
 	# standing in a sand drift before its half-buried sarcophagus; phase 2 raises a sandstorm around it
 	"boss_sand_colossus": {"model": "skel_golem", "undead_large": true, "tint": Color(0.9, 0.72, 0.46), "strength": 0.72,
 		"scale": 1.35, "emission": Color(0.06, 0.035, 0.0),
-		"gear": {"handslot.r": SKW + "Skeleton_Mace_Large.gltf"}, "gear_xf": {"handslot.r": [Vector3.ZERO, Vector3.ZERO, 0.95]},
+		"gear": {"handslot.r": SKW + "Skeleton_Mace_Large.gltf"}, "gear_xf": {"handslot.r": [Vector3.ZERO, Vector3.ZERO, 0.72]},
 		"clips": {"attack": LARGE_2H, "idle": "Melee_2H_Idle", "cast": "Melee_Unarmed_Smash"},
 		"extras": ["usekh", "sand_tomb"], "eye_glow": Color(0.3, 0.9, 1.0), "light": Color(1.0, 0.8, 0.45),
 		"phase2": ["sandstorm"], "boss": true, "label": "sand colossus",

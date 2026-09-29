@@ -346,8 +346,11 @@ static func retint(ch: Character, id: String, flash := Color.BLACK) -> void:
 		ch.tint_where(func(m: MeshInstance3D) -> bool: return _in_attachment(m, ""), e.gear_tint, float(e.gear_strength),
 			(e.gear_emission as Color) + flash, 0.35, 0.85)
 	if "pierce" in traits:
+		# a red weapon marks Pierce; on a large rig (a boss's two-handed mace) the full-strength glow
+		# became a big red ball over the body, so big weapons get a darker, dimmer wash
+		var big := _rig_k(ch) > 1.0
 		ch.tint_where(func(m: MeshInstance3D) -> bool: return _in_attachment(m, "handslot_r"),
-			Color(0.55, 0.08, 0.05), 0.6, Color(0.9, 0.12, 0.04) + flash)
+			Color(0.55, 0.08, 0.05), 0.4 if big else 0.6, (Color(0.3, 0.04, 0.01) if big else Color(0.9, 0.12, 0.04)) + flash)
 	if not affixes.is_empty():
 		AffixLooks.retint(ch, L, flash)
 
