@@ -157,8 +157,8 @@ const MILESTONES := [
 		"unlocks": [["packs", "resonance"]]},
 	# --- 2026-09-29 new biomes (docs/design/2026-09-29-new-biomes.md §7): one biome per milestone,
 	# with a runs fallback; their mini-bosses and final bosses come with them.
-	{"id": "prospector", "run": 8, "desc": "Cash out the Treasury 17 times, or play 12 runs.",
-		"cond": {"any": [{"stat": "cashouts", "min": 17}, {"stat": "runs", "min": 12}]},
+	{"id": "prospector", "run": 8, "desc": "Cash out the Treasury 20 times, or play 12 runs.",
+		"cond": {"any": [{"stat": "cashouts", "min": 20}, {"stat": "runs", "min": 12}]},
 		"unlocks": [["biomes", "mines"]]},
 	{"id": "warpath", "run": 12, "desc": "Defeat 380 enemies, or play 16 runs.",
 		"cond": {"any": [{"stat": "kills", "min": 380}, {"stat": "runs", "min": 16}]},
@@ -166,8 +166,8 @@ const MILESTONES := [
 	{"id": "night_walker", "run": 17, "desc": "Reach the third biome 16 times, or play 22 runs.",
 		"cond": {"any": [{"stat": "act3_runs", "min": 16}, {"stat": "runs", "min": 22}]},
 		"unlocks": [["biomes", "moonlit"], ["minibosses", "mini_moonfang"], ["bosses", "boss_moon_king"]]},
-	{"id": "sun_seeker", "run": 21, "desc": "Defeat 3 different final bosses, or play 26 runs.",
-		"cond": {"any": [{"stat": "boss_kinds", "min": 3}, {"stat": "runs", "min": 26}]},
+	{"id": "sun_seeker", "run": 21, "desc": "Defeat 4 different final bosses, or play 22 runs.",
+		"cond": {"any": [{"stat": "boss_kinds", "min": 4}, {"stat": "runs", "min": 22}]},
 		"unlocks": [["biomes", "ruins"], ["bosses", "boss_sand_colossus"]]},
 ]
 

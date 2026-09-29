@@ -48,7 +48,7 @@ const DEFS := {
 			["cultist", "bandit", "hollow_wisp", "werewolf"]],
 		"elite": "fallen_paladin",
 		"minibosses": ["mini_pumpkin_knight", "mini_grave_mage", "mini_moonfang"], "bosses": [],
-		"short_bosses": ["boss_lich", "boss_bone_warden"], "short_boss_hp": 0.95,
+		"short_bosses": ["boss_lich", "boss_bone_warden"], "short_boss_hp": 0.88,
 	},
 	"frost": {
 		"name": "Frostpeak", "tier": 2,
@@ -115,7 +115,7 @@ const DEFS := {
 		"pools": [["werewolf", "wolf_bandit", "hollow_wisp", "orc_raider"],
 			["werewolf", "werewolf", "brute", "wolf_bandit"]],
 		"elite": "werewolf",
-		"minibosses": ["mini_moonfang"], "bosses": ["boss_moon_king", "boss_lich"], "short_boss_hp": 0.62,
+		"minibosses": ["mini_moonfang"], "bosses": ["boss_moon_king", "boss_lich"], "short_boss_hp": 0.72,
 	},
 }
 
