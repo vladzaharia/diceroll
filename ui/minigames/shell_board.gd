@@ -35,6 +35,7 @@ var _pill := Rect2()
 var _gy := 0.0                # cups' ground line
 var _dy := 0.0                # front/back offset of a passing cup
 var _cw := 80.0               # cup width (bottom)
+var _lift_px := 50.0          # how high a lifted cup rises
 var _ch := 90.0               # cup height
 var _xs: Array[float] = [0.0, 0.0, 0.0]
 
@@ -493,6 +494,9 @@ func _layout() -> void:
 	_ch = _cw * 1.08
 	for i in 3:
 		_xs[i] = _stage.get_center().x + (i - 1) * spacing
+	# lifted cups rise high enough to show the gem, but stay under the round sign if they can
+	var room := (_gy - _ch * 1.12) - (_sign.end.y + 4.0)
+	_lift_px = clampf(room, _ch * 0.5, _ch * 0.64)
 
 
 func _x_of(slot_x: float) -> float:
@@ -501,7 +505,12 @@ func _x_of(slot_x: float) -> float:
 
 
 func _gem_pos(slot: int) -> Vector2:
-	return Vector2(_xs[clampi(slot, 0, 2)], _gy - _cw * 0.26)
+	return Vector2(_xs[clampi(slot, 0, 2)], _gy - _gem_size() * 0.3)
+
+
+## The gem's size on the felt: as big as fits under a lifted cup.
+func _gem_size() -> float:
+	return clampf(_lift_px * 1.3, _cw * 0.66, _cw * 0.86)
 
 
 # --- drawing --------------------------------------------------------------------------------
@@ -808,7 +817,7 @@ func _draw_cup_at(slot_x: float, depth: float, hop: float, lift: float, sq: floa
 	var p := _pose(slot_x, depth, hop)
 	var base: Vector2 = p[0]
 	var s: float = p[1]
-	base.y -= lift * _ch * 0.64
+	base.y -= lift * _lift_px
 	var q := sq * cos((1.0 - sq) * 14.0)
 	var w := _cw * s * (1.0 + 0.1 * q)
 	var h := _ch * s * (1.0 - 0.1 * q)
@@ -933,7 +942,7 @@ func _draw_gem_on_felt() -> void:
 	var p := _gem_pos(_gem_slot)
 	var k := clampf((time - _gem_t0) / 0.35, 0.0, 1.0)
 	var pop := ease(k, 0.4) * (1.0 + 0.25 * sin(k * PI))
-	var s := _cw * 0.78 * pop * (1.15 if _gem_win else 1.0)
+	var s := _gem_size() * pop * (1.12 if _gem_win else 1.0)
 	var bob := sin(time * 3.0) * 3.0 * _u
 	glow(p + Vector2(0, -s * 0.05), s * 1.1, Color(1.0, 0.55, 0.85, 0.75))
 	_ellipse(Vector2(p.x, _gy), s * 0.4, s * 0.1, Color(0, 0, 0, 0.3))
