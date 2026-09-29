@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
 """Diceroll monogram app icon: a "D"-shaped die (the shipped icon) + monogram concept family.
 
-  monogram.py ship <out_dir> [gold|inverse]    render the shipped icon: render.png (light),
-                                               render_dark.png (iOS dark), render_tint.png (tinted)
+  monogram.py ship <out_dir>                   render the SHIPPED icon ("doubles", single die below
+                                               DOUBLES_MIN px): ios/icon_<px>[_dark|_tinted].png for
+                                               every Godot iOS size + 1024 renders for macOS
+  monogram.py doubles <P0..P3> <out.png> [mode]  one refinement pass of the doubles art
+  monogram.py single <out.png> [mode]          the small-size single die
+  monogram.py ship_mono <out_dir> [gold|inverse]  the earlier G10 / I14 monogram (light/dark/tint)
   monogram.py variant <out.png> key=value ...  one variant, e.g. colour=gold rot=-6 dx=-20 dy=-24
                                                scale=1.0 shadow=soft|hard|air|none style=slab|flat|bevel
                                                mode=light|dark|tint
   monogram.py concept <name> <out.png>         one monogram-family concept (see CONCEPTS)
   monogram.py --list                           list concepts
 
-SHIP (below) is the pipeline default; `ICON_COLOURWAY=inverse tools/export.sh icon` (or changing
-SHIP["colour"]) switches the colourway. Everything is flat SVG rendered with cairosvg at 1024.
+The shipped icon is DOUBLES (a gold D-die in front of a red one), degrading to a single gold D-die
+below DOUBLES_MIN px. SHIP / SHIP_INVERSE are the earlier single-monogram picks (G10 / I14), still
+renderable with `ship_mono`. Everything is flat SVG rendered with cairosvg at 1024.
 
 Geometry notes: rotation turns the die only. The slab's depth (extrusion), the light and the
 shadow stay fixed in world space (light from the top-left, shadow down-right), so a rotated die
@@ -120,10 +125,18 @@ class DDie:
                     % (self.fcx + 40, gy, self.s * 0.36, self.s * 0.07, INK))
         return ""
 
-    def svg(self, shadow="soft"):
+    def svg(self, shadow="soft", knock=None):
+        """knock=(colour, width): a background-coloured gap around the silhouette, so a die in front
+        of another separates cleanly (drawn under the outline)."""
         sc, d, g = self.sc, self.depth, []
-        g.append(self.shadow(shadow))
         ow = 30 * self.scale
+        if knock:
+            steps = max(1, int(d // 4)) if d else 1
+            for i in range(steps + 1):
+                k = d * i / steps
+                g.append(self.shape(knock[0], k * 0.35, k * 0.9, 'stroke="%s" stroke-width="%.1f" stroke-linejoin="round"'
+                                    % (knock[0], ow + 2 * knock[1])))
+        g.append(self.shadow(shadow))
         if sc["outline"]:
             steps = max(1, int(d // 4)) if d else 1
             for i in range(steps + 1):
@@ -604,6 +617,84 @@ COMBOS = {
 CONCEPTS.update(COMBOS)
 
 
+# ---- THE SHIPPED ICON: "doubles" (N04 refined) + the single-die small-size art -------------------
+# A gold D-die in front of a red D-die, both showing three (doubles: the board's bonus roll).
+# Below DOUBLES_MIN px the icon degrades to the SINGLE gold die (the same die, zoomed in).
+
+RED_SCHEMES = {
+    "light": dict(face="#d9342b", hi="#f2645c", side="#8a1f1a", pip=CREAM, pip_hi=None, outline=INK, rim=None),
+    "dark": dict(face="#c92f27", hi="#e85750", side="#7a1b17", pip=CREAM, pip_hi=None, outline="#000000", rim=None),
+    "tint": dict(face="#8c8c8c", hi="#a8a8a8", side="#4a4a4a", pip="#000000", pip_hi=None, outline="#000000",
+                 rim=None),
+}
+GOLD_SCHEMES = {"light": "gold", "dark": "gold_dark", "tint": "tint"}
+KNOCK = {"light": "#181b40", "dark": "#0d0e19", "tint": "#000000"}
+
+# Refinement passes of the doubles layout (P3 ships). front/back = (cx, cy, scale, rot).
+DOUBLES_PASSES = {
+    "P0": dict(front=(430, 585, 0.78, -8), back=(640, 400, 0.66, 12), knock=0, back_pips=1.0),   # = N04
+    "P1": dict(front=(418, 590, 0.8, -10), back=(650, 392, 0.64, 14), knock=16, back_pips=0.92),
+    "P2": dict(front=(410, 598, 0.82, -12), back=(664, 380, 0.62, 16), knock=18, back_pips=0.9),
+    "P3": dict(front=(414, 596, 0.83, -10), back=(660, 386, 0.63, 15), knock=18, back_pips=0.9),
+    # P4: pair centred as a group, less overlap so all three red pips show, a little more margin
+    "P4": dict(front=(420, 592, 0.8, -10), back=(682, 392, 0.6, 16), knock=18, back_pips=0.9),
+    # P5: P4 with the red die turned further (a fresh roll), tucked a touch lower
+    "P5": dict(front=(418, 594, 0.8, -10), back=(684, 404, 0.6, 22), knock=18, back_pips=0.9),
+}
+DOUBLES_SHIP = "P4"
+SINGLE = dict(cx=490, cy=486, scale=1.12)  # the P3 front die, centred and zoomed (G10 framing)
+DOUBLES_MIN = 114  # px: sizes >= this show the doubles, smaller sizes the single die
+
+
+def doubles_svg(mode="light", p=None):
+    p = DOUBLES_PASSES[p or DOUBLES_SHIP]
+    defs, body = background("gold", mode)
+    defs += blur_filter("sh", 22)
+    bx, by, bs, br = p["back"]
+    fx, fy, fs, fr = p["front"]
+    back = DDie(bx, by, bs, br, RED_SCHEMES[mode], "slab", pip_scale=p["back_pips"], uid="back")
+    front = DDie(fx, fy, fs, fr, GOLD_SCHEMES[mode], "slab", uid="front")
+    sh = "none" if mode == "tint" else "soft"
+    d1, s1 = back.svg(sh)
+    d2, s2 = front.svg(sh, knock=(KNOCK[mode], p["knock"] * fs) if p["knock"] else None)
+    return svg_doc(body + s1 + s2, defs + d1 + d2)
+
+
+def single_svg(mode="light"):
+    fr = DOUBLES_PASSES[DOUBLES_SHIP]["front"][3]
+    defs, body = background("gold", mode)
+    defs += blur_filter("sh", 22)
+    d = DDie(SINGLE["cx"], SINGLE["cy"], SINGLE["scale"], fr, GOLD_SCHEMES[mode], "slab", uid="single")
+    dd, ds = d.svg("none" if mode == "tint" else "soft")
+    return svg_doc(body + ds, defs + dd)
+
+
+def art_for(size, mode="light"):
+    return doubles_svg(mode) if size >= DOUBLES_MIN else single_svg(mode)
+
+
+# Godot 4.7 iOS preset keys (platform/ios/export/export_plugin.cpp get_icon_infos) -> pixel size
+IOS_ICONS = {
+    "settings_58x58": 58, "settings_87x87": 87, "notification_40x40": 40, "notification_60x60": 60,
+    "notification_76x76": 76, "notification_114x114": 114, "spotlight_80x80": 80, "spotlight_120x120": 120,
+    "iphone_120x120": 120, "iphone_180x180": 180, "ipad_167x167": 167, "ipad_152x152": 152, "ios_128x128": 128,
+    "ios_192x192": 192, "ios_136x136": 136, "app_store_1024x1024": 1024,
+}
+MAC_SIZES = [16, 32, 64, 128, 256, 512, 1024]
+
+
+def ship_all(out_dir):
+    """Every per-size file: <out_dir>/ios/icon_<px>[_dark|_tinted].png (exact-size vector renders) and
+    <out_dir>/render_<px>.png (1024 renders of the art used at that size, for the macOS grid)."""
+    os.makedirs(os.path.join(out_dir, "ios"), exist_ok=True)
+    for px in sorted(set(IOS_ICONS.values())):
+        for mode, suf in (("light", ""), ("dark", "_dark"), ("tint", "_tinted")):
+            to_png(art_for(px, mode), os.path.join(out_dir, "ios", "icon_%d%s.png" % (px, suf)), px)
+    for mode, suf in (("light", ""), ("dark", "_dark"), ("tint", "_tint")):
+        to_png(doubles_svg(mode), os.path.join(out_dir, "render%s.png" % suf))
+        to_png(single_svg(mode), os.path.join(out_dir, "render_single%s.png" % suf))
+
+
 def to_png(svg, out, size=1024):
     if out.endswith(".svg"):
         open(out, "w").write(svg)
@@ -628,6 +719,16 @@ def main(argv):
         print("\n".join(CONCEPTS))
         return 0
     if len(argv) >= 3 and argv[1] == "ship":
+        ship_all(argv[2])
+        print("monogram: shipped doubles %s (single die below %d px)" % (DOUBLES_SHIP, DOUBLES_MIN))
+        return 0
+    if len(argv) >= 4 and argv[1] == "doubles":  # doubles <pass> <out.png> [mode]
+        to_png(doubles_svg(argv[4] if len(argv) > 4 else "light", argv[2]), argv[3])
+        return 0
+    if len(argv) >= 3 and argv[1] == "single":  # single <out.png> [mode]
+        to_png(single_svg(argv[3] if len(argv) > 3 else "light"), argv[2])
+        return 0
+    if len(argv) >= 3 and argv[1] == "ship_mono":
         colour = argv[3] if len(argv) > 3 else os.environ.get("ICON_COLOURWAY", SHIP["colour"])
         v = dict(SHIP_INVERSE if colour == "inverse" else SHIP)
         os.makedirs(argv[2], exist_ok=True)

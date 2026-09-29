@@ -9,7 +9,7 @@
 #   web     build/web/index.html (single-threaded "nothreads" template: no COOP/COEP needed)
 #   all     macos + ios + web
 #   icon    re-render the app icon + derived assets (tools/icon/build_icons.sh -> assets/icon/);
-#           ICON_COLOURWAY=inverse for the navy-D-on-gold colourway
+#           ("doubles" monogram; per-size iOS files in assets/icon/ios, single die below 114 px)
 #
 # Options:
 #   --debug             export with debug templates (default: release)
