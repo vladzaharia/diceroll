@@ -3,7 +3,7 @@
 All agents were stopped on purpose by Vlad. Nothing is running. Each unfinished work package lives in its own git worktree, with a WIP checkpoint commit at its tip. Nothing below is merged to `main` yet.
 
 Standing rules for every resumed agent:
-- **Cap background CPU:** batch sims run at most 6 concurrent processes under `nice -n 15`.
+- **Clean up:** heavy parallel sims are fine, but leave no stray processes (sims, servers, renders) behind.
 - **Never launch a windowed Godot.** Use `tools/shoot.sh` for screenshots, running one at a time; from a worktree use `GODOT_PROJECT=$PWD /Users/vlad/Repos/diceroll/tools/shoot.sh ...`. Use `--headless` for tests and sims.
 - **Commit with explicit paths only.** End commit messages with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - **Tests:** `./tests/run.sh`. Run `godot --headless --path . --import` first in a fresh worktree.
