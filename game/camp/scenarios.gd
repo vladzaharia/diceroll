@@ -143,7 +143,7 @@ class _Driver extends Node:
 			r.gold = 164
 			r.level = 7
 			r.stats.merge({"fights_won": 24, "minibosses_won": 1, "minibosses_killed": [r.miniboss_id], "bosses_killed": [r.boss_id],
-				"minigames_played": 4, "minigame_crowns": 13, "minigame_plays": {"fossil_hunter": 2, "claw_machine": 2},
+				"minigames_played": 4, "minigame_crowns": 13, "pet_fights": 22, "minigame_plays": {"fossil_hunter": 2, "claw_machine": 2},
 				"damage_dealt": 2480, "gold_earned": 610, "boss_reached": true, "miniboss_reached": true, "max_act": 3,
 				"straights": 9, "rerolls_used": 140, "kept_dice": 260, "block_gained": 180, "cashouts": 4}, true)
 		else:

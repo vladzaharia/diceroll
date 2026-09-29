@@ -304,7 +304,7 @@ func reveal(before: Dictionary, after: Dictionary, overlay: Node = null, speed :
 		var kind := String(it.kind)
 		var id := String(it.id)
 		var at := _reveal_spot(kind, id)
-		_focus_on(at, 2.2 if kind == "station" else 1.6)
+		_focus_on(at, {"stage": 5.0, "station": 2.7}.get(kind, 2.0))
 		await _wait(0.7 / speed)
 		if _skip:
 			break
@@ -576,13 +576,13 @@ func _build_decor(s: Dictionary, animate := false) -> void:
 		Props.put(_deco, D + "banner_thin_%s.gltf" % colors[i % colors.size()], at + Vector3(0, 1.0, 0.1), 0.0, 0.4)
 	# early camps are overgrown: bushes and rocks crowd the clearing until the camp grows
 	var stage := int(s.get("stage", 0))
-	var growth := [[Vector3(-4.6, 0, 3.6), "Bush_1_D"], [Vector3(4.8, 0, 3.4), "Bush_2_D"], [Vector3(-2.2, 0, -3.4), "Bush_4_C"],
+	var growth := [[Vector3(-4.6, 0, 3.6), "Bush_1_D"], [Vector3(4.9, 0, 4.0), "Bush_2_D"], [Vector3(-2.2, 0, -3.4), "Bush_4_C"],
 		[Vector3(2.4, 0, -3.1), "Rock_3_B"], [Vector3(-5.2, 0, -1.2), "Rock_1_C"], [Vector3(5.4, 0, -0.8), "Bush_1_C"],
-		[Vector3(0.9, 0, 4.8), "Bush_2_C"]]
+		[Vector3(-0.4, 0, 5.4), "Bush_2_C"]]
 	for i in growth.size():
 		if i < (3 - stage) * 3:
 			var g: Array = growth[i]
-			CampProps.forest(_deco, String(g[1]), [1, 2, 4][i % 3], FIRE_POS + (g[0] as Vector3), 40.0 * i, 1.2)
+			CampProps.forest(_deco, String(g[1]), [1, 2, 4][i % 3], FIRE_POS + (g[0] as Vector3), 40.0 * i, 0.95)
 
 
 func _souvenir(biome: String, at: Vector3) -> void:

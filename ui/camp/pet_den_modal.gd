@@ -57,7 +57,7 @@ func _pet_card(p: Profile, id: String) -> Control:
 	var charge := UiTheme.hbox(8)
 	v.add_child(charge)
 	charge.add_child(_meter(int(card.size), col if owned else UiPalette.TEXT_MUTED))
-	var ct := UiTheme.para("Charges %s" % String(CampInfo.CHARGE_TEXT.get(String(card.charge_on), "")).trim_prefix("+1 "), 19,
+	var ct := UiTheme.para("Fills %s" % String(CampInfo.CHARGE_TEXT.get(String(card.charge_on), "")), 19,
 		UiPalette.TEXT if owned else UiPalette.TEXT_MUTED, 600)
 	ct.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	charge.add_child(ct)

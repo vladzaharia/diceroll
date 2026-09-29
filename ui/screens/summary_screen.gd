@@ -33,6 +33,7 @@ var _extra: VBoxContainer
 var _goals: VBoxContainer
 var _camp_btn: GameButton
 var _anim_gen := 0
+var _footer: MarginContainer
 var _lines: Array = []
 var _cards: Array = []
 
@@ -54,9 +55,10 @@ func _build() -> void:
 	body.add_child(_extra)
 	_goals = UiTheme.vbox(10)
 	body.add_child(_goals)
-	body.add_child(UiTheme.spacer(4))
+	# the buttons sit under the panel (never scrolled away)
 	var row := UiTheme.hbox(14)
-	body.add_child(row)
+	_footer = UiTheme.margin(row, 12, 38, 12, 0)
+	_frame.add_child(_footer)
 	var title := GameButton.make("", "home", GameButton.Kind.SECONDARY, 30)
 	title.icon_tint = UiPalette.GOLD
 	title.min_height = 100
@@ -111,6 +113,30 @@ func refresh(flow: GameFlow) -> void:
 func open() -> void:
 	await super.open()
 	_animate()
+
+
+## UiModal's layout, with the footer's height kept free under the scrolling panel.
+func _layout() -> void:
+	if _frame == null or _footer == null:
+		super._layout()
+		return
+	var view := size
+	if view.x <= 0.0:
+		return
+	var safe := UiTheme.safe_margins(self)
+	var w := minf(max_width, view.x - safe.left - safe.right)
+	_frame.custom_minimum_size.x = w
+	_frame.size = Vector2(w, 0)
+	var avail_h := view.y - safe.top - safe.bottom
+	var sb := panel.get_theme_stylebox("panel")
+	var chrome := sb.content_margin_top + sb.content_margin_bottom + (ribbon.get_combined_minimum_size().y - 26.0 if ribbon.visible else 0.0)
+	chrome += _footer.get_combined_minimum_size().y - 26.0
+	var natural := _inner.get_combined_minimum_size().y
+	_scroll.custom_minimum_size.y = maxf(120.0, minf(natural, avail_h - chrome))
+	_frame.reset_size()
+	_frame.size.x = w
+	_frame.position = Vector2((view.x - w) * 0.5, maxf(safe.top, (view.y - _frame.size.y) * 0.5))
+	_frame.pivot_offset = _frame.size * 0.5
 
 
 func show_now() -> void:

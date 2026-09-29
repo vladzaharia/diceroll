@@ -113,3 +113,23 @@ func test_level_up_is_not_a_draft() -> void:
 				assert_true(bool(e.get("auto", false)), "auto level-up")
 	assert_true(saw_level, "leveled up")
 	assert_true(not (f.phase == GameFlow.Phase.DRAFT and String(f.offer.get("source", "")) == "level"), "no level draft")
+
+
+## The camp is a pure function of the profile and builds out with it.
+func test_camp_state_progression() -> void:
+	var fresh := CampState.of(Profile.fresh())
+	assert_eq(int(fresh.stage), 0)
+	assert_eq(String(fresh.stations.armory.state), "ruined")
+	assert_eq(String(fresh.stations.pet_den.state), "ruined")
+	assert_eq(String(fresh.stations.workshop.state), "construction")
+	assert_eq(String(fresh.stations.arcade.state), "construction")
+	assert_eq(fresh, CampState.of(Profile.fresh()), "deterministic")
+	var late := ProfileStore.load_profile("res://game/camp/stages/stage_3.json")
+	assert_true(late != null, "stage fixture")
+	var s3 := CampState.of(late)
+	assert_eq(int(s3.stage), 3)
+	for id in CampInfo.STATION_IDS:
+		assert_eq(String(s3.stations[id].state), "built", "stage 3: %s built" % id)
+	assert_true((s3.classes as Array).size() > 1, "more classes in camp")
+	var d := CampState.diff(fresh, s3)
+	assert_true(d.size() >= 6, "build-out moments")

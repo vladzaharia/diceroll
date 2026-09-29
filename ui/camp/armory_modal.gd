@@ -64,7 +64,13 @@ func _gear_card(p: Profile, slot: String) -> Control:
 	stat.add_child(UiTheme.label(CampInfo.gear_stat(slot, lvl) if lvl > 0 else "No bonus", 21, UiPalette.TEXT, false, 0, false, 700))
 	if lvl < GearDefs.MAX_LEVEL:
 		stat.add_child(UiIcons.rect("arrow_right", 22, UiPalette.GOLD))
-		var nx := UiTheme.label(CampInfo.gear_stat(slot, lvl + 1), 21, UiPalette.HEAL, false, 0, false, 700)
+		# the next level where the stat actually changes (Helm and Blade move every few levels)
+		var now := CampInfo.gear_stat(slot, lvl)
+		var at := lvl + 1
+		while at < GearDefs.MAX_LEVEL and CampInfo.gear_stat(slot, at) == now:
+			at += 1
+		var nt := CampInfo.gear_stat(slot, at) + ("" if at == lvl + 1 else "  at L%d" % at)
+		var nx := UiTheme.label(nt, 21, UiPalette.HEAL, false, 0, false, 700)
 		nx.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		nx.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		nx.custom_minimum_size.x = 60

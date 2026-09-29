@@ -365,7 +365,7 @@ class _Driver extends Node:
 			await _pause(3.5)
 			await _save("%s_results_%02d.png" % [_shot_base, k + 1] if runs > 1 else "%s_final.png" % _shot_base)
 			if runs > 1:
-				c.show_camp()
+				await c.show_camp()
 				await _pause(0.8)
 				if String(args.get("spend", "1")) == "1":
 					_spend()
