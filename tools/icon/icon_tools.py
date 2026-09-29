@@ -5,8 +5,14 @@
   icon_tools.py tinted <render.png> <out.png>            grayscale opaque (iOS 18 tinted)
   icon_tools.py macos  <render.png> <out.png>            macOS grid: 824 px squircle body + shadow, transparent
   icon_tools.py iconset <macos.png> <dir.iconset>        16..512@2x PNGs for iconutil
+  icon_tools.py iconset_split <big.png> <small.png> <dir.iconset> [min_px=128]
+                                                         same, entries < min_px px from small.png
+  icon_tools.py flatten <in.png> <out.png> [tinted]      opaque RGB at the same size (grayscale if tinted)
   icon_tools.py sheet  <out.png> <label=render.png>...   comparison sheet: 1024/180/120/60/29 px, masked,
                                                          on light and dark home-screen backgrounds
+  icon_tools.py grid   <out.png> label=cand.png ... -- label=ref.png ...
+                                                         crowded home-screen mock: each candidate at 60 px
+                                                         among competitor icons, light + dark wallpaper
 """
 import sys
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
@@ -96,6 +102,85 @@ def cmd_macos(src, out):
     canvas.save(out, optimize=True)
 
 
+def cmd_flatten(src, out, tinted=False):
+    """Opaque RGB at the source's own size (per-size iOS icons); tinted = grayscale autocontrast."""
+    im = Image.open(src).convert("RGBA")
+    bg = Image.new("RGBA", im.size, (0, 0, 0, 255))
+    bg.alpha_composite(im)
+    im = bg.convert("RGB")
+    if tinted:
+        from PIL import ImageOps
+        im = ImageOps.autocontrast(im.convert("L"), cutoff=0.5).convert("RGB")
+    im.save(out, optimize=True)
+
+
+def cmd_iconset_split(big, small, outdir, min_px=128):
+    """macOS .iconset where entries >= min_px pixels use `big` (macOS-grid 1024 PNG) and smaller
+    ones use `small` (the size-degraded art)."""
+    import os
+    os.makedirs(outdir, exist_ok=True)
+    ims = {k: Image.open(v).convert("RGBA") for k, v in (("big", big), ("small", small))}
+    for s in (16, 32, 128, 256, 512):
+        for px, name in ((s, f"icon_{s}x{s}.png"), (s * 2, f"icon_{s}x{s}@2x.png")):
+            src = ims["big"] if px >= min_px else ims["small"]
+            src.resize((px, px), Image.LANCZOS).save(f"{outdir}/{name}")
+
+
+def cmd_ladder(out, ios_dir, iconset_dir):
+    """Size ladder: exactly the file that ships at each size (iOS: ios/icon_<px>*.png with the iOS
+    mask, on light + dark wallpapers, normal/dark/tinted rows; macOS: the .iconset entries on a
+    light + dark Dock/Finder strip). Pixels are shown 1:1 (no rescale), sizes labelled."""
+    import glob, os, re
+    sizes = sorted({int(re.match(r"icon_(\d+)", os.path.basename(f)).group(1))
+                    for f in glob.glob(os.path.join(ios_dir, "icon_*.png"))}, reverse=True)
+    sizes = [x for x in sizes if x != 1024]
+    pad, lab = 18, 22
+    rows = [("iOS", ""), ("iOS dark", "_dark"), ("iOS tinted", "_tinted")]
+    col_w = [x + pad for x in sizes]
+    row_h = max(sizes) + lab + 2 * pad
+    W = 170 + 2 * (sum(col_w) + pad) + 3 * pad
+    mac = [(16, "icon_16x16.png"), (32, "icon_16x16@2x.png"), (32, "icon_32x32.png"), (64, "icon_32x32@2x.png"),
+           (128, "icon_128x128.png"), (256, "icon_128x128@2x.png"), (512, "icon_256x256@2x.png")]
+    mac_h = 512 + lab + 2 * pad
+    H = 60 + len(rows) * row_h + 50 + mac_h + pad
+    sheet = Image.new("RGB", (W, H), (245, 243, 238))
+    d = ImageDraw.Draw(sheet)
+    d.text((pad, 14), "Size ladder: the exact file shipped at each pixel size (1:1).  Light / dark wallpaper.",
+           fill=(20, 20, 20), font=font(22))
+    for r, (name, suf) in enumerate(rows):
+        y0 = 60 + r * row_h
+        d.text((pad, y0 + pad), name, fill=(20, 20, 20), font=font(20))
+        for g, bgc in enumerate(((232, 226, 214), (22, 22, 28))):
+            gx = 170 + g * (sum(col_w) + 2 * pad)
+            d.rectangle([gx, y0, gx + sum(col_w) + pad, y0 + row_h - 6], fill=bgc)
+            x = gx + pad
+            for px in sizes:
+                f = os.path.join(ios_dir, "icon_%d%s.png" % (px, suf))
+                im = Image.open(f).convert("RGBA")
+                m = squircle_mask(px * 4).resize((px, px), Image.LANCZOS)
+                im.putalpha(m)
+                yy = y0 + pad + (max(sizes) - px)
+                sheet.paste(im, (x, yy), im)
+                d.text((x, y0 + pad + max(sizes) + 3), "%d" % px, fill=(120, 120, 120) if g == 0 else (170, 170, 170),
+                       font=font(13))
+                x += px + pad
+    y0 = 60 + len(rows) * row_h + 20
+    d.text((pad, y0 + 6), "macOS .icns entries (Dock / Finder)", fill=(20, 20, 20), font=font(20))
+    y0 += 40
+    for g, bgc in enumerate(((236, 236, 240), (40, 40, 46))):
+        gx = 170 + g * ((W - 170) // 2)
+        d.rectangle([gx, y0, gx + (W - 170) // 2 - pad, y0 + mac_h - 10], fill=bgc)
+        x = gx + pad
+        for px, fname in mac:
+            im = Image.open(os.path.join(iconset_dir, fname)).convert("RGBA")
+            if x + px > gx + (W - 170) // 2 - pad:
+                break
+            sheet.paste(im, (x, y0 + pad + 512 - px), im)
+            d.text((x, y0 + pad + 512 + 3), "%d" % px, fill=(120, 120, 120) if g == 0 else (170, 170, 170), font=font(13))
+            x += px + pad
+    sheet.save(out)
+
+
 def cmd_iconset(src, outdir):
     import os
     os.makedirs(outdir, exist_ok=True)
@@ -112,6 +197,22 @@ def font(size):
         except OSError:
             pass
     return ImageFont.load_default()
+
+
+def _wrap(d, xy, text, f, width, fill=(20, 20, 20), lh=26):
+    """Draws `text` word-wrapped to `width` px."""
+    x, y = xy
+    line = ""
+    for w in text.split():
+        t = (line + " " + w).strip()
+        if d.textlength(t, font=f) > width and line:
+            d.text((x, y), line, fill=fill, font=f)
+            y += lh
+            line = w
+        else:
+            line = t
+    if line:
+        d.text((x, y), line, fill=fill, font=f)
 
 
 def cmd_sheet(out, items):
@@ -134,7 +235,7 @@ def cmd_sheet(out, items):
         art = load_rgb(path).convert("RGBA")
         mask = squircle_mask(1024)
         art.putalpha(mask)
-        d.text((pad, y0 + pad), label, fill=(20, 20, 20), font=f)
+        _wrap(d, (pad, y0 + pad), label, f, 200 - 2 * pad)
         sheet.paste(art.resize((big, big), Image.LANCZOS), (200, y0 + pad), art.resize((big, big), Image.LANCZOS))
         for g, bgc in enumerate((light, dark)):
             gx = 200 + big + pad + g * group_w
@@ -144,6 +245,58 @@ def cmd_sheet(out, items):
                 small = art.resize((s, s), Image.LANCZOS)
                 sheet.paste(small, (x, y0 + pad + (big - s) // 2), small)
                 x += s + pad
+    sheet.save(out)
+
+
+def _home_grid(cands, refs, bg, cols=4, icon=60, gap_x=27, gap_y=26, label_color=(255, 255, 255), labels=None):
+    """One iPhone-like home-screen page (1x scale: 60 px icons) with `cands` mixed into `refs`."""
+    rows = (len(cands) + len(refs) + cols - 1) // cols
+    pad = 24
+    w = pad * 2 + cols * icon + (cols - 1) * gap_x
+    h = pad * 2 + rows * (icon + 14) + (rows - 1) * gap_y
+    page = Image.new("RGB", (w, h), bg)
+    d = ImageDraw.Draw(page)
+    mask = squircle_mask(icon * 4).resize((icon, icon), Image.LANCZOS)
+    items = list(refs)
+    # spread candidates through the page (not all in a corner)
+    slots = [5, 10, 2, 13, 7, 0]
+    for i, c in enumerate(cands):
+        items.insert(min(slots[i % len(slots)], len(items)), c)
+    f = font(10)
+    for i, (label, path) in enumerate(items):
+        x = pad + (i % cols) * (icon + gap_x)
+        y = pad + (i // cols) * (icon + 14 + gap_y)
+        art = load_rgb(path).resize((icon, icon), Image.LANCZOS).convert("RGBA")
+        art.putalpha(mask)
+        page.paste(art, (x, y), art)
+        tw = d.textlength(label[:11], font=f)
+        d.text((x + (icon - tw) / 2, y + icon + 3), label[:11], fill=label_color, font=f)
+    return page
+
+
+def cmd_grid(out, cands, refs):
+    """Crowded-grid mock: each candidate on a home-screen page among competitor icons, on a light
+    and a dark wallpaper, plus a 2x "App Store search" strip at 64/40 px."""
+    pages = []
+    for label, path in cands:
+        lt = _home_grid([(label, path)], refs, (214, 205, 190), label_color=(30, 30, 30))
+        dk = _home_grid([(label, path)], refs, (20, 20, 26))
+        pages.append((label, lt, dk))
+    pw, ph = pages[0][1].size
+    head = 30
+    cols = 1 if len(pages) < 3 else (2 if len(pages) < 7 else 3)  # candidate columns (light + dark each)
+    rows = (len(pages) + cols - 1) // cols
+    cw = 2 * pw + 16 + 40
+    W = cols * cw + 16
+    H = rows * (ph + head + 16) + 16
+    sheet = Image.new("RGB", (W, H), (245, 243, 238))
+    d = ImageDraw.Draw(sheet)
+    for i, (label, lt, dk) in enumerate(pages):
+        x = 16 + (i % cols) * cw
+        y = 16 + (i // cols) * (ph + head + 16)
+        d.text((x, y + 4), label, fill=(20, 20, 20), font=font(20))
+        sheet.paste(lt, (x, y + head))
+        sheet.paste(dk, (x + 16 + pw, y + head))
     sheet.save(out)
 
 
@@ -160,8 +313,18 @@ def main(argv):
         cmd_macos(argv[2], argv[3])
     elif c == "iconset":
         cmd_iconset(argv[2], argv[3])
+    elif c == "iconset_split":
+        cmd_iconset_split(argv[2], argv[3], argv[4], int(argv[5]) if len(argv) > 5 else 128)
+    elif c == "ladder":
+        cmd_ladder(argv[2], argv[3], argv[4])
+    elif c == "flatten":
+        cmd_flatten(argv[2], argv[3], len(argv) > 4 and argv[4] == "tinted")
     elif c == "sheet":
         cmd_sheet(argv[2], [a.split("=", 1) for a in argv[3:]])
+    elif c == "grid":
+        # grid <out.png> label=cand.png ... -- label=ref.png ...
+        i = argv.index("--")
+        cmd_grid(argv[2], [a.split("=", 1) for a in argv[3:i]], [a.split("=", 1) for a in argv[i + 1:]])
     else:
         print(__doc__)
         return 2

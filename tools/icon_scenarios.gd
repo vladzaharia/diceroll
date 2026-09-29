@@ -1,7 +1,7 @@
 extends RefCounted
 ## App-icon scenarios for the screenshot harness (tools/shot.gd). Art lives in tools/icon/.
-##  app_icon        the shipped icon (IconArt.FINAL), full-bleed square
-##  icon_<concept>  exploration concepts (hero, doubles, knight, tile, sword, trails)
+##  app_icon        the 3D pick (IconArt.FINAL); the shipped icon is the SVG "doubles" monogram (tools/icon/monogram.py)
+##  icon_<concept>  every concept (IconArt.CONCEPTS: hero, hero_dark, solo, tumble, doubles, knight, orbit, tile)
 ## Render square, in the background only:
 ##   tools/shoot.sh app_icon /abs/icon.png 1024x1024 --wait=2
 ## tools/icon/build_icons.sh (tools/export.sh icon) renders + derives every icon asset.
