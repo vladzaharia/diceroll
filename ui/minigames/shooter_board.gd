@@ -52,6 +52,7 @@ var _drop_pts := 0
 var _clear_t := -1000.0
 var _chest_bump := -10.0
 var _cancel_t := -10.0
+var _happy_t := -10.0
 
 
 # --- state -----------------------------------------------------------------------------
@@ -204,9 +205,7 @@ func _gui_input(e: InputEvent) -> void:
 func scripted_input(args: Array, drv: Node) -> bool:
 	if args.is_empty():
 		return false
-	# the drag runs as its own coroutine: the harness polls the core for the action (awaiting a
-	# coroutine through the MgBoard-typed call loses the caller's frame state in the harness)
-	_scripted_drag(clampi(int(args[0]), 0, BubbleShooter.ANGLES - 1), drv)
+	await _scripted_drag(clampi(int(args[0]), 0, BubbleShooter.ANGLES - 1), drv)
 	return true
 
 
@@ -295,7 +294,8 @@ func play_update(ev: Dictionary) -> void:
 			await wait(step)
 		await wait(0.1)
 		var n := popped.size()
-		float_text(P(centre), "POP x%d  +%d" % [n, n] if n >= 5 else "+%d" % n, _bc(col).lightened(0.4), maxi(22, int(_u * (0.75 if n >= 5 else 0.6))), 1.0)
+		float_text(_safe(P(centre)), "POP x%d  +%d" % [n, n] if n >= 5 else "+%d" % n, _bc(col).lightened(0.4), maxi(22, int(_u * (0.75 if n >= 5 else 0.6))), 1.0)
+		_happy_t = time
 		shake(3.0 + minf(n, 10) * 0.6)
 		kick.emit(0.2 + minf(n, 10) * 0.03, Color(_bc(col), 0.25))
 	elif cell >= 0:
@@ -327,7 +327,7 @@ func play_update(ev: Dictionary) -> void:
 		ctr /= float(dropped.size())
 		MgBoard.sfx("swoosh", 0.1, 0.0)
 		var nd := dropped.size()
-		float_text(P(ctr), "DROP x%d!" % nd if nd >= 2 else "DROP!", Color("ffd84a"), maxi(24, int(_u * 0.8)), 1.2)
+		float_text(_safe(P(ctr) + Vector2(0, _u * 0.8)), "DROP x%d!" % nd if nd >= 2 else "DROP!", Color("ffd84a"), maxi(24, int(_u * 0.8)), 1.2)
 		var guard := 0
 		while guard < 240 and _drop_pts < nd:
 			guard += 1
@@ -348,6 +348,11 @@ func play_update(ev: Dictionary) -> void:
 	_swap_k = -1.0
 	_animating = false
 	unlock()
+
+
+## Keeps a big float text inside the field (group centres can hug a wall or the ceiling).
+func _safe(p: Vector2) -> Vector2:
+	return Vector2(clampf(p.x, P(Vector2(2.2, 0)).x, P(Vector2(5.8, 0)).x), maxf(p.y, P(Vector2(0, 1.2)).y))
 
 
 ## Bubbles popped in rings outward from the landing cell.
@@ -770,8 +775,14 @@ func _draw_launcher(gc: Color) -> void:
 	# eyes on the body, looking where it aims
 	var look := Vector2(sin(_aim), -cos(_aim)) * u * 0.05
 	var blink := 1.0 if fposmod(time, 3.7) > 0.12 else 0.15
+	var happy := time - _happy_t < dur(1.4)
 	for s in [-1.0, 1.0]:
 		var e := body_c + Vector2(s * u * 0.3, u * 0.38)
+		if happy:
+			# ^ ^ : a pop pleases it
+			draw_arc(e + Vector2(0, u * 0.05), u * 0.11, PI * 1.1, PI * 1.9, 10, UiPalette.OUTLINE, maxf(2.5, u * 0.07), true)
+			draw_circle(body_c + Vector2(s * u * 0.55, u * 0.55), u * 0.11, Color(1.0, 0.45, 0.6, 0.7))
+			continue
 		draw_set_transform(e, 0.0, Vector2(1.0, blink))
 		draw_circle(Vector2.ZERO, u * 0.13 + 2.0, UiPalette.OUTLINE)
 		draw_circle(Vector2.ZERO, u * 0.13, Color.WHITE)
