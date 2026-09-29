@@ -73,6 +73,18 @@ for c in yellow red blue; do
 done
 lic "$PLAT" "$KK/platformer"
 
+echo "== KayKit Skeletons 1.1 (FREE): the minion's head/jaw/eyes make the Skull Buddy pet"
+SK="KayKit_Skeletons_1.1_FREE"
+sync "$SRC/$SK/characters/gltf" "$KK/skeletons" --include='Skeleton_Minion.glb' --include='*.png' --exclude='*'
+lic "$SK" "$KK/skeletons"
+
+echo "== KayKit ResourceBits EXTRA gems (Crystal Wisp pet; EXTRA = never committed, skipped if absent)"
+RB="KayKit_ResourceBits_1.0_EXTRA"
+if [ -d "$SRC/$RB/Assets/gltf" ]; then
+	sync "$SRC/$RB/Assets/gltf" "$KK/resource" --include='Gem_*' --include='resource_bits_texture.png' --exclude='*'
+	lic "$RB" "$KK/resource"
+fi
+
 echo "== Music beds (mixkit, re-encoded to 96 kbps mp3 to keep the repo lean)"
 MUS="$DST/audio/music"
 mkdir -p "$MUS"

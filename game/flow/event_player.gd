@@ -190,11 +190,9 @@ func _one(ev: Dictionary) -> void:
 			await _wait(0.1)
 		"offer_closed":
 			c.close_modals()
-		"level_up":
-			Fx.level_up(c.world_parent(), c.hero_pos())
-			Audio.play_sfx("levelup")
-			c.overlay.announce("LEVEL UP!", "Level %d" % int(ev.level), UiPalette.XP.lightened(0.3), 0.9)
-			await _wait(1.2)
+		"level_up", "potion_gained", "potion_used", "pet_charged", "pet_acted", "second_boss", "face_cursed", "trait_triggered", "crowns_pending":
+			# meta-layer beats (auto level-ups, potions, pets, ascension events): game/pets/meta_beats.gd
+			await MetaBeats.play(c, ev)
 		"act_started":
 			await c.change_biome(ev)
 		"game_over":
