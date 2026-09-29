@@ -22,6 +22,13 @@ extends RefCounted
 ##                         value is refunded (max NINJA_REFUNDS_PER_TURN per turn; never twice
 ##                         for one reroll, so Encore and Shadow Step don't stack); a board reroll
 ##                         that rolls doubles is refunded (max 1 per board turn)
+##   bone_harvest (Necromancer)  each enemy death during the fight raises a temporary Bone die
+##                         (faces 1 2 2 3 3 4, tag "bone") that joins the pool next turn (max
+##                         BONE_MAX, pool max BONE_POOL_MAX); a fight that starts with a lone enemy
+##                         raises one at the start of turns BONE_LONE_TURNS, and a boss drops one
+##                         when phase 2 starts. Bones crumble when the fight is won, healing
+##                         BONE_HEAL each. Events: die_added {die_idx, temporary: true, tag: "bone",
+##                         die} and die_removed {die_idx, temporary: true}.
 ##   overgrowth (Druid)    each lap completion raises the lowest face of every "seed" die by 1
 ##                         (face_changed {source: "growth"}); each biome change tags the
 ##                         untagged die with the lowest face sum as a seed (max DRUID_MAX_SEEDS);
@@ -41,6 +48,10 @@ static var NINJA_BOARD_REFUNDS := 1
 static var DRUID_GROWTH := 1
 static var DRUID_MAX_SEEDS := 3
 static var DRUID_PET_CHARGE := 1
+static var BONE_MAX := 2
+static var BONE_POOL_MAX := 6
+static var BONE_HEAL := 2
+static var BONE_LONE_TURNS := [3, 6]
 
 ## Sim-only analysis dial (tools/sim.gd --cl=<KNOB>=<value>): sets one of the knobs above.
 ## Returns false for an unknown knob. The defaults above ARE the shipped numbers.
@@ -56,6 +67,8 @@ static func tune_knob(knob: String, v: float) -> bool:
 		"DRUID_GROWTH": DRUID_GROWTH = int(v)
 		"DRUID_MAX_SEEDS": DRUID_MAX_SEEDS = int(v)
 		"DRUID_PET_CHARGE": DRUID_PET_CHARGE = int(v)
+		"BONE_MAX": BONE_MAX = int(v)
+		"BONE_HEAL": BONE_HEAL = int(v)
 		_: return false
 	return true
 
@@ -137,6 +150,37 @@ static func on_combat_start(run: RunState, c: CombatState) -> Array[Dictionary]:
 					out.append_array(ch)
 	return out
 
+## Before a player turn's dice are sized and rolled: temporary dice join the pool (Bone dice
+## raised last turn; the lone-foe rule raises one right away on turns BONE_LONE_TURNS).
+static func before_turn(run: RunState, c: CombatState) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	match mech(run):
+		"bone_harvest":
+			if c.turn in BONE_LONE_TURNS and c.enemies.size() == 1 and not c.all_dead():
+				out.append_array(_raise_bone(run, c, "lone"))
+			while c.pending_bones > 0:
+				c.pending_bones -= 1
+				var d := Die.make("", "bone")
+				d.add_tag("bone")
+				c.extra_dice.append(d)
+				var idx := run.dice.size() + c.extra_dice.size() - 1
+				out.append({"type": "die_added", "die_idx": idx, "kind": "bone", "temporary": true, "tag": "bone", "die": d.to_dict()})
+	return out
+
+## Queues a Bone die (it joins at the next turn start) when the caps allow. `why`: kill | lone | phase.
+static func _raise_bone(run: RunState, c: CombatState, why: String) -> Array[Dictionary]:
+	if c.bones_raised >= BONE_MAX or run.dice.size() + c.extra_dice.size() + c.pending_bones >= BONE_POOL_MAX:
+		return []
+	c.bones_raised += 1
+	c.pending_bones += 1
+	return [ev(run, "bone_harvest", c.bones_raised, {"reason": why})]
+
+## A boss entered phase 2.
+static func on_boss_phase(run: RunState, c: CombatState, _i: int) -> Array[Dictionary]:
+	if mech(run) == "bone_harvest":
+		return _raise_bone(run, c, "phase")
+	return []
+
 ## Player turn start (after the dice are rolled).
 static func on_turn_start(_run: RunState, _c: CombatState) -> Array[Dictionary]:
 	return []
@@ -199,7 +243,9 @@ static func after_main_hit(run: RunState, c: CombatState, tgt: int, overkill: in
 	return out
 
 ## An enemy died (any source).
-static func on_enemy_killed(_run: RunState, _c: CombatState, _i: int, _source: String) -> Array[Dictionary]:
+static func on_enemy_killed(run: RunState, c: CombatState, _i: int, _source: String) -> Array[Dictionary]:
+	if mech(run) == "bone_harvest" and not c.all_dead():
+		return _raise_bone(run, c, "kill")
 	return []
 
 ## End of the enemy phase (the hero survived), before the next turn starts.
@@ -207,8 +253,20 @@ static func on_enemy_phase_end(_run: RunState, _c: CombatState) -> Array[Diction
 	return []
 
 ## The fight was won.
-static func on_fight_end(_run: RunState, _c: CombatState) -> Array[Dictionary]:
-	return []
+static func on_fight_end(run: RunState, c: CombatState) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	match mech(run):
+		"bone_harvest":
+			var n := c.extra_dice.size()
+			for k in range(n - 1, -1, -1):
+				out.append({"type": "die_removed", "die_idx": run.dice.size() + k, "temporary": true, "tag": "bone"})
+			c.extra_dice.clear()
+			c.pending_bones = 0
+			if n > 0:
+				var h := run.heal(BONE_HEAL * n)
+				out.append(ev(run, "bone_crumble", n))
+				out.append({"type": "hp_changed", "amount": h, "total": run.hp, "source": "bones", "max_hp": run.max_hp})
+	return out
 
 # ------------------------------------------------------------------ board
 

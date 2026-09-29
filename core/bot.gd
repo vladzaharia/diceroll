@@ -183,7 +183,7 @@ static func _combat(f: GameFlow) -> Array:
 					continue
 				if keep_hi and c.dice_values[i] >= 5:
 					continue
-				if f.run.dice[i].rune == "wild":
+				if c.die_at(f.run, i).rune == "wild":
 					continue
 				want[i] = true
 	for i in want.size():
@@ -742,6 +742,7 @@ class CombatModel:
 	var aim := 1.0           # Ranger: damage factor when no die was rerolled this turn
 	var aim_ok := false      # Ranger: no reroll spent yet this turn
 	var pierce_carry := false  # Ranger: overkill carries once to the next living enemy
+	var kill_value := 0.0    # Necromancer: worth of a kill beyond the enemy itself (a Bone die)
 	var ne := 0
 	var e_idx := PackedInt32Array()
 	var e_hp := PackedFloat64Array()
@@ -1006,7 +1007,7 @@ class CombatModel:
 					h[k] = 0.0
 				if h[k] <= 0.0:
 					kills += 1
-					val += e_future[k]
+					val += e_future[k] + kill_value
 					continue
 				all_dead = false
 				if k == t and venom > 0.0:
@@ -1074,7 +1075,7 @@ static func _combat_model(f: GameFlow, rules: AutoRules) -> CombatModel:
 	var c := f.combat
 	var run := f.run
 	var cm := CombatModel.new()
-	cm.set_dice(_dice_desc(run.dice))
+	cm.set_dice(_dice_desc(c.pool_dice(run)))
 	cm.set_passives(Array(run.passives), run.gold, c.turn == 1)
 	_class_model(cm, run, c)
 	cm.atk = run.atk
@@ -1143,6 +1144,9 @@ static func _class_model(cm: CombatModel, run: RunState, c: CombatState, dice: A
 				for d in dice:
 					fs.append(d[0])
 				cm.oath = ClassLogic.oath_of(fs)
+		"bone_harvest":
+			if c != null and c.bones_raised < ClassLogic.BONE_MAX and c.pool_dice(run).size() + c.pending_bones < ClassLogic.BONE_POOL_MAX:
+				cm.kill_value = 6.0 # a Bone die for the rest of the fight: kill the weak ones first
 		"aim":
 			cm.aim = ClassLogic.RANGER_AIM_MULT
 			cm.aim_ok = c == null or c.rerolls_used_this_turn == 0
@@ -1335,7 +1339,7 @@ static func _combat_key(f: GameFlow, rules: AutoRules) -> int:
 	for e in c.enemies:
 		en.append([e.hp, e.block, e.poison, e.frozen, e.intent.kind, e.intent.value, e.atk_bonus, e.traits])
 	var dd: Array = []
-	for d in f.run.dice:
+	for d in c.pool_dice(f.run):
 		dd.append([d.faces, d.rune])
 	var k := hash([f.run.seed, int(f.run.stats.get("combat_turns", 0)), c.turn, c.rerolls_left, c.dice_values,
 		c.locked, c.rerolled, en, dd, f.run.hp, f.run.max_hp, f.run.block, f.run.gold, f.run.passives,

@@ -25,13 +25,16 @@ const DATA := {
 		"kinds": ["standard", "odd"], "tags": ["", ""], "combat_rerolls": 3, "mechanic": "shadow_step", "style": "dual"},
 	"druid": {"name": "Druid", "model": "druid", "hp": 62, "atk": 0, "runes": ["", ""], "board_rerolls": 1,
 		"kinds": ["low", "standard"], "tags": ["seed", ""], "combat_rerolls": 2, "mechanic": "overgrowth", "style": "magic"},
+	# --- wave 2
+	"necromancer": {"name": "Necromancer", "model": "necromancer", "hp": 54, "atk": 0, "runes": ["vampire", ""], "board_rerolls": 1,
+		"kinds": ["standard", "standard"], "tags": ["", ""], "combat_rerolls": 2, "mechanic": "bone_harvest", "style": "magic"},
 }
 
 ## Unlock order (UnlockDefs milestones, the Sigil "next two" rule and the class shelf).
-const IDS := ["knight", "barbarian", "paladin", "mage", "ranger", "rogue", "ninja", "druid"]
+const IDS := ["knight", "barbarian", "paladin", "mage", "ranger", "rogue", "ninja", "druid", "necromancer"]
 
 ## Mechanic names for the class badge (presentation).
-const MECHANIC_NAMES := {"oath": "Oath", "aim": "Aim", "shadow_step": "Shadow Step", "overgrowth": "Overgrowth"}
+const MECHANIC_NAMES := {"oath": "Oath", "aim": "Aim", "shadow_step": "Shadow Step", "overgrowth": "Overgrowth", "bone_harvest": "Bone Harvest"}
 
 ## Sim-only analysis dial (tools/sim.gd --hero=<id>.<field>=<value>): per-class field overrides.
 ## The game never sets it; the DATA values ARE the shipped numbers.

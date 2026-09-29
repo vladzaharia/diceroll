@@ -42,7 +42,11 @@ var last_overkill: int = 0         # damage_enemy: overkill of the last lethal h
 # pets (PetLogic)
 var pet_thorns: int = 0            # Pebble: thorns against attackers this enemy phase
 var pet_block_turn: int = 0        # Block the pet gave this turn (Pebble's charge ignores it)
-var last_runes: Array[Dictionary] = []  # runes that triggered in the last attack [{rune, value, die}] (Grimoire)
+var last_runes: Array[Dictionary] = []
+# Necromancer (ClassLogic "bone_harvest")
+var extra_dice: Array[Die] = []    # temporary dice for this fight (Bone dice), after run.dice
+var pending_bones: int = 0         # Bone dice raised this turn: they join the pool next turn
+var bones_raised: int = 0          # Bone dice raised this fight (max ClassLogic.BONE_MAX)  # runes that triggered in the last attack [{rune, value, die}] (Grimoire)
 
 # ---------------------------------------------------------------- setup
 
@@ -153,7 +157,15 @@ func _note_seen(run: RunState) -> void:
 
 ## The die at combat index i (run.dice; the Necromancer's temporary dice come after them).
 func die_at(run: RunState, i: int) -> Die:
-	return run.dice[i]
+	return run.dice[i] if i < run.dice.size() else extra_dice[i - run.dice.size()]
+
+## The combat pool: run.dice, then the fight's temporary dice (CombatState.extra_dice).
+func pool_dice(run: RunState) -> Array[Die]:
+	if extra_dice.is_empty():
+		return run.dice
+	var out: Array[Die] = run.dice.duplicate()
+	out.append_array(extra_dice)
+	return out
 
 static func has_affix(e: Dictionary, a: String) -> bool:
 	return (e.get("affixes", []) as Array).has(a)
@@ -217,6 +229,9 @@ func roll_intent(rng: Rng, i: int) -> void:
 func start_turn(run: RunState) -> Array[Dictionary]:
 	var ev: Array[Dictionary] = []
 	turn += 1
+	# class dice that join from this turn (the Necromancer's Bone dice)
+	var cev := ClassLogic.before_turn(run, self)
+	var pd := pool_dice(run)
 	run.stats.combat_turns = int(run.stats.get("combat_turns", 0)) + 1
 	run.block = 0
 	rerolls_left = run.combat_rerolls + run.banked_rerolls
@@ -247,7 +262,7 @@ func start_turn(run: RunState) -> Array[Dictionary]:
 			pev.append({"type": "block_gained", "target": "hero", "amount": extra, "total": run.block})
 		if boost:
 			rerolls_left += 1
-	var n := run.dice.size()
+	var n := pd.size()
 	marked.resize(n)
 	marked.fill(false)
 	locked.resize(n)
@@ -266,13 +281,14 @@ func start_turn(run: RunState) -> Array[Dictionary]:
 		pending_curse = 0
 	lock_list.sort()
 	ev.append({"type": "combat_turn_started", "turn": turn, "rerolls_left": rerolls_left, "locked": lock_list, "hero_block": run.block})
+	ev.append_array(cev)
 	ev.append_array(pev)
 	for i in lock_list:
 		ev.append({"type": "status", "target": "hero", "status": "curse", "value": 1, "die_idx": i})
 	var all: Array[int] = []
 	for i in n:
-		dice_faces[i] = run.dice[i].roll(run.rng)
-		dice_values[i] = run.dice[i].value(dice_faces[i])
+		dice_faces[i] = pd[i].roll(run.rng)
+		dice_values[i] = pd[i].value(dice_faces[i])
 		all.append(i)
 	ev.append({"type": "dice_rolled", "values": dice_values.duplicate(), "indices": all, "context": "combat", "faces": dice_faces.duplicate(), "rerolls_left": rerolls_left})
 	ev.append_array(PetLogic.on_turn_start(run, self))
@@ -290,6 +306,7 @@ func toggle(i: int) -> Array[Dictionary]:
 	return [{"type": "die_marked", "die_idx": i, "marked": marked[i]}]
 
 func reroll(run: RunState) -> Array[Dictionary]:
+	var pd := pool_dice(run)
 	if rerolls_left <= 0:
 		return [_err("no rerolls left")]
 	var idx: Array[int] = []
@@ -306,8 +323,8 @@ func reroll(run: RunState) -> Array[Dictionary]:
 	if free:
 		wisp_free -= 1
 	for i in idx:
-		dice_faces[i] = run.dice[i].roll(run.rng)
-		dice_values[i] = run.dice[i].value(dice_faces[i])
+		dice_faces[i] = pd[i].roll(run.rng)
+		dice_values[i] = pd[i].value(dice_faces[i])
 		if not free:
 			rerolled[i] = true
 		marked[i] = false
@@ -330,9 +347,10 @@ func set_target(i: int) -> Array[Dictionary]:
 
 ## Best combo for the current dice (Wild aware), without resolving anything.
 func current_combo(run: RunState) -> Dictionary:
+	var pd := pool_dice(run)
 	var wild: Array[bool] = []
 	var left := Balance.WILD_MAX_DICE
-	for d in run.dice:
+	for d in pd:
 		# anti-stacking: only the first WILD_MAX_DICE Wild dice act as Wild
 		var w := d.rune == "wild" and left > 0
 		if w:
@@ -362,10 +380,11 @@ static func passive_mult(run: RunState, combo_id: String, base: float) -> float:
 ## rune_cap(rune) dice in pool order whose trigger fires (combo runes: in the scoring group;
 ## Ember: shows 6; Frost: shows 1; Thunder: rerolled; Lucky: kept; Guard: always).
 func rune_active(run: RunState, group: Array, eff: Array) -> Array[bool]:
+	var pd := pool_dice(run)
 	var out: Array[bool] = []
 	var used := {}
-	for i in run.dice.size():
-		var r := run.dice[i].rune
+	for i in pd.size():
+		var r := pd[i].rune
 		var ok := false
 		match r:
 			"blade", "venom", "vampire", "echo", "heavy", "gilded":
@@ -388,6 +407,7 @@ func rune_active(run: RunState, group: Array, eff: Array) -> Array[bool]:
 	return out
 
 func attack(run: RunState) -> Array[Dictionary]:
+	var pd := pool_dice(run)
 	var ev: Array[Dictionary] = []
 	ev.append_array(PetLogic.fire_at_attack(run, self))
 	if all_dead():
@@ -411,10 +431,10 @@ func attack(run: RunState) -> Array[Dictionary]:
 	mult += float(cls_bonus[0])
 	# How many times each die's rune triggers (Resonance: combo dice x2; Rune Echo: 25% x2).
 	var times: Array[int] = []
-	for i in run.dice.size():
+	for i in pd.size():
 		var t := 1
 		# anti-stacking: the multiplier runes (Heavy, Echo) never trigger twice
-		if run.dice[i].rune != "" and group.has(i) and not Balance.NO_DOUBLE_TRIGGER.has(run.dice[i].rune):
+		if pd[i].rune != "" and group.has(i) and not Balance.NO_DOUBLE_TRIGGER.has(pd[i].rune):
 			if run.has_passive("resonance"):
 				t = 2
 			elif run.has_passive("rune_echo") and run.rng.chance(Balance.PASSIVE_RUNE_ECHO_CHANCE):
@@ -428,7 +448,7 @@ func attack(run: RunState) -> Array[Dictionary]:
 	last_runes.clear()
 	for i in act.size():
 		if act[i]:
-			last_runes.append({"rune": run.dice[i].rune, "value": int(eff[i]), "die": i})
+			last_runes.append({"rune": pd[i].rune, "value": int(eff[i]), "die": i})
 	run.stats.rune_triggers = int(run.stats.get("rune_triggers", 0)) + last_runes.size()
 	if cid in ["three_kind", "full_house", "four_kind", "five_kind", "six_kind"]:
 		run.stats.sets3 = int(run.stats.get("sets3", 0)) + 1
@@ -436,9 +456,9 @@ func attack(run: RunState) -> Array[Dictionary]:
 	var steady := 0
 	var boxcars := 0
 	var snakes := 0
-	for i in run.dice.size():
+	for i in pd.size():
 		var pips := int(eff[i])
-		var rune := run.dice[i].rune
+		var rune := pd[i].rune
 		var in_group := group.has(i)
 		if rune == "heavy" and act[i]:
 			# anti-stacking: Heavy doubles only inside the scoring group, at most 2 dice
@@ -538,16 +558,16 @@ func attack(run: RunState) -> Array[Dictionary]:
 			run.stats.damage_taken = int(run.stats.get("damage_taken", 0)) + th
 			ev.append({"type": "damage", "target": "hero", "amount": th, "blocked": 0, "source": "thorns", "attacker": target, "lethal": false, "hp": run.hp, "max_hp": run.max_hp, "block": run.block})
 	# Ember (SIX): 6 to all
-	for i in run.dice.size():
-		if run.dice[i].rune == "ember" and act[i]:
+	for i in pd.size():
+		if pd[i].rune == "ember" and act[i]:
 			for k in times[i]:
 				ev.append(_rune(i, "ember", "damage_all", 6))
 				for j in enemies.size():
 					if alive(j):
 						ev.append_array(damage_enemy(j, 6, "ember", run))
 	# Thunder (REROLLED): pips to a random enemy
-	for i in run.dice.size():
-		if run.dice[i].rune == "thunder" and act[i]:
+	for i in pd.size():
+		if pd[i].rune == "thunder" and act[i]:
 			for k in times[i]:
 				var a := alive_indices()
 				if a.is_empty():
@@ -557,7 +577,7 @@ func attack(run: RunState) -> Array[Dictionary]:
 				ev.append_array(damage_enemy(j, int(eff[i]), "thunder", run))
 	if run.has_passive("gold_tooth"):
 		var sixes := 0
-		for i in run.dice.size():
+		for i in pd.size():
 			if int(eff[i]) == 6:
 				sixes += 1
 		if sixes > 0:
@@ -571,8 +591,8 @@ func attack(run: RunState) -> Array[Dictionary]:
 		ev.append({"type": "hp_changed", "amount": fh, "total": run.hp, "source": "full_house_party", "max_hp": run.max_hp})
 	var killed := alive_before - alive_indices().size()
 	_fix_target()
-	for i in run.dice.size():
-		var rune := run.dice[i].rune
+	for i in pd.size():
+		var rune := pd[i].rune
 		var pips := int(eff[i])
 		if not act[i]:
 			continue
@@ -690,6 +710,7 @@ func damage_enemy(i: int, amount: int, source: String, run: RunState, ignore_blo
 			var lost := int(e.block)
 			e.block = 0
 			ev.append({"type": "block_gained", "target": i, "amount": -lost, "total": 0, "source": "shatter"})
+		ev.append_array(ClassLogic.on_boss_phase(run, self, i))
 	return ev
 
 ## Frenzy: +FRENZY_STEP attack after surviving a main-attack hit, up to +FRENZY_MAX per fight.
@@ -992,6 +1013,7 @@ func to_dict() -> Dictionary:
 		"potion_turn": potion_turn, "stoneskin": stoneskin, "boost": boost, "pet_mult": pet_mult,
 		"rerolls_used_this_turn": rerolls_used_this_turn, "refunds_this_turn": refunds_this_turn, "oath": oath,
 		"pet_thorns": pet_thorns, "pet_block_turn": pet_block_turn, "last_runes": last_runes.duplicate(true),
+		"extra_dice": extra_dice.map(func(d): return d.to_dict()), "pending_bones": pending_bones, "bones_raised": bones_raised,
 	}
 
 static func from_dict(d: Dictionary) -> CombatState:
@@ -1027,6 +1049,10 @@ static func from_dict(d: Dictionary) -> CombatState:
 	c.oath = int(d.get("oath", 0))
 	c.pet_thorns = int(d.get("pet_thorns", 0))
 	c.pet_block_turn = int(d.get("pet_block_turn", 0))
+	for xd in d.get("extra_dice", []):
+		c.extra_dice.append(Die.from_dict(xd))
+	c.pending_bones = int(d.get("pending_bones", 0))
+	c.bones_raised = int(d.get("bones_raised", 0))
 	for lr in d.get("last_runes", []):
 		c.last_runes.append({"rune": String(lr.rune), "value": int(lr.value), "die": int(lr.die)})
 	c.last_combo = _norm_combo(d.last_combo)

@@ -25,6 +25,9 @@ const DEFS := {
 		"desc": "Faces 0,0,6,6,6,6. A blank moves nothing and scores nothing."},
 	"giant": {"name": "Giant", "faces": [4, 5, 6, 7, 8, 9], "rarity": "epic", "price": 65, "cap": 9,
 		"desc": "Faces 4 to 9. Forge can raise it up to 9."},
+	# class-only kinds (never in shops, drafts or drops): the Necromancer's temporary Bone die
+	"bone": {"name": "Bone", "faces": [1, 2, 2, 3, 3, 4], "rarity": "class", "price": 0, "cap": 6, "class_only": true,
+		"desc": "Faces 1,2,2,3,3,4. Raised from a fallen foe for the rest of the fight."},
 }
 
 const IDS := ["standard", "low", "odd", "even", "loaded", "twin", "high", "gambler", "giant"]
@@ -47,6 +50,8 @@ static func raise_cap(id: String) -> int:
 static func of_rarity(r: String) -> Array[String]:
 	var out: Array[String] = []
 	for id in IDS:
+		if bool(DEFS[id].get("class_only", false)):
+			continue
 		if DEFS[id].rarity == r:
 			out.append(id)
 	return out
