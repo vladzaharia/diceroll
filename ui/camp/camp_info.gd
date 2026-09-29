@@ -154,6 +154,11 @@ static func nearest_goals(p: Profile, n := 3) -> Array:
 		if int(pr[0]) >= int(pr[1]):
 			continue
 		var first: Array = (m.unlocks as Array)[0]
+		if bool(m.get("hidden", false)):
+			# a secret: only its hint, never what it unlocks
+			goals.append({"title": "A secret", "detail": String(m.get("hint", "Keep exploring.")), "cur": int(pr[0]),
+				"need": int(pr[1]), "icon": "question", "color": Color("c79bff"), "ratio": float(pr[0]) / maxf(1.0, float(pr[1]))})
+			continue
 		goals.append({"title": rewards_text(m), "detail": String(m.desc), "cur": int(pr[0]), "need": int(pr[1]),
 			"icon": icon_of(String(first[0]), String(first[1])), "color": color_of(String(first[0]), String(first[1])),
 			"ratio": float(pr[0]) / maxf(1.0, float(pr[1]))})

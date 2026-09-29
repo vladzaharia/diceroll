@@ -19,18 +19,20 @@ func _build() -> void:
 
 func rebuild(p: Profile) -> void:
 	body.add_child(CampModal.heading("Hero"))
+	var cur := String(p.loadout.get("class", "knight"))
+	if not p.class_allowed(cur):
+		cur = "knight"
+	body.add_child(hero_card(p, cur))
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 10)
 	grid.add_theme_constant_override("v_separation", 10)
 	grid.mouse_filter = Control.MOUSE_FILTER_PASS
 	body.add_child(grid)
-	var cur := String(p.loadout.get("class", "knight"))
 	for id in HeroDefs.IDS:
-		var ok := p.class_allowed(String(id))
-		var d: Dictionary = HeroDefs.DATA[id]
-		var desc := String(ClassSelect.TAGLINES.get(id, "")) if ok else String(CampInfo.milestone_for("classes", String(id)).get("desc", "Locked"))
-		var t := CampUi.tile(String(d.name), desc, ok and cur == String(id), ok, UiIcons.class_icon(String(id)), UiPalette.GOLD_BRIGHT)
+		var st := ClassCard.state_for(p, String(id), cur)
+		var lock := ClassCard.unlock_text(p, String(id)) if st == ClassCard.State.LOCKED or st == ClassCard.State.SECRET else ""
+		var t := ClassCard.make(String(id), st, lock)
 		t.size_flags_vertical = Control.SIZE_FILL
 		t.pressed.connect(cmd.bind(["set_class", String(id)]))
 		grid.add_child(t)
@@ -54,6 +56,32 @@ func rebuild(p: Profile) -> void:
 	go.min_height = 108
 	go.pressed.connect(func() -> void: start_pressed.emit())
 	body.add_child(go)
+
+
+## The chosen hero: a turning portrait in the equipped Wardrobe look, the mechanic badge and HP.
+static func hero_card(p: Profile, id: String) -> Control:
+	var c := CampUi.card(true)
+	var row := UiTheme.hbox(12)
+	c.add_child(row)
+	var por := HeroPortrait.new()
+	por.custom_minimum_size = Vector2(190, 230)
+	por.ring_color = UiPalette.class_color(id)
+	por.set_hero(id, p.equipped_skin(id), p.prestige_on(id), false)
+	row.add_child(por)
+	var col := UiTheme.vbox(8)
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_child(col)
+	var d: Dictionary = HeroDefs.DATA[id]
+	var head := UiTheme.hbox(10)
+	col.add_child(head)
+	var nm := UiTheme.label(String(d.name), 34, UiPalette.class_color(id).lightened(0.2), true, 6)
+	nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(nm)
+	var hp := CampUi.amount("heart", int(d.hp), UiPalette.HP, 22)
+	head.add_child(hp)
+	col.add_child(ClassDetail.mechanic_badge(id, 17))
+	return c
 
 
 func _ascension(p: Profile, unl: int) -> Control:

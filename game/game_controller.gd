@@ -865,6 +865,12 @@ func camp_command(cmd: Array) -> void:
 					CampInfo.icon_of(String(e.kind), String(e.id)), UiPalette.GOLD_BRIGHT)
 			"trait_set", "pool_toggled", "starter_kind_set", "ascension_changed", "loadout_changed":
 				Audio.play_sfx("dice_select")
+			"skin_equipped", "prestige_set":
+				Audio.play_sfx("buff")
+			"skin_unlocked":
+				Audio.play_sfx("fanfare")
+				overlay.toast("New skin: %s, %s" % [CampInfo.name_of("classes", String(e["class"])), String(SkinDefs.NAMES.get(String(e.skin), e.skin))],
+					"wardrobe", Color("c79bff"))
 	if camp_scene:
 		camp_scene.apply_profile(profile)
 	ui.camp.show_profile(profile, TitleScreen.has_save())

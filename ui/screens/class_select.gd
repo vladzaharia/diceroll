@@ -1,7 +1,11 @@
 class_name ClassSelect
 extends Control
-## Class select: rotating 3D Character preview (SubViewport), class tabs, stats, starting
-## dice with runes, Start. Portrait stacks preview over info; landscape puts them side by side.
+## Class select: a turning 3D hero (HeroPortrait, in the equipped Wardrobe look), a grid of
+## class chips (11 classes), the class name, its mechanic badge with the rule, stats, the
+## starting dice with their kinds (each die's six faces; the Pretend ★ is a star) and Start.
+## With a profile (set_profile) locked classes show their unlock and the secret Monster Kid is
+## a "???" mystery chip with only its hint; Start is disabled on them. Portrait stacks the
+## preview over the info; landscape puts them side by side.
 ## Emits class_chosen(class_id), back_pressed.
 
 signal class_chosen(class_id: String)
@@ -10,23 +14,20 @@ signal back_pressed
 const TAGLINES := ClassInfo.TAGLINES
 
 var selected := "knight"
+var profile: Profile
 var start_btn: GameButton
 var back_btn: GameButton
-var _preview: SubViewportContainer
-var _viewport: SubViewport
-var _pivot: Node3D
-var _hero: Node3D
-var _tabs: Array[GameButton] = []
-var _tabs_row: HBoxContainer
+var portrait: HeroPortrait
+var _chips: Array[GameButton] = []
+var _grid: GridContainer
 var _info: VBoxContainer
 var _name: Label
 var _tagline: Label
-var _stats: HBoxContainer
-var _dice_box: VBoxContainer
+var _detail: VBoxContainer
 var _header: Label
 var _panel: PanelContainer
+var _scroll: ScrollContainer
 var _bg: _Backdrop
-var _cam: Camera3D
 
 
 func _init() -> void:
@@ -34,7 +35,9 @@ func _init() -> void:
 	UiTheme.full_rect(self)
 	_bg = _Backdrop.new()
 	add_child(UiTheme.full_rect(_bg))
-	_build_preview()
+	portrait = HeroPortrait.new()
+	portrait.zoom = 1.12
+	add_child(portrait)
 	_header = UiTheme.label("CHOOSE YOUR HERO", 44, UiPalette.GOLD_BRIGHT, true, 10, true)
 	_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(_header)
@@ -46,51 +49,37 @@ func _init() -> void:
 
 	_panel = UiTheme.panel("main")
 	add_child(_panel)
-	_info = UiTheme.vbox(14)
-	_panel.add_child(_info)
-	_tabs_row = UiTheme.hbox(10)
-	_info.add_child(_tabs_row)
-	for id in HeroDefs.IDS:
-		var b := GameButton.make(String(HeroDefs.DATA[id].name), UiIcons.class_icon(id), GameButton.Kind.SECONDARY, 22)
-		b.toggle_mode = true
-		b.toggle_primary = true
-		b.pad_x = 10
-		b.min_height = 88
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.icon_px = 34
-		b.pressed.connect(select.bind(String(id)))
-		_tabs_row.add_child(b)
-		_tabs.append(b)
-	_name = UiTheme.label("", 52, UiPalette.TEXT, true, 8, true)
+	var outer := UiTheme.vbox(12)
+	_panel.add_child(outer)
+	_grid = GridContainer.new()
+	_grid.columns = 4
+	_grid.add_theme_constant_override("h_separation", 8)
+	_grid.add_theme_constant_override("v_separation", 8)
+	outer.add_child(_grid)
+	_scroll = ScrollContainer.new()
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	outer.add_child(_scroll)
+	_info = UiTheme.vbox(12)
+	_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_scroll.add_child(_info)
+	_name = UiTheme.label("", 48, UiPalette.TEXT, true, 8, true)
 	_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_info.add_child(_name)
-	_tagline = UiTheme.para("", 24, UiPalette.TEXT_DIM, 500)
+	_tagline = UiTheme.para("", 22, UiPalette.TEXT_DIM, 500)
 	_tagline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_info.add_child(_tagline)
-	_stats = UiTheme.hbox(10)
-	_stats.alignment = BoxContainer.ALIGNMENT_CENTER
-	_info.add_child(_stats)
-	_info.add_child(UiModal.section_label("Starting dice"))
-	_dice_box = UiTheme.vbox(8)
-	_info.add_child(_dice_box)
+	_detail = UiTheme.vbox(12)
+	_info.add_child(_detail)
 	start_btn = GameButton.make("START RUN", "arrow_right", GameButton.Kind.PRIMARY, 44)
 	start_btn.icon_tint = UiPalette.TEXT_DARK
-	start_btn.min_height = 112
-	start_btn.pressed.connect(func() -> void: class_chosen.emit(selected))
-	_info.add_child(start_btn)
+	start_btn.min_height = 108
+	start_btn.pressed.connect(func() -> void:
+		if _open(selected):
+			class_chosen.emit(selected))
+	outer.add_child(start_btn)
+	_build_chips()
 	resized.connect(_layout)
-	_panel.minimum_size_changed.connect(_queue_layout)
-
-
-var _layout_queued := false
-
-
-func _queue_layout() -> void:
-	if not _layout_queued:
-		_layout_queued = true
-		(func() -> void:
-			_layout_queued = false
-			_layout()).call_deferred()
 
 
 func _ready() -> void:
@@ -98,196 +87,123 @@ func _ready() -> void:
 	_layout()
 
 
-func _build_preview() -> void:
-	_preview = SubViewportContainer.new()
-	_preview.stretch = true
-	_preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_preview)
-	_viewport = SubViewport.new()
-	_viewport.own_world_3d = true
-	_viewport.transparent_bg = true
-	_viewport.msaa_3d = Viewport.MSAA_4X
-	_preview.add_child(_viewport)
-	var world := Node3D.new()
-	_viewport.add_child(world)
-	var env := WorldEnvironment.new()
-	var e := Environment.new()
-	e.background_mode = Environment.BG_CLEAR_COLOR
-	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	e.ambient_light_color = Color("8a86c0")
-	e.ambient_light_energy = 0.7
-	e.tonemap_mode = Environment.TONE_MAPPER_AGX
-	env.environment = e
-	world.add_child(env)
-	var key := DirectionalLight3D.new()
-	key.light_color = Color("ffe0b0")
-	key.light_energy = 1.6
-	key.rotation_degrees = Vector3(-35, -40, 0)
-	key.shadow_enabled = true
-	world.add_child(key)
-	var rim := DirectionalLight3D.new()
-	rim.light_color = Color("7aa0ff")
-	rim.light_energy = 1.2
-	rim.rotation_degrees = Vector3(-20, 150, 0)
-	world.add_child(rim)
-	var ped := MeshInstance3D.new()
-	var cm := CylinderMesh.new()
-	cm.top_radius = 1.05
-	cm.bottom_radius = 1.2
-	cm.height = 0.3
-	cm.radial_segments = 48
-	ped.mesh = cm
-	ped.position.y = -0.15
-	var pm := StandardMaterial3D.new()
-	pm.albedo_color = Color("3a3450")
-	pm.roughness = 0.6
-	ped.material_override = pm
-	world.add_child(ped)
-	var ring := MeshInstance3D.new()
-	var tm := TorusMesh.new()
-	tm.inner_radius = 1.08
-	tm.outer_radius = 1.16
-	tm.rings = 64
-	ring.mesh = tm
-	ring.position.y = 0.0
-	var rm := StandardMaterial3D.new()
-	rm.albedo_color = UiPalette.GOLD
-	rm.emission_enabled = true
-	rm.emission = UiPalette.GOLD
-	rm.emission_energy_multiplier = 0.6
-	ring.material_override = rm
-	world.add_child(ring)
-	_pivot = Node3D.new()
-	world.add_child(_pivot)
-	var cam := Camera3D.new()
-	_cam = cam
-	cam.fov = 32
-	cam.position = Vector3(0, 1.35, 5.2)
-	cam.transform = Transform3D(Basis.looking_at(Vector3(0, 0.85, 0) - cam.position), cam.position)
-	world.add_child(cam)
-	cam.current = true
+## Locks / secret state from a profile (null = every class open, the no-profile game).
+func set_profile(p: Profile) -> void:
+	profile = p
+	_build_chips()
+	if not _open(selected):
+		selected = "knight"
+	select(selected, false)
+
+
+func _open(id: String) -> bool:
+	return profile == null or profile.class_allowed(id)
+
+
+func _build_chips() -> void:
+	UiTheme.clear(_grid)
+	_chips.clear()
+	for id in HeroDefs.IDS:
+		var open := _open(String(id))
+		var secret := not open and ClassCard.is_secret(String(id))
+		var label := "???" if secret else String(HeroDefs.DATA[id].name)
+		var icon := "question" if secret else UiIcons.class_icon(String(id))
+		var b := GameButton.make(label, icon, GameButton.Kind.SECONDARY, 18)
+		b.toggle_mode = true
+		b.toggle_primary = true
+		b.pad_x = 6
+		b.min_height = 76
+		b.icon_px = 30
+		b.icon_tint = UiPalette.class_color(String(id)) if open else UiPalette.TEXT_MUTED
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.custom_minimum_size.x = 60
+		if not open:
+			b.modulate = Color(1, 1, 1, 0.7)
+		b.pressed.connect(select.bind(String(id)))
+		_grid.add_child(b)
+		_chips.append(b)
 
 
 func select(id: String, animate := true) -> void:
 	selected = id
+	var open := _open(id)
+	var secret := not open and ClassCard.is_secret(id)
+	for i in _chips.size():
+		_chips[i].set_pressed_no_signal(HeroDefs.IDS[i] == id)
+		_chips[i].call("_refresh")
 	var def: Dictionary = HeroDefs.DATA[id]
-	for i in _tabs.size():
-		_tabs[i].set_pressed_no_signal(HeroDefs.IDS[i] == id)
-		_tabs[i].call("_refresh")
-	_name.text = String(def.name)
-	_tagline.text = TAGLINES.get(id, "")
-	UiTheme.clear(_stats)
-	_stats.add_child(_stat("heart", "%d" % int(def.hp), "HP", UiPalette.HP))
-	_stats.add_child(_stat("sword", "+%d" % int(def.atk), "ATK", UiPalette.TEXT))
-	_stats.add_child(_stat("reroll", "%d" % int(def.board_rerolls), "MOVE REROLL", UiPalette.GOLD_BRIGHT))
-	_stats.add_child(_stat("dice", "%d" % Balance.COMBAT_REROLLS, "FIGHT REROLLS", UiPalette.DIE_BODY))
-	UiTheme.clear(_dice_box)
-	var runes: Array = def.runes
-	for r in runes:
-		_dice_box.add_child(_die_row(String(r)))
-	_swap_hero(String(def.model))
+	_name.text = "???" if secret else String(def.name)
+	_name.label_settings = UiTheme.label_settings(48, UiPalette.class_color(id).lightened(0.25) if open else UiPalette.TEXT_MUTED, true, 8, UiPalette.OUTLINE, true)
+	UiTheme.clear(_detail)
+	if secret:
+		_tagline.text = "A secret hero hides in the camp's stories."
+		var c := CampUi.locked_card()
+		var h := UiTheme.para(ClassCard.secret_hint(id), 24, Color("c9b6ea"), 600)
+		h.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		c.add_child(h)
+		_detail.add_child(c)
+	else:
+		_tagline.text = ClassInfo.tagline(id)
+		if not open:
+			var lc := CampUi.locked_card()
+			lc.add_child(CampUi.lock_line(ClassCard.unlock_text(profile, id), 21))
+			_detail.add_child(lc)
+		_detail.add_child(ClassDetail.mechanic_badge(id, 20))
+		_detail.add_child(ClassDetail.stats_row(id))
+		_detail.add_child(UiModal.section_label("Starting dice"))
+		_detail.add_child(ClassDetail.dice_rows(id, 34))
+	start_btn.set_enabled(open)
+	var skin := profile.equipped_skin(id) if profile != null and open else "default"
+	var pres := profile.prestige_on(id) if profile != null and open else false
+	portrait.ring_color = UiPalette.class_color(id) if open else Color(0.4, 0.38, 0.55)
+	portrait.set_hero(id, skin, pres, animate)
+	portrait.silhouette = not open
 	if animate:
 		UiTheme.pop(_name, 1.1, 0.25)
-		_layout.call_deferred()
-
-
-func _stat(icon: String, value: String, label: String, col: Color) -> Control:
-	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(UiPalette.NAVY_2, 18, 2, Color(1, 1, 1, 0.06)), 12, 8))
-	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var v := UiTheme.vbox(0)
-	p.add_child(v)
-	var r := UiTheme.hbox(6)
-	r.alignment = BoxContainer.ALIGNMENT_CENTER
-	v.add_child(r)
-	r.add_child(UiIcons.rect(icon, 30))
-	r.add_child(UiTheme.label(value, 30, col, true, 0))
-	var l := UiTheme.label(label, 15, UiPalette.TEXT_MUTED, false, 0, false, 700)
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	v.add_child(l)
-	return p
-
-
-func _die_row(rune: String) -> Control:
-	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(0.03, 0.03, 0.09, 0.45), 16), 12, 6))
-	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var row := UiTheme.hbox(14)
-	p.add_child(row)
-	var f := DieFace.make(6, rune, false, 52)
-	f.star = rune == "wild"
-	row.add_child(f)
-	var col := UiTheme.vbox(-2)
-	col.alignment = BoxContainer.ALIGNMENT_CENTER
-	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(col)
-	if rune == "":
-		col.add_child(UiTheme.label("Plain die", 26, UiPalette.TEXT, true, 0))
-		col.add_child(UiTheme.label("Faces 1 to 6, no rune.", 20, UiPalette.TEXT_MUTED, false, 0, false, 500))
-	else:
-		var d: Dictionary = Runes.DEFS[rune]
-		col.add_child(UiTheme.label("%s Rune" % d.name, 26, UiPalette.rune_color(rune).lightened(0.15), true, 0))
-		var desc := UiTheme.para(String(d.desc), 20, UiPalette.TEXT_DIM)
-		col.add_child(desc)
-		row.add_child(RuneBadge.make(rune, 46))
-	return p
-
-
-func _swap_hero(model: String) -> void:
-	if _hero:
-		_hero.queue_free()
-	_hero = Character.create(model)
-	_pivot.add_child(_hero)
-	if _hero.has_method("play"):
-		_hero.call("play", "idle")
-	_pivot.rotation.y = deg_to_rad(-25.0)
-	_hero.scale = Vector3(0.6, 0.6, 0.6)
-	var t := create_tween()
-	t.tween_property(_hero, "scale", Vector3.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	if is_inside_tree() and _hero.has_method("play_once"):
-		_hero.call("play_once", "cheer")
-
-
-func _process(delta: float) -> void:
-	if _pivot:
-		_pivot.rotation.y += delta * 0.45
+		portrait.cheer()
+	_layout.call_deferred()
 
 
 func _layout() -> void:
 	if size.x <= 0.0:
 		return
 	var safe := UiTheme.safe_margins(self)
-	var portrait := UiTheme.is_portrait(size)
+	var portrait_mode := UiTheme.is_portrait(size)
 	back_btn.reset_size()
 	back_btn.position = Vector2(safe.left, safe.top)
 	_header.size = Vector2(size.x, 88)
 	_header.position = Vector2(0, safe.top)
-	if portrait:
+	_grid.columns = 4 if portrait_mode else 4
+	_info.custom_minimum_size.x = 0
+	var info_h := _info.get_combined_minimum_size().y
+	if portrait_mode:
 		var w := minf(UiTheme.MODAL_MAX_W, size.x - safe.left - safe.right)
+		var top := safe.top + 90.0
+		var avail := size.y - safe.bottom - top
+		# the preview keeps at least a third of the height; the info scrolls beyond that
+		var chrome := _grid.get_combined_minimum_size().y + start_btn.get_combined_minimum_size().y + 24.0 + 60.0
+		var ph := minf(chrome + info_h, avail - maxf(avail * 0.3, 240.0))
+		_scroll.custom_minimum_size = Vector2(0, maxf(160.0, ph - chrome))
 		_panel.reset_size()
-		_panel.size.x = w
-		var ph := _panel.get_combined_minimum_size().y
 		_panel.size = Vector2(w, ph)
 		_panel.position = Vector2((size.x - w) * 0.5, size.y - safe.bottom - ph)
-		var top := safe.top + 90.0
-		var avail := _panel.position.y - top + 30.0
-		_preview.position = Vector2(0, top)
-		_preview.size = Vector2(size.x, maxf(200.0, avail))
-		_cam.fov = 32
+		portrait.position = Vector2(0, top)
+		portrait.size = Vector2(size.x, maxf(200.0, _panel.position.y - top + 20.0))
 	else:
-		var w := minf(UiTheme.MODAL_MAX_W, size.x * 0.46)
+		var w := minf(UiTheme.MODAL_MAX_W, size.x * 0.5)
+		var x := size.x * 0.5 + (size.x * 0.5 - w) * 0.3
+		var top := safe.top + 96.0
+		var avail := size.y - safe.bottom - top - 10.0
+		var chrome := _grid.get_combined_minimum_size().y + start_btn.get_combined_minimum_size().y + 24.0 + 60.0
+		var ph := minf(chrome + info_h, avail)
+		_scroll.custom_minimum_size = Vector2(0, maxf(120.0, ph - chrome))
 		_panel.reset_size()
-		_panel.size.x = w
-		var ph := _panel.get_combined_minimum_size().y
 		_panel.size = Vector2(w, ph)
-		var x := size.x * 0.5 + (size.x * 0.5 - w) * 0.35
-		_panel.position = Vector2(x, maxf(safe.top + 90.0, (size.y - ph) * 0.5 + 40.0))
-		_preview.position = Vector2(size.x * 0.04, safe.top)
-		_preview.size = Vector2(size.x * 0.48, size.y - safe.top - safe.bottom)
-		_cam.fov = 40
+		_panel.position = Vector2(x, top + (avail - ph) * 0.5)
+		portrait.position = Vector2(size.x * 0.03, safe.top + 40.0)
+		portrait.size = Vector2(size.x * 0.46, size.y - safe.top - safe.bottom - 40.0)
 		_header.size = Vector2(w, 88)
-		_header.position = Vector2(x, _panel.position.y - 100.0)
+		_header.position = Vector2(x, _panel.position.y - 96.0)
 
 
 class _Backdrop:
@@ -295,11 +211,11 @@ class _Backdrop:
 	## Radial dusk gradient behind the class preview.
 	func _draw() -> void:
 		draw_rect(Rect2(Vector2.ZERO, size), Color("0e0f24"))
-		var c := Vector2(size.x * (0.5 if size.y > size.x else 0.26), size.y * 0.36)
+		var c := Vector2(size.x * (0.5 if size.y > size.x else 0.26), size.y * 0.3)
 		var r := maxf(size.x, size.y) * 0.62
 		for i in 28:
 			var k := float(i) / 28.0
 			draw_circle(c, r * (1.0 - k), Color("2a2560").lerp(Color("5a3a7a"), k * k).darkened(0.1) * Color(1, 1, 1, 0.08 + k * 0.05))
-		var g := Vector2(c.x, size.y * 0.36 + 60)
+		var g := Vector2(c.x, size.y * 0.3 + 60)
 		for i in 10:
 			draw_circle(g, 180.0 - i * 16.0, Color(1.0, 0.72, 0.3, 0.025))

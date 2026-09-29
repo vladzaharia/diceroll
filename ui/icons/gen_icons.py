@@ -78,6 +78,9 @@ ICONS = {}
 # ---------------------------------------------------------------- stats & resources
 HEART = "M12 20.6s-8.2-4.9-8.2-11.1A4.6 4.6 0 0 1 12 6.7a4.6 4.6 0 0 1 8.2 2.8c0 6.2-8.2 11.1-8.2 11.1z"
 ICONS["heart"] = fill(HEART) + shade("M12 20.6s8.2-4.9 8.2-11.1a4.6 4.6 0 0 0-3-4.3c1.2 5.6-2.4 11-5.2 15.4z", 0.16) + hl("M6.6 9.2a2.4 2.4 0 0 1 2.6-1.7")
+# Wardrobe (Camp skins): a coat hanger
+ICONS["wardrobe"] = (lines(["M12 7.6V6.2a2 2 0 1 1 2 2", "M12 8.4L3 16.6h18z"], 2.2)
+                     + fill("M4.6 16.6h14.8v2.6H4.6z") + shade("M12 16.6h7.4v2.6H12z", 0.16))
 
 ICONS["coin"] = (circ(12, 12, 8.6) + shade("M18.1 6a8.6 8.6 0 0 1-12.1 12.1A8.6 8.6 0 0 0 18.1 6z", 0.2)
                  + f'<circle cx="12" cy="12" r="5.7" fill="none" stroke="{O}" stroke-opacity="0.45" stroke-width="1.3"/>'

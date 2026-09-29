@@ -34,8 +34,8 @@ static func of(p: Profile) -> Dictionary:
 	for id in HeroDefs.IDS:
 		if p.class_allowed(String(id)):
 			classes.append(String(id))
-		else:
-			locked.append(String(id))
+		elif not bool((HeroDefs.DATA[id] as Dictionary).get("secret", false)):
+			locked.append(String(id))    # the secret class leaves no trace (no tent) until it is found
 	var hero := String(p.loadout.get("class", "knight"))
 	if not classes.has(hero) and not classes.is_empty():
 		hero = String(classes[0])
