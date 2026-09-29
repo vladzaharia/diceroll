@@ -6,6 +6,7 @@
                                                every Godot iOS size + 1024 renders for macOS
   monogram.py doubles <P0..P3> <out.png> [mode]  one refinement pass of the doubles art
   monogram.py single <out.png> [mode]          the small-size single die
+  monogram.py logo <out.png> [px]              the doubles art on a transparent ground (in-game logo)
   monogram.py ship_mono <out_dir> [gold|inverse]  the earlier G10 / I14 monogram (light/dark/tint)
   monogram.py variant <out.png> key=value ...  one variant, e.g. colour=gold rot=-6 dx=-20 dy=-24
                                                scale=1.0 shadow=soft|hard|air|none style=slab|flat|bevel
@@ -660,6 +661,20 @@ def doubles_svg(mode="light", p=None):
     return svg_doc(body + s1 + s2, defs + d1 + d2)
 
 
+def logo_svg():
+    """The doubles art on a transparent ground (in-game logo, e.g. the missing-assets screen)."""
+    p = DOUBLES_PASSES[DOUBLES_SHIP]
+    defs = blur_filter("sh", 22)
+    bx, by, bs, br = p["back"]
+    fx, fy, fs, fr = p["front"]
+    back = DDie(bx, by, bs, br, RED_SCHEMES["light"], "slab", pip_scale=p["back_pips"], uid="back")
+    front = DDie(fx, fy, fs, fr, GOLD_SCHEMES["light"], "slab", uid="front")
+    d1, s1 = back.svg("soft")
+    d2, s2 = front.svg("soft", knock=(KNOCK["light"], p["knock"] * fs) if p["knock"] else None)
+    # Square crop around the dice + their shadow (the icon framing leaves wide margins).
+    return svg_doc(s1 + s2, defs + d1 + d2).replace('viewBox="0 0 1024 1024"', 'viewBox="114 148 780 780"')
+
+
 def single_svg(mode="light"):
     fr = DOUBLES_PASSES[DOUBLES_SHIP]["front"][3]
     defs, body = background("gold", mode)
@@ -724,6 +739,9 @@ def main(argv):
         return 0
     if len(argv) >= 4 and argv[1] == "doubles":  # doubles <pass> <out.png> [mode]
         to_png(doubles_svg(argv[4] if len(argv) > 4 else "light", argv[2]), argv[3])
+        return 0
+    if len(argv) >= 3 and argv[1] == "logo":  # logo <out.png> [px]: doubles on a transparent ground
+        to_png(logo_svg(), argv[2], int(argv[3]) if len(argv) > 3 else 512)
         return 0
     if len(argv) >= 3 and argv[1] == "single":  # single <out.png> [mode]
         to_png(single_svg(argv[3] if len(argv) > 3 else "light"), argv[2])
