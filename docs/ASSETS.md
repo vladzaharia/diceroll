@@ -16,6 +16,9 @@ No third-party asset is committed to this repo. Some packs, the KayKit **EXTRA**
 1. Put the packs into `third_party/` using the layout above. Extract KayKit downloads into `third_party/kaykit/<PackName>/`.
 2. Run `tools/import_assets.sh`. Add `--fetch` to download the fonts and Kenney SFX into `third_party/` if they're missing.
 3. Run `godot --headless --path . --import`.
+4. Run `tools/render_icons.sh` to render the "rendered" UI icons (coin pile, chests, gems, potions, key) from the KayKit props into `ui/icons/rendered/*.png`. They derive from paid models, so they are ignored by git like the models. Without them the UI falls back to the vector glyphs.
 
 ## Adding assets from a new pack
+The optional KayKit EXTRA subsets (ResourceBits, RPGToolsBits, Dungeon, Adventurers potions into `assets/kaykit/resources`, `tools_x`, `dungeon_x`, `potions`) are copied by `xsync` lines and skipped when a pack is absent; the tile props then fall back to the FREE models.
+
 Extend `tools/import_assets.sh` with a `sync` line that copies the needed subset from `third_party/kaykit/<Pack>/...` into `assets/kaykit/<name>/`. Keep runtime subsets lean.

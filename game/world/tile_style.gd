@@ -27,6 +27,13 @@ const COLORS := {
 const BASE := {"crypt": Color(0.46, 0.42, 0.42), "hollow": Color(0.42, 0.34, 0.3), "throne": Color(0.34, 0.33, 0.42)}
 
 
+## Optional KayKit EXTRA prop folders (tools/import_assets.sh; absent packs fall back to the
+## FREE props).
+const RES := Props.K + "resources/"
+const TOOLS_X := Props.K + "tools_x/"
+const DUN_X := Props.K + "dungeon_x/"
+
+
 static func base_color(biome: Variant) -> Color:
 	var id := Biome.id_of(biome)
 	if BASE.has(id):
@@ -57,27 +64,57 @@ static func make_prop(type: String) -> Node3D:
 			var f2 := Props.put(root, Props.BGB + "flag_B_red.gltf", Vector3(0.45, 0, -0.45), -20.0, 0.6)
 			f2.name = "Flag2"
 		"forge":
-			Props.put(root, Props.TOOLS + "anvil.gltf", Vector3(0.0, 0, -0.35), 15.0, 0.62)
-			Props.put(root, Props.TOOLS + "hammer.gltf", Vector3(0.45, 0.02, 0.2), 80.0, 0.5)
-			var spark := Biome.flame(root, Vector3(0.0, 0.55, -0.35), Color(1.0, 0.6, 0.2), 0.14, 5)
+			Props.put(root, Props.TOOLS + "anvil.gltf", Vector3(0.0, 0, -0.3), 15.0, 0.62)
+			if Props.has(RES + "Iron_Bars_Stack_Small.gltf"):
+				# ingots waiting by the anvil and the tongs leaning on it
+				Props.put(root, RES + "Iron_Bars_Stack_Small.gltf", Vector3(0.42, 0, 0.28), -25.0, 0.42)
+				var tg := Props.put(root, TOOLS_X + "tongs.gltf", Vector3(-0.42, 0.42, 0.22), 30.0, 0.5)
+				tg.rotation.z = deg_to_rad(-18.0)
+			else:
+				Props.put(root, Props.TOOLS + "hammer.gltf", Vector3(0.45, 0.02, 0.2), 80.0, 0.5)
+			var spark := Biome.flame(root, Vector3(0.0, 0.55, -0.3), Color(1.0, 0.6, 0.2), 0.14, 5)
 			spark.name = "Sparks"
 		"treasury":
-			Props.put(root, Props.DUN + "coin_stack_large.gltf", Vector3(-0.1, 0, -0.3), 20.0, 0.55)
-			Props.put(root, Props.DUN + "coin_stack_small.gltf", Vector3(0.5, 0, 0.2), -40.0, 0.5)
-			Props.put(root, Props.DUN + "coin.gltf", Vector3(-0.5, 0, 0.35), 0.0, 0.8)
+			if Props.has(RES + "Gold_Bars_Stack_Small.gltf"):
+				# the bank: a stack of gold bars, coin towers and a gem heap, with a glint
+				Props.put(root, RES + "Gold_Bars_Stack_Small.gltf", Vector3(-0.12, 0, -0.28), 20.0, 0.6)
+				Props.put(root, RES + "Money_Coins_Stack_Large.gltf", Vector3(0.42, 0, -0.34), 0.0, 0.75)
+				Props.put(root, RES + "Money_Coins_Stack_Medium.gltf", Vector3(0.52, 0, -0.08), 30.0, 0.75)
+				Props.put(root, RES + "Gems_Pile_Small.gltf", Vector3(0.3, 0, 0.36), -30.0, 0.34)
+				Props.put(root, Props.DUN + "coin.gltf", Vector3(-0.48, 0, 0.36), 0.0, 0.8)
+				var gl := Fx.elite_sparkle(root, Vector3(0, 0.4, -0.1), 0.45, 0.4)
+				gl.name = "Glint"
+			else:
+				Props.put(root, Props.DUN + "coin_stack_large.gltf", Vector3(-0.1, 0, -0.3), 20.0, 0.55)
+				Props.put(root, Props.DUN + "coin_stack_small.gltf", Vector3(0.5, 0, 0.2), -40.0, 0.5)
+				Props.put(root, Props.DUN + "coin.gltf", Vector3(-0.5, 0, 0.35), 0.0, 0.8)
 		"portal":
 			var arch := Props.put(root, Props.HAL + "arch.gltf", Vector3(0, 0, -0.25), 0.0, 0.34)
 			arch.name = "Arch"
 			var swirl := Fx.portal_swirl(root, Vector3(0, 0.72, -0.25), 0.62, false)
 			swirl.name = "Swirl"
 		"chest":
-			Props.put(root, Props.DUN + "chest.gltf", Vector3(0, 0, -0.2), -12.0, 0.5)
+			if Props.has(RES + "Gems_Chest.gltf"):
+				# an open chest spilling gems, with a gold key in front
+				Props.put(root, RES + "Gems_Chest.gltf", Vector3(0, 0, -0.18), -12.0, 0.5)
+				var k := Props.put(root, DUN_X + "key_gold.gltf", Vector3(0.38, 0.05, 0.42), -35.0, 0.42)
+				k.rotation.x = deg_to_rad(-90.0)
+			else:
+				Props.put(root, Props.DUN + "chest.gltf", Vector3(0, 0, -0.2), -12.0, 0.5)
 		"event":
 			var stone := Props.put(root, Props.HAL + "shrine.gltf", Vector3(-0.4, 0, -0.4), 20.0, 0.36)
 			stone.name = "Shrine"
+			if Props.has(DUN_X + "candle_triple.gltf"):
+				Props.put(root, DUN_X + "candle_triple.gltf", Vector3(0.48, 0, -0.42), -20.0, 0.5)
+				var fl := Biome.flame(root, Vector3(0.48, 0.46, -0.42), Color(1.0, 0.75, 0.35), 0.06, 4)
+				fl.name = "CandleFlame"
 			root.add_child(_question_mark())
 		"campfire":
 			root.add_child(_campfire())
+			if Props.has(RES + "Wood_Log_Stack.gltf"):
+				# firewood and a berry basket at the back corners (rest = heal)
+				Props.put(root, RES + "Wood_Log_Stack.gltf", Vector3(-0.5, 0, -0.5), 35.0, 0.26)
+				Props.put(root, RES + "Food_Basket_A_Berries.gltf", Vector3(0.52, 0, -0.5), 0.0, 0.34)
 		"trap":
 			var spikes := Props.put(root, Props.DUN + "floor_tile_big_spikes.gltf", Vector3(0, -0.03, 0), 0.0, 0.34)
 			spikes.scale = Vector3(0.36, 0.3, 0.36)

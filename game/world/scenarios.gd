@@ -22,7 +22,7 @@ extends RefCounted
 const NAMES := ["board_glade", "board_crypt", "board_hollow", "board_frost", "board_throne", "board_magma",
 	"board_act1", "board_act2", "board_act3", "board_follow", "board_mutate", "board_portal", "combat_act1",
 	"combat_act2", "combat_act3", "boss_act1", "boss_act2", "boss_act3", "fx_gallery", "enemy_gallery", "combat_sequence",
-	"combat_hero_check", "tiles_ice_lava"]
+	"combat_hero_check", "tiles_ice_lava", "tiles_props"]
 
 
 static func names() -> PackedStringArray:
@@ -212,6 +212,18 @@ class _Driver extends Node3D:
 					pts.append(board.tile_global_position(k))
 				pts.append(board.tile_global_position(3) + Vector3.UP * 2.0)
 				rig.frame_points(pts, 0.0, 42.0, true)
+			"tiles_props":
+				# one of each prop tile in a row, close up (--biome=<id> to check a biome)
+				var kinds := ["forge", "treasury", "chest", "event", "campfire", "trap", "portal"]
+				for k in kinds.size():
+					board.set_tile(k + 1, {"type": kinds[k]})
+				board.place_hero(0)
+				await get_tree().create_timer(0.1).timeout
+				var pts := PackedVector3Array()
+				for k in kinds.size() + 1:
+					pts.append(board.tile_global_position(k))
+				pts.append(board.tile_global_position(4) + Vector3.UP * 1.6)
+				rig.frame_points(pts, float(args.get("yaw", "90")), float(args.get("pitch", "40")), true)
 			"enemy_gallery":
 				_gallery(String(args.get("only", "new")))
 			"fx_gallery":

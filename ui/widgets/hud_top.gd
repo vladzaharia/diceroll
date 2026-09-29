@@ -105,9 +105,9 @@ func _init() -> void:
 
 	var chips := UiTheme.hbox(10)
 	mid.add_child(chips)
-	gold = Counter.make("coin", 0, 28, UiPalette.TEXT)
+	gold = Counter.make("3d:coins", 0, 28, UiPalette.TEXT)
 	chips.add_child(gold)
-	treasury = Counter.make("chest", 10, 22, UiPalette.GOLD_BRIGHT)
+	treasury = Counter.make("3d:chest", 10, 22, UiPalette.GOLD_BRIGHT)
 	treasury.tooltip_text = "Treasury bank: land on the Treasury corner to cash out."
 	chips.add_child(treasury)
 

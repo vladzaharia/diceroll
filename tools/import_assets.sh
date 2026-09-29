@@ -73,6 +73,28 @@ for c in yellow red blue; do
 done
 lic "$PLAT" "$KK/platformer"
 
+echo "== KayKit EXTRA props: tile props + rendered UI icons (paid packs; skipped when absent)"
+xsync() { # xsync <pack> <dst> <texture.png> <names...>: copies <name>.gltf/.bin + the texture
+	local pack="$1" d="$2" tex="$3"; shift 3
+	[ -d "$SRC/$pack" ] || { echo "   (no $pack, skipping)"; return 0; }
+	local keep="--include=$tex"
+	for n in "$@"; do keep="$keep --include=$n.gltf --include=$n.bin"; done
+	# shellcheck disable=SC2086
+	sync "$SRC/$pack/Assets/gltf" "$d" $keep --exclude='*'
+	lic "$pack" "$d"
+}
+xsync KayKit_ResourceBits_1.0_EXTRA "$KK/resources" resource_bits_texture.png \
+	Gold_Bars_Stack_Small Gold_Bars_Stack_Medium Gold_Nuggets Gold_Bar Money_Coins_Stack_Large \
+	Money_Coins_Stack_Medium Money_Coins_Stack_Small Money_Pile_Small Gem_Large Gem_Medium Gem_Small \
+	Gems_Pile_Small Gems_Chest Gems_Sack Iron_Bars_Stack_Small Wood_Log_Stack Wood_Log_A \
+	Food_Basket_A_Berries Food_Crate_Small_Berries Food_Cheese Food_Apple_Red Food_Apple_Green
+xsync KayKit_RPGToolsBits_1.0_EXTRA "$KK/tools_x" tools_bits_texture.png \
+	anvil grindstone tongs lantern key_A key_B lock_A lock_B map_rolled
+xsync KayKit_Dungeon_Pack_1.1_EXTRA "$KK/dungeon_x" dungeon_texture.png \
+	chest_large_gold chest_large key_gold candle_triple candle_lit rocks_gold pickaxe_gold
+xsync KayKit_Adventurers_2.0_EXTRA "$KK/potions" druid_texture.png \
+	potion_medium_red potion_medium_blue potion_medium_green potion_large_red
+
 echo "== Music beds (mixkit, re-encoded to 96 kbps mp3 to keep the repo lean)"
 MUS="$DST/audio/music"
 mkdir -p "$MUS"
