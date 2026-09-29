@@ -6,7 +6,7 @@ extends RefCounted
 ## and one at L8 per piece, freely switchable at Camp.
 ##   helm   +0.5 max HP per level (cap +4)
 ##   blade  +0.125 ATK per level (cap +1)
-##   boots  L1: +1 board reroll per biome. L2+: trap and lava damage -5% per level above 1
+##   boots  trap and lava damage -5% per level; L6: +1 board reroll per biome (worth ~6 pp alone)
 ##   charm  +1.5% gold per level (cap +12%) on fight, chest and minigame gold
 
 const MAX_LEVEL := 8
@@ -18,13 +18,15 @@ const HP_CAP := 4
 const ATK_PER_LEVEL := 0.125
 const ATK_CAP := 1
 const BOOTS_HAZARD_PER_LEVEL := 0.05
+## Boots level that adds the board reroll per biome.
+const BOOTS_REROLL_LEVEL := 6
 const GOLD_PER_LEVEL := 0.015
 const GOLD_CAP := 0.12
 
 const DEFS := {
 	"helm": {"name": "Helm", "desc": "+1 max HP every 2 levels (max +4)."},
 	"blade": {"name": "Blade", "desc": "+1 ATK at level 8."},
-	"boots": {"name": "Boots", "desc": "+1 board reroll per biome. Traps and lava hurt 5% less per level above 1."},
+	"boots": {"name": "Boots", "desc": "Traps and lava hurt 5% less per level. Level 6: +1 board reroll per biome."},
 	"charm": {"name": "Charm", "desc": "+1.5% gold per level (max +12%)."},
 }
 
@@ -88,8 +90,8 @@ static func stats(levels: Dictionary) -> Dictionary:
 	return {
 		"max_hp": mini(HP_CAP, int(floor(HP_PER_LEVEL * helm))),
 		"atk": mini(ATK_CAP, int(floor(ATK_PER_LEVEL * blade))),
-		"lap_rerolls": 1 if boots >= 1 else 0,
-		"hazard_mult": 1.0 - BOOTS_HAZARD_PER_LEVEL * maxi(0, boots - 1),
+		"lap_rerolls": 1 if boots >= BOOTS_REROLL_LEVEL else 0,
+		"hazard_mult": 1.0 - BOOTS_HAZARD_PER_LEVEL * boots,
 		"gold_pct": minf(GOLD_CAP, GOLD_PER_LEVEL * charm),
 	}
 

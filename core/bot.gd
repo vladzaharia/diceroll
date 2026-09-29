@@ -413,7 +413,7 @@ const REAL_SHINY := 0.25
 const REAL_SHINY_BONUS := 0.2
 ## Heuristic-lapse probabilities by scope (tuned so the realistic bot hits the balance targets
 ## in docs/plans/balance.md). Static vars so tools/sim.gd can sweep them (--real-heur=).
-static var real_heur := {"combat": 0.6, "board": 0.6, "build": 0.6}
+static var real_heur := {"combat": 0.55, "board": 0.55, "build": 0.55}
 
 static func _real(rules: AutoRules) -> bool:
 	return rules != null and rules.skill == "realistic"

@@ -75,7 +75,7 @@ const LAVA_LAND_PCT := 0.06
 # (ENEMY_BASE_SCALE + ENEMY_ATK_LAP_STEP*(lap-1)). 2026-09-28 rebalance: a gentle start (no
 # drafts, 2 dice), HP growing faster than attack late (long fights, fewer one-shots).
 const ENEMY_BASE_SCALE := 1.0
-const ENEMY_LAP_STEP := 0.33
+const ENEMY_LAP_STEP := 0.34
 const ENEMY_ATK_LAP_STEP := 0.125
 const ELITE_HP_MULT := 1.3
 const ELITE_ATK_MULT := 1.15
