@@ -243,7 +243,8 @@ static func choose_loadout(p: Profile) -> Array:
 		if p.owns("minigames", id) and mg.size() < p.loadout_slots():
 			mg.append(id)
 	var pet := ""
-	var pref := ["skull_buddy", "guard_die", "lantern_ghost", "pumpkin_sprite", "crystal_wisp", "coin_mimic"]
+	var pref := ["skull_buddy", "guard_die", "lantern_ghost", "pumpkin_sprite", "crystal_wisp", "coin_mimic",
+		"wick", "frost_mote", "pebble_golem", "grimoire", "tinker_gear", "cauldron"]
 	for id in pref:
 		if p.owns("pets", id) and (pet == "" or p.pet_level(id) > p.pet_level(pet)):
 			pet = id

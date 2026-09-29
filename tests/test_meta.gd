@@ -332,15 +332,25 @@ func test_pet_charge_persists_across_fights_and_fires_automatically() -> void:
 
 func test_every_pet_acts() -> void:
 	var expect := {"pumpkin_sprite": "heal", "skull_buddy": "bite", "lantern_ghost": "poison", "guard_die": "block",
-		"coin_mimic": "gold", "crystal_wisp": "reroll"}
+		"coin_mimic": "gold", "crystal_wisp": "reroll", "pebble_golem": "block", "frost_mote": "freeze", "wick": "burn",
+		"tinker_gear": "fix", "grimoire": "rune", "cauldron": "potion"}
 	for pet in PetDefs.IDS:
 		var f := _pet_flow(pet, 10)
 		assert_eq(f.run.pet_level(), 10)
 		_fight(f, "skeleton_minion,skeleton_minion")
 		f.run.pet_state.charge = PetDefs.size(pet)
+		f.run.pet_state["rune"] = Runes.IDS.find("blade")
+		f.run.pet_state["rune_v"] = 4
 		f.combat.dice_values.assign([4, 4])
 		var ev: Array[Dictionary] = []
-		if pet == "crystal_wisp":
+		if pet == "cauldron":
+			# Bubbles charges per fight won and brews right after the fight
+			f.run.pet_state.charge = PetDefs.size(pet) - 1
+			f.combat.enemies[0].hp = 1
+			f.combat.enemies[1].hp = 0
+			f.combat.target = 0
+			ev = f.combat_attack()
+		elif pet == "crystal_wisp":
 			ev = f.combat.start_turn(f.run)
 		else:
 			ev = f.combat_attack()

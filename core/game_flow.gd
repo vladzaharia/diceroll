@@ -424,7 +424,7 @@ func _trigger_tile(idx: int, ev: Array[Dictionary]) -> void:
 			if run.potion_cap > 0 and run.rng.chance(Balance.CHEST_POTION_CHANCE):
 				_gain_potion(ev, "chest")
 			if run.rng.chance(Balance.CHEST_RUNE_CHANCE):
-				_open_rune_choice("chest", ev)
+				_open_rune_choice("chest", ev, 4 if run.has_pet("grimoire") else 3)
 			else:
 				var roll := run.rng.randi_range(Balance.CHEST_GOLD_MIN, Balance.CHEST_GOLD_MAX)
 				if run.has_pet("coin_mimic") and run.pet_level() >= 10:
@@ -449,7 +449,8 @@ func _trigger_tile(idx: int, ev: Array[Dictionary]) -> void:
 		"trap":
 			var roll := run.rng.randi_range(1, 6)
 			var dodged := roll + _dodge_bonus() >= _dodge_min()
-			var dmg := 0 if dodged else mini(run.hp, maxi(1, int(round(run.pct_of_max(Balance.TRAP_DAMAGE_PCT) * run.hazard_mult()))))
+			var dmg := 0 if dodged else mini(run.hp, maxi(1, int(round(run.pct_of_max(Balance.TRAP_DAMAGE_PCT) * run.hazard_mult()
+				* (PetDefs.PEBBLE_TRAP_MULT if run.has_pet("pebble_golem") else 1.0)))))
 			var hp_before := run.hp
 			run.hp -= dmg
 			var saved := run.survive_lethal(hp_before) if run.hp <= 0 else ""
@@ -470,6 +471,8 @@ func _trigger_tile(idx: int, ev: Array[Dictionary]) -> void:
 			# Frostpeak: slip (fail the dodge roll) and a die freezes for your next fight.
 			var roll := run.rng.randi_range(1, 6)
 			var dodged := roll + _dodge_bonus() >= _dodge_min()
+			if run.has_pet("frost_mote"):
+				dodged = true # Frost Mote perk: ice never freezes your dice
 			if not dodged:
 				run.chill = mini(Balance.ICE_CHILL_MAX, run.chill + Balance.ICE_CHILL)
 			ev.append({"type": "trap", "roll": roll, "dodged": dodged, "damage": 0, "ice": true, "chill": run.chill})
@@ -601,6 +604,9 @@ func _on_combat_won(ev: Array[Dictionary]) -> void:
 		_stat_add(run.miniboss_id if c.enemies.is_empty() else String(c.enemies[0].id), "minibosses_killed")
 	if run.pet_id() != "":
 		run.stats.pet_fights = int(run.stats.get("pet_fights", 0)) + 1
+		ev.append_array(PetLogic.on_fight_won(run))
+		if run.has_pet("cauldron") and PetLogic.is_full(run):
+			_cauldron_brew(ev)
 	if c.gold_reward > 0:
 		_gold(ev, run.gold_bonus(c.gold_reward), "combat")
 	if c.tile >= 0 and not c.boss:
@@ -631,6 +637,25 @@ func _on_combat_won(ev: Array[Dictionary]) -> void:
 		front.append({"kind": "passive_choice", "source": "elite", "tier": tier})
 	front.append_array(pending)
 	pending = front
+
+## Bubbles (cauldron pet) fires after a won fight: a potion for the belt (a random unlocked type
+## at L5+, two at L10), healing 15% instead when the belt is full, plus 1% of max HP per level.
+func _cauldron_brew(ev: Array[Dictionary]) -> void:
+	var lvl := run.pet_level()
+	var types: Array = run.meta.get("potion_types", ["healing"])
+	var n := 2 if lvl >= 10 else 1
+	for k in n:
+		var pt := "healing"
+		if lvl >= 5 and types.size() > 1:
+			pt = String(run.rng.pick(types))
+		if k == 0:
+			ev.append(PetLogic._acted(run, "potion", 1, "hero"))
+			ev.back()["potion"] = pt
+		if not _gain_potion(ev, "pet", pt):
+			var hf := run.heal(run.pct_of_max(PetDefs.CAULDRON_FULL_HEAL))
+			ev.append({"type": "hp_changed", "amount": hf, "total": run.hp, "source": "pet", "max_hp": run.max_hp})
+	var h := run.heal(run.pct_of_max(PetDefs.cauldron_heal_pct(lvl)))
+	ev.append({"type": "hp_changed", "amount": h, "total": run.hp, "source": "pet", "max_hp": run.max_hp})
 
 ## Automatic, slow levels (no choice): each level gives LEVEL_MAX_HP max HP and heals
 ## LEVEL_MAX_HP + LEVEL_HEAL_PCT of max HP. Emits level_up {level, xp, next, auto:true,
@@ -906,9 +931,10 @@ func _open_shop(ev: Array[Dictionary]) -> void:
 
 ## Restock price: A3 raises it, the Charm's Haggle trait lowers it.
 func _restock_price() -> int:
+	var off := PetDefs.TINKER_RESTOCK_OFF if run.has_pet("tinker_gear") else 0
 	if run.has_trait("charm_cheap_restock"):
-		return int(GearDefs.TRAIT_BONUS.charm_cheap_restock)
-	return UnlockDefs.ASC_RESTOCK if run.has_asc("shop_tax") else Balance.SHOP_RESTOCK_PRICE
+		return maxi(0, int(GearDefs.TRAIT_BONUS.charm_cheap_restock) - off)
+	return maxi(0, (UnlockDefs.ASC_RESTOCK if run.has_asc("shop_tax") else Balance.SHOP_RESTOCK_PRICE) - off)
 
 ## 3-4 items. While the pool is below MAX_DICE the first item is always a die (random kind);
 ## at most 2 dice per stock (distinct kinds), runes repeat (distinct), anything else once.
@@ -964,7 +990,7 @@ func _shop_item(id: String, used: Dictionary) -> Dictionary:
 			item.desc = String(DiceKinds.DEFS[kind].desc)
 			item.price = int(DiceKinds.DEFS[kind].price)
 		"potion":
-			item.price = Balance.SHOP_POTION_PRICE
+			item.price = Balance.SHOP_POTION_PRICE - (PetDefs.CAULDRON_POTION_OFF if run.has_pet("cauldron") else 0)
 			if run.potion_cap > 0:
 				var types: Array = run.meta.get("potion_types", ["healing"])
 				var pt := String(types[0]) if types.size() <= 1 else String(run.rng.pick(types))

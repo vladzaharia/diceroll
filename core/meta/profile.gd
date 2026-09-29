@@ -30,7 +30,8 @@ const VERSION := 2
 
 const COUNTERS := ["runs", "laps", "fights", "minigames", "rerolls", "kept", "poison_kills", "cashouts", "block",
 	"straights", "minibosses_reached", "minibosses_killed", "bosses_reached", "wins", "act2_runs", "act3_runs",
-	"frost_visits", "throne_wins", "mage_wins", "full_runes", "face_edits", "kills", "hollow_events"]
+	"frost_visits", "throne_wins", "mage_wins", "full_runes", "face_edits", "kills", "hollow_events",
+	"freezes", "sets3", "rune_triggers", "potions"]
 
 var crowns: int = 0
 var sigils: int = 0
@@ -376,6 +377,10 @@ func _count(st: Dictionary, victory: bool) -> void:
 	add.call("face_edits", int(st.get("face_edits", 0)))
 	add.call("kills", int(st.get("kills", 0)))
 	add.call("hollow_events", int(st.get("hollow_events", 0)))
+	add.call("freezes", int(st.get("freezes", 0)))
+	add.call("sets3", int(st.get("sets3", 0)))
+	add.call("rune_triggers", int(st.get("rune_triggers", 0)))
+	add.call("potions", int(st.get("potions_used", 0)))
 	records.counters = c
 
 ## Milestone conditions: {stat, min} (counter), {class_wins: id, min}, {boss_kills: id, min},

@@ -39,6 +39,10 @@ var rerolls_used_this_turn: int = 0 # combat rerolls spent this turn (Ranger Aim
 var refunds_this_turn: int = 0     # Ninja Shadow Step refunds this turn
 var oath: int = 0                  # Paladin Oath value for this fight (0 = none)
 var last_overkill: int = 0         # damage_enemy: overkill of the last lethal hit (0 otherwise)
+# pets (PetLogic)
+var pet_thorns: int = 0            # Pebble: thorns against attackers this enemy phase
+var pet_block_turn: int = 0        # Block the pet gave this turn (Pebble's charge ignores it)
+var last_runes: Array[Dictionary] = []  # runes that triggered in the last attack [{rune, value, die}] (Grimoire)
 
 # ---------------------------------------------------------------- setup
 
@@ -147,6 +151,10 @@ func _note_seen(run: RunState) -> void:
 	run.stats["seen_enemies"] = se
 	run.stats["seen_affixes"] = sa
 
+## The die at combat index i (run.dice; the Necromancer's temporary dice come after them).
+func die_at(run: RunState, i: int) -> Die:
+	return run.dice[i]
+
 static func has_affix(e: Dictionary, a: String) -> bool:
 	return (e.get("affixes", []) as Array).has(a)
 
@@ -215,6 +223,8 @@ func start_turn(run: RunState) -> Array[Dictionary]:
 	run.banked_rerolls = 0
 	rerolls_used_this_turn = 0
 	refunds_this_turn = 0
+	pet_thorns = 0
+	pet_block_turn = 0
 	var pev: Array[Dictionary] = []
 	if run.has_passive("loaded_hands") and turn == 1:
 		rerolls_left += 1
@@ -308,6 +318,7 @@ func reroll(run: RunState) -> Array[Dictionary]:
 		refunded = true
 		ev.append(_passive("encore", 1))
 	ev.append_array(ClassLogic.on_reroll(run, self, idx, refunded))
+	ev.append_array(PetLogic.on_reroll(run))
 	ev.push_front({"type": "dice_rolled", "values": dice_values.duplicate(), "indices": idx, "context": "combat", "faces": dice_faces.duplicate(), "rerolls_left": rerolls_left})
 	return ev
 
@@ -414,6 +425,13 @@ func attack(run: RunState) -> Array[Dictionary]:
 	var bonus := int(cls_bonus[1])
 	var flat := 0
 	var act := rune_active(run, group, eff)
+	last_runes.clear()
+	for i in act.size():
+		if act[i]:
+			last_runes.append({"rune": run.dice[i].rune, "value": int(eff[i]), "die": i})
+	run.stats.rune_triggers = int(run.stats.get("rune_triggers", 0)) + last_runes.size()
+	if cid in ["three_kind", "full_house", "four_kind", "five_kind", "six_kind"]:
+		run.stats.sets3 = int(run.stats.get("sets3", 0)) + 1
 	var wild_left := Balance.WILD_MAX_DICE
 	var steady := 0
 	var boxcars := 0
@@ -567,6 +585,8 @@ func attack(run: RunState) -> Array[Dictionary]:
 						ev.append({"type": "status", "target": target, "status": "poison", "value": int(enemies[target].poison)})
 				"frost":
 					if alive(target):
+						if not bool(enemies[target].frozen):
+							run.stats.freezes = int(run.stats.get("freezes", 0)) + 1
 						enemies[target].frozen = true
 						ev.append(_rune(i, rune, "freeze", 1))
 						ev.append({"type": "status", "target": target, "status": "frozen", "value": 1})
@@ -750,7 +770,7 @@ func _tick_burn(run: RunState) -> Array[Dictionary]:
 	var ev: Array[Dictionary] = []
 	if hero_burn <= 0 or result != "":
 		return ev
-	var dmg := mini(hero_burn, run.hp)
+	var dmg := mini(maxi(0, hero_burn - (1 if run.has_pet("wick") else 0)), run.hp)
 	var hp_before := run.hp
 	run.hp -= dmg
 	var saved := ""
@@ -793,6 +813,9 @@ func _hit_hero(run: RunState, i: int, v: int, out_dealt: Array = []) -> Array[Di
 	elif dealt > 0 and run.has_passive("thorns"):
 		ev.append(_passive("thorns", Balance.PASSIVE_THORNS))
 		ev.append_array(damage_enemy(i, Balance.PASSIVE_THORNS, "thorns", run))
+	if result == "" and pet_thorns > 0 and alive(i) and (dealt > 0 or run.pet_level() >= 5):
+		ev.append({"type": "pet_acted", "pet": run.pet_id(), "effect": "thorns", "value": pet_thorns, "target": i})
+		ev.append_array(damage_enemy(i, pet_thorns, "pet", run))
 	out_dealt.append(dealt)
 	return ev
 
@@ -968,6 +991,7 @@ func to_dict() -> Dictionary:
 		"hero_burn": hero_burn, "pet_block_carry": pet_block_carry, "wisp_free": wisp_free, "wisp_used": wisp_used,
 		"potion_turn": potion_turn, "stoneskin": stoneskin, "boost": boost, "pet_mult": pet_mult,
 		"rerolls_used_this_turn": rerolls_used_this_turn, "refunds_this_turn": refunds_this_turn, "oath": oath,
+		"pet_thorns": pet_thorns, "pet_block_turn": pet_block_turn, "last_runes": last_runes.duplicate(true),
 	}
 
 static func from_dict(d: Dictionary) -> CombatState:
@@ -1001,6 +1025,10 @@ static func from_dict(d: Dictionary) -> CombatState:
 	c.rerolls_used_this_turn = int(d.get("rerolls_used_this_turn", 0))
 	c.refunds_this_turn = int(d.get("refunds_this_turn", 0))
 	c.oath = int(d.get("oath", 0))
+	c.pet_thorns = int(d.get("pet_thorns", 0))
+	c.pet_block_turn = int(d.get("pet_block_turn", 0))
+	for lr in d.get("last_runes", []):
+		c.last_runes.append({"rune": String(lr.rune), "value": int(lr.value), "die": int(lr.die)})
 	c.last_combo = _norm_combo(d.last_combo)
 	for ch in d.chaos:
 		c.chaos.append({"die": int(ch.die), "face": int(ch.face), "value": int(ch.value)})
