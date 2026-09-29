@@ -186,11 +186,19 @@ const LOOKS := {
 				"clips": {"attack": LARGE_2H, "idle": "Melee_2H_Idle"}},
 			{"model": "mannequin_large", "undead_large": false, "strength": 0.95, "gear": {}, "clips": {"attack": LARGE_FIST},
 				"eyes": Color(1.0, 0.7, 0.2), "label": "lava hulk"}]},
-	# --- new biomes (docs/design/2026-09-29-new-biomes.md): PLACEHOLDER looks from the merge; the
-	# presentation pass owns the real ones -------------------------------------------------------
-	"rock_golem": {"model": "skel_golem", "undead_large": true, "tint": Color(0.42, 0.38, 0.34), "strength": 0.8,
-		"scale": 1.1, "gear": {}, "clips": {"attack": LARGE_FIST, "idle": "Idle_B"}, "extras": ["rock_shell"],
-		"eyes": Color(0.9, 0.75, 0.4), "label": "rock golem (placeholder)"},
+	# --- Deep Mines elite (docs/design/2026-09-29-new-biomes.md §2): a slate-bodied stone brute under
+	# grey rock plates, ore crystals sprouting from its shoulders and back (hitting it hurts: thorns)
+	"rock_golem": {"model": "mannequin_large", "tint": Color(0.2, 0.19, 0.23), "strength": 0.9, "scale": 0.82,
+		"gear": {}, "clips": {"attack": LARGE_FIST, "idle": "Melee_Unarmed_Idle"}, "hide": ["MannequinLarge_Head"],
+		"extras": ["rock_shell", "gem_crystals"], "rock": Color(0.6, 0.57, 0.58), "gem": Color(0.3, 0.95, 0.88),
+		"eyes": Color(0.45, 1.0, 0.92), "eyes_offset": Vector3(0, 0.02, 0.12),
+		"label": "teal crystal golem",
+		"variants": [{},
+			{"gem": Color(1.0, 0.36, 0.82), "eyes": Color(1.0, 0.55, 0.9),
+				"label": "amethyst golem (pickaxe)", "gear": {"handslot.r": "res://assets/kaykit/tools_x/pickaxe.gltf"},
+				"gear_xf": {"handslot.r": [Vector3.ZERO, Vector3.ZERO, 2.2]}, "clips": {"attack": LARGE_1H, "idle": "Idle_B"}},
+			{"rock": Color(0.64, 0.54, 0.44), "gem": Color(1.0, 0.78, 0.25), "eyes": Color(1.0, 0.8, 0.35),
+				"label": "gold-vein golem"}]},
 	# --- 2026-09-28 roster (docs/design/2026-09-28-classes-enemies-skins.md §3) --------------------
 	"bone_cutthroat": {"model": "skel_rogue", "undead": true,
 		"gear": {"handslot.r": SKW + "Skeleton_Dagger.gltf", "handslot.l": SKW + "Skeleton_Dagger.gltf"},
@@ -352,13 +360,42 @@ const LOOKS := {
 		"emission": Color(0.7, 0.2, 0.02), "cracks": Color(1.0, 0.8, 0.35, 0.8), "gear": {}, "clips": {"attack": LARGE_FIST},
 		"extras": ["rock_shell", "embers"], "eyes": Color(1.0, 0.85, 0.4), "eyes_offset": Vector3(0, 0.02, 0.12),
 		"hide": ["MannequinLarge_Head"], "light": Color(1.0, 0.45, 0.12), "boss": true, "label": "magma golem"},
-	# new biomes: PLACEHOLDER boss looks (presentation pass to replace)
-	"boss_sand_colossus": {"model": "mannequin_large", "tint": Color(0.85, 0.7, 0.42), "strength": 0.85, "scale": 1.8,
-		"gear": {}, "clips": {"attack": LARGE_FIST}, "extras": ["rock_shell"], "eyes": Color(1.0, 0.85, 0.4),
-		"eyes_offset": Vector3(0, 0.02, 0.12), "hide": ["MannequinLarge_Head"], "light": Color(1.0, 0.8, 0.45),
-		"boss": true, "label": "sand colossus (placeholder)"},
-	"boss_moon_king": {"model": "barbarian_large", "texture": ADT + "barbarian_texture_alt_A.png", "tint": Color(0.55, 0.6, 0.85),
-		"strength": 0.5, "scale": 1.35, "gear": {"handslot.r": ADW + "axe_2handed_Large.gltf"},
-		"clips": {"attack": LARGE_2H, "idle": "Melee_2H_Idle"}, "extras": ["crown"], "eyes": Color(0.75, 0.85, 1.0),
-		"hide": ["BearHat"], "light": Color(0.6, 0.7, 1.0), "boss": true, "label": "moon king (placeholder)"},
+	# Sunscorched Ruins boss (§5): the tomb's bone golem in sandstone, a nemes headdress of gold and lapis,
+	# standing in a sand drift before its half-buried sarcophagus; phase 2 raises a sandstorm around it
+	"boss_sand_colossus": {"model": "skel_golem", "undead_large": true, "tint": Color(0.9, 0.72, 0.46), "strength": 0.72,
+		"scale": 1.35, "emission": Color(0.06, 0.035, 0.0),
+		"gear": {"handslot.r": SKW + "Skeleton_Mace_Large.gltf"}, "gear_xf": {"handslot.r": [Vector3.ZERO, Vector3.ZERO, 0.95]},
+		"clips": {"attack": LARGE_2H, "idle": "Melee_2H_Idle", "cast": "Melee_Unarmed_Smash"},
+		"extras": ["usekh", "sand_tomb"], "eye_glow": Color(0.3, 0.9, 1.0), "light": Color(1.0, 0.8, 0.45),
+		"phase2": ["sandstorm"], "boss": true, "label": "sand colossus",
+		"variants": [{},
+			{"texture": SKIN_B, "tint": Color(0.8, 0.6, 0.38), "label": "sand colossus (dark)",
+				"gear": {"handslot.r": SKW + "Skeleton_Golem_Axe_Large.gltf"}, "gear_xf": {}}]},
+	# Moonlit Woods boss (§4.3): the grey Silverback in a crown and a night-blue cloak, silver eyes;
+	# phase 2 (Moonrise or half HP) he becomes the great wolf under a blood-red rim
+	"boss_moon_king": {"model": "werewolf_man", "texture": WWF + "textures/werewolf_B.png", "scale": 1.9,
+		"tint": Color(0.52, 0.58, 0.78), "strength": 0.45,
+		"gear": {"handslot.r": WPN + "halberd.gltf"}, "gear_xf": {"handslot.r": [Vector3.ZERO, Vector3.ZERO, 1.1]},
+		"clips": {"attack": TWO_H, "idle": "Melee_2H_Idle", "cast": "Ranged_Magic_Summon"},
+		"extras": ["crown", "moon_cloak", "fur_mantle", "moon_motes"], "crown_gem": Color(0.6, 0.85, 1.0),
+		"crown_metal": Color(0.86, 0.9, 1.0), "fur": Color(0.78, 0.8, 0.86),
+		"eyes": Color(0.85, 0.94, 1.0), "eyes_at": Vector3(0, 0.02, 0.06), "light": Color(0.62, 0.74, 1.0),
+		"aura": Color(0.7, 0.8, 1.0), "boss": true, "hud": 0.15, "label": "moon king",
+		"forms": {"wolf": {"model": "werewolf", "gear": {"handslot.r": WPN + "fistweapon_B.gltf", "handslot.l": WPN + "fistweapon_B.gltf"},
+			"gear_xf": {}, "clips": {"attack": PUNCH, "idle": "Melee_Unarmed_Idle", "cast": "Melee_Unarmed_Idle"},
+			"eyes": Color(1.0, 0.3, 0.26), "light": Color(1.0, 0.32, 0.3), "aura": Color(1.0, 0.42, 0.42),
+			"extras": ["crown", "moon_cloak", "fur_mantle", "blood_motes"], "crown_gem": Color(1.0, 0.3, 0.28)}},
+		"variants": [{},
+			{"gear": {"handslot.r": WWF + "weapons/axe.gltf"}, "gear_xf": {"handslot.r": [Vector3.ZERO, Vector3.ZERO, 1.35]},
+				"clips": {"attack": ONE_H, "idle": "Idle_A"}, "label": "moon king (axe)"}]},
+}
+
+## Presentation-only look overrides by board biome (docs/design/2026-09-29-new-biomes.md look hints):
+## merged over the spawn's variant like a variant (clips key by key), before the tier colourway.
+const BIOME_LOOKS := {
+	# Deep Mines: the skeleton miners swing pickaxes
+	"mines": {"skeleton_minion": {"gear": {"handslot.r": "res://assets/kaykit/tools_x/pickaxe.gltf"},
+		"gear_xf": {"handslot.r": [Vector3.ZERO, Vector3.ZERO, 1.25]}, "clips": {"attack": ONE_H}}},
+	# Sunscorched Ruins: the tomb's bone golems are weathered sandstone
+	"ruins": {"bone_golem": {"tint": Color(0.88, 0.7, 0.46), "strength": 0.6, "sandstone": true}},
 }

@@ -243,13 +243,8 @@ func _one(ev: Dictionary) -> void:
 			c.overlay.toast("A minion rises!", "skull", UiPalette.TEXT)
 			await _wait(0.7)
 		"boss_phase":
-			if int(ev.enemy_idx) < c.stage.enemy_count():
-				c.stage.set_enemy(int(ev.enemy_idx), {"traits": ev.get("traits", []), "phase": int(ev.phase)})
-			c.rig.shake(0.9, 0.6)
-			Fx.flash(c, Color(0.8, 0.2, 0.3, 0.45), 0.5)
-			var nm := String(c.stage.data[int(ev.enemy_idx)].get("name", "The boss")) if int(ev.enemy_idx) < c.stage.data.size() else "The boss"
-			c.overlay.announce("PHASE %d" % int(ev.phase), "%s grows furious!" % nm, UiPalette.DANGER, 1.0)
-			await _wait(1.1)
+			# phase-2 beats per boss (the Moon King's wolf form and blood moon, the Colossus' sandstorm)
+			await BossBeats.boss_phase(c, ev)
 		"combat_won":
 			await c.end_combat(ev)
 		# --- minigames (game/minigames/minigame_beats.gd) ---------------------------------
