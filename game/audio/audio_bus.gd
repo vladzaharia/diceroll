@@ -142,7 +142,8 @@ func stop_all() -> void:
 
 
 ## Plays a one-shot SFX by id. Unknown ids warn and do nothing.
-func play_sfx(id: String, pitch_var := 0.05, volume_db := 0.0) -> void:
+## `pitch` sets the base pitch (a rising combo), `pitch_var` jitters around it.
+func play_sfx(id: String, pitch_var := 0.05, volume_db := 0.0, pitch := 1.0) -> void:
 	if not SFX.has(id):
 		push_warning("Audio: unknown sfx id '%s'" % id)
 		return
@@ -155,7 +156,7 @@ func play_sfx(id: String, pitch_var := 0.05, volume_db := 0.0) -> void:
 	_next = (_next + 1) % _pool.size()
 	p.stream = stream
 	p.volume_db = def[1] + volume_db
-	p.pitch_scale = 1.0 + randf_range(-pitch_var, pitch_var)
+	p.pitch_scale = maxf(0.05, pitch * (1.0 + randf_range(-pitch_var, pitch_var)))
 	p.play()
 
 
