@@ -17,8 +17,10 @@ var panel: PanelContainer
 var ribbon: Ribbon
 var scrim: ColorRect
 var _frame: VBoxContainer
-## Panel scale when its content is wider than the screen allows (1 = natural size).
+## Panel scale when its content is wider / taller than the screen allows (1 = natural size).
 var _fit := 1.0
+## Narrowest layout width; narrower screens shrink the panel instead of squeezing it.
+const MIN_W := 560.0
 var _center: Control
 var _scroll: ScrollContainer
 var _inner: MarginContainer
@@ -143,19 +145,25 @@ func _layout() -> void:
 	if view.x <= 0.0:
 		return
 	var safe := UiTheme.safe_margins(self)
-	var w := minf(max_width, view.x - safe.left - safe.right)
-	_frame.custom_minimum_size.x = w
-	_frame.size = Vector2(w, 0)
+	var avail_w := view.x - safe.left - safe.right
+	var w := minf(max_width, avail_w)
+	# never lay out narrower than MIN_W (cards would wrap word by word): shrink instead
+	var lw := maxf(w, minf(MIN_W, max_width))
+	_frame.custom_minimum_size.x = lw
+	_frame.size = Vector2(lw, 0)
 	var avail_h := view.y - safe.top - safe.bottom
 	var sb := panel.get_theme_stylebox("panel")
 	var chrome := sb.content_margin_top + sb.content_margin_bottom + (ribbon.get_combined_minimum_size().y - 26.0 if ribbon.visible else 0.0)
 	var natural := _inner.get_combined_minimum_size().y
-	_scroll.custom_minimum_size.y = minf(natural, avail_h - chrome)
+	# a little too tall (short landscape, big UI size): shrink up to ~20% before scrolling
+	var k := minf(w / lw, clampf(avail_h / maxf(natural + chrome, 1.0), 0.8, 1.0))
+	_scroll.custom_minimum_size.y = minf(natural, avail_h / k - chrome)
 	_frame.reset_size()
-	_frame.size.x = w
-	# content wider than the screen (narrow phone + large UI size): shrink the whole panel
+	_frame.size.x = lw
+	# content wider than the screen allows: shrink the whole panel
+	k = minf(k, avail_w / maxf(_frame.size.x, 1.0))
 	var was := _fit
-	_fit = clampf(w / maxf(_frame.size.x, 1.0), 0.6, 1.0)
+	_fit = clampf(k, 0.6, 1.0)
 	if not is_equal_approx(was, _fit) and is_equal_approx(_frame.scale.x, was):
 		_frame.scale = Vector2.ONE * _fit
 	var fh := _frame.size.y * _fit
