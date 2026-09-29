@@ -1,4 +1,4 @@
-# Resume point (paused 2026-09-28)
+# Resume point (paused 2026-09-28; progress log at the bottom)
 
 All agents were stopped on purpose by Vlad. Nothing is running. Each unfinished work package lives in its own git worktree, with a WIP checkpoint commit at its tip. Nothing below is merged to `main` yet.
 
@@ -108,3 +108,20 @@ Remaining / to verify:
 - **AUTO settings panel:** scopes, stops, focus, mini-boss fight, skill; saved under `[auto]`.
 - **Scenarios:** ui_speed_auto, ui_auto_settings, game_auto, and `play_auto --ui-auto=1`.
 - **Verification:** screenshots at both sizes, and a full run at 4× with no errors, confirming that stop conditions hand control back.
+
+## Progress since resuming (2026-09-28)
+- **Merged to main:**
+  - Meta rules + rebalance (313 tests; realistic bot: fresh 36%, mid 49%, max 61%, A10 21%).
+  - WP-D1: biomes, enemies, route card, and the hero-tile fix.
+  - WP-D2: speed and AUTO UI, alignment fixes.
+  - App icon "doubles" (with a single die below 114 px).
+- **Magma margin change:** made, then reverted at Vlad's request. He prefers the original Magma.
+- **In progress (worktrees):**
+  - WP-E1: Camp hub, profile persistence and meta flow, results screen.
+  - WP-E2: the 4 minigame UIs and minigame tiles.
+  - WP-E3: potion belt, pet familiars, auto level-ups, remaining new events.
+- **Next:**
+  1. Merge E1 → E2 → E3.
+  2. UX/UI designer review of the whole game, then fixes.
+  3. A second meta-design pass with real sim data.
+  4. Final exports and regression runs.
