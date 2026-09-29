@@ -30,6 +30,8 @@ var lap_pips: HBoxContainer
 var block_badge: Control
 var passives: HFlowContainer
 var _passive_ids: Array = []
+## The class mechanic badge (first in the passives bar; hidden until a run syncs it).
+var class_badge: ClassBadge
 var _tip: PanelContainer
 var _tip_tween: Tween
 var _act_chip: PanelContainer
@@ -173,6 +175,12 @@ func _init() -> void:
 	passives.add_theme_constant_override("v_separation", 6)
 	passives.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(passives)
+	class_badge = ClassBadge.new()
+	class_badge.visible = false
+	class_badge.tapped.connect(show_class_tip)
+	class_badge.mouse_entered.connect(show_class_tip)
+	class_badge.mouse_exited.connect(hide_tip)
+	passives.add_child(class_badge)
 	_tip = PanelContainer.new()
 	_tip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tip.visible = false
@@ -212,7 +220,7 @@ func _layout() -> void:
 	passives.size = Vector2(pw, 0)
 	passives.reset_size()
 	passives.size.x = pw
-	var extra := passives.size.y + 8.0 if not _passive_ids.is_empty() else 0.0
+	var extra := passives.size.y + 8.0 if _bar_used() else 0.0
 	_scrim.position = Vector2.ZERO
 	_scrim.size = Vector2(view.x, safe.top + rh + extra + 90.0)
 
@@ -270,7 +278,7 @@ func chips_rect() -> Rect2:
 ## Bottom edge of the HUD block (row + passives bar), in local coordinates.
 func content_bottom() -> float:
 	var b := _row.position.y + _row.size.y * _fit
-	if not _passive_ids.is_empty():
+	if _bar_used():
 		b = passives.position.y + passives.size.y
 	return maxf(b, extra_bottom)
 
@@ -314,6 +322,21 @@ func refresh(flow: GameFlow, animate := false) -> void:
 	set_burn(flow.combat.hero_burn if flow.phase == GameFlow.Phase.COMBAT and flow.combat else 0)
 	set_passives(Array(run.passives))
 	set_twist(flow)
+	sync_class(flow)
+
+
+## Shows the class badge for the run's class with its live state.
+func sync_class(flow: GameFlow) -> void:
+	var was := class_badge.visible
+	class_badge.visible = flow != null
+	class_badge.sync(flow)
+	if was != class_badge.visible:
+		_layout()
+
+
+## True when the passives bar row shows anything (the class badge or passives).
+func _bar_used() -> bool:
+	return not _passive_ids.is_empty() or (class_badge != null and class_badge.visible)
 
 
 ## Takes over another HudTop's shown numbers (combat HUD -> board HUD after a fight) so the
@@ -330,6 +353,9 @@ func copy_from(o: HudTop) -> void:
 		_show_twist(o._twist_key)
 	else:
 		twist_chip.visible = false
+	if o.class_badge.class_id != "":
+		class_badge.set_class(o.class_badge.class_id)
+		class_badge.visible = o.class_badge.visible
 
 
 ## XP bar for `xp` total at the level currently shown (capped at full; level-ups come from
@@ -358,10 +384,13 @@ func set_lap(act: int, lap: int) -> void:
 
 ## Rebuilds the passives bar (ids in pickup order).
 func set_passives(ids: Array) -> void:
-	if ids == _passive_ids and passives.get_child_count() == ids.size():
+	if ids == _passive_ids and passives.get_child_count() == ids.size() + 1:
 		return
 	_passive_ids = ids.duplicate()
-	UiTheme.clear(passives)
+	for c in passives.get_children():
+		if c is PassiveIcon:
+			passives.remove_child(c)
+			c.queue_free()
 	for id in ids:
 		_add_passive_icon(String(id))
 	_layout()
@@ -393,22 +422,34 @@ func _add_passive_icon(id: String) -> PassiveIcon:
 	return p
 
 
+## Tooltip under the class badge: mechanic name (its colour) + the rule.
+func show_class_tip() -> void:
+	var b := class_badge
+	var title := ClassInfo.mechanic_name(b.mechanic) if b.mechanic != "" else String(HeroDefs.DATA.get(b.class_id, {}).get("name", ""))
+	var tag := String(HeroDefs.DATA.get(b.class_id, {}).get("name", "")).to_upper() if b.mechanic != "" else "CLASS"
+	_text_tip(title, tag, b.rule_text(), b.color, b)
+
+
 ## Tooltip under a passive icon: name (rarity colour) + description.
 func show_tip(id: String, anchor: Control = null) -> void:
 	if not Passives.DEFS.has(id):
 		return
 	var d: Dictionary = Passives.DEFS[id]
 	var rc := UiPalette.passive_color(String(d.rarity))
+	var tag := "BOSS" if String(d.rarity) == "boss" else String(d.rarity).to_upper()
+	_text_tip(String(d.name), tag, String(d.desc), rc, anchor)
+
+
+func _text_tip(title: String, tag: String, text: String, rc: Color, anchor: Control = null) -> void:
 	UiTheme.clear(_tip)
 	_tip.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(0.05, 0.05, 0.12, 0.96), 16, 2, rc, 10, Color(0, 0, 0, 0.4)), 16, 10))
 	var col := UiTheme.vbox(2)
 	_tip.add_child(col)
 	var head := UiTheme.hbox(8)
 	col.add_child(head)
-	head.add_child(UiTheme.label(String(d.name), 26, rc.lightened(0.3), true, 5))
-	var tag := "BOSS" if String(d.rarity) == "boss" else String(d.rarity).to_upper()
+	head.add_child(UiTheme.label(title, 26, rc.lightened(0.3), true, 5))
 	head.add_child(UiTheme.label(tag, 15, rc, false, 0, false, 800))
-	var desc := UiTheme.para(String(d.desc), 21, UiPalette.TEXT_DIM, 500)
+	var desc := UiTheme.para(text, 21, UiPalette.TEXT_DIM, 500)
 	desc.custom_minimum_size.x = minf(380.0, size.x - 60.0)
 	col.add_child(desc)
 	_tip.visible = true
@@ -565,11 +606,13 @@ func on_event(ev: Dictionary, flow: GameFlow) -> void:
 				set_block(maxi(int(ev.get("total", flow.run.block)), 0), true)
 		"combat_turn_started":
 			set_block(0)
+			class_badge.sync(flow)
 		"status":
 			if str(ev.get("target", "")) == "hero" and String(ev.get("status", "")) == "burn":
 				set_burn(int(ev.get("value", 0)), true)
 		"combat_started":
 			set_burn(0)
+			class_badge.sync(flow)
 		"board_rolled":
 			if int(ev.get("treasury_added", 0)) <= 0:
 				treasury.set_value(int(ev.get("treasury", flow.run.treasury)), true)
@@ -581,10 +624,16 @@ func on_event(ev: Dictionary, flow: GameFlow) -> void:
 			level_badge.set_level(lv, float(xp - prev) / float(maxi(1, need - prev)), true)
 		"combat_won":
 			set_burn(0)
+			class_badge.sync(flow)
 			show_xp(flow.run.xp, true)
 		"lap_completed":
 			if not bool(ev.get("boss", false)):
 				set_lap(_act, int(ev.lap) + 1)
+		"class_triggered":
+			class_badge.sync(flow)
+			class_badge.pulse()
+		"dice_rolled", "die_added", "die_tagged", "enemy_scared", "die_marked":
+			class_badge.sync(flow)
 		"act_started":
 			set_lap(int(ev.get("act", _act)), int(ev.get("lap", _lap)))
 			treasury.set_value(int(ev.get("treasury", flow.run.treasury)), false)

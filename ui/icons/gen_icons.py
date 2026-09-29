@@ -78,6 +78,9 @@ ICONS = {}
 # ---------------------------------------------------------------- stats & resources
 HEART = "M12 20.6s-8.2-4.9-8.2-11.1A4.6 4.6 0 0 1 12 6.7a4.6 4.6 0 0 1 8.2 2.8c0 6.2-8.2 11.1-8.2 11.1z"
 ICONS["heart"] = fill(HEART) + shade("M12 20.6s8.2-4.9 8.2-11.1a4.6 4.6 0 0 0-3-4.3c1.2 5.6-2.4 11-5.2 15.4z", 0.16) + hl("M6.6 9.2a2.4 2.4 0 0 1 2.6-1.7")
+# Wardrobe (Camp skins): a coat hanger
+ICONS["wardrobe"] = (lines(["M12 7.6V6.2a2 2 0 1 1 2 2", "M12 8.4L3 16.6h18z"], 2.2)
+                     + fill("M4.6 16.6h14.8v2.6H4.6z") + shade("M12 16.6h7.4v2.6H12z", 0.16))
 
 ICONS["coin"] = (circ(12, 12, 8.6) + shade("M18.1 6a8.6 8.6 0 0 1-12.1 12.1A8.6 8.6 0 0 0 18.1 6z", 0.2)
                  + f'<circle cx="12" cy="12" r="5.7" fill="none" stroke="{O}" stroke-opacity="0.45" stroke-width="1.3"/>'
@@ -660,6 +663,55 @@ def auto_icon():
 
 
 ICONS["auto"] = auto_icon()
+
+# ---------------------------------------------------------------- classes 5-11 and their mechanics (class badge, cards)
+ICONS["class_paladin"] = (fill("M11 9.6h2v11.2a1 1 0 0 1-2 0z") + fill("M5.6 3.4h12.8v6.4H5.6z")
+                          + shade("M12 3.4h6.4v6.4H12z", 0.16) + hl("M7.2 5v3.2") + dark("M11 11.2h2v1.4h-2z"))
+ICONS["class_ranger"] = (lines(["M7.4 3.2c6 2.4 6 15.2 0 17.6", "M7.4 3.2v17.6", "M4.6 12h14"], 2.0,
+                               [poly([(20.6, 12), (16.6, 9.6), (16.6, 14.4)]), poly([(4.8, 12), (3.2, 10.2), (3.2, 13.8)])]))
+ICONS["class_ninja"] = (fill(poly(star_pts(12, 12, 10, 3.2, 4, -90))) + shade(poly([(12, 12), (12, 2), (15.2, 8.8), (22, 12)]), 0.16)
+                        + circ(12, 12, 1.9, "#1B1530", False))
+LEAF = "M4.2 19.8C3.6 10.6 9.2 4.2 20 3.6c.6 10.6-5.8 16.4-15.8 16.2z"
+ICONS["class_druid"] = (fill(LEAF) + shade("M20 3.6c.6 10.6-5.8 16.4-15.8 16.2C11.6 16 17 10.4 20 3.6z", 0.16)
+                        + lines(["M4.4 19.6L14.8 9.2"], 1.2))
+WRENCH = "M14.6 3.2a5 5 0 0 0-4.7 6.7l-6.4 6.4a2.1 2.1 0 0 0 3 3l6.4-6.4a5 5 0 0 0 6.7-4.7l-3.1 3.1-2.9-.7-.7-2.9z"
+ICONS["class_engineer"] = fill(WRENCH) + shade("M9.9 9.9l3.3 3.3-6.4 6.4a2.1 2.1 0 0 1-3-3z", 0.16) + circ(5.2, 18.1, 0.9, "#1B1530", False)
+ICONS["class_necromancer"] = (lines(["M12 11.6v10"], 2.4) + fill("M12 1.8a5.6 5.6 0 0 0-5.6 5.6c0 1.9 1 3.2 2.1 3.9v1.6h7v-1.6c1.1-.7 2.1-2 2.1-3.9A5.6 5.6 0 0 0 12 1.8z")
+                              + dark("M8.6 6.6h2.4v2.2H8.6zM13 6.6h2.4v2.2H13z") + f'<path d="M6.2 8.4c-1.6-.2-2.6-1.4-2.4-3" fill="none" stroke="#7CF0B8" stroke-width="1.4" stroke-linecap="round"/>'
+                              + f'<path d="M17.8 8.4c1.6-.2 2.6-1.4 2.4-3" fill="none" stroke="#7CF0B8" stroke-width="1.4" stroke-linecap="round"/>')
+PAD = "M12 11.2c3.8 0 6.6 3 6.6 6.2 0 2.4-2.2 3.6-6.6 3.6s-6.6-1.2-6.6-3.6c0-3.2 2.8-6.2 6.6-6.2z"
+ICONS["class_monster_kid"] = (fill(PAD) + fill("M5.4 9.8L3.2 3.6l5.2 4.2z") + fill("M12 8.2l-1.6-6.2h3.2z") + fill("M18.6 9.8l2.2-6.2-5.2 4.2z")
+                              + shade("M12 11.2c3.8 0 6.6 3 6.6 6.2 0 2.4-2.2 3.6-6.6 3.6z", 0.16))
+# mechanics
+def sun():
+    rays = []
+    for k in range(8):
+        a = math.radians(k * 45)
+        rays.append(f"M{12 + 6.4 * math.cos(a):.2f} {12 + 6.4 * math.sin(a):.2f}L{12 + 9.6 * math.cos(a):.2f} {12 + 9.6 * math.sin(a):.2f}")
+    return lines(rays, 2.2) + circ(12, 12, 4.6) + shade("M12 7.4a4.6 4.6 0 0 1 0 9.2z", 0.16)
+ICONS["mech_oath"] = sun()
+ICONS["mech_aim"] = (lines(["M12 2.6v4.2", "M12 17.2v4.2", "M2.6 12h4.2", "M17.2 12h4.2"], 2.2)
+                     + f'<circle cx="12" cy="12" r="6.4" fill="none" stroke="{O}" stroke-width="5"/><circle cx="12" cy="12" r="6.4" fill="none" stroke="{F}" stroke-width="2"/>'
+                     + circ(12, 12, 1.8))
+ICONS["mech_shadow_step"] = (fill("M15.8 3.2a8.8 8.8 0 1 0 5 15.4A7.4 7.4 0 0 1 15.8 3.2z") + shade("M20.8 18.6a8.8 8.8 0 0 1-13.4 1.2c5 .6 9.8-1 13.4-1.2z", 0.2)
+                             + lines(["M17.6 7.6h3.6", "M18.6 11h3"], 1.4))
+ICONS["mech_overgrowth"] = (lines(["M12 21.2v-9.6"], 2.4) + fill("M12 13.2C8.2 13.6 4.6 11.4 4 6.2c4.6-.4 7.6 2.2 8 7z")
+                            + fill("M12 11.6c.4-4.6 3.4-7.6 8-7.8-.2 5-3.6 7.6-8 7.8z") + shade("M12 11.6c3.2-2 5.2-4.4 8-7.8-.2 5-3.6 7.6-8 7.8z", 0.16)
+                            + fill("M6.4 21.2h11.2l-1-2.8H7.4z"))
+BONE = "M6.2 4.2a2.4 2.4 0 0 0-2 3.6 2.4 2.4 0 0 0 1.4 3.9l7.6 7.6a2.4 2.4 0 0 0 3.9 1.4 2.4 2.4 0 0 0 3.6-2 2.4 2.4 0 0 0-3.6-2l-7.4-7.4a2.4 2.4 0 0 0-2-4.4 2.4 2.4 0 0 0-1.5.3z"
+ICONS["mech_bone_harvest"] = fill(BONE) + shade("M13.2 19.3l-7.6-7.6c1.4.4 2.4-.2 2.6-1.2l7.4 7.4c-1 .2-1.8.6-2.4 1.4z", 0.16)
+ICONS["mech_turret"] = (fill("M4.4 20.6h15.2l-2-5.4H6.4z") + fill("M7.6 15.2a4.4 4.4 0 0 1 8.8 0z") + fill("M11.4 10.2l8.4-5.4 1.2 1.8-8.4 5.4z")
+                        + shade("M12 20.6h7.6l-2-5.4H12z", 0.16) + circ(12, 12.8, 1.2, "#1B1530", False))
+ICONS["mech_boo"] = (fill(poly(star_pts(12, 12, 10.2, 6.2, 9, -90))) + shade(poly([(12, 12)] + star_pts(12, 12, 10.2, 6.2, 9, -90)[1:8]), 0.14)
+                     + dark("M10.8 6.6h2.4l-.4 7.4h-1.6z") + circ(12, 16.6, 1.3, "#1B1530", False))
+
+# ---------------------------------------------------------------- BOO! (Monster Kid): cowering face, brave badge
+ICONS["intent_cower"] = (circ(11.2, 12.8, 8.4) + shade("M11.2 4.4a8.4 8.4 0 0 1 0 16.8c3-2.2 4.8-5.2 4.8-8.4s-1.8-6.2-4.8-8.4z", 0.16)
+                         + dark("M6.6 10.4l3 1.6-3 1.2zM15.8 10.4l-3 1.6 3 1.2z")
+                         + f'<path d="M7.6 17.6c1.2-1.4 2.4-1.4 3.6 0s2.4 1.4 3.6 0" fill="none" stroke="{O}" stroke-width="1.5" stroke-linecap="round"/>'
+                         + f'<path d="M19.6 2.6c1.6 2.2 2.4 3.6 2.4 4.6a2.4 2.4 0 0 1-4.8 0c0-1 .8-2.4 2.4-4.6z" fill="#8FD8FF" stroke="{O}" stroke-width="1.2"/>')
+ICONS["trait_brave"] = (fill(SHIELD) + shade("M12 2.9v18.3c4.4-1.4 7.6-5 7.6-9.7V5.8z")
+                        + f'<path d="{poly(star_pts(12, 11.6, 4.6, 2.0))}" fill="{O}"/>')
 
 for pid, body in P.items():
     ICONS["passive_" + pid] = body

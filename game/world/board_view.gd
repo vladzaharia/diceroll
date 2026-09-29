@@ -34,6 +34,9 @@ var side := DEFAULT_RING / 4 + 1
 var tiles: Array = []
 var hero: Character
 var hero_class := "knight"
+## Equipped skin (SkinDefs slot) and the A10 prestige overlay of the hero (HeroLook).
+var hero_skin := "default"
+var hero_prestige := false
 var hero_idx := 0
 ## Seeds the biome's dressing variant (set before build(); see Biome.build / Dressing).
 var variant_seed := 0
@@ -720,7 +723,7 @@ func rise_wave(from: int, duration := 1.1) -> void:
 # --- hero -----------------------------------------------------------------------------------
 
 func _spawn_hero() -> void:
-	hero = Character.create(hero_class)
+	hero = HeroLook.create(hero_class, hero_skin, hero_prestige)
 	hero.name = "Hero"
 	hero.scale = Vector3.ONE * HERO_SCALE
 	add_child(hero)
