@@ -384,6 +384,30 @@ func _count(st: Dictionary, victory: bool) -> void:
 	add.call("potions", int(st.get("potions_used", 0)))
 	records.counters = c
 
+## [current, needed] toward a milestone condition, for progress bars: every form of _cond ({stat},
+## {class_wins}, {boss_kills}, {any}: the closest branch, {all}: the furthest branch).
+func cond_progress(cond: Dictionary) -> Array:
+	if cond.has("any") or cond.has("all"):
+		var subs: Array = cond.get("any", cond.get("all", []))
+		var pick := [0, 1]
+		var pick_r := -1.0 if cond.has("any") else 2.0
+		for sub in subs:
+			var pr := cond_progress(sub)
+			var r := float(pr[0]) / maxf(1.0, float(pr[1]))
+			if (cond.has("any") and r > pick_r) or (cond.has("all") and r < pick_r):
+				pick_r = r
+				pick = pr
+		return pick
+	var need := int(cond.get("min", 1))
+	var cur := 0
+	if cond.has("class_wins"):
+		cur = int((records.get("wins_by_class", {}) as Dictionary).get(String(cond.class_wins), 0))
+	elif cond.has("boss_kills"):
+		cur = int((records.get("boss_kills", {}) as Dictionary).get(String(cond.boss_kills), 0))
+	else:
+		cur = counter(String(cond.get("stat", "")))
+	return [mini(cur, need), need]
+
 ## Milestone conditions: {stat, min} (counter), {class_wins: id, min}, {boss_kills: id, min},
 ## {any: [conds]}, {all: [conds]}.
 func _cond(cond: Dictionary) -> bool:

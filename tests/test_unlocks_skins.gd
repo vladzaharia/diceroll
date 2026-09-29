@@ -198,3 +198,15 @@ func test_run_carries_the_equipped_skin() -> void:
 	var back := GameFlow.from_dict(JSON.parse_string(JSON.stringify(f.to_dict())))
 	assert_eq(back.run.skin, "victor")
 	assert_eq(GameFlow.new_run("knight", 3).run.skin, "default")
+
+func test_cond_progress_every_form() -> void:
+	var p := Profile.fresh()
+	p.records.counters.runs = 4
+	p.records.wins_by_class = {"knight": 1}
+	assert_eq(p.cond_progress({"stat": "runs", "min": 8}), [4, 8])
+	assert_eq(p.cond_progress({"class_wins": "knight", "min": 2}), [1, 2])
+	assert_eq(p.cond_progress({"any": [{"class_wins": "knight", "min": 2}, {"stat": "runs", "min": 8}]}), [1, 2], "closest branch")
+	assert_eq(p.cond_progress({"all": [{"stat": "hollow_events", "min": 36}, {"stat": "runs", "min": 8}]}), [0, 36], "furthest branch")
+	for m in UnlockDefs.MILESTONES:
+		var pr := p.cond_progress(m.cond)
+		assert_true(int(pr[1]) > 0, m.id)
