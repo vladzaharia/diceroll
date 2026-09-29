@@ -59,7 +59,7 @@ static func maxed() -> Profile:
 	for id in MinigameDefs.IDS:
 		p.minigame_plays[id] = int(MinigameDefs.MASTERY_PLAYS.back())
 	p.upgrades = {"whetstone": 1, "starter_kit": 1, "potion_belt": 1, "loadout_slot": 1}
-	p.starter_kind = "loaded"
+	p.starter_kind = "odd"
 	p.loadout = {"class": "knight", "mode": "standard", "minigames": ["fossil_hunter", "claw_machine", "bubble_breaker"], "pet": "skull_buddy"}
 	p.ascension = {"unlocked": UnlockDefs.MAX_ASCENSION, "selected": 0}
 	return p

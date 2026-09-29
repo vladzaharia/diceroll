@@ -232,9 +232,13 @@ func gold_bonus(amount: int) -> int:
 		return amount
 	return int(round(amount * (1.0 + p)))
 
-## Lap pool size: Boots +1, Crystal Wisp perk +1.
-func lap_reroll_refill() -> int:
-	return int(meta.get("lap_rerolls", 0)) + (1 if has_pet("crystal_wisp") else 0)
+## Board reroll pool refill when a lap starts. Boots (meta.lap_rerolls) refill only when a new
+## biome starts (and at run start); unused Boots rerolls carry over within the biome. The
+## Crystal Wisp perk adds +1 for each lap (lost if unused).
+func lap_reroll_refill(new_biome := true) -> int:
+	var boots := int(meta.get("lap_rerolls", 0))
+	var kept := boots if new_biome else mini(lap_rerolls, boots)
+	return kept + (1 if has_pet("crystal_wisp") else 0)
 
 ## Syncs the potion count with the belt.
 func sync_potions() -> void:

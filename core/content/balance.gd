@@ -126,6 +126,10 @@ const PASSIVE_THORNS := 3
 const PASSIVE_IRON_SKIN := 3
 const PASSIVE_BLOODTHIRST := 3
 const PASSIVE_DAMAGE_MULT := 1.5
+## Glass Cannon's damage factor (2026-09-28 nerf from x1.5).
+const PASSIVE_GLASS_MULT := 1.3
+## Runes that Resonance / Rune Echo never trigger twice (Heavy and Echo stacking nerf).
+const NO_DOUBLE_TRIGGER := ["heavy", "echo"]
 const PASSIVE_GLASS_HP_PCT := 0.2
 const PASSIVE_MIDAS_GOLD := 8
 const PASSIVE_MIDAS_MAX := 15

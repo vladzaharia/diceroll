@@ -413,7 +413,7 @@ const REAL_SHINY := 0.25
 const REAL_SHINY_BONUS := 0.2
 ## Heuristic-lapse probabilities by scope (tuned so the realistic bot hits the balance targets
 ## in docs/plans/balance.md). Static vars so tools/sim.gd can sweep them (--real-heur=).
-static var real_heur := {"combat": 0.5, "board": 0.5, "build": 0.5}
+static var real_heur := {"combat": 0.6, "board": 0.6, "build": 0.6}
 
 static func _real(rules: AutoRules) -> bool:
 	return rules != null and rules.skill == "realistic"
@@ -786,7 +786,7 @@ class CombatModel:
 		times_group = 2.0 if ps.has("resonance") else (1.0 + Balance.PASSIVE_RUNE_ECHO_CHANCE if ps.has("rune_echo") else 1.0)
 		factor = 1.0
 		if ps.has("glass_cannon"):
-			factor *= Balance.PASSIVE_DAMAGE_MULT
+			factor *= Balance.PASSIVE_GLASS_MULT
 		if ps.has("opening_salvo") and first_turn:
 			factor *= Balance.PASSIVE_DAMAGE_MULT
 		midas = mini(Balance.PASSIVE_MIDAS_MAX, gold / Balance.PASSIVE_MIDAS_GOLD) if ps.has("midas_fist") else 0
@@ -860,7 +860,7 @@ class CombatModel:
 			var rc := rune[i]
 			var ing := ((gm >> i) & 1) == 1
 			var rerolled := ((rer >> i) & 1) == 1
-			var t := times_group if (ing and rc != 0) else 1.0
+			var t := times_group if (ing and rc != 0 and rc != Bot.R_HEAVY and rc != Bot.R_ECHO) else 1.0
 			var on := false
 			match rc:
 				Bot.R_BLADE, Bot.R_VENOM, Bot.R_VAMPIRE, Bot.R_ECHO, Bot.R_HEAVY, Bot.R_GILDED:

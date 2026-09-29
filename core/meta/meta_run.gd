@@ -91,7 +91,7 @@ static func apply_start(r: RunState) -> void:
 	r.potions = r.belt.size()
 	r.lap_rerolls = r.lap_reroll_refill()
 	var sk := String(m.starter_kind)
-	if sk != "" and r.dice.size() >= 2 and DiceKinds.DEFS.has(sk):
+	if sk != "" and r.dice.size() >= 2 and UnlockDefs.STARTER_KINDS.has(sk):
 		r.dice[1] = Die.make(r.dice[1].rune, sk)
 
 # ------------------------------------------------------------------ Crowns

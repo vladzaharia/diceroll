@@ -55,6 +55,7 @@ func _init() -> void:
 	var pet_override := ""
 	var focus := "balanced"
 	var scopes: Array = []
+	var strip: Array = []
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--runs="):
 			runs = arg.substr(7).to_int()
@@ -127,6 +128,8 @@ func _init() -> void:
 		elif arg.begins_with("--danger="):
 			Bot.danger_lo = arg.substr(9).get_slice(",", 0).to_float()
 			Bot.danger_hi = arg.substr(9).get_slice(",", 1).to_float()
+		elif arg.begins_with("--strip="):
+			strip = Array(arg.substr(8).split(",", false))
 		elif arg == "--items":
 			track_items = true
 		elif arg == "--verbose":
@@ -145,6 +148,7 @@ func _init() -> void:
 		prof = MetaPresets.get_preset(profile_name, asc)
 		if pet_override != "":
 			prof.loadout.pet = "" if pet_override == "none" else pet_override
+		_strip(prof, strip)
 		opts["profile"] = prof
 	var classes: Array = HeroDefs.IDS if cls == "all" else [cls]
 	var total_stuck := 0
@@ -253,6 +257,63 @@ func _init() -> void:
 		print("decide(): %d calls, avg %.2f ms, max %.1f ms, unexpected stops %d" % [decide_calls, decide_us / 1000.0 / maxi(1, decide_calls), decide_max_us / 1000.0, stops])
 	print("overall win%%=%.1f runs/class=%d seed=%d errors=%d capped=%d time=%.1fs" % [100.0 * all_wins / maxi(1, all_runs), runs, seed0, total_errors, total_stuck, (Time.get_ticks_msec() - t0) / 1000.0])
 	quit(0 if total_errors == 0 and total_stuck == 0 else 1)
+
+## Analysis: removes parts of a profile (gear, traits, pet, belt, whetstone, starter, slot,
+## packs, all-classes-knight...) to measure what each contributes.
+func _strip(p: Dictionary, parts: Array) -> void:
+	for part in parts:
+		match String(part):
+			"gear":
+				for k in p.gear:
+					p.gear[k] = 0
+			"traits":
+				for k in p.gear:
+					p.gear[k] = mini(int(p.gear[k]), 3)
+			"hp":
+				p.gear["helm"] = 0
+			"atk":
+				p.gear["blade"] = 0
+			"boots":
+				p.gear["boots"] = 0
+			"charm":
+				p.gear["charm"] = 0
+			"pet":
+				p.loadout.pet = ""
+			"belt":
+				p.upgrades["potion_belt"] = 0
+			"whetstone":
+				p.upgrades["whetstone"] = 0
+			"starter":
+				p.upgrades["starter_kit"] = 0
+			"slot":
+				p.upgrades["loadout_slot"] = 0
+				p.loadout.minigames = (p.loadout.minigames as Array).slice(0, 2)
+			"packs":
+				p.unlocks.packs = ["starter"]
+			"mastery":
+				p.minigame_plays = {}
+			"gear4":
+				for k in p.gear:
+					p.gear[k] = mini(int(p.gear[k]), 4)
+			"pet4":
+				p.pet_bought = {}
+				for k in p.pet_xp:
+					p.pet_xp[k] = 30
+			"midpacks":
+				p.unlocks.packs = ["starter", "gamblers_kit", "cold_steel", "numerology"]
+			_:
+				if String(part).begins_with("t:"):
+					# t:<slot>:<tier>:<trait id> picks a different gear trait
+					var bits := String(part).split(":")
+					var t: Dictionary = p.gear_traits.get(bits[1], {})
+					t[bits[2]] = bits[3]
+					p.gear_traits[bits[1]] = t
+				elif String(part).begins_with("lv:"):
+					# lv:<slot>:<level>
+					var b2 := String(part).split(":")
+					p.gear[b2[1]] = int(b2[2])
+				elif String(part).begins_with("-"):
+					(p.unlocks.packs as Array).erase(String(part).substr(1))
 
 ## Plays one run with the Bot. Returns {flow, last_fight, minis:[won bools], crowns}.
 func _play(c: String, s: int, board: int, opts: Dictionary, verbose := false) -> Dictionary:
@@ -497,7 +558,7 @@ func _items_table() -> void:
 		print("Top 10 items in %s builds (%d runs); per run in wins vs losses, and win%% of runs holding it:" % ["winning" if side == 0 else "losing", item_runs[side]])
 		print("| item | per winning run | per losing run | win% when held | runs held |")
 		print("|---|---|---|---|---|")
-		for k in keys.slice(0, 10):
+		for k in keys.slice(0, 40 if side == 0 else 10):
 			var v: Array = items[k]
 			var held := int(v[2]) + int(v[3])
 			print("| %s | %.2f | %.2f | %.1f | %d |" % [k, float(v[0]) / w, float(v[1]) / l, 100.0 * v[2] / maxi(1, held), held])

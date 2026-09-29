@@ -10,7 +10,7 @@ extends RefCounted
 ##
 ## charge_on:
 ##   pair_plus      +1 per attack whose combo is a Pair or better
-##   low_die        +1 per die showing 1 or 0 when you attack (L10: a 0 gives +2)
+##   low_die        +1 per die showing 2 or less when you attack (L10: a 0 gives +2)
 ##   six            +1 per die showing 6 when you attack
 ##   kept           +1 per die you never rerolled that turn, when you attack
 ##   attack_intent  +1 per enemy intent rolled that is an attack
@@ -28,28 +28,28 @@ const XP_LEVELS := [5, 15, 30, 50]
 const LEVEL_COSTS := [20, 30, 40, 50, 60]
 
 const DEFS := {
-	"pumpkin_sprite": {"name": "Pumpkin Sprite", "role": "heal", "charge_on": "pair_plus", "size": 4, "model": "pumpkin",
-		"fires": "Heal 6% of max HP (+1% per level).",
+	"pumpkin_sprite": {"name": "Pumpkin Sprite", "role": "heal", "charge_on": "pair_plus", "size": 5, "model": "pumpkin",
+		"fires": "Heal 4% of max HP (+0.3% per level).",
 		"perk": "Campfires heal +5%.",
 		"l5": "Also removes Burn.", "l10": "Overheal becomes Block."},
-	"skull_buddy": {"name": "Skull Buddy", "role": "attack", "charge_on": "low_die", "size": 4, "model": "skull",
-		"fires": "Bite the target for 4x your lowest die (min 4), +0.5x per level.",
+	"skull_buddy": {"name": "Skull Buddy", "role": "attack", "charge_on": "low_die", "size": 5, "model": "skull",
+		"fires": "Before your attack, bite the target for 35% (+2% per level) of the hand's combo damage.",
 		"perk": "Traps: +1 to the dodge roll.",
 		"l5": "Bites every enemy at half damage.", "l10": "Blanks count as 1 for its bite and charge x2."},
 	"lantern_ghost": {"name": "Lantern Ghost", "role": "burn", "charge_on": "six", "size": 5, "model": "lantern",
-		"fires": "Poison 4 (+1 per level) on every enemy.",
+		"fires": "Poison 2 (+1 per level) on every enemy.",
 		"perk": "Lava damage -50%.",
 		"l5": "Poison doesn't decay on bosses.", "l10": "Poisoned enemies take +1 from Thunder and Ember."},
 	"crystal_wisp": {"name": "Crystal Wisp", "role": "tempo", "charge_on": "kept", "size": 6, "model": "crystal",
-		"fires": "At turn start: +1 combat reroll now.",
+		"fires": "At turn start: +1 combat reroll, and this turn's combo multiplier +0.5.",
 		"perk": "+1 board reroll on the first board turn of each lap.",
 		"l5": "Also +1 banked reroll and frees a cursed die.", "l10": "Its first reroll each fight doesn't count as rerolled."},
-	"guard_die": {"name": "Guard Die", "role": "defense", "charge_on": "attack_intent", "size": 3, "model": "die",
-		"fires": "Roll a d6: gain pips x2 Block (+1 per level).",
+	"guard_die": {"name": "Guard Die", "role": "defense", "charge_on": "attack_intent", "size": 4, "model": "die",
+		"fires": "Roll a d6: gain pips + 1 Block (+1 per 3 levels).",
 		"perk": "Each new biome: +1 Healing Draught if the belt is empty.",
 		"l5": "Its Block lasts one extra turn.", "l10": "On a 6, also freezes the target."},
 	"coin_mimic": {"name": "Coin Mimic", "role": "economy", "charge_on": "board_double", "size": 3, "model": "chest",
-		"fires": "+8 gold (+1 per level) and bite the target for gold/20 (max 10).",
+		"fires": "+10 gold (+1.5 per level) and bite the target for gold/20 (max 10).",
 		"perk": "Treasury banks +2 per double.",
 		"l5": "One free shop restock per shop.", "l10": "Chest gold rolls twice and keeps the better."},
 }
@@ -84,20 +84,31 @@ static func level_cost(level: int) -> Dictionary:
 
 # ------------------------------------------------------------------ effect numbers
 
+## Pet numbers (2026-09-28 pass: every pet worth about +3-6 pp at L10 in the realistic sim).
 static func heal_pct(level: int) -> float:
-	return 0.06 + 0.01 * (clampi(level, 1, MAX_LEVEL) - 1)
+	return 0.04 + 0.003 * (clampi(level, 1, MAX_LEVEL) - 1)
 
-static func bite_mult(level: int) -> float:
-	return 4.0 + 0.5 * (clampi(level, 1, MAX_LEVEL) - 1)
+## Skull Buddy bite: bite_pct(level) x the hand's combo damage (pips x combo multiplier), at
+## least BITE_MIN.
+static func bite_pct(level: int) -> float:
+	return 0.35 + 0.02 * (clampi(level, 1, MAX_LEVEL) - 1)
+
+const BITE_MIN := 8
+## Low-die charge threshold (dice showing this or less charge Skull Buddy).
+const LOW_DIE_MAX := 2
+## Crystal Wisp: rerolls per firing, and the combo multiplier bonus for that turn's attack.
+const WISP_REROLLS := 1
+const WISP_MULT := 0.5
 
 static func poison(level: int) -> int:
-	return 4 + (clampi(level, 1, MAX_LEVEL) - 1)
+	return 2 + (clampi(level, 1, MAX_LEVEL) - 1)
 
+## Guard Die Block = d6 + 1 + block_bonus.
 static func block_bonus(level: int) -> int:
-	return clampi(level, 1, MAX_LEVEL) - 1
+	return (clampi(level, 1, MAX_LEVEL) - 1) / 3
 
 static func mimic_gold(level: int) -> int:
-	return 8 + (clampi(level, 1, MAX_LEVEL) - 1)
+	return 10 + (3 * (clampi(level, 1, MAX_LEVEL) - 1)) / 2
 
 ## Presentation card for the Pet Den.
 static func card(id: String, level: int) -> Dictionary:

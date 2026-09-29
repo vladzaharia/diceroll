@@ -169,7 +169,7 @@ static func milestone(id: String) -> Dictionary:
 const UPGRADES := {
 	"workshop": {
 		"whetstone": {"name": "Whetstone", "desc": "Start every run with 1 Face Raise.", "cost": {"crowns": 80}},
-		"starter_kit": {"name": "Starter Kit", "desc": "Choose the kind of your second starting die (unlocked commons).", "cost": {"crowns": 40}},
+		"starter_kit": {"name": "Starter Kit", "desc": "Choose the kind of your second starting die: a sidegrade (Standard, Low, Odd).", "cost": {"crowns": 40}},
 	},
 	"armory": {
 		"potion_belt": {"name": "Third Potion Slot", "desc": "The potion belt holds 3.", "cost": {"crowns": 120}, "requires": "potion_belt"},
@@ -178,6 +178,17 @@ const UPGRADES := {
 		"loadout_slot": {"name": "Third Minigame Slot", "desc": "Equip 3 minigames per run.", "cost": {"crowns": 150}, "requires": "loadout_slot"},
 	},
 }
+
+## Starter Kit kinds: sidegrades only, never strictly better than a Standard die (2026-09-28:
+## Loaded/Even as a starting die was worth about +5 pp).
+const STARTER_KINDS := ["standard", "low", "odd"]
+
+static func starter_kinds(pool: Array) -> Array:
+	var out: Array = []
+	for k in STARTER_KINDS:
+		if pool.has(k) or k == "standard":
+			out.append(k)
+	return out
 
 static func upgrade_def(track: String, id: String) -> Dictionary:
 	return (UPGRADES.get(track, {}) as Dictionary).get(id, {})

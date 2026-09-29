@@ -31,7 +31,7 @@ const DEFS := {
 		"desc": "Moving on doubles banks +1 combat reroll for your next fight."},
 	# ---- runes
 	"rune_echo": {"name": "Rune Echo", "rarity": "rare", "icon": "echo",
-		"desc": "Runes on combo dice have a 25% chance to trigger twice."},
+		"desc": "Runes on combo dice have a 25% chance to trigger twice (not Heavy or Echo)."},
 	"collector": {"name": "Collector", "rarity": "uncommon", "icon": "gem",
 		"desc": "+5 max HP for every rune on your dice, now and later."},
 	# ---- board and economy
@@ -59,7 +59,7 @@ const DEFS := {
 	"second_wind": {"name": "Second Wind", "rarity": "rare", "icon": "wind",
 		"desc": "Once per run, survive a lethal hit with 1 HP."},
 	"glass_cannon": {"name": "Glass Cannon", "rarity": "rare", "icon": "glass",
-		"desc": "Attacks deal x1.5 damage. Lose 20% max HP."},
+		"desc": "Attacks deal x1.3 damage. Lose 20% max HP."},
 	# ---- boss tier (build-defining; only from mini-bosses and Act 1/2 bosses)
 	"extra_hand": {"name": "Extra Hand", "rarity": "boss", "icon": "hand_plus",
 		"desc": "Your pool can hold a 6th die. Gain a Standard die now."},
@@ -72,7 +72,7 @@ const DEFS := {
 	"fast_feet": {"name": "Fast Feet", "rarity": "boss", "icon": "wing",
 		"desc": "Moving on doubles: after landing, hop forward again by the pair value."},
 	"resonance": {"name": "Resonance", "rarity": "boss", "icon": "wave",
-		"desc": "Runes on dice in your combo trigger twice."},
+		"desc": "Runes on dice in your combo trigger twice (not Heavy or Echo)."},
 	"phoenix": {"name": "Phoenix Feather", "rarity": "boss", "icon": "feather",
 		"desc": "Once per act, survive a lethal hit with 1 HP."},
 	"midas_fist": {"name": "Midas Fist", "rarity": "boss", "icon": "fist",

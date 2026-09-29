@@ -123,8 +123,8 @@ func toggle_pool(kind: String, id: String, enabled: bool) -> Array[Dictionary]:
 func set_starter_kind(kind: String) -> Array[Dictionary]:
 	if int(profile.upgrades.get("starter_kit", 0)) < 1:
 		return _err("buy the Starter Kit first")
-	if kind != "" and (not profile.pool("kinds").has(kind) or String(DiceKinds.def(kind).rarity) != "common"):
-		return _err("pick an unlocked common kind")
+	if kind != "" and not UnlockDefs.starter_kinds(profile.pool("kinds")).has(kind):
+		return _err("pick an unlocked sidegrade kind (%s)" % ", ".join(UnlockDefs.STARTER_KINDS))
 	profile.starter_kind = kind
 	return [{"type": "starter_kind_set", "kind": kind}]
 

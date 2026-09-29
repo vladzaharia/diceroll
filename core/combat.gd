@@ -33,6 +33,7 @@ var wisp_used: bool = false        # Crystal Wisp L10 used this fight
 var potion_turn: int = 0           # turn a potion was last drunk (max one per combat turn)
 var stoneskin: int = 0             # Stoneskin Block still to land at the next turn start
 var boost: bool = false            # Bubble Breaker signature: +1 reroll every turn this fight
+var pet_mult: float = 0.0          # Crystal Wisp: combo multiplier bonus for this turn's attack
 
 # ---------------------------------------------------------------- setup
 
@@ -342,7 +343,8 @@ func attack(run: RunState) -> Array[Dictionary]:
 	var eff: Array = combo.values
 	var group: Array = combo.group
 	var cid := String(combo.id)
-	var mult := passive_mult(run, cid, float(combo.mult))
+	var mult := passive_mult(run, cid, float(combo.mult)) + pet_mult
+	pet_mult = 0.0
 	if cid == "pair" and run.has_passive("crowd_pleaser"):
 		ev.append(_passive("crowd_pleaser", 0))
 	if (cid == "pair" or cid == "two_pair") and run.has_passive("pair_master"):
@@ -353,7 +355,8 @@ func attack(run: RunState) -> Array[Dictionary]:
 	var times: Array[int] = []
 	for i in run.dice.size():
 		var t := 1
-		if run.dice[i].rune != "" and group.has(i):
+		# anti-stacking: the multiplier runes (Heavy, Echo) never trigger twice
+		if run.dice[i].rune != "" and group.has(i) and not Balance.NO_DOUBLE_TRIGGER.has(run.dice[i].rune):
 			if run.has_passive("resonance"):
 				t = 2
 			elif run.has_passive("rune_echo") and run.rng.chance(Balance.PASSIVE_RUNE_ECHO_CHANCE):
@@ -430,7 +433,7 @@ func attack(run: RunState) -> Array[Dictionary]:
 		if cid == "straight" or cid == "small_straight":
 			run.stats.straights = int(run.stats.get("straights", 0)) + 1
 	if run.has_passive("glass_cannon"):
-		factor *= Balance.PASSIVE_DAMAGE_MULT
+		factor *= Balance.PASSIVE_GLASS_MULT
 		ev.append(_passive("glass_cannon", 0))
 	if run.has_passive("opening_salvo") and turn == 1:
 		factor *= Balance.PASSIVE_DAMAGE_MULT
@@ -824,7 +827,7 @@ func to_dict() -> Dictionary:
 		"boss": boss, "elite": elite, "miniboss": miniboss, "tile": tile, "act": act, "lap": lap, "pending_curse": pending_curse,
 		"chaos": chaos.duplicate(true), "result": result, "gold_reward": gold_reward, "xp_reward": xp_reward,
 		"hero_burn": hero_burn, "pet_block_carry": pet_block_carry, "wisp_free": wisp_free, "wisp_used": wisp_used,
-		"potion_turn": potion_turn, "stoneskin": stoneskin, "boost": boost,
+		"potion_turn": potion_turn, "stoneskin": stoneskin, "boost": boost, "pet_mult": pet_mult,
 	}
 
 static func from_dict(d: Dictionary) -> CombatState:
@@ -854,6 +857,7 @@ static func from_dict(d: Dictionary) -> CombatState:
 	c.potion_turn = int(d.get("potion_turn", 0))
 	c.stoneskin = int(d.get("stoneskin", 0))
 	c.boost = bool(d.get("boost", false))
+	c.pet_mult = float(d.get("pet_mult", 0.0))
 	c.last_combo = _norm_combo(d.last_combo)
 	for ch in d.chaos:
 		c.chaos.append({"die": int(ch.die), "face": int(ch.face), "value": int(ch.value)})

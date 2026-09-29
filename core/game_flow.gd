@@ -317,7 +317,7 @@ func _move(steps: int, teleport: bool) -> Array[Dictionary]:
 			pending.push_front({"kind": "boss"})
 			return ev
 		run.lap += 1
-		run.lap_rerolls = run.lap_reroll_refill()
+		run.lap_rerolls = run.lap_reroll_refill(run.act_for_lap(run.lap) != run.act)
 		run.stats.laps_completed = int(run.stats.get("laps_completed", 0)) + 1
 		ev.append({"type": "lap_completed", "lap": completed, "healed": healed, "hp": run.hp, "boss": false})
 		ev.append({"type": "hp_changed", "amount": healed, "total": run.hp, "source": "lap", "max_hp": run.max_hp})

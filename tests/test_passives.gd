@@ -319,6 +319,9 @@ func test_resonance() -> void:
 		if e.target == "hero" and e.amount > 0:
 			gained += int(e.amount)
 	assert_eq(gained, 8, "guard in combo fires twice")
+	# Heavy and Echo never trigger twice (stacking nerf): same hit with or without Resonance
+	assert_eq(_hit([6, 6, 1], ["resonance"], ["heavy", "", ""]), _hit([6, 6, 1], [], ["heavy", "", ""]))
+	assert_eq(_hit([6, 6, 1], ["resonance"], ["echo", "", ""]), _hit([6, 6, 1], [], ["echo", "", ""]))
 
 func test_thorns() -> void:
 	_setup(["thorns"])
@@ -354,7 +357,7 @@ func test_opening_salvo() -> void:
 	assert_eq(int(_first(c.attack(run), "combo").total), 13, "only the first attack")
 
 func test_glass_cannon() -> void:
-	assert_eq(_hit([2, 2, 5], ["glass_cannon"]), 20)
+	assert_eq(_hit([2, 2, 5], ["glass_cannon"]), 17, "13.5 x1.3")
 	var f := _flow()
 	f.phase = P.DRAFT
 	f.offer = {"kind": "passive", "options": [Passives.option("glass_cannon")], "source": "elite"}

@@ -53,8 +53,9 @@ static func on_turn_start(run: RunState, c: CombatState) -> Array[Dictionary]:
 				n += 1
 		ev.append_array(_charge(run, n))
 	elif id == "crystal_wisp" and is_full(run):
-		c.rerolls_left += 1
-		ev.append(_acted(run, "reroll", 1, "hero"))
+		c.rerolls_left += PetDefs.WISP_REROLLS
+		c.pet_mult += PetDefs.WISP_MULT
+		ev.append(_acted(run, "reroll", PetDefs.WISP_REROLLS, "hero"))
 		if lvl >= 5:
 			if run.banked_rerolls < Balance.MAX_BANKED_REROLLS:
 				run.banked_rerolls += 1
@@ -91,13 +92,11 @@ static func fire_at_attack(run: RunState, c: CombatState) -> Array[Dictionary]:
 				run.stats.block_gained = int(run.stats.get("block_gained", 0)) + amt - h
 				ev.append({"type": "block_gained", "target": "hero", "amount": amt - h, "total": run.block, "source": "pet"})
 		"skull_buddy":
-			var low := 99
-			for v in c.dice_values:
-				var x := int(v)
-				if lvl >= 10 and x == 0:
-					x = 1
-				low = mini(low, x)
-			var dmg := maxi(4, int(round(PetDefs.bite_mult(lvl) * maxi(0, low))))
+			var cb := c.current_combo(run)
+			var pips := 0
+			for v in cb.values:
+				pips += maxi(1 if lvl >= 10 else 0, int(v))
+			var dmg := maxi(PetDefs.BITE_MIN, int(round(PetDefs.bite_pct(lvl) * pips * float(cb.mult))))
 			var tgt := c.target
 			ev.append(_acted(run, "bite", dmg, "all" if lvl >= 5 else tgt))
 			ev.append_array(c.damage_enemy(tgt, dmg, "pet", run))
@@ -114,7 +113,7 @@ static func fire_at_attack(run: RunState, c: CombatState) -> Array[Dictionary]:
 					ev.append({"type": "status", "target": j, "status": "poison", "value": int(c.enemies[j].poison), "source": "pet"})
 		"guard_die":
 			var pips := run.rng.randi_range(1, 6)
-			var b := pips * 2 + PetDefs.block_bonus(lvl)
+			var b := pips + 1 + PetDefs.block_bonus(lvl)
 			run.block += b
 			run.stats.block_gained = int(run.stats.get("block_gained", 0)) + b
 			ev.append(_acted(run, "block", b, "hero"))
@@ -148,7 +147,7 @@ static func on_attack_resolved(run: RunState, c: CombatState, combo_id: String, 
 			for v in values:
 				if int(v) == 0:
 					n += 2 if run.pet_level() >= 10 else 1
-				elif int(v) == 1:
+				elif int(v) <= PetDefs.LOW_DIE_MAX:
 					n += 1
 		"six":
 			for v in values:

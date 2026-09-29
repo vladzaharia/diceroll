@@ -4,27 +4,27 @@ extends RefCounted
 ## Crowns (COSTS[level] buys level+1; level 0 = unlocked but not crafted, the first purchase
 ## crafts it). Stats stay small, with hard caps; the depth is in one binary TRAIT choice at L4
 ## and one at L8 per piece, freely switchable at Camp.
-##   helm   +1.5 max HP per level (cap +12)
-##   blade  +0.25 ATK per level (cap +2)
-##   boots  L1: +1 board reroll per lap. L2+: trap and lava damage -5% per level above 1
+##   helm   +1 max HP per level (cap +8)
+##   blade  +0.125 ATK per level (cap +1)
+##   boots  L1: +1 board reroll per biome. L2+: trap and lava damage -5% per level above 1
 ##   charm  +2% gold per level (cap +15%) on fight, chest and minigame gold
 
 const MAX_LEVEL := 8
 const SLOTS := ["helm", "blade", "boots", "charm"]
 const COSTS := [10, 20, 30, 45, 60, 75, 80, 90]
 
-const HP_PER_LEVEL := 1.5
-const HP_CAP := 12
-const ATK_PER_LEVEL := 0.25
-const ATK_CAP := 2
+const HP_PER_LEVEL := 1.0
+const HP_CAP := 8
+const ATK_PER_LEVEL := 0.125
+const ATK_CAP := 1
 const BOOTS_HAZARD_PER_LEVEL := 0.05
 const GOLD_PER_LEVEL := 0.02
 const GOLD_CAP := 0.15
 
 const DEFS := {
-	"helm": {"name": "Helm", "desc": "+1.5 max HP per level (max +12)."},
-	"blade": {"name": "Blade", "desc": "+0.25 ATK per level (max +2)."},
-	"boots": {"name": "Boots", "desc": "+1 board reroll per lap. Traps and lava hurt 5% less per level above 1."},
+	"helm": {"name": "Helm", "desc": "+1 max HP per level (max +8)."},
+	"blade": {"name": "Blade", "desc": "+1 ATK at level 8."},
+	"boots": {"name": "Boots", "desc": "+1 board reroll per biome. Traps and lava hurt 5% less per level above 1."},
 	"charm": {"name": "Charm", "desc": "+2% gold per level (max +15%)."},
 }
 
@@ -49,11 +49,11 @@ const TRAITS := {
 }
 
 const TRAIT_DEFS := {
-	"helm_lap_heal": {"name": "Hearty", "desc": "Lap heal +2%."},
+	"helm_lap_heal": {"name": "Hearty", "desc": "Lap heal +1%."},
 	"helm_campfire": {"name": "Camper", "desc": "Campfires heal +10%."},
 	"helm_last_stand": {"name": "Last Stand", "desc": "Once per run, a lethal hit leaves you at 1 HP if you were above 50% HP."},
-	"helm_bulwark": {"name": "Bulwark", "desc": "Block 5 on turn 1 of every fight."},
-	"blade_pair": {"name": "Twin Edge", "desc": "+3 damage on a Pair."},
+	"helm_bulwark": {"name": "Bulwark", "desc": "Block 4 on turn 1 of every fight."},
+	"blade_pair": {"name": "Twin Edge", "desc": "+2 damage on a Pair."},
 	"blade_high": {"name": "Long Edge", "desc": "+3 damage on High Roller."},
 	"blade_boss_opener": {"name": "Opener", "desc": "Your first attack against the final boss deals x1.3."},
 	"blade_overflow": {"name": "Cleave", "desc": "A kill carries 50% of the excess damage to the next enemy."},
@@ -68,7 +68,7 @@ const TRAIT_DEFS := {
 }
 
 const TRAIT_BONUS := {
-	"helm_lap_heal": 0.02, "helm_campfire": 0.10, "helm_bulwark": 5, "blade_pair": 3, "blade_high": 3,
+	"helm_lap_heal": 0.01, "helm_campfire": 0.10, "helm_bulwark": 4, "blade_pair": 2, "blade_high": 3,
 	"blade_boss_opener": 1.3, "blade_overflow": 0.5, "boots_portal": 2, "boots_sure_foot": 3,
 	"boots_treasury_step": 5, "charm_cheap_restock": 5, "charm_treasury": 1.25,
 }
