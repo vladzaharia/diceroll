@@ -357,6 +357,8 @@ class _Driver extends Node:
 					return
 			else:
 				stuck = 0
+			if args.has("trace"):
+				print("EVENTS ", ",".join(evs.map(func(e: Dictionary) -> String: return String(e.get("type", "")))))
 			await c.play_events(evs)
 			# a real player needs a beat to look; keep it short at auto speed
 			await c.wait(0.15)

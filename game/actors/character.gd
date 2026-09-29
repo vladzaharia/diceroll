@@ -248,10 +248,13 @@ func clear_attachments(slot := "") -> void:
 			_attachments.erase(s)
 
 
+## Tintable meshes: the model's own and attached scenes' (weapons, skull heads). Procedural
+## extras built in code (glowing eyes, ice crystals, rock plates; no owner) keep their own
+## materials, so a hit flash never turns an eye or a crystal into a flat tinted blob.
 func _meshes() -> Array[MeshInstance3D]:
 	var out: Array[MeshInstance3D] = []
 	for n in model.find_children("*", "MeshInstance3D", true, false):
-		if n.mesh:
+		if n.mesh and n.owner != null:
 			out.append(n)
 	return out
 
