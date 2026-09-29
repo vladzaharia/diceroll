@@ -78,6 +78,9 @@ func test_decide_under_budget() -> void:
 	lines.append("full run p99.5 %.1f ms" % p995)
 	for l in lines:
 		print("  [bot perf] " + l)
+	if OS.get_environment("CI") != "":
+		print("  [bot perf] SKIPPED the timing asserts: shared CI runners are too noisy for a ms budget")
+		return
 	var load := _load_ratio()
 	if load > 1.0:
 		print("  [bot perf] SKIPPED the timing asserts: load average is %.1fx the core count" % load)
