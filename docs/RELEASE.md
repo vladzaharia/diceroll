@@ -92,6 +92,14 @@ Never delete the `channels` release: installed games read their updates from it.
 
 ## In-game auto-updates
 
+> **Known issue (2026-09-29):** Godot 4.6+ official export templates refuse `--main-pack`
+> (godotengine/godot#111909; our rc.3 Linux binary aborts with "compiled without support for path
+> overrides"). The content-pack relaunch described below therefore can't work on exported builds:
+> a staged pack costs two failed launches, then rolls back and is skipped. Until this is fixed, publish
+> legacy manifests without a `pack` (or with `min_binary` above every shipped version) so clients get
+> the "new version" prompt. The replacement (Velopack for desktop core updates, data-only content
+> packs) is proposed in [design/2026-09-29-distribution-v2.md](design/2026-09-29-distribution-v2.md).
+
 `game/update/` (autoload `Updater`, first in the autoload list):
 
 - Desktop builds with `distribution: github` check

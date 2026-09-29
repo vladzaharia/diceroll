@@ -1,6 +1,9 @@
 # Content streaming, content packs and the bootstrapper (investigation)
 
 Date: 2026-09-29. Status: **proposal for Vlad's decision.** Nothing here is implemented.
+**Partly superseded (pending decision) by [`2026-09-29-distribution-v2.md`](2026-09-29-distribution-v2.md)**,
+which keeps this document's measurements, experiments and loader UX but replaces its delivery,
+manifest, signing, hosting and phasing parts (its appendix A lists what carries over).
 Scope: should Diceroll split its content into downloadable, updatable packs (core, characters,
 foes, biome dressing, audio, EXTRA props…) and bootstrap itself Fortnite-launcher style, or keep
 relying on store, Steam and itch updates plus the signed full-PCK updater that's being built now?
