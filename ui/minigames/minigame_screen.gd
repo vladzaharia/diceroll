@@ -1,7 +1,9 @@
 class_name MinigameScreen
 extends Control
 ## Full-screen minigame modal over the dimmed board (phase MINIGAME). Hosts one MgBoard
-## (FossilBoard / BubbleBoard / ScratchBoard / ClawBoard) plus the frame every game shares:
+## (FossilBoard / BubbleBoard / ScratchBoard / ClawBoard and the Minigames 2.0 boards: ShooterBoard,
+## PlinkoBoard, ShellBoard, MemoryBoard, FishingBoard, WheelBoard, LadderBoard) plus the frame
+## every game shares:
 ## title ribbon, a one-line hint, the actions-left and score pills, a live par meter, the
 ## AUTO button (takes the par result) and the results beat (medal stamp, score, par meter,
 ## Crowns). Portrait: everything stacked; landscape: the board left, the panel right.
@@ -144,6 +146,13 @@ func _ensure(id: String, title: String) -> void:
 		"bubble_breaker": board = BubbleBoard.new()
 		"scratch_off": board = ScratchBoard.new()
 		"claw_machine": board = ClawBoard.new()
+		"bubble_shooter": board = ShooterBoard.new()
+		"plinko": board = PlinkoBoard.new()
+		"shell_game": board = ShellBoard.new()
+		"memory_match": board = MemoryBoard.new()
+		"fishing": board = FishingBoard.new()
+		"lucky_wheel": board = WheelBoard.new()
+		"high_low": board = LadderBoard.new()
 		_: board = FossilBoard.new()
 	board.name = "Board"
 	_board_holder.add_child(board)

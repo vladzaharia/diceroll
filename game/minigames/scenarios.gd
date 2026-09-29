@@ -3,7 +3,9 @@ extends RefCounted
 ## Minigame scenarios for the screenshot harness (tools/shot.gd, registered in
 ## tools/scenarios.gd PROVIDERS):
 ##
-##  mg_fossil / mg_bubble / mg_scratch / mg_claw   the game screen over the dimmed board
+##  mg_fossil / mg_bubble / mg_scratch / mg_claw and mg_<id> for the Minigames 2.0 games
+##  (mg_bubble_shooter, mg_plinko, mg_shell_game, mg_memory_match, mg_fishing, mg_lucky_wheel,
+##  mg_high_low; their input goes through MgBoard.scripted_input)   the game screen over the dimmed board
 ##      --state=fresh   (default) just opened, after the landing beat and intro
 ##      --state=mid     a few actions played through real taps (injected mouse events)
 ##      --state=result  played to the end: the results beat held on screen
@@ -19,7 +21,8 @@ extends RefCounted
 ##      --auto=1        (fresh) press the screen's AUTO button (par result)
 ##      --state=anim    --actions=N actions after --delay=S seconds (frame sequences: pair it
 ##                      with --wait and --frames)
-##  tile_minigames  a board with all four minigame tiles next to the hero (--close=1: close-up)
+##  tile_minigames  a board with all four minigame tiles next to the hero (--close=1: close-up;
+##                  --set=new: the seven Minigames 2.0 tiles; --game=<id>: that one tile)
 ##  mg_play_auto    a run with all four minigames equipped (opts.meta from the max profile,
 ##                  loadout = every minigame), played by AUTO through the real toggle
 ##                  (AutoPilot + Bot.decide); shots whenever a minigame starts / ends
@@ -27,8 +30,13 @@ extends RefCounted
 ##                  end. Prints MG_AUTO_PLAYED lines and MG_AUTO_DONE.
 ## Common: --seed=N --speed=N --class=<id>
 
-const NAMES := ["mg_fossil", "mg_bubble", "mg_scratch", "mg_claw", "tile_minigames", "mg_play_auto", "mg_icons"]
-const IDS := {"mg_fossil": "fossil_hunter", "mg_bubble": "bubble_breaker", "mg_scratch": "scratch_off", "mg_claw": "claw_machine"}
+const NAMES := ["mg_fossil", "mg_bubble", "mg_scratch", "mg_claw", "tile_minigames", "mg_play_auto", "mg_icons",
+	"mg_bubble_shooter", "mg_plinko", "mg_shell_game", "mg_memory_match", "mg_fishing", "mg_lucky_wheel", "mg_high_low"]
+const IDS := {"mg_fossil": "fossil_hunter", "mg_bubble": "bubble_breaker", "mg_scratch": "scratch_off", "mg_claw": "claw_machine",
+	"mg_bubble_shooter": "bubble_shooter", "mg_plinko": "plinko", "mg_shell_game": "shell_game", "mg_memory_match": "memory_match",
+	"mg_fishing": "fishing", "mg_lucky_wheel": "lucky_wheel", "mg_high_low": "high_low"}
+## The Minigames 2.0 set (tile_minigames --set=new).
+const NEW_IDS := ["bubble_shooter", "plinko", "shell_game", "memory_match", "fishing", "lucky_wheel", "high_low"]
 
 
 static func names() -> PackedStringArray:
@@ -228,7 +236,11 @@ class _Driver extends Node:
 					if absf(MgLogic.claw_x(cb._swing) - target) < 0.012:
 						break
 				_click(o + cb.size * 0.5)
-		for k in 40:
+			_:
+				if not await b.scripted_input(a, self):
+					print("MG_INPUT_UNSUPPORTED %s %s" % [id, str(a)])
+					return false
+		for k in 160:
 			if f.commands.size() > n:
 				return true
 			await _pause(0.05)
@@ -266,17 +278,22 @@ class _Driver extends Node:
 	func _tiles() -> void:
 		var f := _flow()
 		# the four games on the tiles right after the hero
-		var ids: Array = MinigameDefs.IDS
-		var at := [1, 2, 3, 4] if args.get("close", "0") != "1" else [1, 2, 3, 4]
-		for k in 4:
+		var ids: Array = MinigameDefs.IDS.slice(0, 4)
+		if args.get("set", "") == "new":
+			ids = NEW_IDS.duplicate()
+		if args.has("game"):
+			ids = [String(args.game)]
+		var at: Array = []
+		for k in ids.size():
+			at.append(k + 1)
 			var t := Board.make_tile("minigame")
 			t["game"] = String(ids[k])
-			f.run.board.tiles[at[k]] = t
+			f.run.board.tiles[k + 1] = t
 		c.start(f)
 		await _pause(0.4)
 		if args.get("close", "0") == "1":
 			var pts := PackedVector3Array()
-			for i in [1, 2, 3, 4]:
+			for i in at:
 				var p := c.board.tile_global_position(i)
 				pts.append(p + Vector3(-1.4, 0, -1.4))
 				pts.append(p + Vector3(1.4, 1.4, 1.4))
@@ -352,6 +369,35 @@ class _Driver extends Node:
 		await _save(path)
 
 	# --- helpers -------------------------------------------------------------------------
+
+	## For MgBoard.scripted_input: mouse input at a global position.
+	func click(p: Vector2) -> void:
+		_click(p)
+
+	func press(p: Vector2) -> void:
+		_button(p, true)
+
+	func release(p: Vector2) -> void:
+		_button(p, false)
+
+	func move(p: Vector2, held := true) -> void:
+		var m := InputEventMouseMotion.new()
+		m.position = p
+		m.global_position = p
+		m.button_mask = MOUSE_BUTTON_MASK_LEFT if held else 0
+		get_viewport().push_input(m, true)
+
+	func drag(pts: Array) -> void:
+		await _drag(pts)
+
+	func _button(p: Vector2, down: bool) -> void:
+		var e := InputEventMouseButton.new()
+		e.button_index = MOUSE_BUTTON_LEFT
+		e.pressed = down
+		e.position = p
+		e.global_position = p
+		e.button_mask = MOUSE_BUTTON_MASK_LEFT if down else 0
+		get_viewport().push_input(e, true)
 
 	func _click(p: Vector2) -> void:
 		for down in [true, false]:
