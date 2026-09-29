@@ -1,12 +1,61 @@
 class_name HeroDefs
 extends RefCounted
-## Class definitions. `runes` lists the rune of each starting die ("" = plain).
+## Class definitions. Per starting die (parallel arrays): `runes` (rune id, "" = plain),
+## `kinds` (DiceKinds id) and `tags` (Die.tags entry, "" = none, e.g. "seed").
+## `combat_rerolls`: rerolls per combat turn (default Balance.COMBAT_REROLLS).
+## `mechanic`: the class mechanic id (ClassLogic; "" = none). `style`: attack style for the
+## presentation (melee_1h | melee_2h | ranged | magic | dual).
+## docs/design/2026-09-28-classes-enemies-skins.md has the class sheets.
 
 const DATA := {
-	"knight": {"name": "Knight", "model": "knight", "hp": 60, "atk": 0, "runes": ["guard", ""], "board_rerolls": 1},
-	"barbarian": {"name": "Barbarian", "model": "barbarian", "hp": 60, "atk": 2, "runes": ["heavy", ""], "board_rerolls": 1},
-	"mage": {"name": "Mage", "model": "mage", "hp": 60, "atk": 0, "runes": ["ember", "echo"], "board_rerolls": 1},
-	"rogue": {"name": "Rogue", "model": "rogue", "hp": 58, "atk": 0, "runes": ["venom", "lucky"], "board_rerolls": 2},
+	"knight": {"name": "Knight", "model": "knight", "hp": 60, "atk": 0, "runes": ["guard", ""], "board_rerolls": 1,
+		"kinds": ["standard", "standard"], "tags": ["", ""], "combat_rerolls": 2, "mechanic": "", "style": "melee_1h"},
+	"barbarian": {"name": "Barbarian", "model": "barbarian", "hp": 60, "atk": 2, "runes": ["heavy", ""], "board_rerolls": 1,
+		"kinds": ["standard", "standard"], "tags": ["", ""], "combat_rerolls": 2, "mechanic": "", "style": "melee_2h"},
+	"mage": {"name": "Mage", "model": "mage", "hp": 60, "atk": 0, "runes": ["ember", "echo"], "board_rerolls": 1,
+		"kinds": ["standard", "standard"], "tags": ["", ""], "combat_rerolls": 2, "mechanic": "", "style": "magic"},
+	"rogue": {"name": "Rogue", "model": "rogue", "hp": 58, "atk": 0, "runes": ["venom", "lucky"], "board_rerolls": 2,
+		"kinds": ["standard", "standard"], "tags": ["", ""], "combat_rerolls": 2, "mechanic": "", "style": "dual"},
+	# --- wave 1 (docs/design/2026-09-28-classes-enemies-skins.md §1.2)
+	"paladin": {"name": "Paladin", "model": "paladin", "hp": 60, "atk": 0, "runes": ["", ""], "board_rerolls": 1,
+		"kinds": ["twin", "twin"], "tags": ["", ""], "combat_rerolls": 2, "mechanic": "oath", "style": "melee_1h"},
+	"ranger": {"name": "Ranger", "model": "ranger", "hp": 54, "atk": 0, "runes": ["blade", ""], "board_rerolls": 1,
+		"kinds": ["loaded", "standard"], "tags": ["", ""], "combat_rerolls": 2, "mechanic": "aim", "style": "ranged"},
+	"ninja": {"name": "Ninja", "model": "ninja", "hp": 52, "atk": 0, "runes": ["thunder", ""], "board_rerolls": 1,
+		"kinds": ["standard", "odd"], "tags": ["", ""], "combat_rerolls": 3, "mechanic": "shadow_step", "style": "dual"},
+	"druid": {"name": "Druid", "model": "druid", "hp": 62, "atk": 0, "runes": ["", ""], "board_rerolls": 1,
+		"kinds": ["low", "standard"], "tags": ["seed", ""], "combat_rerolls": 2, "mechanic": "overgrowth", "style": "magic"},
 }
 
-const IDS := ["knight", "barbarian", "mage", "rogue"]
+## Unlock order (UnlockDefs milestones, the Sigil "next two" rule and the class shelf).
+const IDS := ["knight", "barbarian", "paladin", "mage", "ranger", "rogue", "ninja", "druid"]
+
+## Mechanic names for the class badge (presentation).
+const MECHANIC_NAMES := {"oath": "Oath", "aim": "Aim", "shadow_step": "Shadow Step", "overgrowth": "Overgrowth"}
+
+## Field with its default for classes that leave it out.
+static func field(id: String, key: String) -> Variant:
+	var d: Dictionary = DATA.get(id, DATA.knight)
+	match key:
+		"kinds":
+			var k: Array = d.get("kinds", [])
+			var out: Array = []
+			for i in (d.runes as Array).size():
+				out.append(String(k[i]) if i < k.size() else "standard")
+			return out
+		"tags":
+			var t: Array = d.get("tags", [])
+			var out2: Array = []
+			for i in (d.runes as Array).size():
+				out2.append(String(t[i]) if i < t.size() else "")
+			return out2
+		"combat_rerolls":
+			return int(d.get("combat_rerolls", Balance.COMBAT_REROLLS))
+		"mechanic":
+			return String(d.get("mechanic", ""))
+		"style":
+			return String(d.get("style", "melee_1h"))
+	return d.get(key)
+
+static func mechanic(id: String) -> String:
+	return String(field(id, "mechanic"))

@@ -18,6 +18,10 @@ static func _charge(run: RunState, amount: int) -> Array[Dictionary]:
 		return []
 	return [{"type": "pet_charged", "pet": id, "charge": now, "size": size, "gained": now - before}]
 
+## Adds charge from outside the pet rules (the Druid's Wild Bond). Returns pet_charged or [].
+static func add_charge(run: RunState, amount: int) -> Array[Dictionary]:
+	return _charge(run, amount)
+
 static func is_full(run: RunState) -> bool:
 	var id := run.pet_id()
 	return id != "" and int(run.pet_state.get("charge", 0)) >= PetDefs.size(id)

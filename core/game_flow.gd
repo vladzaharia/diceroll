@@ -19,6 +19,8 @@ var board_choice: Array[int] = []
 var board_move: int = 0
 # extras
 var board_rerolls_left: int = 0
+## Board rerolls refunded this board turn (Ninja Shadow Step; reset by roll_board).
+var board_refunds: int = 0
 ## Queue of steps still to resolve after the current modal/combat closes.
 ## Step kinds: tile{idx}, shop, draft, rune_choice{source}, passive_choice{source, tier}, boss,
 ## bonus_move{steps}, victory.
@@ -87,6 +89,7 @@ func roll_board() -> Array[Dictionary]:
 	_record(["roll_board"])
 	run.stats.board_turns = int(run.stats.get("board_turns", 0)) + 1
 	board_rerolls_left = run.board_rerolls + (1 if run.has_passive("pathfinder") else 0) + run.lap_rerolls
+	board_refunds = 0
 	phase = Phase.BOARD_ROLLED
 	return _do_board_roll()
 
@@ -99,7 +102,12 @@ func board_reroll() -> Array[Dictionary]:
 	board_rerolls_left -= 1
 	# the lap pool (Boots, Crystal Wisp) is spent after the per-turn rerolls
 	run.lap_rerolls = mini(run.lap_rerolls, board_rerolls_left)
-	return _do_board_roll()
+	var ev := _do_board_roll()
+	var refund := ClassLogic.on_board_reroll(run, self)
+	if not refund.is_empty():
+		ev.back()["rerolls_left"] = board_rerolls_left
+		ev.append_array(refund)
+	return ev
 
 func _do_board_roll() -> Array[Dictionary]:
 	var ev: Array[Dictionary] = []
@@ -315,6 +323,7 @@ func _move(steps: int, teleport: bool) -> Array[Dictionary]:
 			run.stats.laps_completed = int(run.stats.get("laps_completed", 0)) + 1
 			ev.append({"type": "lap_completed", "lap": completed, "healed": healed, "hp": run.hp, "boss": true})
 			ev.append({"type": "hp_changed", "amount": healed, "total": run.hp, "source": "lap", "max_hp": run.max_hp})
+			ev.append_array(ClassLogic.on_lap(run))
 			pending.push_front({"kind": "boss"})
 			return ev
 		run.lap += 1
@@ -322,6 +331,7 @@ func _move(steps: int, teleport: bool) -> Array[Dictionary]:
 		run.stats.laps_completed = int(run.stats.get("laps_completed", 0)) + 1
 		ev.append({"type": "lap_completed", "lap": completed, "healed": healed, "hp": run.hp, "boss": false})
 		ev.append({"type": "hp_changed", "amount": healed, "total": run.hp, "source": "lap", "max_hp": run.max_hp})
+		ev.append_array(ClassLogic.on_lap(run))
 		if run.act_for_lap(run.lap) != run.act:
 			_new_biome(dest, ev)
 		else:
@@ -702,6 +712,7 @@ func _new_biome(dest: int, ev: Array[Dictionary]) -> void:
 		_biome_curse(ev)
 	if run.has_passive("rune_bloom"):
 		_rune_bloom(ev)
+	ev.append_array(ClassLogic.on_biome(run))
 
 # ================================================================ draft & runes
 
@@ -940,11 +951,11 @@ func _shop_item(id: String, used: Dictionary) -> Dictionary:
 	var item := {"id": id, "label": String(def.label), "desc": String(def.desc), "price": 0, "needs_die": bool(def.needs_die), "sold": false}
 	match id:
 		"die":
-			var kind := _rand_kind()
+			var kind := _shop_kind()
 			for attempt in 5:
 				if not used.has("die:" + kind):
 					break
-				kind = _rand_kind()
+				kind = _shop_kind()
 			used["die:" + kind] = true
 			item.kind = kind
 			item.label = DiceKinds.label(kind)
@@ -1284,6 +1295,13 @@ func _rune_pool() -> Array:
 
 func _rand_kind() -> String:
 	return DiceKinds.random_kind_in(run.rng, run.pool("kinds"))
+
+## Shop die kind: _rand_kind() with the class's kind weighting (Paladin: Twin/Even x2).
+func _shop_kind() -> String:
+	var bias := ClassLogic.shop_kind_bias(run)
+	if bias.is_empty():
+		return _rand_kind()
+	return DiceKinds.random_kind_biased(run.rng, run.pool("kinds"), bias)
 
 ## Owned passives plus every passive not unlocked in the profile. `reward` (elite and mini-boss
 ## rewards) also keeps the economy-only passives out in meta runs.
@@ -1633,7 +1651,7 @@ func to_dict() -> Dictionary:
 		"combat": combat.to_dict() if combat != null else null,
 		"board_roll": Array(board_roll), "board_choice": Array(board_choice), "board_move": board_move,
 		"offer": offer.duplicate(true),
-		"board_rerolls_left": board_rerolls_left, "pending": pending.duplicate(true),
+		"board_rerolls_left": board_rerolls_left, "board_refunds": board_refunds, "pending": pending.duplicate(true),
 		"commands": commands.duplicate(true),
 		"minigame": minigame.to_dict() if minigame != null else null,
 	}
@@ -1651,6 +1669,7 @@ static func from_dict(d: Dictionary) -> GameFlow:
 	f.board_move = int(d.get("board_move", 0))
 	f.offer = _intify(d.get("offer", {}))
 	f.board_rerolls_left = int(d.get("board_rerolls_left", 0))
+	f.board_refunds = int(d.get("board_refunds", 0))
 	for p in d.get("pending", []):
 		f.pending.append(_intify(p))
 	f.commands = _intify(d.get("commands", []))

@@ -809,7 +809,8 @@ func test_start_with_two_dice_max_five() -> void:
 	for id in HeroDefs.IDS:
 		var g := GameFlow.new_run(id, 1)
 		assert_eq(g.run.dice.size(), 2, id + " starts with 2 dice")
-		assert_eq([g.run.dice[0].rune, g.run.dice[1].rune], want[id])
+		var runes: Array = want.get(id, HeroDefs.DATA[id].runes)
+		assert_eq([g.run.dice[0].rune, g.run.dice[1].rune], runes)
 	assert_eq(GameFlow.new_run("barbarian", 1).run.atk, 2)
 
 func test_zero_roll_stays_put() -> void:

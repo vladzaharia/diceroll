@@ -34,6 +34,11 @@ var potion_turn: int = 0           # turn a potion was last drunk (max one per c
 var stoneskin: int = 0             # Stoneskin Block still to land at the next turn start
 var boost: bool = false            # Bubble Breaker signature: +1 reroll every turn this fight
 var pet_mult: float = 0.0          # Crystal Wisp: combo multiplier bonus for this turn's attack
+# class mechanics (ClassLogic; all 0 for classes without them)
+var rerolls_used_this_turn: int = 0 # combat rerolls spent this turn (Ranger Aim)
+var refunds_this_turn: int = 0     # Ninja Shadow Step refunds this turn
+var oath: int = 0                  # Paladin Oath value for this fight (0 = none)
+var last_overkill: int = 0         # damage_enemy: overkill of the last lethal hit (0 otherwise)
 
 # ---------------------------------------------------------------- setup
 
@@ -75,6 +80,7 @@ func begin(run: RunState, ids: Array, p_elite: bool, p_boss: bool, p_tile: int, 
 		pending_curse += run.chill
 		ev.append({"type": "status", "target": "hero", "status": "chill", "value": run.chill})
 		run.chill = 0
+	ev.append_array(ClassLogic.on_combat_start(run, self))
 	ev.append_array(start_turn(run))
 	return ev
 
@@ -184,6 +190,8 @@ func start_turn(run: RunState) -> Array[Dictionary]:
 	run.block = 0
 	rerolls_left = run.combat_rerolls + run.banked_rerolls
 	run.banked_rerolls = 0
+	rerolls_used_this_turn = 0
+	refunds_this_turn = 0
 	var pev: Array[Dictionary] = []
 	if run.has_passive("loaded_hands") and turn == 1:
 		rerolls_left += 1
@@ -235,6 +243,7 @@ func start_turn(run: RunState) -> Array[Dictionary]:
 		all.append(i)
 	ev.append({"type": "dice_rolled", "values": dice_values.duplicate(), "indices": all, "context": "combat", "faces": dice_faces.duplicate(), "rerolls_left": rerolls_left})
 	ev.append_array(PetLogic.on_turn_start(run, self))
+	ev.append_array(ClassLogic.on_turn_start(run, self))
 	return ev
 
 func toggle(i: int) -> Array[Dictionary]:
@@ -258,6 +267,7 @@ func reroll(run: RunState) -> Array[Dictionary]:
 		return [_err("no dice marked")]
 	var before_mult := float(current_combo(run).mult)
 	rerolls_left -= 1
+	rerolls_used_this_turn += 1
 	run.stats.rerolls_used = int(run.stats.get("rerolls_used", 0)) + 1
 	var free := wisp_free > 0
 	if free:
@@ -269,9 +279,12 @@ func reroll(run: RunState) -> Array[Dictionary]:
 			rerolled[i] = true
 		marked[i] = false
 	var ev: Array[Dictionary] = []
+	var refunded := false
 	if run.has_passive("encore") and float(current_combo(run).mult) > before_mult:
 		rerolls_left += 1
+		refunded = true
 		ev.append(_passive("encore", 1))
+	ev.append_array(ClassLogic.on_reroll(run, self, idx, refunded))
 	ev.push_front({"type": "dice_rolled", "values": dice_values.duplicate(), "indices": idx, "context": "combat", "faces": dice_faces.duplicate(), "rerolls_left": rerolls_left})
 	return ev
 
@@ -359,6 +372,9 @@ func attack(run: RunState) -> Array[Dictionary]:
 		ev.append(_passive("pair_master", 0))
 	if cid in ["three_kind", "four_kind", "five_kind", "six_kind"] and run.has_passive("triple_threat"):
 		ev.append(_passive("triple_threat", 0))
+	# Class combo bonus (Paladin Oath): [mult added once, pips added before the multiplier]
+	var cls_bonus := ClassLogic.combo_bonus(run, self, combo, ev)
+	mult += float(cls_bonus[0])
 	# How many times each die's rune triggers (Resonance: combo dice x2; Rune Echo: 25% x2).
 	var times: Array[int] = []
 	for i in run.dice.size():
@@ -372,7 +388,7 @@ func attack(run: RunState) -> Array[Dictionary]:
 				ev.append(_passive("rune_echo", i))
 		times.append(t)
 	var sum := 0
-	var bonus := 0
+	var bonus := int(cls_bonus[1])
 	var flat := 0
 	var act := rune_active(run, group, eff)
 	var wild_left := Balance.WILD_MAX_DICE
@@ -446,7 +462,8 @@ func attack(run: RunState) -> Array[Dictionary]:
 	if run.has_passive("opening_salvo") and turn == 1:
 		factor *= Balance.PASSIVE_DAMAGE_MULT
 		ev.append(_passive("opening_salvo", 0))
-	var total := int(floor(((sum + bonus) * mult + flat) * factor)) + run.atk
+	factor *= ClassLogic.attack_factor(run, self, ev)
+	var total :=int(floor(((sum + bonus) * mult + flat) * factor)) + run.atk
 	last_combo = {"id": combo.id, "name": combo.name, "mult": mult, "base_mult": float(combo.mult), "group": group.duplicate(), "total": total, "values": eff.duplicate()}
 	ev.append({"type": "combo", "id": combo.id, "name": combo.name, "mult": mult, "group": group.duplicate(), "total": total, "values": eff.duplicate(), "sum": sum + bonus})
 	if mult > float(run.stats.get("best_mult", 0.0)):
@@ -457,6 +474,7 @@ func attack(run: RunState) -> Array[Dictionary]:
 	var soak := int(enemies[target].hp) + int(enemies[target].block) if alive(target) else 0
 	var tgt0 := target
 	ev.append_array(damage_enemy(target, total, "attack", run))
+	ev.append_array(ClassLogic.after_main_hit(run, self, tgt0, last_overkill))
 	if run.has_trait("blade_overflow") and not alive(tgt0) and total > soak:
 		var spill := int(floor((total - soak) * float(GearDefs.TRAIT_BONUS.blade_overflow)))
 		var nxt := -1
@@ -556,6 +574,7 @@ func attack(run: RunState) -> Array[Dictionary]:
 
 func damage_enemy(i: int, amount: int, source: String, run: RunState, ignore_block := false) -> Array[Dictionary]:
 	var ev: Array[Dictionary] = []
+	last_overkill = 0
 	if not alive(i) or amount <= 0:
 		return ev
 	var e := enemies[i]
@@ -578,6 +597,7 @@ func damage_enemy(i: int, amount: int, source: String, run: RunState, ignore_blo
 	if lethal:
 		if source == "poison":
 			run.stats.poison_kills = int(run.stats.get("poison_kills", 0)) + 1
+		last_overkill = maxi(0, amount - blocked - dealt)
 		e.poison = 0
 		e.frozen = false
 		ev.append({"type": "enemy_died", "enemy_idx": i, "id": e.id})
@@ -585,6 +605,9 @@ func damage_enemy(i: int, amount: int, source: String, run: RunState, ignore_blo
 			var h := run.heal(Balance.PASSIVE_BLOODTHIRST)
 			ev.append(_passive("bloodthirst", Balance.PASSIVE_BLOODTHIRST))
 			ev.append({"type": "hp_changed", "amount": h, "total": run.hp, "source": "bloodthirst", "max_hp": run.max_hp})
+		var ok := last_overkill
+		ev.append_array(ClassLogic.on_enemy_killed(run, self, i, source))
+		last_overkill = ok
 	elif e.boss and int(e.phase) == 1 and int(e.hp) * 2 <= int(e.max_hp):
 		var was_armored := has_trait(e, "armor")
 		e.phase = 2
@@ -644,6 +667,8 @@ func _enemy_phase(run: RunState) -> Array[Dictionary]:
 		roll_intent(run.rng, i)
 		ev.append({"type": "enemy_intent", "enemy_idx": i, "intent": e.intent.duplicate()})
 	ev.append_array(_tick_burn(run))
+	if result == "":
+		ev.append_array(ClassLogic.on_enemy_phase_end(run, self))
 	return ev
 
 ## Burn on the hero: at the end of the enemy phase the hero takes damage equal to the stacks
@@ -802,6 +827,7 @@ func _win(run: RunState) -> Array[Dictionary]:
 	xp_reward = int(round(x))
 	var ev: Array[Dictionary] = [{"type": "combat_won", "gold": gold_reward, "xp": xp_reward, "boss": boss, "elite": elite, "miniboss": miniboss}]
 	ev.append_array(restore_chaos(run))
+	ev.append_array(ClassLogic.on_fight_end(run, self))
 	return ev
 
 ## Restores faces set to 1 by Chaos; one face_changed event per restored face.
@@ -836,6 +862,7 @@ func to_dict() -> Dictionary:
 		"chaos": chaos.duplicate(true), "result": result, "gold_reward": gold_reward, "xp_reward": xp_reward,
 		"hero_burn": hero_burn, "pet_block_carry": pet_block_carry, "wisp_free": wisp_free, "wisp_used": wisp_used,
 		"potion_turn": potion_turn, "stoneskin": stoneskin, "boost": boost, "pet_mult": pet_mult,
+		"rerolls_used_this_turn": rerolls_used_this_turn, "refunds_this_turn": refunds_this_turn, "oath": oath,
 	}
 
 static func from_dict(d: Dictionary) -> CombatState:
@@ -866,6 +893,9 @@ static func from_dict(d: Dictionary) -> CombatState:
 	c.stoneskin = int(d.get("stoneskin", 0))
 	c.boost = bool(d.get("boost", false))
 	c.pet_mult = float(d.get("pet_mult", 0.0))
+	c.rerolls_used_this_turn = int(d.get("rerolls_used_this_turn", 0))
+	c.refunds_this_turn = int(d.get("refunds_this_turn", 0))
+	c.oath = int(d.get("oath", 0))
 	c.last_combo = _norm_combo(d.last_combo)
 	for ch in d.chaos:
 		c.chaos.append({"die": int(ch.die), "face": int(ch.face), "value": int(ch.value)})

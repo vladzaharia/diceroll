@@ -51,6 +51,9 @@ var combos := {}
 ## In-run upgrades by source (run.stats.upgrades) summed over every run, and gold earned.
 var upgrades := {}
 var gold_sum := 0
+## --force (and any explicit --class=<id>[,<id>...]): classes the profile has locked are granted
+## for the sim instead of skipped, so per-class rows exist at every profile.
+var force_classes := false
 
 func _init() -> void:
 	var runs := 100
@@ -147,6 +150,8 @@ func _init() -> void:
 			strip = Array(arg.substr(8).split(",", false))
 		elif arg == "--items":
 			track_items = true
+		elif arg == "--force":
+			force_classes = true
 		elif arg == "--verbose":
 			verbose = true
 	rules = AutoRules.all_on(focus, "realistic" if policy == "realistic" else "expert")
@@ -165,7 +170,13 @@ func _init() -> void:
 			prof.loadout.pet = "" if pet_override == "none" else pet_override
 		_strip(prof, strip)
 		opts["profile"] = prof
-	var classes: Array = HeroDefs.IDS if cls == "all" else [cls]
+	var classes: Array = HeroDefs.IDS if cls == "all" else Array(cls.split(",", false))
+	if not prof.is_empty() and (force_classes or cls != "all"):
+		# per-class rows: the sim forces the class even where the profile has it locked
+		for c in classes:
+			if not (prof.unlocks.classes as Array).has(c):
+				(prof.unlocks.classes as Array).append(c)
+		opts["profile"] = prof
 	var total_stuck := 0
 	var rows: Array = []
 	var by_route := {}   # route -> [wins, runs]
@@ -239,6 +250,8 @@ func _init() -> void:
 				upgrades[k] = int(upgrades.get(k, 0)) + int(up[k])
 		# machine-readable row for shard aggregation (tools: sum wins/runs over shards)
 		print("#row %s %d %d %d %d %d %d" % [c, wins, runs, level_sum, fights_won_sum, act_sum, win_level_sum])
+		for k in deaths:
+			print("#death %s %s %d" % [c, k, int(deaths[k])])
 		all_wins += wins
 		all_runs += runs
 		rows.append([c, 100.0 * wins / runs, float(act_sum) / runs, float(board_turns) / runs,
@@ -259,6 +272,8 @@ func _init() -> void:
 		if row[9] > 0:
 			print("  WARNING: %d runs hit the command cap" % row[9])
 	_table("route", by_route)
+	for k in by_route:
+		print("#route %s %d %d" % [k, int(by_route[k][0]), int(by_route[k][1])])
 	_table("final boss", by_boss)
 	_table("route / final boss", by_combo)
 	_table("mini-boss", by_mini, false)

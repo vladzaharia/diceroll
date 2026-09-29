@@ -92,7 +92,9 @@ static func apply_start(r: RunState) -> void:
 	r.lap_rerolls = r.lap_reroll_refill()
 	var sk := String(m.starter_kind)
 	if sk != "" and r.dice.size() >= 2 and UnlockDefs.STARTER_KINDS.has(sk):
+		var tags := r.dice[1].tags
 		r.dice[1] = Die.make(r.dice[1].rune, sk)
+		r.dice[1].tags = tags
 
 # ------------------------------------------------------------------ Crowns
 

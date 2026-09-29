@@ -72,8 +72,13 @@ static func create(p_class_id: String, p_seed: int, p_board_size: int = Balance.
 	r.hp = r.max_hp
 	r.atk = int(def.atk)
 	r.board_rerolls = int(def.board_rerolls)
-	for rune_id in def.runes:
-		r.dice.append(Die.make(String(rune_id)))
+	r.combat_rerolls = int(HeroDefs.field(p_class_id, "combat_rerolls"))
+	var kinds: Array = HeroDefs.field(p_class_id, "kinds")
+	var tags: Array = HeroDefs.field(p_class_id, "tags")
+	for k in (def.runes as Array).size():
+		var die := Die.make(String(def.runes[k]), String(kinds[k]))
+		die.add_tag(String(tags[k]))
+		r.dice.append(die)
 	r.board_size = p_board_size
 	r.mode = "short" if String(opts.get("mode", "standard")) == "short" else "standard"
 	if opts.has("meta"):
