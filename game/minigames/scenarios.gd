@@ -113,6 +113,7 @@ class _Driver extends Node:
 			await _pause(float(args.delay))
 		if st == "play":
 			await _snap("opened")
+		var t_open := Time.get_ticks_msec()
 		var played := 0
 		while f.phase == GameFlow.Phase.MINIGAME and not bool(f.offer.done) and played < n:
 			await _idle()
@@ -137,6 +138,7 @@ class _Driver extends Node:
 		while f.phase == GameFlow.Phase.MINIGAME and guard < 200:
 			guard += 1
 			await _pause(0.05)
+		var game_secs := (Time.get_ticks_msec() - t_open) / 1000.0
 		if st == "result":
 			return
 		await _idle()
@@ -169,8 +171,8 @@ class _Driver extends Node:
 		await _pause(0.6)
 		await _snap("back on the board (phase %s)" % GameFlow.phase_name(f.phase))
 		var ok := _fail == "" and f.phase == GameFlow.Phase.BOARD_READY and not c.ui.minigame.visible
-		print("%s %s phase=%s commands=%s %s" % ["MG_PLAY_OK" if ok else "MG_PLAY_FAIL", id, GameFlow.phase_name(f.phase),
-			str(f.commands), _fail])
+		print("%s %s phase=%s game_time=%.1fs (incl. harness snapshots) commands=%s %s" % ["MG_PLAY_OK" if ok else "MG_PLAY_FAIL", id,
+			GameFlow.phase_name(f.phase), game_secs, str(f.commands), _fail])
 		await _quit(0 if ok else 1)
 
 	## Plays one action through injected mouse input. Returns true when the core took it.
