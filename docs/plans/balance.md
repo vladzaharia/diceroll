@@ -5,10 +5,253 @@ Numbers live in `core/content/` (`balance.gd`, `heroes.gd`, `enemies.gd`, `biome
 `gear.gd`, `pets.gd`, `potions.gd`, `minigames.gd`, `unlocks.gd`), `core/runes.gd`,
 `core/combo.gd` and the profile presets in `core/meta/presets.gd`.
 
-## Current balance (2026-09-29: 11 classes, new enemies, affixes, 12 pets, skins)
+## Current balance (2026-09-29 combined: 11 classes + new biomes)
 
-This section is authoritative. Later sections are kept as history; where they disagree with
-this one, this one wins. The design behind it is
+This section is authoritative. It covers the merge of the 11-class work (`main`) with the new
+biomes (`wp-b2-new-biomes`). Both sections below it are kept as history: the 11-class pass was
+tuned against the old final bosses, and the new-biomes pass never saw the new classes. Where
+either disagrees with this section, this section wins. Designs:
+`docs/design/2026-09-28-classes-enemies-skins.md` and `docs/design/2026-09-29-new-biomes.md`.
+
+### How this was measured
+
+- Realistic policy, A0, standard mode, 28-tile board, unless a row says otherwise.
+- **Class rows:** 600 runs per class (6 seed shards of 100, `--seed=1001, 2001, …, 6001`). About
+  ±2 pp of noise per row; the 11-class average is about ±0.6 pp.
+- **A10 rows:** 300 runs per class (`--asc=10`, seeds 1001–3001).
+- **Route sweep:** max profile, `--class=all --runs=28` at seeds 50001 and 100001 for each route:
+  616 runs per route, 22,176 in all.
+- **Short Road sweep:** the same seeds, `--mode=short --route=<tier 1>,<second>`: 616 runs per
+  route, 12,936 in all.
+- **"Before" numbers:** the merge commit with no retuning.
+- **Reading route rows:** a route row's standard error is about 2 pp. Even with every route
+  truly equal, about 1 route in 7 lands outside ±3 pp by noise alone. The biome marginals
+  (7,392 runs per tier-1 or tier-2 biome) are the better signal.
+
+### What changed in this pass, and why
+
+| lever | was | now | why |
+|---|---|---|---|
+| mid preset: Pumpkin Sprite XP | 140 (L4) | **155 (L5)** | The mid preset models run 10 of the realistic campaign. In the combined game, the median run-10 profile has 154 XP and 22 of 32 profiles are at 150+ (L5). L5 adds "removes Burn", so the preset understated mid by about 3 pp. It was 10 XP short of the level that answers the Cinder King. |
+| mid preset: minigames owned | fossil_hunter (+ defaults) | + plinko, fishing, high_low, memory_match | Fidelity only: every run-10 snapshot owns these. They are not equipped, so the sim is unchanged. |
+| Cinder King | HP 1560, Burn 4 / 5 | **HP 1800, Burn 2 / 3** | Burn is a flat, Block-ignoring clock. It is mild at max, where the L10 Pumpkin Sprite cleanses it and the hero has a big HP pool, but brutal at mid. At mid the Cinder King won 46% vs the Lich's 62%, and it is 1 of the 3 bosses mid can meet. With the boss forced, removing Burn entirely raised its boss-win by 33 pp at mid but only 17 pp at max, so less Burn and more HP helps mid without moving max. |
+| The Moon King | HP 900 | **860** | It sat −3 pp below the other five at max once the classes were in. |
+| Orc Warcamp | elite leader `brute`, 2 drums | **elite `orc_raider`, 1 drum** (`WARCAMP_DRUMS`) | The Warcamp was −3.5 pp vs its tier, from deaths in laps 7–10 (4.2% of runs vs the Hollow's 0.8%): Brute elites with rallied orcs. Either change alone was noise; together they gave +2 to +4 pp on Warcamp routes. |
+| Deep Mines | ore 15 gold | **20** (`ORE_GOLD`) | The Mines were −2.0 pp vs their tier. Ore is the only economy in the biome, and the cave-in traps cost HP. |
+| Short Road finale HP | Warcamp ×0.68, Moonlit ×0.72 | **Warcamp ×0.75, Moonlit ×0.70** | The Warcamp and Cinder King changes made Warcamp finales too easy (+6 to +9 pp). Moonlit finales were −4 to −7 pp. |
+| New-biome Sigil price | 5 | **8** (`SIGIL_PRICE_BY_ID.biomes`) | With the 11-class Sigil prices, the campaign bot bought the Deep Mines at run 4 (target 8). The merge alone caused this. |
+| `prospector` | 20 cash-outs or 12 runs | **15 cash-outs or 10 runs** | Once the Mines could no longer be bought early, the milestone landed at run 10.5. |
+
+Tried and rejected (paired seeds, 1,850–5,300 runs each; every effect within noise unless noted):
+- **Hollow:** event heal 3% → 0% and the event mix 2 → 1. The Hollow got *better* (+0.6 and
+  +2.0), so its edge comes from its weak enemy pools, not from its events.
+- **Warcamp:** Orc Drummer and Warchief rally 2 → 1, `ATK_BONUS_CAP` 8 → 5, drum gold 14 → 22
+  or 24, no drum rebuild, a campfire in the mix. The Brute at ×0.8 HP did help (+3), but the
+  Brute is shared with 6 other biomes.
+- **Magma Golem:** phase-1 Block 32 → 24, with or without +80 HP. No mid effect.
+- **Economy:** `--tune-gold=1.1` moved mid by −0.8 (noise) and max by +1.6.
+- **Affixes:** off at mid was −0.4. Removing the Mines from the mid preset was +0.4.
+- **Pyromancy in the mid preset** (16 of 32 run-10 profiles own it): +0.9. Left out as a coin
+  flip.
+
+Unchanged from the two passes: every class number, pet, affix and minigame, the Lich, the Bone
+Warden, the Magma Golem, the Sand Colossus, the Ruins, the Moonlit twist, the Hollow and every
+other biome.
+
+### Targets and results per class (11 classes)
+
+Targets (Vlad): realistic class average fresh 30–40%, mid 45–50%, max 55–65%, max A10 20–30%;
+every class within ±5 pp of the average at fresh and mid.
+
+| class | fresh | mid | max | max A10 | act-1 deaths (fresh) |
+|---|---|---|---|---|---|
+| Knight | 37.2 | 45.3 | 62.3 | 22.0 | 6% |
+| Barbarian | 39.8 | 48.0 | 62.2 | 24.7 | 4% |
+| Paladin | 40.7 | 48.2 | 62.7 | 19.7 | 13% |
+| Mage | 40.5 | 44.2 | 62.7 | 25.7 | 4% |
+| Ranger | 36.2 | 45.7 | 69.0 | 28.0 | 7% |
+| Rogue | 37.2 | 46.2 | 61.0 | 21.3 | 3% |
+| Ninja | 38.5 | 45.3 | 65.0 | 22.3 | 8% |
+| Druid | 38.2 | 42.0 | 63.8 | 21.3 | 17% |
+| Engineer | 41.2 | 45.5 | 62.2 | 21.7 | 6% |
+| Necromancer | 38.0 | 44.0 | 61.0 | 20.3 | 4% |
+| Monster Kid | 42.2 | 44.5 | 59.0 | 22.7 | 7% |
+| **average** | **39.0** | **45.3** | **62.8** | **22.7** | |
+| spread | −2.8 / +3.2 | −3.3 / +2.9 | −3.8 / +6.2 | −3.0 / +5.3 | |
+
+**Before this pass** (the merge commit, the same seeds), the averages were fresh 39.0, mid
+**40.5** (out of band), max 60.6 and A10 21.4. Mid ran from 35.7 (Necromancer, −4.8) to 44.2
+(Paladin).
+
+The fresh column did not move: the fresh route (Glade, Hollow, Throne, the Lich, no pet) holds
+none of the levers.
+
+Notes:
+- **Ranger at max: +6.2** on these seeds. On 1,200 fresh seeds (7001–14001) it is 64.0% vs
+  63.0% before, so most of the jump is seed luck. The pooled estimate is about +3.
+- **Druid act-1 deaths:** 17% at fresh, unchanged from main (15% there, target ≤ 20%).
+- **Greedy and expert policies:** not re-measured. The expert ceiling is deferred to the
+  whole-game pass.
+
+### Profile bands
+
+| profile | before | after | target |
+|---|---|---|---|
+| fresh | 39.0 | **39.0** | 30–40 |
+| mid | 40.5 | **45.3** | 45–50 |
+| max | 60.6 | **62.8** | 55–65 |
+| max A10 | 21.4 | **22.7** | 20–30 |
+
+- **Mid is in band but near its floor.** Measurement noise is about ±0.6 pp, and a second
+  2,640-run sample read 45.7.
+- **Mid bosses (boss-win%)** before → after: Cinder King 46.3 → **62.5**, Lich 62.5 → 64.8,
+  Magma Golem 59.0 → 60.7. Mid meets only these three.
+- **Profile gaps.** Before, the Cinder King was 23 pp harder at mid than at max, while the Lich
+  and the Golem were about 10 pp harder. Now all three are 8–11 pp harder at mid.
+
+### Final bosses (max)
+
+Boss-win% = won / reached. The route-sweep column covers the 36 routes and has the larger sample.
+
+| boss | HP | before (route sweep) | after (route sweep) | after (class sweep) |
+|---|---|---|---|---|
+| The Lich | 1650 | 73.6 | 73.3 | 73.1 |
+| Bone Warden | 1000 | 71.3 | 71.6 | 73.2 |
+| Cinder King | **1800** (Burn 2 / 3) | 69.5 | 73.1 | 73.2 |
+| Magma Golem | 960 | 68.7 | 70.2 | 70.3 |
+| Sand Colossus | 1180 | 70.3 | 70.1 | 73.1 |
+| The Moon King | **860** | 68.5 | 72.8 | 71.7 |
+| **spread** | | −2.6 / +2.5 | **−1.8 / +1.5** | −2.1 / +0.8 |
+
+The target was ±3 pp around the mean, and it is met.
+
+### Standard routes (max)
+
+Overall **62.3%** across 22,176 runs (before: 60.7%). Win% per route, with the delta from the
+route mean in brackets:
+
+| tier 1 / tier 2 | throne | magma | ruins | moonlit |
+|---|---|---|---|---|
+| glade / hollow | 67.7 (+5.4) | 67.2 (+4.9) | 64.1 (+1.8) | 68.7 (+6.4) |
+| glade / frost | 62.2 (−0.1) | 63.6 (+1.4) | 62.5 (+0.2) | 65.1 (+2.8) |
+| glade / warcamp | 59.3 (−3.0) | 62.0 (−0.3) | 59.4 (−2.9) | 58.6 (−3.7) |
+| crypt / hollow | 65.6 (+3.3) | 65.7 (+3.5) | 64.9 (+2.7) | 67.7 (+5.4) |
+| crypt / frost | 60.1 (−2.2) | 63.8 (+1.5) | 57.1 (−5.1) | 65.1 (+2.8) |
+| crypt / warcamp | 58.1 (−4.2) | 58.1 (−4.2) | 58.8 (−3.5) | 59.7 (−2.5) |
+| mines / hollow | 60.6 (−1.7) | 62.7 (+0.4) | 63.0 (+0.7) | 61.2 (−1.1) |
+| mines / frost | 61.0 (−1.2) | 60.9 (−1.4) | 59.1 (−3.2) | 64.8 (+2.5) |
+| mines / warcamp | 61.4 (−0.9) | 63.5 (+1.2) | 57.3 (−5.0) | 61.7 (−0.6) |
+
+**23 of 36 routes are within ±3 pp** (before: 17), and the range is −5.1 to +6.4 (before: −8.3
+to +7.0). **The ±3 pp aim is not met.**
+- About 5 of the 13 misses are noise at 616 runs per route. `crypt / frost / ruins` is −5.1 and
+  none of its content changed.
+- The rest is the tier-2 spread, Hollow +2.6 vs Warcamp −2.5, which adds to the tier-1 spread
+  (Glade +1.1, Mines −0.9).
+
+Biome marginals (routes containing the biome, vs its tier mean):
+
+| tier | biome | win% | Δ tier (before) | Δ tier (after) | reached boss% | boss-win% |
+|---|---|---|---|---|---|---|
+| 1 | glade | 63.4 | +2.2 | +1.1 | 87.7 | 72.2 |
+| 1 | crypt | 62.1 | −0.3 | −0.2 | 86.4 | 71.8 |
+| 1 | mines | 61.4 | −2.0 | −0.9 | 85.5 | 71.8 |
+| 2 | hollow | 64.9 | +3.1 | +2.6 | 87.7 | 74.0 |
+| 2 | frost | 62.1 | +0.4 | −0.2 | 87.1 | 71.3 |
+| 2 | warcamp | 59.8 | −3.5 | −2.5 | 84.9 | 70.5 |
+| 3 | throne | 61.8 | −0.0 | −0.5 | 81.5 | 75.8 |
+| 3 | magma | 63.1 | −0.8 | +0.8 | 88.0 | 71.7 |
+| 3 | ruins | 60.7 | −0.4 | −1.6 | 88.7 | 68.4 |
+| 3 | moonlit | 63.6 | +1.2 | +1.3 | 88.0 | 72.3 |
+
+- **Next lever:** the Hollow's edge. Its pools (Wisp, Cultist, Bandit, Werewolf) are the weakest
+  tier-2 pools.
+- **Constraint:** the Hollow is on the fresh route and in half of the mid routes, so a Hollow
+  nerf costs mid about 0.7 pp. It needs a mid lever to go with it.
+
+### Short Road (max)
+
+Overall **62.4%** across 12,936 runs (before: 60.9%). Win% per route, with the delta from the
+route mean in brackets:
+
+| tier 1 | hollow | frost | warcamp | throne | magma | ruins | moonlit |
+|---|---|---|---|---|---|---|---|
+| glade | 64.1 (+1.8) | 62.7 (+0.3) | 66.9 (+4.5) | 63.1 (+0.8) | 68.2 (+5.8) | 64.1 (+1.8) | 64.4 (+2.1) |
+| crypt | 63.3 (+1.0) | 59.1 (−3.3) | 60.2 (−2.1) | 62.3 (−0.0) | 63.5 (+1.1) | 60.4 (−2.0) | 60.4 (−2.0) |
+| mines | 60.6 (−1.8) | 59.9 (−2.5) | 63.5 (+1.1) | 61.4 (−1.0) | 60.6 (−1.8) | 60.9 (−1.5) | 59.9 (−2.5) |
+
+- **Tier-2 vs tier-3 finales:** 62.2% vs 62.4%, **0.2 pp apart** (target ≤ 3; before 61.3 vs
+  60.6).
+- **Routes within ±3 pp:** 18 of 21 (before: 16), range −3.3 to +5.8 (before: −6.2 to +6.0).
+  `glade / magma` +5.8 is unchanged content and was +6.0 before.
+- **Short Road bosses (boss-win%):** Cinder King 73.8, Sand Colossus 72.0, Moon King 72.7,
+  Magma Golem 67.7, Lich 68.6, Bone Warden 68.1.
+
+Per class (300 runs per cell; the before column is the merge commit):
+
+| class | fresh | mid | max |
+|---|---|---|---|
+| Knight | 45.7 | 51.3 | 66.0 |
+| Barbarian | 47.0 | 49.7 | 64.7 |
+| Paladin | 36.3 | 46.7 | 61.7 |
+| Mage | 40.7 | 50.3 | 67.0 |
+| Ranger | 36.7 | 46.3 | 60.7 |
+| Rogue | 37.7 | 49.0 | 57.3 |
+| Ninja | 38.7 | 45.7 | 67.0 |
+| Druid | 41.7 | 43.0 | 62.7 |
+| Engineer | 42.3 | 51.3 | 59.7 |
+| Necromancer | 41.0 | 45.3 | 63.3 |
+| Monster Kid | 48.7 | 49.3 | 62.0 |
+| **average** | **41.5** | **48.0** | **62.9** |
+| before | 41.5 | 45.1 | 61.1 |
+
+The Short Road misses the ±5 pp per-class rule in 5 cells:
+- fresh: Monster Kid +7.2, Barbarian +5.5, Paladin −5.2
+- mid: Druid −5.0
+- max: Rogue −5.6
+
+The fresh Short Road average is 41.5. On main it was 33.1, before the new-biomes Short Road
+finale multipliers. The Short Road has no band of its own, so this is left for the whole-game
+pass.
+
+### Unlock pacing (realistic campaign, 16 fresh profiles × 40 runs)
+
+| unlock | target | median before (merge) | median after |
+|---|---|---|---|
+| Deep Mines | 8 | **4** (bought with 5 Sigils) | 8 |
+| Orc Warcamp | 12 | 11.5 | 11 |
+| Moonlit Woods | 17 | 17.5 | 17.5 |
+| Sunscorched Ruins | 21 | 16 | 22 |
+| Paladin / Mage / Ranger / Rogue | 6 / 10 / 13 / 15 | 8 / 10.5 / 12.5 / – | 8 / 8.5 / 11 / 15 |
+| Ninja / Druid / Engineer / Necromancer / Monster Kid | 19 / 23 / 27 / ≤ 32 / 20–25 | – | 20.5 / 24 / 26 / 28.5 / 24.5 |
+
+- **Double unlocks:** no run unlocks 2 classes (0 of 640). 64 of 640 runs unlock two majors
+  (class, pet or biome), as on main, where they all involved a biome.
+- **Run-10 snapshot** (32 profiles):
+  - Unlocked: Mines 88%, Warcamp 47%, Ruins 16%, Bone Warden 13%.
+  - Classes: Mage 78%, Ranger 31%.
+  - Pyromancy pack: 50%.
+  - Pumpkin Sprite XP median: 154.
+  - Minigame plays: Claw Machine 14, Fossil Hunter 6 (as the preset has them).
+  - This is why the mid preset keeps the Mines and leaves out the Warcamp, Ruins and Moonlit.
+
+### API notes for presentation
+
+- **Placeholder looks.** `game/enemies/roster.gd` has placeholder looks for `rock_golem`,
+  `boss_sand_colossus` and `boss_moon_king`, labelled "(placeholder)". They exist so that
+  `test_enemy_looks` passes, and the presentation pass should replace them.
+- **Warcamp elite.** The Warcamp's elite leader is now `orc_raider` (with the elite flag and
+  affixes), and the Warcamp shows **1** drum.
+- **Mini-boss homes follow the biomes design:**
+  - The Orc Warchief is a Warcamp mini-boss (not Frost) and unlocks with `warpath`.
+  - Moonfang is a Hollow candidate and unlocks with `night_walker`.
+  - The 11-class section below says "both unlock with `warden_slayer`". That is superseded.
+- **Bossbane** still needs 4 distinct final bosses per class, of the 6 that now exist.
+
+## 11-class pass (2026-09-29: 11 classes, new enemies, affixes, 12 pets, skins; superseded where the combined section differs)
+
+This was the authoritative section before the merge with the new biomes. Its class, boss and
+route numbers were measured against the old four final bosses. The design behind it is
 `docs/design/2026-09-28-classes-enemies-skins.md`.
 
 ### How to measure
@@ -691,6 +934,10 @@ The campaign's win rate by run is about 45–55% over runs 1–5, 55–70% over 
   that share of its HP in two enemy turns.
 
 ### New biomes (2026-09-29: Deep Mines, Orc Warcamp, Sunscorched Ruins, Moonlit Woods)
+
+*Superseded where the combined section at the top differs. This pass never saw the 11 classes.
+The merge retuned the Cinder King, Moon King, Warcamp, Mines ore, Short Road finales and Sigil
+prices listed there.*
 
 Design: docs/design/2026-09-29-new-biomes.md. Tiers are now 3/3/4 (glade, crypt, mines ·
 hollow, frost, warcamp · throne, magma, ruins, moonlit): 36 standard routes, 6 final bosses, and

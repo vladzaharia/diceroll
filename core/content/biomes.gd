@@ -92,12 +92,12 @@ const DEFS := {
 	"warcamp": {
 		"name": "Orc Warcamp", "tier": 2, "twist": "drums", "look": "warcamp",
 		"desc": "War drums rally every orc in earshot: enemies gain +1 attack per standing drum. Land on a drum to smash it.",
-		"mix": {"drum": 2}, # drum count = WARCAMP_DRUMS (Board.layout_for)
+		"mix": {"drum": 1}, # drum count = WARCAMP_DRUMS (Board.layout_for)
 		"pools": [["orc_raider", "wolf_bandit", "bandit", "skeleton_archer"],
 			["orc_raider", "orc_drummer", "wolf_bandit", "skeleton_warrior"]],
-		"elite": "brute",
+		"elite": "orc_raider",
 		"minibosses": ["mini_orc_warchief", "mini_cinder_brute"], "bosses": [],
-		"short_bosses": ["boss_cinder_king", "boss_magma_golem"], "short_boss_hp": 0.68,
+		"short_bosses": ["boss_cinder_king", "boss_magma_golem"], "short_boss_hp": 0.75,
 	},
 	"ruins": {
 		"name": "Sunscorched Ruins", "tier": 3, "twist": "heat", "look": "ruins",
@@ -115,14 +115,14 @@ const DEFS := {
 		"pools": [["werewolf", "wolf_bandit", "hollow_wisp", "orc_raider"],
 			["werewolf", "werewolf", "brute", "wolf_bandit"]],
 		"elite": "werewolf",
-		"minibosses": ["mini_moonfang"], "bosses": ["boss_moon_king", "boss_lich"], "short_boss_hp": 0.72,
+		"minibosses": ["mini_moonfang"], "bosses": ["boss_moon_king", "boss_lich"], "short_boss_hp": 0.70,
 	},
 }
 
 # ---------------------------------------------------------------- new-biome twist numbers
 
 ## Deep Mines: an ore vein pays ORE_GOLD x lap gold scale or one Face Raise, then caves in (a trap).
-static var ORE_GOLD := 15
+static var ORE_GOLD := 20
 ## Lap mutation: ore tiles are refilled on Empty tiles up to the biome's refill count, unless the
 ## board already holds MINES_TRAP_CAP traps.
 static var MINES_TRAP_CAP := 6
@@ -130,7 +130,7 @@ static var MINES_TRAP_CAP := 6
 ## pays DRUM_GOLD x gold scale; the lap mutation rebuilds one drum once every drum is smashed.
 static var DRUM_RALLY := 1
 static var DRUM_GOLD := 14
-static var WARCAMP_DRUMS := 2
+static var WARCAMP_DRUMS := 1
 ## Sunscorched Ruins: heat at each lap end (never lethal) unless you landed on an oasis that lap.
 static var HEAT_PCT := 0.08
 static var OASIS_HEAL_PCT := 0.05

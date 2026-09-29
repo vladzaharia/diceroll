@@ -19,7 +19,10 @@ const SIGIL_PRICE := {
 ## milestones per run (biomes come bundled with their bosses on the first win, so they don't wait).
 const MAJOR_KINDS := ["classes", "pets"]
 ## Per-id Sigil price overrides (the late classes cost more).
-const SIGIL_PRICE_BY_ID := {"classes": {"paladin": 12, "ninja": 10, "druid": 10, "engineer": 12, "necromancer": 12}}
+## The four 2026-09-29 biomes cost 8 Sigils (not 5): with the 11-class Sigil prices the campaign bot
+## bought the Deep Mines at run 4 (target 8).
+const SIGIL_PRICE_BY_ID := {"classes": {"paladin": 12, "ninja": 10, "druid": 10, "engineer": 12, "necromancer": 12},
+	"biomes": {"mines": 8, "warcamp": 8, "moonlit": 8, "ruins": 8}}
 ## Sigils can buy only the next SIGIL_NEXT_CLASSES locked classes in HeroDefs.IDS order.
 const SIGIL_NEXT_CLASSES := 2
 ## Secret classes: never sold for Sigils, outside the next-two rule (HeroDefs.DATA[id].secret).
@@ -234,8 +237,8 @@ const MILESTONES := [
 		"unlocks": [["packs", "resonance"]]},
 	# --- 2026-09-29 new biomes (docs/design/2026-09-29-new-biomes.md §7): one biome per milestone,
 	# with a runs fallback; their mini-bosses and final bosses come with them.
-	{"id": "prospector", "run": 8, "desc": "Cash out the Treasury 20 times, or play 12 runs.",
-		"cond": {"any": [{"stat": "cashouts", "min": 20}, {"stat": "runs", "min": 12}]},
+	{"id": "prospector", "run": 8, "desc": "Cash out the Treasury 15 times, or play 10 runs.",
+		"cond": {"any": [{"stat": "cashouts", "min": 15}, {"stat": "runs", "min": 10}]},
 		"unlocks": [["biomes", "mines"]]},
 	{"id": "warpath", "run": 12, "desc": "Defeat 380 enemies, or play 16 runs.",
 		"cond": {"any": [{"stat": "kills", "min": 380}, {"stat": "runs", "min": 16}]},

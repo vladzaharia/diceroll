@@ -5,7 +5,8 @@ extends RefCounted
 ##          Scratch-off + Claw Machine, belt 2 with 1 Healing Draught, no gear
 ##   mid    run 10 of a typical campaign (tools/sim.gd --campaign --snapshot=10, realistic bot):
 ##          4 classes (Knight, Barbarian, Paladin, Mage), the biomes owned by run 10 (not Warcamp/Moonlit/Ruins), 5 packs, gear L3-4 with the L4 traits, belt 2, Starter Kit,
-##          Pumpkin Sprite at XP level 4, 3 minigames owned (2 equipped)
+##          Pumpkin Sprite at XP level 5 (155 XP: the combined-game campaign median at run 10 is 154,
+##          about 70% of profiles at 150+), 7 minigames owned (2 equipped)
 ##   max    everything unlocked and maxed: all packs/classes/biomes/bosses, gear L8 with traits,
 ##          every pet L10, every minigame mastered, all Crowns upgrades, 3 minigame slots
 ## Ascension is 0 in every preset; pass the level separately (profile.ascension.selected).
@@ -27,7 +28,7 @@ static func mid() -> Profile:
 	var grants := {
 		"classes": ["barbarian", "paladin", "mage"], "biomes": ["crypt", "frost", "magma", "mines"], "minibosses": ["mini_grave_mage"],
 		"bosses": ["boss_cinder_king", "boss_magma_golem"],
-		"pets": ["pumpkin_sprite", "skull_buddy"], "minigames": ["fossil_hunter"],
+		"pets": ["pumpkin_sprite", "skull_buddy"], "minigames": ["fossil_hunter", "plinko", "fishing", "high_low", "memory_match"],
 		"packs": ["gamblers_kit", "cold_steel", "numerology", "colossus"], "gear": ["helm", "blade", "boots", "charm"],
 		"potions": ["stoneskin", "reroll_tonic"], "features": ["potion_belt", "affixes"],
 	}
@@ -35,7 +36,7 @@ static func mid() -> Profile:
 		for id in grants[kind]:
 			p.grant(kind, id)
 	p.gear = {"helm": 4, "blade": 4, "boots": 4, "charm": 4}
-	p.pet_xp = {"pumpkin_sprite": 140, "skull_buddy": 5}
+	p.pet_xp = {"pumpkin_sprite": 155, "skull_buddy": 5}
 	p.minigame_plays = {"scratch_off": 12, "claw_machine": 12, "fossil_hunter": 6}
 	p.upgrades = {"starter_kit": 1}
 	p.loadout = {"class": "knight", "mode": "standard", "minigames": ["fossil_hunter", "claw_machine"], "pet": "pumpkin_sprite"}

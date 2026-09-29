@@ -90,9 +90,9 @@ const BOSSES := {
 		[{"kind": "summon", "value": 1}, {"kind": "attack", "value": 24}, {"kind": "attack", "value": 20}, {"kind": "block", "value": 24}],
 	]},
 	# Magma Depths: burns you; phase 2 scorches a face of your dice to 0 (blank) for the fight.
-	"boss_cinder_king": {"name": "Cinder King", "hp": 1560, "gold": 0, "xp": 0, "phases": [
-		[{"kind": "burn", "value": 4}, {"kind": "attack", "value": 20}, {"kind": "block", "value": 24}],
-		[{"kind": "scorch", "value": 1}, {"kind": "attack", "value": 24}, {"kind": "burn", "value": 5}, {"kind": "attack", "value": 20}],
+	"boss_cinder_king": {"name": "Cinder King", "hp": 1800, "gold": 0, "xp": 0, "phases": [
+		[{"kind": "burn", "value": 2}, {"kind": "attack", "value": 20}, {"kind": "block", "value": 24}],
+		[{"kind": "scorch", "value": 1}, {"kind": "attack", "value": 24}, {"kind": "burn", "value": 3}, {"kind": "attack", "value": 20}],
 	]},
 	# Magma Depths: a molten shell (Block never expires) in phase 1; in phase 2 the shell shatters
 	# (its Block is lost when phase 2 starts) and its attacks pierce your Block.
@@ -109,7 +109,7 @@ const BOSSES := {
 	]},
 	# Moonlit Woods: the moon meter (CombatState.moon) rises every enemy phase and your 1s push it
 	# back; a full meter forces phase 2 (Moonrise), then turns its next intent into Moonfall.
-	"boss_moon_king": {"name": "The Moon King", "hp": 900, "gold": 0, "xp": 0, "summon": "wolf_bandit",
+	"boss_moon_king": {"name": "The Moon King", "hp": 860, "gold": 0, "xp": 0, "summon": "wolf_bandit",
 		"forms": ["man", "wolf"], "phases": [
 		[{"kind": "attack", "value": 20}, {"kind": "block", "value": 24}, {"kind": "summon", "value": 1}],
 		[{"kind": "drain", "value": 16}, {"kind": "attack", "value": 22}, {"kind": "attack", "value": 18}],

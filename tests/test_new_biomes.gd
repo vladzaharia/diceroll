@@ -91,7 +91,7 @@ func test_new_tile_mixes() -> void:
 	var l := Board.layout_for(28, "mines")
 	assert_eq([l.ore, l.chest, l.trap], [3, 4, 2])
 	l = Board.layout_for(28, "warcamp")
-	assert_eq([l.drum, l.enemy, l.event], [2, 7, 4])
+	assert_eq([l.drum, l.enemy, l.event], [1, 7, 4])
 	l = Board.layout_for(28, "ruins")
 	assert_eq([l.oasis, l.campfire], [3, 1])
 	l = Board.layout_for(28, "moonlit")
@@ -108,7 +108,7 @@ func test_drums_and_ore_never_on_tiles_1_2() -> void:
 			var b := Board.generate(Rng.new(s), 1, 28, 1, id)
 			for i in [1, 2]:
 				assert_true(not ["drum", "ore", "enemy", "elite"].has(String(b.tiles[i].type)), "%s tile %d" % [id, i])
-			assert_eq(b.count("drum" if id == "warcamp" else "ore"), 2 if id == "warcamp" else 3)
+			assert_eq(b.count("drum" if id == "warcamp" else "ore"), BiomeDefs.WARCAMP_DRUMS if id == "warcamp" else 3)
 
 func test_twist_off_empties_tiles() -> void:
 	BiomeDefs.twist_off = ["all"]

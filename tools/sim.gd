@@ -544,9 +544,10 @@ func _campaign(n: int, m: int, seed0: int, board: int, mode: String) -> void:
 				have_all = r + 1
 			spent = p.records.crowns_earned - p.crowns
 			if snapshot_run == r + 1:
-				print("snapshot run %d: gear=%s upgrades=%s pets=%s pet_lv=%s classes=%s packs=%s minigames=%s potions=%s crowns=%d sigils=%d asc=%s" % [
+				print("snapshot run %d: gear=%s upgrades=%s pets=%s pet_lv=%s classes=%s packs=%s minigames=%s potions=%s crowns=%d sigils=%d asc=%s biomes=%s bosses=%s mg_plays=%s traits=%s" % [
 					r + 1, str(p.gear), str(p.upgrades), str(p.unlocks.pets), str(p.pet_xp), str(p.unlocks.classes),
-					str(p.unlocks.packs), str(p.unlocks.minigames), str(p.unlocks.potions), p.crowns, p.sigils, str(p.ascension)])
+					str(p.unlocks.packs), str(p.unlocks.minigames), str(p.unlocks.potions), p.crowns, p.sigils, str(p.ascension),
+					str(p.unlocks.biomes), str(p.unlocks.bosses), str(p.minigame_plays), str(p.gear_traits)])
 			if not got_max and spent >= sink:
 				got_max = true
 				maxed_at.append(r + 1)
