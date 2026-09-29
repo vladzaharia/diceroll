@@ -1,0 +1,4 @@
+# PR screenshot scenarios (tools/ci/shoot_ci.sh --set=quick)
+game_title
+game_rolled
+game_combat

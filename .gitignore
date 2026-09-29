@@ -17,3 +17,9 @@
 /assets/kaykit/
 /assets/audio/
 /assets/fonts/
+
+# CI / release outputs
+/android/
+/.ci-cache/
+/build_info.json
+*.age.part

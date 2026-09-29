@@ -1,12 +1,21 @@
 #!/bin/bash
 # Diceroll export pipeline (Godot 4.7.2, presets in export_presets.cfg).
 #
-# Usage: tools/export.sh <macos|ios|web|all|icon> [options]
+# Usage: tools/export.sh <target> [options]
 #
 #   macos   build/macos/Diceroll.app (universal, ad-hoc signed, not notarized)
 #   ios     build/ios/Diceroll.xcodeproj (Xcode project), then an iOS Simulator build
 #           (build/ios_dd/Build/Products/Release-iphonesimulator/Diceroll.app)
 #   web     build/web/index.html (single-threaded "nothreads" template: no COOP/COEP needed)
+#   windows build/windows/Diceroll.exe (+ .pck; x86_64)
+#   linux   build/linux-x86_64/Diceroll.x86_64 (+ .pck)
+#   linux-arm64  build/linux-arm64/Diceroll.arm64 (+ .pck; ARM Linux boards/laptops)
+#   android build/android/Diceroll.apk (prebuilt template, arm64; sideload/testing)
+#   android-aab  build/android/Diceroll.aab (Gradle build, installs res://android/build; Play)
+#           Android needs JAVA_HOME (JDK 17+) and ANDROID_HOME (SDK). Signing: release keystore via
+#           GODOT_ANDROID_KEYSTORE_RELEASE_{PATH,USER,PASSWORD}; otherwise a debug keystore is
+#           created (build/android/debug.keystore) and used for both debug and release exports.
+#   pck     build/pck/Diceroll-desktop.pck (full content pack for the desktop auto-updater)
 #   all     macos + ios + web
 #   icon    re-render the app icon + derived assets (tools/icon/build_icons.sh -> assets/icon/);
 #           ("doubles" monogram; per-size iOS files in assets/icon/ios, single die below 114 px)
@@ -200,6 +209,89 @@ do_web() {
 	[ $bad = 0 ] || die "web server check failed"
 }
 
+# --- Windows / Linux / content pack ----------------------------------------------------
+do_desktop() { # do_desktop <preset> <out>
+	local preset="$1" out="$2"
+	rm -rf "$(dirname "$out")"
+	godot_export "$preset" "$out"
+	[ -s "$out" ] || die "$preset export produced no binary"
+	echo "    $out ($(du -sh "$(dirname "$out")" | cut -f1))"
+}
+
+do_pck() {
+	# Full game PCK for the desktop updater (game/update): the Linux preset's resources
+	# (S3TC/BPTC textures work on every desktop GPU incl. Apple Silicon).
+	local out="$ROOT/build/pck/Diceroll-desktop.pck" log
+	mkdir -p "$(dirname "$out")"
+	log="$(mktemp -t diceroll_export).log"
+	step "godot --export-pack Linux -> $out"
+	if ! "$GODOT" --headless --path "$ROOT" --export-pack Linux "$out" >"$log" 2>&1 || grep -q "^ERROR:" "$log"; then
+		grep -A3 "^ERROR:" "$log" >&2 || tail -30 "$log" >&2
+		rm -f "$log"
+		die "pck export failed"
+	fi
+	rm -f "$log"
+	echo "    $out ($(du -h "$out" | cut -f1))"
+}
+
+# --- Android -------------------------------------------------------------------------
+android_env() {
+	[ -n "${JAVA_HOME:-}" ] || die "JAVA_HOME is not set (JDK 17+)"
+	[ -n "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}" ] || die "ANDROID_HOME is not set"
+	if [ -z "${GODOT_ANDROID_KEYSTORE_RELEASE_PATH:-}" ]; then
+		# No release keystore: sign with a throwaway debug key (sideload/testing only; the Play
+		# Store rejects debug-signed bundles).
+		local ks="$ROOT/build/android/debug.keystore"
+		mkdir -p "$(dirname "$ks")"
+		[ -f "$ks" ] || "$JAVA_HOME/bin/keytool" -genkeypair -v -keystore "$ks" -storepass android \
+			-alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 \
+			-dname "CN=Android Debug,O=Android,C=US" >/dev/null 2>&1 || die "keytool failed"
+		export GODOT_ANDROID_KEYSTORE_RELEASE_PATH="$ks" GODOT_ANDROID_KEYSTORE_RELEASE_USER=androiddebugkey
+		export GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD=android
+		echo "    (no release keystore: signing with the debug key $ks)"
+	fi
+	# Godot only defaults the SDK paths from JAVA_HOME / ANDROID_HOME when its editor settings don't
+	# already hold a value; on CI (fresh settings, possibly created by an earlier --import with
+	# empty values) pin them explicitly.
+	if [ -n "${CI:-}" ]; then
+		local es
+		for es in "$HOME/.config/godot"/editor_settings-4*.tres "$HOME/Library/Application Support/Godot"/editor_settings-4*.tres; do
+			[ -f "$es" ] || continue
+			grep -v '^export/android/java_sdk_path\|^export/android/android_sdk_path' "$es" >"$es.tmp"
+			printf 'export/android/java_sdk_path = "%s"\nexport/android/android_sdk_path = "%s"\n' \
+				"$JAVA_HOME" "${ANDROID_HOME:-$ANDROID_SDK_ROOT}" >>"$es.tmp"
+			mv "$es.tmp" "$es"
+		done
+	fi
+	export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="${GODOT_ANDROID_KEYSTORE_DEBUG_PATH:-$GODOT_ANDROID_KEYSTORE_RELEASE_PATH}"
+	export GODOT_ANDROID_KEYSTORE_DEBUG_USER="${GODOT_ANDROID_KEYSTORE_DEBUG_USER:-$GODOT_ANDROID_KEYSTORE_RELEASE_USER}"
+	export GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD="${GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD:-$GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD}"
+}
+
+do_android() {
+	android_env
+	local out="$ROOT/build/android/Diceroll.apk"
+	rm -f "$out"
+	godot_export Android "$out"
+	[ -s "$out" ] || die "Android export produced no APK"
+	echo "    $out ($(du -h "$out" | cut -f1))"
+}
+
+do_android_aab() {
+	android_env
+	local out="$ROOT/build/android/Diceroll.aab"
+	rm -f "$out"
+	# The Gradle build needs the android build template in res://android/build (git-ignored).
+	if [ ! -f "$ROOT/android/build/build.gradle" ]; then
+		step "installing the Android build template"
+		"$GODOT" --headless --path "$ROOT" --install-android-build-template --export-release "Android AAB" "$out" >/dev/null 2>&1 || true
+		mkdir -p "$ROOT/android" && touch "$ROOT/android/.gdignore"
+	fi
+	godot_export "Android AAB" "$out"
+	[ -s "$out" ] || die "Android export produced no AAB"
+	echo "    $out ($(du -h "$out" | cut -f1))"
+}
+
 # --- Icon ----------------------------------------------------------------------------
 do_icon() {
 	# Renders tools/icon (scenario app_icon) and derives iOS/macOS/icns assets in assets/icon/.
@@ -210,8 +302,14 @@ case "$TARGET" in
 	macos) ensure_import; do_macos ;;
 	ios) ensure_import; do_ios ;;
 	web) ensure_import; do_web ;;
+	windows) ensure_import; do_desktop Windows "$ROOT/build/windows/Diceroll.exe" ;;
+	linux) ensure_import; do_desktop Linux "$ROOT/build/linux-x86_64/Diceroll.x86_64" ;;
+	linux-arm64) ensure_import; do_desktop "Linux ARM64" "$ROOT/build/linux-arm64/Diceroll.arm64" ;;
+	android) ensure_import; do_android ;;
+	android-aab) ensure_import; do_android_aab ;;
+	pck) ensure_import; do_pck ;;
 	all) ensure_import; do_macos; do_ios; do_web ;;
 	icon) do_icon ;;
-	*) sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+	*) sed -n '2,43p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
 step "done"
