@@ -81,8 +81,8 @@ Kills give gold, XP and pet charge only. An "upgrade" is a die, a rune, a face e
 | minigame | 0.0 | 0.0 | 0.0 |
 | **total** | **21.93** | **25.46** | **27.82** |
 
-Minigame rewards are real but show as 0 here: AUTO's par result is silver, and the bots take the
-potion or the gold. A played gold tier offers a rune, a die, a passive or +1 reroll (all counted).
+Minigame rewards are real but show as 0 here: the sims' average-player result is usually
+silver (see "Minigame calibration"), and the bots take the potion or the gold. A played gold tier offers a rune, a die, a passive or +1 reroll (all counted).
 Upgrades are the whole growth curve now: the old level-up drafts gave about 17 per run on top.
 
 ### Rule changes in this pass
@@ -153,22 +153,102 @@ Upgrades are the whole growth curve now: the old level-up drafts gave about 17 p
   potion goes on the belt, or is drunk at once when the belt is full.
 - **Minigames:** one tile per equipped minigame (2 slots, 3 with the Arcade upgrade), and each
   tile respawns on lap mutation. The score is compared with `MinigameDefs.MEDIAN`: below 0.8 is
-  bronze, 0.8 to 1.2 is silver, and 1.2+ is gold. Gold rewards scale by ±15% (the skill band).
-  AUTO takes the par result of 0.85 (silver) without playing. The run is saved when a minigame
-  starts (`minigame_started.save_point`).
-- **Fossil Hunter is a luck dig (user decision, no Minesweeper hints):** 7x7 site, three fossils
-  (4, 3, 2 long) plus a gem (3 pts) and two coin pouches (2 pts), 10 digs; a dig reveals only its
-  own cell. Score = fossil cells dug + each complete fossil's size again + treasure points.
-  MEDIAN 8 = the follow-the-bone bot's median (3,000 boards: q25 6, q75 10; tiers 32% bronze /
-  36% silver / 31% gold; random digging medians 3). Its gold rewards move only ±5% with the
-  score (`MinigameDefs.SKILL_BAND_BY_ID`), the others ±15%.
-- **Claw Machine is a capsule pile (user direction, supersedes the fluff/two-claw drafts):**
-  18 capsules (10 common, 5 rare, 2 epic, 1 legendary, deeper by tier); the tier colour is
-  public, the prize inside is hidden until won (common coins/potion 2-3, rare nugget/gem 3-4,
-  epic figure/robot 6, legendary chest 10). A drop scoops up to 3 capsules whose reach
-  (0.075 x (1 - 0.8 x depth)) contains it; each held capsule slips out with 0.14 per extra
-  capsule held + 0.22 x depth (minigame Rng). 2 grabs. MEDIAN 10: a human-ish aimer (sigma 0.045)
-  medians 10 (mean 10.6, q25 6, q75 15); perfect aim medians 17.
+  bronze, 0.8 to 1.2 is silver, and 1.2+ is gold. Gold rewards scale by the skill band (±15%,
+  luck games less). **Players play every minigame (user decision 2026-09-29):** the in-game
+  AUTO pauses on a minigame tile ("Your turn: play the minigame") and resumes when switched
+  back on; the screen has no AUTO button. The sims and headless bots use `minigame_auto` as a
+  stand-in for an average player: it draws the tier from the game's calibrated split
+  (`MinigameDefs.CALIBRATION[id].tiers`) with the minigame's own Rng (the run Rng is untouched)
+  at a typical ratio per tier (bronze 0.65, silver 1.0, gold 1.35). The run is saved when a
+  minigame starts (`minigame_started.save_point`).
+
+### Minigame calibration (all 11 games, 2026-09-29 balance pass)
+
+Rules in `core/minigames/<id>.gd` (deterministic from the minigame Rng + inputs, public state
+only, save/load mid-game). Every number below comes from `tools/mg_calibrate.gd`: the
+human-like `MgHuman` player (its own noise Rng; `--policy=expert|random` for the bounds), 2,000
+games per game, stored in `MinigameDefs.CALIBRATION` and checked by
+`test_minigames2.gd::test_parity_bounds_from_the_stored_calibration` and a live sample test.
+EV = the expected prize in gold equivalents (bronze 12, silver 25, gold 45 x skill band); the
+mean over the 11 games is 28.6 and every game is within ±6% of it (target ±10%). No game gives
+gold to more than 36% or bronze to more than 35% of players (limits 40% / 45%). Seconds = play
+time at 1x, actions x a per-game think + animation estimate (intro and results beat not
+counted).
+
+| game | actions | est. seconds | MEDIAN (human median) | tier split b/s/g | reward EV | skill band | expert / random median |
+|---|---|---|---|---|---|---|---|
+| Fossil Hunter | 10 digs | 20 | 8 (8) | 33/36/32 | 27.8 (-3%) | ±5% | - |
+| Bubble Breaker | 3 taps (2.9) | 13 * | 17 (17) | 33/36/31 | 28.9 (+1%) | ±15% | 19 / 14 |
+| Scratch-off | 3 scratches | 9 * | 13 (13) | 25/47/28 | 29.1 (+2%) | ±15% | luck |
+| Claw Machine | 3 grabs | 18 | 16 (16) | 34/34/32 | 29.1 (+2%) | ±15% | - |
+| Bubble Shooter | 10 shots (9.6) | 25 | 43 (43) | 34/35/31 | 29.0 (+1%) | ±15% | 55 / 10 |
+| Plinko | 3 drops | 15 | 16 (15) | 33/36/30 | 27.4 (-4%) | ±5% | 17 / 11 |
+| Shell Game | 3 picks | 20 | 11 (11) | 31/34/35 | 30.2 (+5%) | ±15% | 18 / 3 |
+| Memory Match | ~21 flips | 27 | 9 (8) | 34/30/35 | 30.0 (+5%) | ±15% | 18 / 0 |
+| Fishing | 3 casts (6 actions) | 18 | 11 (10) | 35/39/27 | 27.0 (-6%) | ±10% | 16 / 0 |
+| Lucky Wheel | 3 spins (6 actions) | 20 | 20 (20) | 22/50/28 | 28.3 (-1%) | ±5% | 25 / 15 |
+| High-Low Ladder | ~4 guesses | 10 * | 6 (5) | 21/55/24 | 28.0 (-2%) | ±10% | 5 / 2 |
+
+\* Short by design (`MinigameDefs.SHORT_BY_DESIGN`): Scratch-off is the breather, Bubble
+Breaker has 3 taps (user feedback), High-Low ends when the player cashes out.
+
+**Changes in the 2026-09-29 pass:**
+- **Bubble Breaker:** 5 taps -> **3** (user feedback: fewer lives). Big clusters and chains
+  matter more: the big-cluster bonus starts at 5 (was 6: +1 per bubble from the 5th) and each
+  chained big pop (4+ right after another) adds +2 (was +1). MEDIAN 17 for a human who takes
+  the biggest group about half the time (the old 17/5-tap number was a perfect bot's).
+- **Scratch-off:** the flat prizes (7 / 10 / 13 / 15) gave 31/66/4 and EV -25%. Now the score
+  is the pips scratched + 4 for a pair + 10 for three alike (three 6s = 28, the jackpot):
+  MEDIAN 13, 25/47/28.
+- **Claw Machine:** 2 grabs -> **3** (18 s) and flatter capsule prizes (common 3/3/4, rare
+  4/5, epic 6, legendary chest 8; was 2/2/3, 3/4, 6, 10), because the two-grab pile gave
+  39/15/47 (gold-heavy, EV +11%). MEDIAN 16 (a human-ish aimer, sigma 0.045).
+- **Lucky Wheel:** 2 spins -> **3** (20 s), MEDIAN 20.
+- **MEDIAN notes:** Memory Match's, High-Low's and Fishing's scores are lumpy (even pair
+  scores, ladder rungs), so their MEDIAN sits between the two central outcomes (memory 8|10 ->
+  9; high-low's rungs map bust -> bronze, rungs 1-3 -> silver, 4+ -> gold).
+
+**Rules and signatures of the seven new games (WP-E5, spec §16 "More minigames"):**
+
+| game | rules (one thumb) | gold signature |
+|---|---|---|
+| Bubble Shooter | hex cluster 8 wide, 4 colours, 10 shots aimed with a quantised angle (121 steps, walls bounce); pop 3+ = 1/bubble, dropped = 2/bubble, clear +10 | Sharpshooter: +1 ATK (shrine value) |
+| Plinko | 8 peg rows, 9 shuffled buckets (1,1,2,2,3,3,5,6,10), pick a slot, 3 drops; golden peg x2 | Rare rune for a die |
+| Shell Game | 3 cups, 3 rounds: 5/8/11 swaps at 0.46/0.34/0.25 s; right pick 2/3/4, x2 within 1.2 s of the shuffle (Sharp Eye) | Heart Gem: +10 max HP (shrine value) |
+| Memory Match | 4x4, 8 pairs (faces 1-6, Star, Skull), 6 misses; 2 per pair, +1 per miss left on a clear | Mirror Forge: 2 edits, raise or mirror |
+| Fishing | 3 casts at shallows / reeds / deep; strike in the bite window (0.8/0.62/0.48 s), fake nibbles before; fish 1-10, perfect strike +1 | The Catch: Healing Draught + another potion |
+| Lucky Wheel | 12 shuffled segments (2,2,3,3,4,4,5,5,6,7,9,12), 3 spins, one brake tap in the last 1.1 s | Uncommon passive (1 of 3) |
+| High-Low Ladder | d6 higher/lower, ladder 2,5,6,7,9,11,14,18,24, safety rungs 0/1/3/5, push on equal, cash out any time | High Roller: every die's lowest face +1 |
+
+The human models (`core/minigames/mg_human.gd`): fossil follows the bones like the bot; bubble
+breaker takes the biggest group 55% of the time, else one of the three biggest; scratch is pure
+luck; the claw aims at the best capsule with sigma 0.045; shooter best-looking shot 65% else a
+decent one, aim noise sd 2 steps; plinko best-odds slot 50%, above the top bucket 30%, random
+20%; shell loses track per gem-moving swap 2.5/6/11% and taps at once 70% when sure; memory
+forgets a seen card with 0.97 x 0.9^turns; fishing deep 45% / reeds 35% / shallows 20%, fooled
+by a nibble 12%, reaction 0.34 ± 0.09 s; wheel brakes on the best window segment 65% (± 0.09
+s); high-low cashes at a personal nerve (rung 4-7, or 2-4 when the die shows 3 or 4).
+Fossil Hunter: 7x7 site, three fossils (4, 3, 2 long) plus a gem (3 pts) and two coin pouches
+(2 pts), 10 digs, no hints (a dig reveals only its own cell). Claw Machine: 18 capsules (10
+common, 5 rare, 2 epic, 1 legendary, deeper by tier), the tier colour public and the prize
+hidden until won; a drop scoops up to 3 capsules whose reach (0.075 x (1 - 0.8 x depth))
+contains it; each slips with 0.14 per extra capsule held + 0.22 x depth.
+
+**Arcade unlocks (minor unlocks, one milestone each, Sigils 6 as before):** the realistic
+campaign (`--campaign=30 --campaigns=8`) gets them at the median runs below, spread between the
+class/biome majors (never two minigames on one run).
+
+| minigame | milestone | condition | target run | campaign median |
+|---|---|---|---|---|
+| Plinko | arcade_newbie | Play 6 minigames | 2 | 2 |
+| (Fossil Hunter) | arcade_regular | Play 14 minigames | 5 | 4 |
+| High-Low Ladder | lucky_streak | Cash out the Treasury 12 times | 6 | 5 |
+| Fishing | angler | Complete 105 laps in total | 8 | 8 |
+| Memory Match | sharp_memory | Keep 1,350 dice unrerolled | 9 | 10 |
+| Bubble Shooter | arcade_ace | Play 30 minigames | 11 | 11 |
+| (Bubble Breaker) | arcade_fan | Play 40 minigames | 13 | 14 |
+| Shell Game | sleight_of_hand | Use 1,500 combat rerolls | 16 | 17 |
+| Lucky Wheel | high_roller | Play 56 minigames | 20 | 21 |
 
 ### Ascension (global, 10 levels, max profile, realistic bot, standard mode)
 

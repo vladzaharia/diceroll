@@ -3,7 +3,9 @@ extends RefCounted
 ## Minigame scenarios for the screenshot harness (tools/shot.gd, registered in
 ## tools/scenarios.gd PROVIDERS):
 ##
-##  mg_fossil / mg_bubble / mg_scratch / mg_claw   the game screen over the dimmed board
+##  mg_fossil / mg_bubble / mg_scratch / mg_claw and mg_<id> for the Minigames 2.0 games
+##  (mg_bubble_shooter, mg_plinko, mg_shell_game, mg_memory_match, mg_fishing, mg_lucky_wheel,
+##  mg_high_low; their input goes through MgBoard.scripted_input)   the game screen over the dimmed board
 ##      --state=fresh   (default) just opened, after the landing beat and intro
 ##      --state=mid     a few actions played through real taps (injected mouse events)
 ##      --state=result  played to the end: the results beat held on screen
@@ -16,19 +18,27 @@ extends RefCounted
 ##                      (Continue mid-minigame); prints MG_RESUME
 ##      --aim=cluster   (claw) drop where the most capsules are in reach (multi-scoop shots)
 ##      --rig=three     (scratch) scratch three alike (harness peek, for the jackpot shots)
-##      --auto=1        (fresh) press the screen's AUTO button (par result)
 ##      --state=anim    --actions=N actions after --delay=S seconds (frame sequences: pair it
 ##                      with --wait and --frames)
-##  tile_minigames  a board with all four minigame tiles next to the hero (--close=1: close-up)
-##  mg_play_auto    a run with all four minigames equipped (opts.meta from the max profile,
+##  tile_minigames  a board with all four minigame tiles next to the hero (--close=1: close-up;
+##                  --set=new: the seven Minigames 2.0 tiles; --game=<id>: that one tile)
+##  mg_play_auto    a run with every minigame equipped (opts.meta from the max profile,
 ##                  loadout = every minigame), played by AUTO through the real toggle
-##                  (AutoPilot + Bot.decide); shots whenever a minigame starts / ends
-##                  (<shot>_mg_NN.png), quits after --games=N minigames (default 4) or the run
-##                  end. Prints MG_AUTO_PLAYED lines and MG_AUTO_DONE.
+##                  (AutoPilot + Bot.decide). AUTO never plays a minigame: it pauses on the
+##                  tile ("Your turn: play the minigame"), the scenario plays it like a player
+##                  (real input via the boards' scripted_input), then turns AUTO back on. Shots
+##                  whenever a minigame starts / ends (<shot>_mg_NN.png); quits after --games=N
+##                  minigames (default 4) or the run end. Prints MG_AUTO_HANDBACK /
+##                  MG_AUTO_PLAYED / MG_AUTO_RESUMED lines and MG_AUTO_DONE.
 ## Common: --seed=N --speed=N --class=<id>
 
-const NAMES := ["mg_fossil", "mg_bubble", "mg_scratch", "mg_claw", "tile_minigames", "mg_play_auto", "mg_icons"]
-const IDS := {"mg_fossil": "fossil_hunter", "mg_bubble": "bubble_breaker", "mg_scratch": "scratch_off", "mg_claw": "claw_machine"}
+const NAMES := ["mg_fossil", "mg_bubble", "mg_scratch", "mg_claw", "tile_minigames", "mg_play_auto", "mg_icons",
+	"mg_bubble_shooter", "mg_plinko", "mg_shell_game", "mg_memory_match", "mg_fishing", "mg_lucky_wheel", "mg_high_low"]
+const IDS := {"mg_fossil": "fossil_hunter", "mg_bubble": "bubble_breaker", "mg_scratch": "scratch_off", "mg_claw": "claw_machine",
+	"mg_bubble_shooter": "bubble_shooter", "mg_plinko": "plinko", "mg_shell_game": "shell_game", "mg_memory_match": "memory_match",
+	"mg_fishing": "fishing", "mg_lucky_wheel": "lucky_wheel", "mg_high_low": "high_low"}
+## The Minigames 2.0 set (tile_minigames --set=new).
+const NEW_IDS := ["bubble_shooter", "plinko", "shell_game", "memory_match", "fishing", "lucky_wheel", "high_low"]
 
 
 static func names() -> PackedStringArray:
@@ -93,9 +103,6 @@ class _Driver extends Node:
 		var ev := f.debug_open("minigame", id)
 		await c.play_events(ev)
 		if st == "fresh":
-			if args.get("auto", "0") == "1":
-				await _pause(0.6)
-				_click_control(c.ui.minigame.auto_btn)
 			return
 		var scr := c.ui.minigame
 		if st == "result":
@@ -105,6 +112,7 @@ class _Driver extends Node:
 			await _pause(float(args.delay))
 		if st == "play":
 			await _snap("opened")
+		var t_open := Time.get_ticks_msec()
 		var played := 0
 		while f.phase == GameFlow.Phase.MINIGAME and not bool(f.offer.done) and played < n:
 			await _idle()
@@ -129,6 +137,7 @@ class _Driver extends Node:
 		while f.phase == GameFlow.Phase.MINIGAME and guard < 200:
 			guard += 1
 			await _pause(0.05)
+		var game_secs := (Time.get_ticks_msec() - t_open) / 1000.0
 		if st == "result":
 			return
 		await _idle()
@@ -161,8 +170,8 @@ class _Driver extends Node:
 		await _pause(0.6)
 		await _snap("back on the board (phase %s)" % GameFlow.phase_name(f.phase))
 		var ok := _fail == "" and f.phase == GameFlow.Phase.BOARD_READY and not c.ui.minigame.visible
-		print("%s %s phase=%s commands=%s %s" % ["MG_PLAY_OK" if ok else "MG_PLAY_FAIL", id, GameFlow.phase_name(f.phase),
-			str(f.commands), _fail])
+		print("%s %s phase=%s game_time=%.1fs (incl. harness snapshots) commands=%s %s" % ["MG_PLAY_OK" if ok else "MG_PLAY_FAIL", id,
+			GameFlow.phase_name(f.phase), game_secs, str(f.commands), _fail])
 		await _quit(0 if ok else 1)
 
 	## Plays one action through injected mouse input. Returns true when the core took it.
@@ -228,12 +237,35 @@ class _Driver extends Node:
 					if absf(MgLogic.claw_x(cb._swing) - target) < 0.012:
 						break
 				_click(o + cb.size * 0.5)
-		for k in 40:
-			if f.commands.size() > n:
-				return true
-			await _pause(0.05)
+			_:
+				# the board's own input (awaited in a helper: in 4.7.2 locals of a function that
+				# awaited an overridden coroutine can come back corrupted)
+				await _scripted(b, a)
+				if not _scripted_ok:
+					print("MG_INPUT_UNSUPPORTED %s %s" % [id, str(a)])
+					return false
+		_landed_ok = false
+		await _wait_landed(f, n)
+		if _landed_ok:
+			return true
 		print("MG_INPUT_MISSED %s %s" % [id, str(a)])
 		return false
+
+	var _scripted_ok := false
+	var _landed_ok := false
+
+	func _scripted(b: MgBoard, a: Array) -> void:
+		_scripted_ok = false
+		var r: Variant = await b.call("scripted_input", a, self)
+		_scripted_ok = r == true
+
+	## Polls until the core recorded a command beyond `n` (8 s max); sets _landed_ok.
+	func _wait_landed(f: GameFlow, n: int) -> void:
+		for k in 160:
+			if f.commands.size() > n:
+				_landed_ok = true
+				return
+			await _pause(0.05)
 
 	# --- model icons ---------------------------------------------------------------------
 
@@ -266,17 +298,22 @@ class _Driver extends Node:
 	func _tiles() -> void:
 		var f := _flow()
 		# the four games on the tiles right after the hero
-		var ids: Array = MinigameDefs.IDS
-		var at := [1, 2, 3, 4] if args.get("close", "0") != "1" else [1, 2, 3, 4]
-		for k in 4:
+		var ids: Array = MinigameDefs.IDS.slice(0, 4)
+		if args.get("set", "") == "new":
+			ids = NEW_IDS.duplicate()
+		if args.has("game"):
+			ids = [String(args.game)]
+		var at: Array = []
+		for k in ids.size():
+			at.append(k + 1)
 			var t := Board.make_tile("minigame")
 			t["game"] = String(ids[k])
-			f.run.board.tiles[at[k]] = t
+			f.run.board.tiles[k + 1] = t
 		c.start(f)
 		await _pause(0.4)
 		if args.get("close", "0") == "1":
 			var pts := PackedVector3Array()
-			for i in [1, 2, 3, 4]:
+			for i in at:
 				var p := c.board.tile_global_position(i)
 				pts.append(p + Vector3(-1.4, 0, -1.4))
 				pts.append(p + Vector3(1.4, 1.4, 1.4))
@@ -332,7 +369,25 @@ class _Driver extends Node:
 				print("MG_AUTO_STUCK phase=%s enabled=%s busy=%s" % [GameFlow.phase_name(f.phase), c.auto.enabled, c.busy])
 				break
 			if not c.auto.enabled and not c.busy and c.auto.can_act() and not f.is_over():
+				if f.phase == GameFlow.Phase.MINIGAME:
+					# AUTO handed the minigame to the player: play it by hand, then AUTO on again
+					var gid := String(f.offer.id)
+					print("MG_AUTO_HANDBACK %s reason=\"%s\"" % [gid, String(c.auto.last_decision.get("stop_reason", ""))])
+					var guard := 0
+					while f.phase == GameFlow.Phase.MINIGAME and not bool(f.offer.done) and guard < 80:
+						guard += 1
+						await _idle()
+						if not await _input_action(gid, f):
+							break
+						await _idle()
+					var wait_guard := 0
+					while f.phase == GameFlow.Phase.MINIGAME and wait_guard < 200:
+						wait_guard += 1
+						await _pause(0.05)
+					await _idle()
 				AutoScenarios.toggle_on(c)
+				if f.phase != GameFlow.Phase.MINIGAME:
+					print("MG_AUTO_RESUMED phase=%s auto_on=%s" % [GameFlow.phase_name(f.phase), c.auto.enabled])
 		await _pause(2.0)
 		await _save("%s_final.png" % _shot_base)
 		print("MG_AUTO_DONE played=%d phase=%s lap=%d commands=%d t=%.0fs" % [played[0], GameFlow.phase_name(f.phase), f.run.lap,
@@ -352,6 +407,35 @@ class _Driver extends Node:
 		await _save(path)
 
 	# --- helpers -------------------------------------------------------------------------
+
+	## For MgBoard.scripted_input: mouse input at a global position.
+	func click(p: Vector2) -> void:
+		_click(p)
+
+	func press(p: Vector2) -> void:
+		_button(p, true)
+
+	func release(p: Vector2) -> void:
+		_button(p, false)
+
+	func move(p: Vector2, held := true) -> void:
+		var m := InputEventMouseMotion.new()
+		m.position = p
+		m.global_position = p
+		m.button_mask = MOUSE_BUTTON_MASK_LEFT if held else 0
+		get_viewport().push_input(m, true)
+
+	func drag(pts: Array) -> void:
+		await _drag(pts)
+
+	func _button(p: Vector2, down: bool) -> void:
+		var e := InputEventMouseButton.new()
+		e.button_index = MOUSE_BUTTON_LEFT
+		e.pressed = down
+		e.position = p
+		e.global_position = p
+		e.button_mask = MOUSE_BUTTON_MASK_LEFT if down else 0
+		get_viewport().push_input(e, true)
 
 	func _click(p: Vector2) -> void:
 		for down in [true, false]:

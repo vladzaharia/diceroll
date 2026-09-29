@@ -57,6 +57,24 @@ const SFX := {
 	"claw": [[RPG + "metalClick.ogg"], -2.0],
 	"fwump": [[IMPACT + "impactSoft_medium_000.ogg", IMPACT + "impactSoft_medium_001.ogg", IMPACT + "impactSoft_medium_002.ogg"], -3.0],
 	"whirr": [[UI + "maximize_003.ogg", UI + "maximize_006.ogg"], -6.0],
+	# Minigames 2.0
+	"card_flip": [[CASINO + "card-place-1.ogg", CASINO + "card-place-2.ogg", CASINO + "card-place-3.ogg", CASINO + "card-place-4.ogg"], -3.0],
+	"card_slide": [[CASINO + "card-slide-1.ogg", CASINO + "card-slide-2.ogg", CASINO + "card-slide-3.ogg", CASINO + "card-slide-4.ogg"], -4.0],
+	"card_shuffle": [[CASINO + "card-shuffle.ogg", CASINO + "card-fan-1.ogg", CASINO + "card-fan-2.ogg"], -3.0],
+	"chips": [[CASINO + "chips-stack-1.ogg", CASINO + "chips-stack-2.ogg", CASINO + "chips-stack-3.ogg", CASINO + "chips-handle-1.ogg"], -2.0],
+	"chip_tick": [[CASINO + "chips-collide-1.ogg", CASINO + "chips-collide-2.ogg", CASINO + "chips-collide-3.ogg", CASINO + "chips-collide-4.ogg"], -6.0],
+	"cup_knock": [[IMPACT + "impactWood_light_000.ogg", IMPACT + "impactWood_light_001.ogg", IMPACT + "impactWood_light_002.ogg", IMPACT + "impactWood_light_003.ogg"], -3.0],
+	"wood": [[IMPACT + "impactWood_medium_000.ogg", IMPACT + "impactWood_medium_001.ogg", IMPACT + "impactWood_medium_002.ogg"], -3.0],
+	"plink": [[IMPACT + "impactGlass_light_000.ogg", IMPACT + "impactGlass_light_001.ogg", IMPACT + "impactGlass_light_002.ogg", IMPACT + "impactGlass_light_003.ogg", IMPACT + "impactGlass_light_004.ogg"], -8.0],
+	"glass": [[UI + "glass_001.ogg", UI + "glass_002.ogg", UI + "glass_003.ogg", UI + "glass_004.ogg", UI + "glass_005.ogg", UI + "glass_006.ogg"], -4.0],
+	"pluck": [[UI + "pluck_001.ogg", UI + "pluck_002.ogg"], -3.0],
+	"bell": [[IMPACT + "impactBell_heavy_000.ogg", IMPACT + "impactBell_heavy_001.ogg", IMPACT + "impactBell_heavy_002.ogg"], -6.0],
+	"bong": [[UI + "bong_001.ogg"], -3.0],
+	"splash": [[IMPACT + "impactSoft_heavy_000.ogg", IMPACT + "impactSoft_heavy_001.ogg", UI + "drop_003.ogg"], -4.0],
+	"reel": [[UI + "scroll_001.ogg", UI + "scroll_002.ogg", UI + "scroll_003.ogg", UI + "scroll_004.ogg", UI + "scroll_005.ogg"], -5.0],
+	"swoosh": [[RPG + "cloth1.ogg", RPG + "cloth2.ogg", RPG + "cloth3.ogg", RPG + "cloth4.ogg"], -4.0],
+	"question": [[UI + "question_001.ogg", UI + "question_002.ogg", UI + "question_003.ogg"], -4.0],
+	"tin": [[IMPACT + "impactTin_medium_000.ogg", IMPACT + "impactTin_medium_001.ogg", IMPACT + "impactTin_medium_002.ogg"], -5.0],
 }
 
 const M := "res://assets/audio/music/"
@@ -125,7 +143,8 @@ func stop_all() -> void:
 
 
 ## Plays a one-shot SFX by id. Unknown ids warn and do nothing.
-func play_sfx(id: String, pitch_var := 0.05, volume_db := 0.0) -> void:
+## `pitch` sets the base pitch (a rising combo), `pitch_var` jitters around it.
+func play_sfx(id: String, pitch_var := 0.05, volume_db := 0.0, pitch := 1.0) -> void:
 	if not SFX.has(id):
 		push_warning("Audio: unknown sfx id '%s'" % id)
 		return
@@ -138,7 +157,7 @@ func play_sfx(id: String, pitch_var := 0.05, volume_db := 0.0) -> void:
 	_next = (_next + 1) % _pool.size()
 	p.stream = stream
 	p.volume_db = def[1] + volume_db
-	p.pitch_scale = 1.0 + randf_range(-pitch_var, pitch_var)
+	p.pitch_scale = maxf(0.05, pitch * (1.0 + randf_range(-pitch_var, pitch_var)))
 	p.play()
 
 

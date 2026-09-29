@@ -288,18 +288,19 @@ func _glyph(kind: int, at: Vector2, s: float, col: Color) -> void:
 
 
 func _draw_header() -> void:
-	# chain meter: 5 flame segments, lit by the current chain
+	# chain meter: one flame segment per tap, lit by the current chain
 	var ch := int(state.get("chain", 0))
 	var w := minf(size.x - 40.0, 420.0)
 	var r := Rect2((size.x - w) * 0.5, 16, w, 52)
 	rrect(r, Color(0.04, 0.05, 0.13, 0.85), 26, 2, UiPalette.GOLD_FAINT)
 	text_c(Vector2(r.position.x + 62, r.get_center().y), "CHAIN", 24, UiPalette.GOLD, 5)
-	var seg_w := (w - 140.0) / 5.0
+	var segs := BubbleBreaker.TAPS
+	var seg_w := (w - 140.0) / float(segs)
 	var pulse := clampf(1.0 - (time - _chain_pulse) / 0.6, 0.0, 1.0)
-	for k in 5:
+	for k in segs:
 		var sr := Rect2(r.position.x + 120 + k * seg_w, r.position.y + 12, seg_w - 6, 28)
 		var lit := k < ch
-		var col := Color("ff7a2e").lerp(Color("ffd84a"), float(k) / 4.0)
+		var col := Color("ff7a2e").lerp(Color("ffd84a"), float(k) / maxf(1.0, segs - 1.0))
 		rrect(sr, col if lit else Color(1, 1, 1, 0.08), 10)
 		if lit:
 			rrect(Rect2(sr.position + Vector2(3, 3), Vector2(sr.size.x - 6, 8)), Color(1, 1, 1, 0.35), 4)

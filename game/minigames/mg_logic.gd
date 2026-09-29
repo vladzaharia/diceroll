@@ -18,15 +18,28 @@ const PRIZE_NAMES := {"coins": "Coins", "potion": "Potion", "nugget": "Gold Nugg
 
 const TIER_COLORS := {"bronze": Color("d98b4f"), "silver": Color("cfd9ea"), "gold": Color("ffcf4a")}
 const GAME_COLORS := {"fossil_hunter": Color("e0a15a"), "bubble_breaker": Color("5ab8ff"),
-	"scratch_off": Color("c98cff"), "claw_machine": Color("ff6f9a")}
+	"scratch_off": Color("c98cff"), "claw_machine": Color("ff6f9a"), "bubble_shooter": Color("7f8cff"), "plinko": Color("4fd8b4"),
+	"shell_game": Color("e89a52"), "memory_match": Color("b08cff"), "fishing": Color("3fb8e8"), "lucky_wheel": Color("ff6a5a"),
+	"high_low": Color("8fd85a")}
 const HINTS := {
 	"fossil_hunter": "Dig for 3 fossils and hidden treasure. Hit a bone? Dig beside it!",
-	"bubble_breaker": "Tap a group of 3+ to pop it. Big pops and chains score more.",
-	"scratch_off": "Scratch 3 faces. A pair pays, three alike pays big, three 6s: JACKPOT!",
+	"bubble_breaker": "Only 3 taps! Pop groups of 3+; groups of 5+ and chains of big pops score extra.",
+	"scratch_off": "Scratch 3 faces: win their pips. A pair adds 4, three alike adds 10, three 6s: JACKPOT!",
 	"claw_machine": "Tap to drop. Every capsule hides a prize: gold ones are rare and deep!",
+	"bubble_shooter": "Drag to aim, release to shoot. Match 3+ to pop; what hangs below falls for double!",
+	"plinko": "Pick a slot and drop. Aim above the rich buckets; the golden peg doubles a drop!",
+	"shell_game": "Watch the gem, follow the cups, tap its cup. Pick fast for a Sharp Eye bonus!",
+	"memory_match": "Flip two cards a turn. Pairs stay up. Remember what you saw: 6 misses and it's over!",
+	"fishing": "Pick a spot and cast. Strike when the bobber plunges, not on a nibble!",
+	"lucky_wheel": "Three spins! As it slows, tap BRAKE once to stop on a better prize.",
+	"high_low": "Higher or lower? Each right call climbs the ladder. Cash out before you bust!",
 }
-const UNITS := {"fossil_hunter": "DIGS", "bubble_breaker": "TAPS", "scratch_off": "SCRATCHES", "claw_machine": "GRABS"}
-const ICONS := {"fossil_hunter": "shovel", "bubble_breaker": "bubble", "scratch_off": "ticket", "claw_machine": "claw"}
+const UNITS := {"fossil_hunter": "DIGS", "bubble_breaker": "TAPS", "scratch_off": "SCRATCHES", "claw_machine": "GRABS",
+	"bubble_shooter": "SHOTS", "plinko": "DROPS", "shell_game": "ROUNDS", "memory_match": "MISSES", "fishing": "CASTS",
+	"lucky_wheel": "SPINS", "high_low": "RUNGS"}
+const ICONS := {"fossil_hunter": "shovel", "bubble_breaker": "bubble", "scratch_off": "ticket", "claw_machine": "claw",
+	"bubble_shooter": "bubble", "plinko": "peg", "shell_game": "cup", "memory_match": "card", "fishing": "rod", "lucky_wheel": "wheel",
+	"high_low": "ladder"}
 
 
 static func claw_x(t: float) -> float:

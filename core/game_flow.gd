@@ -393,7 +393,10 @@ func _advance(ev: Array[Dictionary]) -> void:
 			"victory":
 				_finish(true, ev)
 			"forge":
-				_set_offer({"kind": "forge", "ops": ["raise"], "source": String(step.get("source", "reward"))}, Phase.FORGE, ev)
+				var fo := {"kind": "forge", "ops": step.get("ops", ["raise"]), "source": String(step.get("source", "reward"))}
+				if int(step.get("uses", 1)) > 1:
+					fo["uses"] = int(step.uses)
+				_set_offer(fo, Phase.FORGE, ev)
 
 func _set_offer(o: Dictionary, p: Phase, ev: Array[Dictionary]) -> void:
 	offer = o
@@ -1115,7 +1118,8 @@ func forge_apply(die_idx: int, face_idx: int, op: String, src_face := -1) -> Arr
 		var again := offer.duplicate(true)
 		again["uses"] = uses - 1
 		_close_offer(ev)
-		ev.append(_passive_ev("blacksmith", uses - 1))
+		if String(again.get("source", "tile")) == "tile":
+			ev.append(_passive_ev("blacksmith", uses - 1))
 		_set_offer(again, Phase.FORGE, ev)
 		return ev
 	_close_offer(ev)
@@ -1481,12 +1485,15 @@ func minigame_finish() -> Array[Dictionary]:
 	_record(["minigame_finish"])
 	return _minigame_result(float(minigame.score()) / float(MinigameDefs.MEDIAN[minigame.id]), false)
 
-## AUTO: skips the game and takes the par result (MinigameDefs.PAR of median).
+## Skips the game with a simulated average player's result (MinigameDefs.sim_ratio: a tier
+## drawn from the game's calibrated split with the minigame's own Rng, so the run Rng is
+## untouched). Sims / headless bots only: players play every minigame and the in-game AUTO
+## pauses at minigames (Bot.decide).
 func minigame_auto() -> Array[Dictionary]:
 	if phase != Phase.MINIGAME or minigame == null:
 		return _err("minigame_auto")
 	_record(["minigame_auto"])
-	return _minigame_result(MinigameDefs.PAR, true)
+	return _minigame_result(MinigameDefs.sim_ratio(minigame.id, minigame.rng.randf()), true)
 
 ## Emits minigame_result {id, score, ratio, tier, mult, auto, crowns, state} + offer_closed, banks
 ## the tier's Crowns, then opens the reward choice: offer {kind:"reward", source:"minigame", id,
@@ -1534,12 +1541,29 @@ func _reward_options(id: String, tier: String, mult: float) -> Array:
 				"desc": "+1 combat reroll every turn for the next %d fights." % MinigameDefs.REROLL_BOOST_FIGHTS})
 		"passive_common":
 			opts.append({"id": "passive_common", "label": "Common passive", "desc": "Pick 1 of 3 common passives."})
+		"sharpshooter":
+			opts.append({"id": "sharpshooter", "label": "Sharpshooter", "desc": "+%d ATK for the rest of the run." % Balance.SHRINE_ATK})
+		"rare_rune":
+			opts.append({"id": "rare_rune", "rune": _rand_rune("rare"), "label": "Rare rune", "desc": "A rare rune for one of your dice."})
+		"heart_gem":
+			opts.append({"id": "heart_gem", "label": "Heart Gem", "desc": "+%d max HP (and heal it)." % Balance.SHRINE_MAX_HP})
+		"mirror_forge":
+			opts.append({"id": "mirror_forge", "label": "Mirror Forge", "desc": "Two edits: raise a face, or copy one face onto another."})
+		"potion_pair":
+			opts.append({"id": "potion_pair", "potion": "healing", "potion2": _second_potion(), "label": "The Catch",
+				"desc": "A Healing Draught and a %s." % PotionDefs.name_of(_second_potion())})
+		"passive_uncommon":
+			opts.append({"id": "passive_uncommon", "label": "Uncommon passive", "desc": "Pick 1 of 3 uncommon passives."})
+		"high_roller":
+			opts.append({"id": "high_roller", "label": "High Roller", "desc": "Raise the lowest face of every die by 1."})
 		_:
 			var d: int = g.call(MinigameDefs.SIGNATURE_GOLD)
 			opts.append({"id": "gold", "amount": d, "label": "%d gold" % d, "desc": "The jackpot purse."})
 	return opts
 
 func _pick_reward(opt: Dictionary, ev: Array[Dictionary]) -> void:
+	if _pick_signature(opt, ev):
+		return
 	match String(opt.id):
 		"gold":
 			_gold(ev, int(opt.amount), "minigame")
@@ -1565,10 +1589,11 @@ func _pick_reward(opt: Dictionary, ev: Array[Dictionary]) -> void:
 			_upgrade("minigame")
 			run.pet_state["boost"] = int(opt.get("fights", MinigameDefs.REROLL_BOOST_FIGHTS))
 			ev.append({"type": "stat_changed", "stat": "reroll_boost", "value": int(run.pet_state.boost)})
-		"passive_common":
+		"passive_common", "passive_uncommon":
+			var rarity := "common" if opt.id == "passive_common" else "uncommon"
 			var skip := _passive_excluded()
 			for pid in Passives.IDS:
-				if Passives.rarity(pid) != "common" and not skip.has(pid):
+				if Passives.rarity(pid) != rarity and not skip.has(pid):
 					skip.append(pid)
 			var ids := Passives.roll_regular(run.rng, 3, skip)
 			if not ids.is_empty():
@@ -1576,6 +1601,50 @@ func _pick_reward(opt: Dictionary, ev: Array[Dictionary]) -> void:
 				for pid in ids:
 					options.append(Passives.option(pid))
 				_set_offer({"kind": "passive", "options": options, "source": "minigame"}, Phase.DRAFT, ev)
+
+## Minigames 2.0 signature prizes (gold tier): each reuses an existing reward rule.
+func _pick_signature(opt: Dictionary, ev: Array[Dictionary]) -> bool:
+	match String(opt.id):
+		"sharpshooter":
+			_upgrade("minigame")
+			run.atk += Balance.SHRINE_ATK
+			ev.append({"type": "stat_changed", "stat": "atk", "value": run.atk})
+		"rare_rune":
+			_set_offer({"kind": "rune_assign", "rune": String(opt.get("rune", _rand_rune("rare"))), "source": "minigame"}, Phase.DRAFT, ev)
+		"heart_gem":
+			_upgrade("minigame")
+			run.max_hp += Balance.SHRINE_MAX_HP
+			var hh := run.heal(Balance.SHRINE_MAX_HP)
+			ev.append({"type": "hp_changed", "amount": hh, "total": run.hp, "source": "minigame", "max_hp": run.max_hp})
+		"mirror_forge":
+			pending.push_front({"kind": "forge", "source": "minigame", "ops": ["raise", "mirror"], "uses": 2})
+		"potion_pair":
+			for key in ["potion", "potion2"]:
+				var type := String(opt.get(key, "healing"))
+				if not _gain_potion(ev, "minigame", type):
+					ev.append_array(_drink(type, "minigame"))
+		"high_roller":
+			_upgrade("minigame")
+			for d in run.dice.size():
+				var f := run.dice[d].lowest_face()
+				if run.dice[d].raise_face(f):
+					ev.append(_face_ev(d, f))
+		_:
+			return false
+	return true
+
+## The Catch's second potion: the first unlocked non-healing potion type in content order that
+## the belt doesn't hold yet (Healing Draught when none is unlocked). No Rng: the reward
+## options stay stable for the screen.
+func _second_potion() -> String:
+	var types: Array = run.meta.get("potion_types", [])
+	for t in PotionDefs.IDS:
+		if t != "healing" and types.has(t) and not run.belt.has(t):
+			return t
+	for t in PotionDefs.IDS:
+		if t != "healing" and types.has(t):
+			return t
+	return "healing"
 
 # ================================================================ scenarios (presentation/testing aid)
 

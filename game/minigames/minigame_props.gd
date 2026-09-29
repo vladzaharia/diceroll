@@ -6,6 +6,7 @@ extends RefCounted
 ##   bubble_breaker  a bobbing cluster of glossy bubbles in the four game colours
 ##   scratch_off     a tilted scratch card (foil panels, gold title band) with a die
 ##   claw_machine    a tiny arcade cabinet: marquee, glass box, a claw over a prize
+## The Minigames 2.0 props live in game/minigames/props/<id>_prop.gd (static build(n)).
 
 
 static func make(game: String) -> Node3D:
@@ -16,6 +17,13 @@ static func make(game: String) -> Node3D:
 		"bubble_breaker": _bubbles(n)
 		"scratch_off": _scratch(n)
 		"claw_machine": _claw(n)
+		"bubble_shooter": ShooterProp.build(n)
+		"plinko": PlinkoProp.build(n)
+		"shell_game": ShellProp.build(n)
+		"memory_match": MemoryProp.build(n)
+		"fishing": FishingProp.build(n)
+		"lucky_wheel": WheelProp.build(n)
+		"high_low": LadderProp.build(n)
 		_: _bubbles(n)
 	# a slow arcade sparkle so the tile reads as "play me"
 	var sp := Fx.elite_sparkle(n, Vector3(0, 0.1, 0), 0.6, 0.9)

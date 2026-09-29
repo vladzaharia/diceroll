@@ -57,6 +57,15 @@ func status_text() -> String:
 	return ""
 
 
+## Screenshot harness (game/minigames/scenarios.gd, --state=play|mid|result): perform the
+## action `args` (the bot's choice, BotMeta.play_args) through real input, the way a player
+## would: drv.click(p) / drv.press(p) / drv.move(p) / drv.release(p) / await drv.drag(points)
+## inject mouse events at GLOBAL positions (get_global_rect().position + local). Awaitable: may
+## wait for the right moment (a timing game). Return false when the board can't do it.
+func scripted_input(_args: Array, _drv: Node) -> bool:
+	return false
+
+
 ## Sends an action once (locks until the update arrives or a short timeout on refusal).
 func send(args: Array) -> void:
 	if locked:
@@ -72,11 +81,11 @@ func unlock() -> void:
 
 
 ## Plays an Audio sfx if the autoload exists (UI scripts stay loadable without it).
-static func sfx(id: String, pitch_var := 0.05, volume_db := 0.0) -> void:
+static func sfx(id: String, pitch_var := 0.05, volume_db := 0.0, pitch := 1.0) -> void:
 	var loop := Engine.get_main_loop() as SceneTree
 	var a: Node = loop.root.get_node_or_null("Audio") if loop else null
 	if a != null and a.has_method("play_sfx"):
-		a.call("play_sfx", id, pitch_var, volume_db)
+		a.call("play_sfx", id, pitch_var, volume_db, pitch)
 
 
 func dur(t: float) -> float:
