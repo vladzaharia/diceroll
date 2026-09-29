@@ -3,7 +3,8 @@ extends SceneTree
 ## player-facing AUTO policy (Bot.decide with every scope on and no stop conditions); the
 ## realistic AUTO skill is the balance reference (docs/plans/balance.md).
 ## Usage: godot --headless --path . -s tools/sim.gd -- --runs=300 --class=all --seed=1
-##        [--board=24|28|32] [--route=glade,frost,magma] [--boss=boss_lich] [--verbose]
+##        [--board=24|28|32] [--route=glade,frost,magma | mines,moonlit (with --mode=short)]
+##        [--boss=boss_lich] [--twist=off | off:<biome>,<biome>] [--verbose]
 ##        [--profile=none|fresh|mid|max] [--asc=N] [--mode=standard|short] [--mg=par|play]
 ##        [--pet=<id>|none] [--policy=greedy|realistic|expert] [--focus=balanced|damage|defense|economy]
 ## --policy: greedy = the naive Bot.next_command floor; realistic = Bot.decide with
@@ -82,10 +83,40 @@ func _init() -> void:
 			board = arg.substr(8).to_int()
 		elif arg.begins_with("--route="):
 			opts["route"] = Array(arg.substr(8).split(",", false))
-			if not BiomeDefs.valid_route(opts.route):
-				print("bad --route (want one biome per tier, e.g. glade,frost,magma): ", opts.route)
+			if not BiomeDefs.valid_route(opts.route) and not BiomeDefs.valid_short_route(opts.route):
+				print("bad --route (one biome per tier, e.g. glade,frost,magma; Short Road: tier1,second): ", opts.route)
 				quit(2)
 				return
+		elif arg.begins_with("--enemy-hp="):
+			# --enemy-hp=boss_lich:0.9,rock_golem:0.85 (sim-only per-id HP multipliers)
+			for part in arg.substr(11).split(",", false):
+				EnemyDefs.tune_hp_by_id[part.get_slice(":", 0)] = part.get_slice(":", 1).to_float()
+		elif arg.begins_with("--moon="):
+			# --moon=max:4,tide:1,clouds:2,fall:34 (the Moon King's meter numbers)
+			for part in arg.substr(7).split(",", false):
+				var mv := part.get_slice(":", 1).to_int()
+				match part.get_slice(":", 0):
+					"max": EnemyDefs.MOON_MAX = mv
+					"tide": EnemyDefs.MOON_TIDE = mv
+					"clouds": EnemyDefs.MOON_CLOUDS_MAX = mv
+					"fall": EnemyDefs.MOONFALL = mv
+		elif arg.begins_with("--bnum="):
+			# --bnum=DRUM_RALLY:1,HEAT_PCT:0.06 (new-biome twist numbers, BiomeDefs static vars)
+			for part in arg.substr(7).split(",", false):
+				var bv := part.get_slice(":", 1)
+				match part.get_slice(":", 0):
+					"ORE_GOLD": BiomeDefs.ORE_GOLD = bv.to_int()
+					"MINES_TRAP_CAP": BiomeDefs.MINES_TRAP_CAP = bv.to_int()
+					"DRUM_RALLY": BiomeDefs.DRUM_RALLY = bv.to_int()
+					"DRUM_GOLD": BiomeDefs.DRUM_GOLD = bv.to_int()
+					"WARCAMP_DRUMS": BiomeDefs.WARCAMP_DRUMS = bv.to_int()
+					"HEAT_PCT": BiomeDefs.HEAT_PCT = bv.to_float()
+					"OASIS_HEAL_PCT": BiomeDefs.OASIS_HEAL_PCT = bv.to_float()
+					_: print("unknown --bnum ", part)
+		elif arg.begins_with("--twist="):
+			# --twist=off: every new-biome twist off; --twist=off:warcamp,ruins: just those
+			var tw := arg.substr(8)
+			BiomeDefs.twist_off = ["all"] if tw == "off" else Array(tw.substr(4).split(",", false)) if tw.begins_with("off:") else []
 		elif arg.begins_with("--boss="):
 			opts["boss"] = arg.substr(7)
 		elif arg.begins_with("--profile="):
@@ -205,6 +236,8 @@ func _init() -> void:
 	var by_boss := {}
 	var by_combo := {}
 	var by_mini := {}    # mini-boss -> [wins, fights]
+	var by_biome := {}   # biome -> [wins, runs, reached boss]
+	var death_lap := {}  # lap of death (0 = final boss) -> count
 	var t0 := Time.get_ticks_msec()
 	var all_wins := 0
 	var all_runs := 0
@@ -252,6 +285,11 @@ func _init() -> void:
 					print("  died %s seed=%d route=%s at %s lvl=%d dice=%d" % [c, s, ",".join(f.run.route), last_fight, f.run.level, f.run.dice.size()])
 			var route := ",".join(f.run.route)
 			var reached := won or last_fight.contains("boss_")
+			for b in f.run.route:
+				_tally(by_biome, b, won, reached)
+			if not won:
+				var dl := 0 if last_fight.contains("boss_") else f.run.lap
+				death_lap[dl] = int(death_lap.get(dl, 0)) + 1
 			_tally(by_route, route, won, reached)
 			_tally(by_boss, f.run.boss_id, won, reached)
 			_tally(by_combo, route + " / " + f.run.boss_id, won, reached)
@@ -296,7 +334,20 @@ func _init() -> void:
 	_table("route", by_route)
 	for k in by_route:
 		print("#route %s %d %d" % [k, int(by_route[k][0]), int(by_route[k][1])])
+	_table("biome (routes containing it)", by_biome)
+	for k in by_biome:
+		print("#biome %s %d %d %d" % [k, int(by_biome[k][0]), int(by_biome[k][1]), int(by_biome[k][2])])
 	_table("final boss", by_boss)
+	for k in by_boss:
+		print("#boss %s %d %d %d" % [k, int(by_boss[k][0]), int(by_boss[k][1]), int(by_boss[k][2])])
+	var dls := death_lap.keys()
+	dls.sort()
+	var dparts: Array = []
+	for k in dls:
+		dparts.append("%s:%d" % ["boss" if int(k) == 0 else "L%d" % int(k), int(death_lap[k])])
+		print("#dlap %d %d" % [int(k), int(death_lap[k])])
+	print("")
+	print("deaths by lap: " + " ".join(dparts))
 	_table("route / final boss", by_combo)
 	_table("mini-boss", by_mini, false)
 	_upgrades_table(all_runs)
@@ -493,9 +544,10 @@ func _campaign(n: int, m: int, seed0: int, board: int, mode: String) -> void:
 				have_all = r + 1
 			spent = p.records.crowns_earned - p.crowns
 			if snapshot_run == r + 1:
-				print("snapshot run %d: gear=%s upgrades=%s pets=%s pet_lv=%s classes=%s packs=%s minigames=%s potions=%s crowns=%d sigils=%d asc=%s" % [
+				print("snapshot run %d: gear=%s upgrades=%s pets=%s pet_lv=%s classes=%s packs=%s minigames=%s potions=%s crowns=%d sigils=%d asc=%s biomes=%s bosses=%s mg_plays=%s traits=%s" % [
 					r + 1, str(p.gear), str(p.upgrades), str(p.unlocks.pets), str(p.pet_xp), str(p.unlocks.classes),
-					str(p.unlocks.packs), str(p.unlocks.minigames), str(p.unlocks.potions), p.crowns, p.sigils, str(p.ascension)])
+					str(p.unlocks.packs), str(p.unlocks.minigames), str(p.unlocks.potions), p.crowns, p.sigils, str(p.ascension),
+					str(p.unlocks.biomes), str(p.unlocks.bosses), str(p.minigame_plays), str(p.gear_traits)])
 			if not got_max and spent >= sink:
 				got_max = true
 				maxed_at.append(r + 1)

@@ -19,7 +19,10 @@ const SIGIL_PRICE := {
 ## milestones per run (biomes come bundled with their bosses on the first win, so they don't wait).
 const MAJOR_KINDS := ["classes", "pets"]
 ## Per-id Sigil price overrides (the late classes cost more).
-const SIGIL_PRICE_BY_ID := {"classes": {"paladin": 12, "ninja": 10, "druid": 10, "engineer": 12, "necromancer": 12}}
+## The four 2026-09-29 biomes cost 8 Sigils (not 5): with the 11-class Sigil prices the campaign bot
+## bought the Deep Mines at run 4 (target 8).
+const SIGIL_PRICE_BY_ID := {"classes": {"paladin": 12, "ninja": 10, "druid": 10, "engineer": 12, "necromancer": 12},
+	"biomes": {"mines": 8, "warcamp": 8, "moonlit": 8, "ruins": 8}}
 ## Sigils can buy only the next SIGIL_NEXT_CLASSES locked classes in HeroDefs.IDS order.
 const SIGIL_NEXT_CLASSES := 2
 ## Secret classes: never sold for Sigils, outside the next-two rule (HeroDefs.DATA[id].secret).
@@ -88,7 +91,7 @@ static func all_ids(kind: String) -> Array:
 			for tier in BiomeDefs.TIERS:
 				b.append_array(tier)
 			return b
-		"bosses": return ["boss_lich", "boss_bone_warden", "boss_cinder_king", "boss_magma_golem"]
+		"bosses": return ["boss_lich", "boss_bone_warden", "boss_cinder_king", "boss_magma_golem", "boss_sand_colossus", "boss_moon_king"]
 		"minibosses": return ["mini_pumpkin_knight", "mini_grave_mage", "mini_frost_warden", "mini_bone_champion", "mini_briar_beast", "mini_cinder_brute", "mini_moonfang", "mini_orc_warchief"]
 		"pets": return PetDefs.IDS.duplicate()
 		"minigames": return MinigameDefs.IDS.duplicate()
@@ -180,8 +183,7 @@ const MILESTONES := [
 	{"id": "banker", "run": 18, "desc": "Cash out the Treasury 40 times.", "cond": {"stat": "cashouts", "min": 40},
 		"unlocks": [["pets", "coin_mimic"]]},
 	{"id": "warden_slayer", "run": 22, "desc": "Defeat 13 mini-bosses.", "cond": {"stat": "minibosses_killed", "min": 13},
-		"unlocks": [["minibosses", "mini_frost_warden"], ["minibosses", "mini_briar_beast"], ["minibosses", "mini_cinder_brute"],
-			["minibosses", "mini_moonfang"], ["minibosses", "mini_orc_warchief"]]},
+		"unlocks": [["minibosses", "mini_frost_warden"], ["minibosses", "mini_briar_beast"], ["minibosses", "mini_cinder_brute"]]},
 	{"id": "archmage", "run": 20, "desc": "Win 3 runs with the Mage.", "cond": {"stat": "mage_wins", "min": 3},
 		"unlocks": [["packs", "pyromancy"]]},
 	# --- pets 7-12 (2026-09-29): thematic milestones, spread over runs ~20-30
@@ -233,6 +235,20 @@ const MILESTONES := [
 		"unlocks": [["minigames", "lucky_wheel"]]},
 	{"id": "rune_lord", "run": 24, "desc": "In 15 runs, fight with 5 dice that all carry runes.", "cond": {"stat": "full_runes", "min": 15},
 		"unlocks": [["packs", "resonance"]]},
+	# --- 2026-09-29 new biomes (docs/design/2026-09-29-new-biomes.md §7): one biome per milestone,
+	# with a runs fallback; their mini-bosses and final bosses come with them.
+	{"id": "prospector", "run": 8, "desc": "Cash out the Treasury 15 times, or play 10 runs.",
+		"cond": {"any": [{"stat": "cashouts", "min": 15}, {"stat": "runs", "min": 10}]},
+		"unlocks": [["biomes", "mines"]]},
+	{"id": "warpath", "run": 12, "desc": "Defeat 380 enemies, or play 16 runs.",
+		"cond": {"any": [{"stat": "kills", "min": 380}, {"stat": "runs", "min": 16}]},
+		"unlocks": [["biomes", "warcamp"], ["minibosses", "mini_orc_warchief"]]},
+	{"id": "night_walker", "run": 17, "desc": "Reach the third biome 16 times, or play 22 runs.",
+		"cond": {"any": [{"stat": "act3_runs", "min": 16}, {"stat": "runs", "min": 22}]},
+		"unlocks": [["biomes", "moonlit"], ["minibosses", "mini_moonfang"], ["bosses", "boss_moon_king"]]},
+	{"id": "sun_seeker", "run": 21, "desc": "Defeat 4 different final bosses, or play 22 runs.",
+		"cond": {"any": [{"stat": "boss_kinds", "min": 4}, {"stat": "runs", "min": 22}]},
+		"unlocks": [["biomes", "ruins"], ["bosses", "boss_sand_colossus"]]},
 ]
 
 static func milestone(id: String) -> Dictionary:

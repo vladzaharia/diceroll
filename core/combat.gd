@@ -39,6 +39,10 @@ var rerolls_used_this_turn: int = 0 # combat rerolls spent this turn (Ranger Aim
 var refunds_this_turn: int = 0     # Ninja Shadow Step refunds this turn
 var oath: int = 0                  # Paladin Oath value for this fight (0 = none)
 var last_overkill: int = 0         # damage_enemy: overkill of the last lethal hit (0 otherwise)
+# new biomes (docs/design/2026-09-29-new-biomes.md)
+var moon: int = -99                # the Moon King's moon meter (MOON_NONE = no meter in this fight)
+var transform_at: float = 0.5      # HP share at or below which transformers change (Half moon: 0.65)
+var moon_full: bool = false        # fought on Moonlit's Full lap (gold x MOON_FULL_GOLD)
 # pets (PetLogic)
 var pet_thorns: int = 0            # Pebble: thorns against attackers this enemy phase
 var pet_block_turn: int = 0        # Block the pet gave this turn (Pebble's charge ignores it)
@@ -65,7 +69,7 @@ func begin(run: RunState, ids: Array, p_elite: bool, p_boss: bool, p_tile: int, 
 		# Short Road: fewer laps to build, so the final boss is lighter
 		for e in enemies:
 			if bool(e.boss):
-				e.hp = maxi(1, int(round(int(e.hp) * Balance.SHORT_BOSS_HP)))
+				e.hp = maxi(1, int(round(int(e.hp) * BiomeDefs.short_boss_hp(run.route.back()))))
 				e.max_hp = e.hp
 	if not run.meta.is_empty():
 		for e in enemies:
@@ -73,6 +77,7 @@ func begin(run: RunState, ids: Array, p_elite: bool, p_boss: bool, p_tile: int, 
 	for k in enemies.size():
 		if k < affixes.size() and not (affixes[k] as Array).is_empty() and not bool(enemies[k].boss):
 			AffixDefs.apply(enemies[k], affixes[k], EnemyDefs.band(lap))
+	var bev := _biome_begin(run)
 	_note_seen(run)
 	if not run.meta.is_empty():
 		if int(run.pet_state.get("boost", 0)) > 0:
@@ -88,6 +93,7 @@ func begin(run: RunState, ids: Array, p_elite: bool, p_boss: bool, p_tile: int, 
 		roll_intent(run.rng, i)
 	var ev: Array[Dictionary] = []
 	ev.append({"type": "combat_started", "enemies": enemies.duplicate(true), "boss": boss, "elite": elite, "miniboss": miniboss, "tile": tile})
+	ev.append_array(bev)
 	for i in enemies.size():
 		ev.append({"type": "enemy_intent", "enemy_idx": i, "intent": enemies[i].intent.duplicate()})
 	# Frostpeak ice: dice frozen on the board lock on the first turn of this fight.
@@ -104,6 +110,7 @@ static func make_enemy(rng: Rng, id: String, p_act: int, p_lap: int, p_elite: bo
 	var def := EnemyDefs.def(id)
 	var scale := 1.0 if is_boss else Balance.enemy_scale(p_lap)
 	var hp_mult := scale * (Balance.ELITE_HP_MULT if p_elite else 1.0) * Balance.tune_hp * (Balance.tune_boss if is_boss else 1.0)
+	hp_mult *= float(EnemyDefs.tune_hp_by_id.get(id, 1.0))
 	var atk_scale := 1.0 if is_boss else Balance.enemy_atk_scale(p_lap)
 	var atk_mult := atk_scale * (Balance.ELITE_ATK_MULT if p_elite else 1.0) * Balance.tune_atk
 	var hp := int(round(float(def.hp) * hp_mult))
@@ -116,7 +123,7 @@ static func make_enemy(rng: Rng, id: String, p_act: int, p_lap: int, p_elite: bo
 		"elite": p_elite, "atk_mult": atk_mult, "step": step, "summoned": summoned,
 		"miniboss": EnemyDefs.is_miniboss(id), "traits": EnemyDefs.traits(id, 1).duplicate(),
 		"frenzy": 0, "form": EnemyDefs.form(id, 1),
-		"affixes": [], "thorns_value": Balance.ENEMY_THORNS, "actions": 0, "chilled": false,
+		"affixes": [], "thorns_value": Balance.ENEMY_THORNS, "actions": 0, "chilled": false, "rallied": 0,
 		"brave": false, "cower": false, "weakened": false, "fled": false,
 	}
 
@@ -643,6 +650,7 @@ func attack(run: RunState) -> Array[Dictionary]:
 						ev.append(_rune(i, rune, "bank_reroll", 1))
 	ev.append_array(ClassLogic.after_attack(run, self))
 	ev.append_array(PetLogic.on_attack_resolved(run, self, cid, eff))
+	ev.append_array(_moon_clouds(run))
 	if all_dead():
 		ev.append_array(_win(run))
 		return ev
@@ -699,7 +707,7 @@ func damage_enemy(i: int, amount: int, source: String, run: RunState, ignore_blo
 		var ok := last_overkill
 		ev.append_array(ClassLogic.on_enemy_killed(run, self, i, source))
 		last_overkill = ok
-	elif not e.boss and int(e.phase) == 1 and int(e.hp) * 2 <= int(e.max_hp) and EnemyDefs.transforms(String(e.id)):
+	elif not e.boss and int(e.phase) == 1 and float(e.hp) <= float(e.max_hp) * transform_at and EnemyDefs.transforms(String(e.id)):
 		# transform: once at <= 50% HP; drops its Block and re-rolls its intent from phase 2
 		e.phase = 2
 		e.step = 0
@@ -712,23 +720,37 @@ func damage_enemy(i: int, amount: int, source: String, run: RunState, ignore_blo
 		ev.append({"type": "enemy_transformed", "enemy_idx": i, "form": String(e.form), "id": String(e.id)})
 		ev.append({"type": "enemy_intent", "enemy_idx": i, "intent": e.intent.duplicate()})
 	elif e.boss and int(e.phase) == 1 and int(e.hp) * 2 <= int(e.max_hp):
-		var was_armored := has_trait(e, "armor")
-		e.phase = 2
-		e.step = 0
-		e.traits = EnemyDefs.traits(String(e.id), 2).duplicate()
-		ev.append({"type": "boss_phase", "enemy_idx": i, "phase": 2, "traits": e.traits.duplicate()})
-		if was_armored and not has_trait(e, "armor") and int(e.block) > 0:
-			# Magma Golem: the shell shatters and its stored Block is gone.
-			var lost := int(e.block)
-			e.block = 0
-			ev.append({"type": "block_gained", "target": i, "amount": -lost, "total": 0, "source": "shatter"})
-		ev.append_array(ClassLogic.on_boss_phase(run, self, i))
+		ev.append_array(_boss_phase2(i, run))
+	return ev
+
+## Switches boss i to phase 2 (HP threshold, or forced by the Moon King's Moonrise):
+## boss_phase {enemy_idx, phase, traits, form, forced, source}.
+func _boss_phase2(i: int, run: RunState, forced := false) -> Array[Dictionary]:
+	var ev: Array[Dictionary] = []
+	var e := enemies[i]
+	var was_armored := has_trait(e, "armor")
+	e.phase = 2
+	e.step = 0
+	e.traits = EnemyDefs.traits(String(e.id), 2).duplicate()
+	e.form = EnemyDefs.form(String(e.id), 2)
+	var bp := {"type": "boss_phase", "enemy_idx": i, "phase": 2, "traits": e.traits.duplicate(), "form": String(e.form)}
+	if forced:
+		bp["forced"] = true
+		bp["source"] = "moonrise"
+	ev.append(bp)
+	if was_armored and not has_trait(e, "armor") and int(e.block) > 0:
+		# Magma Golem: the shell shatters and its stored Block is gone.
+		var lost := int(e.block)
+		e.block = 0
+		ev.append({"type": "block_gained", "target": i, "amount": -lost, "total": 0, "source": "shatter"})
+	ev.append_array(ClassLogic.on_boss_phase(run, self, i))
 	return ev
 
 ## Frenzy: +FRENZY_STEP attack after surviving a main-attack hit, up to +FRENZY_MAX per fight.
 func _frenzy(i: int) -> Array[Dictionary]:
 	var e := enemies[i]
 	var gain := mini(EnemyDefs.FRENZY_STEP, EnemyDefs.FRENZY_MAX - int(e.get("frenzy", 0)))
+	gain = mini(gain, _bonus_room(e))
 	if gain <= 0:
 		return []
 	e.frenzy = int(e.get("frenzy", 0)) + gain
@@ -798,6 +820,8 @@ func _enemy_phase(run: RunState) -> Array[Dictionary]:
 		ev.append({"type": "enemy_intent", "enemy_idx": i, "intent": e.intent.duplicate()})
 	ev.append_array(_tick_burn(run))
 	if result == "":
+		ev.append_array(_moon_tide(run))
+	if result == "":
 		ev.append_array(ClassLogic.on_enemy_phase_end(run, self))
 	return ev
 
@@ -827,10 +851,10 @@ func _tick_burn(run: RunState) -> Array[Dictionary]:
 
 ## Enemy i hits the hero for v (Block absorbs it unless the enemy pierces). Returns the events
 ## and the damage dealt through `out_dealt[0]` when given.
-func _hit_hero(run: RunState, i: int, v: int, out_dealt: Array = []) -> Array[Dictionary]:
+func _hit_hero(run: RunState, i: int, v: int, out_dealt: Array = [], force_pierce := false) -> Array[Dictionary]:
 	var ev: Array[Dictionary] = []
 	var e := enemies[i]
-	var pierce := has_trait(e, "pierce")
+	var pierce := force_pierce or has_trait(e, "pierce")
 	var blocked := 0 if pierce else mini(run.block, v)
 	run.block -= blocked
 	var dealt := mini(v - blocked, run.hp)
@@ -940,11 +964,22 @@ func _execute_intent(run: RunState, i: int) -> Array[Dictionary]:
 			# every living enemy (the caster included) gains +v attack for the fight
 			for k in enemies.size():
 				if alive(k):
-					enemies[k].atk_bonus = int(enemies[k].atk_bonus) + v
-					ev.append({"type": "status", "target": k, "status": "buff", "value": int(enemies[k].atk_bonus), "source": i, "rally": true})
+					var g := _rally(k, v)
+					if g > 0:
+						ev.append({"type": "status", "target": k, "status": "buff", "value": int(enemies[k].atk_bonus), "source": i, "rally": true})
 		"curse":
 			pending_curse += v
 			ev.append({"type": "status", "target": "hero", "status": "curse", "value": v, "source": i, "pending": true})
+		"bury":
+			# Sand Colossus: locks v dice next turn and gains BURY_BLOCK Block per die buried
+			pending_curse += v
+			ev.append({"type": "status", "target": "hero", "status": "curse", "value": v, "source": i, "pending": true, "bury": true})
+			var bb := int(round(EnemyDefs.BURY_BLOCK * v * float(e.atk_mult)))
+			e.block = int(e.block) + bb
+			ev.append({"type": "block_gained", "target": i, "amount": bb, "total": int(e.block), "source": "bury"})
+		"moonfall":
+			# the Moon King: a piercing blow; the meter was spent when the intent was set
+			ev.append_array(_hit_hero(run, i, v, [], true))
 		"summon":
 			var sdef := EnemyDefs.def(String(e.id))
 			var sid := String(sdef.get("summon", EnemyDefs.SUMMON_ID))
@@ -994,6 +1029,8 @@ func _win(run: RunState) -> Array[Dictionary]:
 			x += float(def.xp) * m * float(am[1])
 	if run.has_passive("scholar"):
 		x *= Balance.PASSIVE_SCHOLAR
+	if moon_full:
+		g *= BiomeDefs.MOON_FULL_GOLD
 	gold_reward = int(round(g * Balance.tune_gold))
 	xp_reward = int(round(x))
 	var ev: Array[Dictionary] = [{"type": "combat_won", "gold": gold_reward, "xp": xp_reward, "boss": boss, "elite": elite, "miniboss": miniboss}]
@@ -1019,6 +1056,128 @@ static func _passive(id: String, value: int) -> Dictionary:
 func _rune(i: int, rune: String, effect: String, value: int) -> Dictionary:
 	return {"type": "rune_fired", "die_idx": i, "rune": rune, "effect": effect, "value": value}
 
+# ---------------------------------------------------------------- new biomes
+
+## No moon meter in this fight.
+const MOON_NONE := -99
+
+## Attack an enemy may still gain from Frenzy, Rally and drums (EnemyDefs.ATK_BONUS_CAP).
+static func _bonus_room(e: Dictionary) -> int:
+	return maxi(0, EnemyDefs.ATK_BONUS_CAP - int(e.get("frenzy", 0)) - int(e.get("rallied", 0)))
+
+## Rallies enemy k by up to v attack (capped). Returns the attack gained.
+func _rally(k: int, v: int) -> int:
+	var e := enemies[k]
+	var g := mini(v, _bonus_room(e))
+	if g <= 0:
+		return 0
+	e["rallied"] = int(e.get("rallied", 0)) + g
+	e.atk_bonus = int(e.atk_bonus) + g
+	return g
+
+## Biome rules at fight start (before the first intents are rolled):
+## - Orc Warcamp: every non-boss enemy is Rallied DRUM_RALLY per standing drum:
+##   rally {source:"drum", value, drums} + status buff {target, value, source:"drum", rally:true}.
+## - Moonlit Woods: the Half moon raises the transform threshold; on the Full lap transformers
+##   start changed (enemy_transformed {enemy_idx, form, id, source:"moon"}) and fights pay more.
+## - The Moon King's meter (moon_meter {value, delta:0, source:"start", max}).
+func _biome_begin(run: RunState) -> Array[Dictionary]:
+	var ev: Array[Dictionary] = []
+	moon = MOON_NONE
+	var ph := run.moon_phase()
+	if ph == "half":
+		transform_at = BiomeDefs.MOON_HALF_TRANSFORM
+	if ph == "full" and not boss:
+		moon_full = true
+		for i in enemies.size():
+			var e := enemies[i]
+			if not bool(e.boss) and EnemyDefs.transforms(String(e.id)):
+				e.phase = 2
+				e.step = 0
+				e.form = EnemyDefs.form(String(e.id), 2)
+				ev.append({"type": "enemy_transformed", "enemy_idx": i, "form": String(e.form), "id": String(e.id), "source": "moon"})
+	if run.twist() == "drums":
+		var drums := run.board.count("drum")
+		if drums > 0:
+			var v := BiomeDefs.DRUM_RALLY * drums
+			var out: Array[Dictionary] = []
+			for k in enemies.size():
+				if bool(enemies[k].boss):
+					continue
+				if _rally(k, v) > 0:
+					out.append({"type": "status", "target": k, "status": "buff", "value": int(enemies[k].atk_bonus), "source": "drum", "rally": true})
+			if not out.is_empty():
+				ev.append({"type": "rally", "source": "drum", "value": v, "drums": drums})
+				ev.append_array(out)
+	for i in enemies.size():
+		if String(enemies[i].id) == "boss_moon_king":
+			moon = 0
+			if run.has_asc("boss_phase") and int(run.stats.get("boss_stage", 0)) == 0:
+				moon = EnemyDefs.MOON_A9_START
+			if run.route.has("hollow") and run.route.has("moonlit") and (run.stats.get("minibosses_killed", []) as Array).has("mini_moonfang"):
+				moon += EnemyDefs.MOON_FANG_START
+				ev.append({"type": "moon_meter", "value": moon, "delta": 0, "source": "moonfang", "max": EnemyDefs.MOON_MAX})
+			else:
+				ev.append({"type": "moon_meter", "value": moon, "delta": 0, "source": "start", "max": EnemyDefs.MOON_MAX})
+			break
+	return ev
+
+## Index of the living Moon King, or -1.
+func moon_king() -> int:
+	if moon == MOON_NONE:
+		return -1
+	for i in enemies.size():
+		if alive(i) and String(enemies[i].id) == "boss_moon_king":
+			return i
+	return -1
+
+## The tide: +MOON_TIDE at the end of every enemy phase (moon_meter {source:"tide"}). A full meter
+## in phase 1 forces phase 2 (Moonrise: boss_phase {forced, source:"moonrise"}, a fresh phase-2
+## intent); in phase 2 it turns the next intent into Moonfall (enemy_intent {kind:"moonfall"}).
+## Either way the meter resets to 0 (moon_meter {source:"moonrise"|"moonfall"}).
+func _moon_tide(run: RunState) -> Array[Dictionary]:
+	var ev: Array[Dictionary] = []
+	var i := moon_king()
+	if i < 0:
+		return ev
+	moon += EnemyDefs.MOON_TIDE
+	ev.append({"type": "moon_meter", "value": moon, "delta": EnemyDefs.MOON_TIDE, "source": "tide", "max": EnemyDefs.MOON_MAX})
+	if moon < EnemyDefs.MOON_MAX:
+		return ev
+	var e := enemies[i]
+	var was := moon
+	moon = 0
+	if int(e.phase) == 1:
+		ev.append_array(_boss_phase2(i, run, true))
+		roll_intent(run.rng, i)
+		ev.append({"type": "moon_meter", "value": 0, "delta": -was, "source": "moonrise", "max": EnemyDefs.MOON_MAX})
+	else:
+		e.intent = {"kind": "moonfall", "value": EnemyDefs.MOONFALL + int(e.atk_bonus)}
+		ev.append({"type": "moon_meter", "value": 0, "delta": -was, "source": "moonfall", "max": EnemyDefs.MOON_MAX})
+	ev.append({"type": "enemy_intent", "enemy_idx": i, "intent": e.intent.duplicate()})
+	return ev
+
+## Clouds: each die showing exactly 1 in the attack (a Wild die never counts) pushes the meter back
+## 1, at most MOON_CLOUDS_MAX per turn and never below 0 (moon_meter {source:"clouds", ones}).
+func _moon_clouds(run: RunState) -> Array[Dictionary]:
+	if moon_king() < 0 or moon <= 0:
+		return []
+	var ones := moon_ones(run)
+	var nv := maxi(0, moon - mini(ones, EnemyDefs.MOON_CLOUDS_MAX))
+	if nv == moon:
+		return []
+	var d := nv - moon
+	moon = nv
+	return [{"type": "moon_meter", "value": moon, "delta": d, "source": "clouds", "ones": ones, "max": EnemyDefs.MOON_MAX}]
+
+## Dice currently showing exactly 1 (not Wild).
+func moon_ones(run: RunState) -> int:
+	var n := 0
+	for k in dice_values.size():
+		if dice_values[k] == 1 and k < run.dice.size() and run.dice[k].rune != "wild":
+			n += 1
+	return n
+
 static func _err(msg: String) -> Dictionary:
 	return {"type": "error", "msg": msg}
 
@@ -1034,6 +1193,7 @@ func to_dict() -> Dictionary:
 		"hero_burn": hero_burn, "pet_block_carry": pet_block_carry, "wisp_free": wisp_free, "wisp_used": wisp_used,
 		"potion_turn": potion_turn, "stoneskin": stoneskin, "boost": boost, "pet_mult": pet_mult,
 		"rerolls_used_this_turn": rerolls_used_this_turn, "refunds_this_turn": refunds_this_turn, "oath": oath,
+		"moon": moon, "transform_at": transform_at, "moon_full": moon_full,
 		"pet_thorns": pet_thorns, "pet_block_turn": pet_block_turn, "last_runes": last_runes.duplicate(true),
 		"extra_dice": extra_dice.map(func(d): return d.to_dict()), "pending_bones": pending_bones, "bones_raised": bones_raised,
 		"attack_target": attack_target,
@@ -1070,6 +1230,9 @@ static func from_dict(d: Dictionary) -> CombatState:
 	c.rerolls_used_this_turn = int(d.get("rerolls_used_this_turn", 0))
 	c.refunds_this_turn = int(d.get("refunds_this_turn", 0))
 	c.oath = int(d.get("oath", 0))
+	c.moon = int(d.get("moon", MOON_NONE))
+	c.transform_at = float(d.get("transform_at", 0.5))
+	c.moon_full = bool(d.get("moon_full", false))
 	c.pet_thorns = int(d.get("pet_thorns", 0))
 	c.pet_block_turn = int(d.get("pet_block_turn", 0))
 	for xd in d.get("extra_dice", []):
@@ -1095,6 +1258,7 @@ static func _norm_enemy(ed: Dictionary) -> Dictionary:
 		"frenzy": int(ed.get("frenzy", 0)), "form": String(ed.get("form", "")),
 		"affixes": _strings(ed.get("affixes", [])), "thorns_value": int(ed.get("thorns_value", Balance.ENEMY_THORNS)),
 		"actions": int(ed.get("actions", 0)), "chilled": bool(ed.get("chilled", false)),
+		"rallied": int(ed.get("rallied", 0)),
 		"brave": bool(ed.get("brave", false)), "cower": bool(ed.get("cower", false)),
 		"weakened": bool(ed.get("weakened", false)), "fled": bool(ed.get("fled", false)),
 	}

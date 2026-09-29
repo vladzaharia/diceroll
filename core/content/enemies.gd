@@ -15,6 +15,9 @@ extends RefCounted
 ## rally intent: every living enemy (the caster included) gains +value attack for the fight.
 ## transform: a regular/mini-boss with `phases: [p1, p2]` (and `forms` names) switches pattern once
 ## at <= 50% HP, dropping its Block (enemy_transformed {enemy_idx, form}).
+## New biomes (docs/design/2026-09-29-new-biomes.md): bury (Sand Colossus: locks N of your dice
+## next turn like curse N and gains BURY_BLOCK Block per die) and moonfall (the Moon King: an attack
+## that ignores Block, replacing its intent when the moon meter fills in phase 2).
 
 const ENEMIES := {
 	"skeleton_minion": {"name": "Skeleton Minion", "hp": 12, "gold": 4, "xp": 3, "mode": "random",
@@ -62,6 +65,9 @@ const ENEMIES := {
 			[{"kind": "attack", "value": 5}, {"kind": "drain", "value": 6}, {"kind": "attack", "value": 9}]]},
 	"fallen_paladin": {"name": "Fallen Paladin", "hp": 40, "gold": 12, "xp": 9, "mode": "cycle",
 		"pattern": [{"kind": "attack", "value": 9}, {"kind": "heal", "value": 6}, {"kind": "block", "value": 8}]},
+	# --- 2026-09-29 new biomes: the Deep Mines elite leader (crystal-studded; hitting it hurts)
+	"rock_golem": {"name": "Rock Golem", "hp": 24, "gold": 14, "xp": 10, "mode": "cycle", "traits": ["thorns"],
+		"pattern": [{"kind": "block", "value": 12}, {"kind": "attack", "value": 11}]},
 }
 
 ## Bosses have two phases; phase 2 starts at or below half HP. Boss numbers are not scaled.
@@ -78,24 +84,53 @@ const BOSSES := {
 	]},
 	# Final-boss rotation (lap 15). The Bone Warden doubles as the Bone Throne's alternate boss:
 	# phase 2 raises a bone legion that wards it (half damage while any minion stands).
-	"boss_bone_warden": {"name": "Bone Warden", "hp": 1150, "gold": 0, "xp": 0, "summon": "skeleton_warrior",
+	"boss_bone_warden": {"name": "Bone Warden", "hp": 1000, "gold": 0, "xp": 0, "summon": "skeleton_warrior",
 		"traits": [[], ["ward"]], "phases": [
 		[{"kind": "attack", "value": 20}, {"kind": "block", "value": 28}, {"kind": "summon", "value": 1}],
-		[{"kind": "summon", "value": 2}, {"kind": "attack", "value": 24}, {"kind": "attack", "value": 20}, {"kind": "block", "value": 24}],
+		[{"kind": "summon", "value": 1}, {"kind": "attack", "value": 24}, {"kind": "attack", "value": 20}, {"kind": "block", "value": 24}],
 	]},
 	# Magma Depths: burns you; phase 2 scorches a face of your dice to 0 (blank) for the fight.
-	"boss_cinder_king": {"name": "Cinder King", "hp": 1200, "gold": 0, "xp": 0, "phases": [
-		[{"kind": "burn", "value": 4}, {"kind": "attack", "value": 20}, {"kind": "block", "value": 24}],
-		[{"kind": "scorch", "value": 1}, {"kind": "attack", "value": 24}, {"kind": "burn", "value": 5}, {"kind": "attack", "value": 20}],
+	"boss_cinder_king": {"name": "Cinder King", "hp": 1800, "gold": 0, "xp": 0, "phases": [
+		[{"kind": "burn", "value": 2}, {"kind": "attack", "value": 20}, {"kind": "block", "value": 24}],
+		[{"kind": "scorch", "value": 1}, {"kind": "attack", "value": 24}, {"kind": "burn", "value": 3}, {"kind": "attack", "value": 20}],
 	]},
 	# Magma Depths: a molten shell (Block never expires) in phase 1; in phase 2 the shell shatters
 	# (its Block is lost when phase 2 starts) and its attacks pierce your Block.
-	"boss_magma_golem": {"name": "Magma Golem", "hp": 800, "gold": 0, "xp": 0,
+	"boss_magma_golem": {"name": "Magma Golem", "hp": 960, "gold": 0, "xp": 0,
 		"traits": [["armor"], ["pierce"]], "phases": [
 		[{"kind": "block", "value": 32}, {"kind": "attack", "value": 22}, {"kind": "attack", "value": 26}],
 		[{"kind": "attack", "value": 24}, {"kind": "attack", "value": 28}, {"kind": "buff", "value": 3}],
 	]},
+	# Sunscorched Ruins: phase 2 ("Sandstorm") buries your dice (curse N + Block per die) and pierces.
+	"boss_sand_colossus": {"name": "Sand Colossus", "hp": 1180, "gold": 0, "xp": 0, "summon": "bone_cutthroat",
+		"traits": [[], ["pierce"]], "phases": [
+		[{"kind": "attack", "value": 20}, {"kind": "block", "value": 26}, {"kind": "summon", "value": 1}],
+		[{"kind": "bury", "value": 2}, {"kind": "attack", "value": 24}, {"kind": "attack", "value": 20}],
+	]},
+	# Moonlit Woods: the moon meter (CombatState.moon) rises every enemy phase and your 1s push it
+	# back; a full meter forces phase 2 (Moonrise), then turns its next intent into Moonfall.
+	"boss_moon_king": {"name": "The Moon King", "hp": 860, "gold": 0, "xp": 0, "summon": "wolf_bandit",
+		"forms": ["man", "wolf"], "phases": [
+		[{"kind": "attack", "value": 20}, {"kind": "block", "value": 24}, {"kind": "summon", "value": 1}],
+		[{"kind": "drain", "value": 16}, {"kind": "attack", "value": 22}, {"kind": "attack", "value": 18}],
+	]},
 }
+
+## Sand Colossus bury: Block gained per die buried.
+const BURY_BLOCK := 10
+## The Moon King's moon meter: fills at MOON_MAX (+MOON_TIDE per enemy phase); each die showing
+## exactly 1 in your attack pushes it back 1 (at most MOON_CLOUDS_MAX per turn, never below 0).
+## Moonrise (phase 1 at MOON_MAX) forces phase 2; in phase 2 a full meter turns the next intent into
+## Moonfall (MOONFALL damage, ignores Block). A9 starts the meter at MOON_A9_START; killing
+## Moonfang on a Hollow + Moonlit route starts it at MOON_FANG_START.
+## (Static vars so tools/sim.gd --moon=max:N,tide:N,clouds:N,fall:N can sweep them; the game never
+## changes them.)
+static var MOON_MAX := 4
+static var MOON_TIDE := 1
+static var MOON_CLOUDS_MAX := 2
+static var MOONFALL := 34
+const MOON_A9_START := 2
+const MOON_FANG_START := -1
 
 ## Mini-bosses: one per run, drawn from the tier-2 biome's candidates (BiomeDefs) and spawned
 ## on a `miniboss` tile when lap 7 starts (optional fight).
@@ -119,7 +154,7 @@ const MINIBOSSES := {
 		"phases": [[{"kind": "block", "value": 10}, {"kind": "attack", "value": 9}, {"kind": "curse", "value": 1}],
 			[{"kind": "attack", "value": 8}, {"kind": "drain", "value": 10}, {"kind": "attack", "value": 12}]]},
 	"mini_orc_warchief": {"name": "Orc Warchief", "hp": 100, "gold": 30, "xp": 15, "mode": "cycle", "summon": "orc_raider",
-		"pattern": [{"kind": "summon", "value": 1}, {"kind": "rally", "value": 3}, {"kind": "attack", "value": 11}, {"kind": "block", "value": 8}]},
+		"pattern": [{"kind": "summon", "value": 1}, {"kind": "rally", "value": 2}, {"kind": "attack", "value": 11}, {"kind": "block", "value": 8}]},
 }
 
 ## Legacy per-act defaults (old saves, scenarios). The run uses RunState.miniboss_id.
@@ -146,6 +181,12 @@ const COUNTS := [[2, 2], [2, 2], [2, 3], [2, 3], [2, 3]]
 ## Frenzy trait: attack gained per main-attack hit survived, and its cap.
 const FRENZY_STEP := 2
 const FRENZY_MAX := 6
+## Sim-only dial (tools/sim.gd --enemy-hp=<id>:<mult>,...): per-id HP multipliers. The game never
+## sets it.
+static var tune_hp_by_id := {}
+
+## Cap on the attack an enemy gains from Frenzy, Rally (the intent) and Warcamp drums combined.
+const ATK_BONUS_CAP := 8
 
 ## Intent pattern of a non-boss enemy in `phase` (1-based): transforming enemies (a "phases"
 ## entry) switch to phases[1] once at <= 50% HP.

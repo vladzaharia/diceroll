@@ -186,6 +186,11 @@ const LOOKS := {
 				"clips": {"attack": LARGE_2H, "idle": "Melee_2H_Idle"}},
 			{"model": "mannequin_large", "undead_large": false, "strength": 0.95, "gear": {}, "clips": {"attack": LARGE_FIST},
 				"eyes": Color(1.0, 0.7, 0.2), "label": "lava hulk"}]},
+	# --- new biomes (docs/design/2026-09-29-new-biomes.md): PLACEHOLDER looks from the merge; the
+	# presentation pass owns the real ones -------------------------------------------------------
+	"rock_golem": {"model": "skel_golem", "undead_large": true, "tint": Color(0.42, 0.38, 0.34), "strength": 0.8,
+		"scale": 1.1, "gear": {}, "clips": {"attack": LARGE_FIST, "idle": "Idle_B"}, "extras": ["rock_shell"],
+		"eyes": Color(0.9, 0.75, 0.4), "label": "rock golem (placeholder)"},
 	# --- 2026-09-28 roster (docs/design/2026-09-28-classes-enemies-skins.md §3) --------------------
 	"bone_cutthroat": {"model": "skel_rogue", "undead": true,
 		"gear": {"handslot.r": SKW + "Skeleton_Dagger.gltf", "handslot.l": SKW + "Skeleton_Dagger.gltf"},
@@ -347,4 +352,13 @@ const LOOKS := {
 		"emission": Color(0.7, 0.2, 0.02), "cracks": Color(1.0, 0.8, 0.35, 0.8), "gear": {}, "clips": {"attack": LARGE_FIST},
 		"extras": ["rock_shell", "embers"], "eyes": Color(1.0, 0.85, 0.4), "eyes_offset": Vector3(0, 0.02, 0.12),
 		"hide": ["MannequinLarge_Head"], "light": Color(1.0, 0.45, 0.12), "boss": true, "label": "magma golem"},
+	# new biomes: PLACEHOLDER boss looks (presentation pass to replace)
+	"boss_sand_colossus": {"model": "mannequin_large", "tint": Color(0.85, 0.7, 0.42), "strength": 0.85, "scale": 1.8,
+		"gear": {}, "clips": {"attack": LARGE_FIST}, "extras": ["rock_shell"], "eyes": Color(1.0, 0.85, 0.4),
+		"eyes_offset": Vector3(0, 0.02, 0.12), "hide": ["MannequinLarge_Head"], "light": Color(1.0, 0.8, 0.45),
+		"boss": true, "label": "sand colossus (placeholder)"},
+	"boss_moon_king": {"model": "barbarian_large", "texture": ADT + "barbarian_texture_alt_A.png", "tint": Color(0.55, 0.6, 0.85),
+		"strength": 0.5, "scale": 1.35, "gear": {"handslot.r": ADW + "axe_2handed_Large.gltf"},
+		"clips": {"attack": LARGE_2H, "idle": "Melee_2H_Idle"}, "extras": ["crown"], "eyes": Color(0.75, 0.85, 1.0),
+		"hide": ["BearHat"], "light": Color(0.6, 0.7, 1.0), "boss": true, "label": "moon king (placeholder)"},
 }

@@ -130,6 +130,9 @@ func counter(stat: String) -> int:
 	match stat:
 		"best_lap":
 			return int(records.get("best_lap", 0))
+		"boss_kinds":
+			# distinct final bosses defeated (the Sigil firsts list)
+			return ((records.get("firsts", {}) as Dictionary).get("boss", []) as Array).size()
 		"classes_at_boss":
 			var n := 0
 			var r: Dictionary = records.get("bosses_reached_by_class", {})

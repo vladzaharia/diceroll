@@ -45,7 +45,14 @@ const BIOME := {
 	"frost": ["frostbound", "armored", "piercing"],
 	"throne": ["armored", "warded", "hexing", "frenzied"],
 	"magma": ["frenzied", "piercing", "thorned"],
+	# 2026-09-29 new biomes (docs/design/2026-09-29-new-biomes.md)
+	"mines": ["armored", "piercing"],
+	"warcamp": ["frenzied", "thorned", "piercing"],
+	"ruins": ["piercing", "hexing", "armored", "frenzied"],
+	"moonlit": ["vampiric", "regenerating", "frenzied", "warded"],
 }
+## Per-biome gilded weight overrides (the Deep Mines is the economy biome).
+const GILDED_BY_BIOME := {"mines": 3.0}
 const BIOME_WEIGHT := 3.0
 const GILDED_WEIGHT := 1.0
 
@@ -82,7 +89,7 @@ static func weights(biome: String) -> Dictionary:
 	var w := {}
 	for id in BIOME.get(biome, []):
 		w[id] = BIOME_WEIGHT
-	w["gilded"] = GILDED_WEIGHT
+	w["gilded"] = float(GILDED_BY_BIOME.get(biome, GILDED_WEIGHT))
 	return w
 
 ## True when affix `a` may go on enemy `id` that already has `have` affixes (and its traits).

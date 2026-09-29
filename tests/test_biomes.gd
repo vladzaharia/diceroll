@@ -54,7 +54,7 @@ func test_route_one_biome_per_tier_and_deterministic() -> void:
 	var routes := {}
 	var bosses := {}
 	var minis := {}
-	for s in 120:
+	for s in 600:
 		var f := GameFlow.new_run("knight", s)
 		var g := GameFlow.new_run("knight", s)
 		assert_eq(Array(f.run.route), Array(g.run.route), "same seed, same route")
@@ -67,9 +67,9 @@ func test_route_one_biome_per_tier_and_deterministic() -> void:
 		routes[",".join(f.run.route)] = true
 		bosses[f.run.boss_id] = true
 		minis[f.run.miniboss_id] = true
-	assert_eq(routes.size(), 8, "every route shows up")
-	assert_eq(bosses.size(), 4, "every final boss shows up")
-	assert_eq(minis.size(), 6, "every tier-2 mini-boss shows up")
+	assert_eq(routes.size(), 36, "every route shows up")
+	assert_eq(bosses.size(), 6, "every final boss shows up")
+	assert_eq(minis.size(), 7, "every tier-2 mini-boss shows up")
 
 func test_forced_route_and_bosses() -> void:
 	var f := GameFlow.new_run("mage", 5, 28, {"route": ["glade", "frost", "magma"], "miniboss": "mini_frost_warden", "boss": "boss_magma_golem"})
@@ -87,7 +87,10 @@ func test_forced_route_and_bosses() -> void:
 
 func test_candidates_per_biome() -> void:
 	assert_eq(BiomeDefs.miniboss_candidates(["crypt", "hollow", "throne"]), ["mini_pumpkin_knight", "mini_grave_mage", "mini_moonfang"])
-	assert_eq(BiomeDefs.miniboss_candidates(["crypt", "frost", "throne"]), ["mini_frost_warden", "mini_bone_champion", "mini_orc_warchief"])
+	assert_eq(BiomeDefs.miniboss_candidates(["crypt", "frost", "throne"]), ["mini_frost_warden", "mini_bone_champion"])
+	assert_eq(BiomeDefs.miniboss_candidates(["mines", "warcamp", "ruins"]), ["mini_orc_warchief", "mini_cinder_brute"])
+	assert_eq(BiomeDefs.boss_candidates(["mines", "warcamp", "ruins"]), ["boss_sand_colossus", "boss_bone_warden"])
+	assert_eq(BiomeDefs.boss_candidates(["mines", "warcamp", "moonlit"]), ["boss_moon_king", "boss_lich"])
 	assert_eq(BiomeDefs.boss_candidates(["crypt", "hollow", "throne"]), ["boss_lich", "boss_bone_warden"])
 	assert_eq(BiomeDefs.boss_candidates(["crypt", "hollow", "magma"]), ["boss_cinder_king", "boss_magma_golem"])
 	var finals := {}
@@ -112,7 +115,7 @@ func test_route_info() -> void:
 	var f := GameFlow.new_run("knight", 1, 28, {"route": ["crypt", "frost", "throne"], "miniboss": "mini_bone_champion", "boss": "boss_lich"})
 	var info := f.route_info()
 	assert_eq(info.route.size(), 3)
-	assert_eq(info.route[0], {"id": "crypt", "name": "The Crypt", "desc": BiomeDefs.desc_of("crypt")})
+	assert_eq(info.route[0], {"id": "crypt", "name": "The Crypt", "desc": BiomeDefs.desc_of("crypt"), "twist": "", "look": "crypt"})
 	assert_eq(info.route[1].name, "Frostpeak")
 	assert_eq(info.route[2].name, "Bone Throne")
 	assert_eq(info.miniboss, {"id": "mini_bone_champion", "name": "Bone Champion"})
@@ -298,7 +301,7 @@ func test_hollow_event_heals() -> void:
 	for e in ev:
 		if e.type == "hp_changed" and e.source == "hollow":
 			h = e
-	assert_eq(h.get("amount", 0), 8, "8% heal after an event")
+	assert_eq(h.get("amount", 0), int(round(100 * Balance.HOLLOW_EVENT_HEAL_PCT)), "the Hollow heal after an event")
 	var g := _flow(["crypt", "frost", "throne"])
 	g.run.hp = 50
 	var ev2: Array[Dictionary] = []

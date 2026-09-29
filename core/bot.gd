@@ -113,6 +113,14 @@ static func tile_score(f: GameFlow, idx: int, crossing: bool) -> float:
 			s = 3.0
 		"minigame":
 			s = 3.5
+		"ore":
+			s = 4.5
+		"drum":
+			s = 5.0
+		"oasis":
+			s = 3.0 + (1.0 - r) * 6.0 + (2.0 if f.run.cooled_lap != f.run.lap else 0.0)
+	if String(t.type) == "chest" and bool(t.get("moon", false)):
+		s = 7.0
 	if not t.enemies.is_empty() and String(t.type) != "miniboss":
 		# a naive player still sees a pack of heavy hitters: about two enemy turns vs HP
 		var d := _danger(f, t)
@@ -127,12 +135,18 @@ static func tile_score(f: GameFlow, idx: int, crossing: bool) -> float:
 static var danger_hi := 1.2
 static var danger_lo := 0.8
 
+## Orc Warcamp: the attack every enemy will start its fight with (standing drums).
+static func drum_bonus(run: RunState) -> int:
+	if run.twist() != "drums":
+		return 0
+	return mini(EnemyDefs.ATK_BONUS_CAP, BiomeDefs.DRUM_RALLY * run.board.count("drum"))
+
 ## Rough share of current HP a fight on tile `t` costs in two enemy turns (greedy heuristic).
 static func _danger(f: GameFlow, t: Dictionary) -> float:
 	var am := Balance.enemy_atk_scale(f.run.eff_lap()) * (Balance.ELITE_ATK_MULT if bool(t.get("elite", false)) else 1.0)
 	var hit := 0.0
 	for id in t.enemies:
-		hit += _avg_attack(String(id), am, 0)
+		hit += _avg_attack(String(id), am, drum_bonus(f.run))
 	return hit * 2.0 / maxf(1.0, float(f.run.hp))
 
 ## The move is automatic; the only choice is reroll-or-go.
@@ -330,6 +344,11 @@ static func _forge(f: GameFlow) -> Array:
 static func _event(f: GameFlow) -> int:
 	var ch: Array = f.offer.choices
 	match String(f.offer.id):
+		"ore":
+			# Deep Mines: the Raise, unless the pool is full and a shop comes at this lap's end
+			if not bool(ch[1].enabled) or (f.run.dice.size() >= f.run.max_dice() and f.run.is_shop_lap(f.run.lap)):
+				return 0
+			return 1
 		"duel":
 			return 2
 		"merchant":
@@ -770,6 +789,9 @@ class CombatModel:
 	var w_heal := 0.8
 	var w_gold := 0.15
 	var w_lucky := 3.0
+	# the Moon King's meter (new biomes): PV per die showing 1 (not Wild), up to moon_cap dice
+	var moon_w := 0.0
+	var moon_cap := 0
 	var win_bonus := 8.0
 	var use_memo := true
 	## >= 0: score only this (model-local) target (realistic rule-of-thumb targeting)
@@ -1075,6 +1097,12 @@ class CombatModel:
 		last_total = total
 		last_dmg = best_dmg if ne > 0 else float(total)
 		last_kills = best_kills
+		if moon_w > 0.0:
+			var ones := 0
+			for i in n:
+				if vals[i] == 1 and (wild_mask & (1 << i)) == 0:
+					ones += 1
+			best += moon_w * mini(ones, moon_cap)
 		if use_memo:
 			memo[key] = best
 		return best
@@ -1166,8 +1194,22 @@ static func _combat_model(f: GameFlow, rules: AutoRules) -> CombatModel:
 		cm.add_enemy(k, float(e.hp), float(e.block), float(e.poison), hit, pierce, other, future,
 			(CombatState.has_trait(e, "ward") and summons > 0) or (CombatState.has_trait(e, "ward_allies") and c._unwarded_others(k) > 0),
 			bool(e.frozen), CombatState.has_trait(e, "thorns"))
+	_moon_model(cm, c)
 	_class_model(cm, run, c)
 	return cm
+
+## The Moon King (new biomes): 1s push the moon meter back, so keep them when it is high. The
+## worth of a 1 is the Moonrise / Moonfall damage it delays (full when the meter would fill at the
+## coming tide, a share of it at 2).
+static func _moon_model(cm: CombatModel, c: CombatState) -> void:
+	var i := c.moon_king()
+	if i < 0 or c.moon < 2:
+		return
+	var e: Dictionary = c.enemies[i]
+	var cost := float(EnemyDefs.MOONFALL) if int(e.phase) == 2 else 18.0
+	var share := 1.0 if c.moon >= EnemyDefs.MOON_MAX - EnemyDefs.MOON_TIDE else 0.35
+	cm.moon_w = cm.w_hp * cost * share * 0.5
+	cm.moon_cap = mini(EnemyDefs.MOON_CLOUDS_MAX, c.moon)
 
 ## Class mechanics in the combat model (c == null: the pool-value model, no fight yet).
 static func _class_model(cm: CombatModel, run: RunState, c: CombatState, dice: Array = []) -> void:
@@ -1964,6 +2006,11 @@ static func _decide_event(f: GameFlow, rules: AutoRules) -> Dictionary:
 		var v := 0.0
 		var why := String(c.label)
 		match id:
+			"ore":
+				if String(c.get("ore", "")) == "gold":
+					v = float(c.get("gold", 0)) * gold_pt
+				else:
+					v = maxf(0.0, float(_best_face_edit(f, rules, ["raise"])[4]))
 			"shrine":
 				if c.has("passive"):
 					v = _passive_value(f, rules, String(c.passive))
@@ -2054,7 +2101,7 @@ static func _fight_loss(f: GameFlow, rules: AutoRules, ids: Array, elite: bool) 
 		var hm := scale * (Balance.ELITE_HP_MULT if elite else 1.0)
 		var am := ascale * (Balance.ELITE_ATK_MULT if elite else 1.0)
 		hps.append(float(EnemyDefs.def(sid).hp) * hm)
-		atks.append(_avg_attack(sid, am, 0))
+		atks.append(_avg_attack(sid, am, 0 if boss else drum_bonus(run)))
 	var order := range(hps.size())
 	order.sort_custom(func(a, b): return hps[a] < hps[b])
 	var cum := 0.0
@@ -2124,6 +2171,8 @@ static func _tile_value(f: GameFlow, rules: AutoRules, idx: int, crossing: bool,
 			v = _fight_value(f, rules, t)
 		"chest":
 			v = 0.5 * 1.5 + 0.5 * 18.0 * Balance.gold_scale(run.eff_lap()) * gold_pt * (1.5 if run.has_passive("treasure_sense") else 1.0)
+			if bool(t.get("moon", false)):
+				v = 2.0
 		"event":
 			v = 0.9
 		"campfire":
@@ -2142,6 +2191,17 @@ static func _tile_value(f: GameFlow, rules: AutoRules, idx: int, crossing: bool,
 			v = -float(run.pct_of_max(Balance.LAVA_LAND_PCT)) * hp_pt
 		"forge":
 			v = 0.6 * (2.0 if run.has_passive("blacksmith") else 1.0)
+		"ore":
+			v = 0.6 if run.twist() == "ore" else 0.0
+		"drum":
+			if run.twist() == "drums":
+				# the gold, and every later fight in the biome loses +DRUM_RALLY attack per enemy
+				v = BiomeDefs.DRUM_GOLD * Balance.gold_scale(run.eff_lap()) * gold_pt + 1.2
+		"oasis":
+			if run.twist() == "heat":
+				v = minf(run.pct_of_max(BiomeDefs.OASIS_HEAL_PCT), run.max_hp - run.hp) * hp_pt
+				if run.cooled_lap != run.lap:
+					v += run.pct_of_max(BiomeDefs.HEAT_PCT) * hp_pt
 		"treasury":
 			v = run.treasury * gold_pt
 		"portal":
@@ -2180,6 +2240,7 @@ static func _tile_label(f: GameFlow, idx: int) -> String:
 		return "a cleared tile"
 	return {"enemy": "a fight", "elite": "an elite fight", "miniboss": "the mini-boss", "chest": "a chest",
 		"event": "an event", "campfire": "a campfire", "trap": "a trap", "ice": "ice", "lava": "lava",
+		"ore": "an ore vein", "drum": "a war drum", "oasis": "an oasis",
 		"forge": "the Forge", "treasury": "the Treasury", "portal": "the Portal", "start": "Start",
 		"empty": "an empty tile"}.get(ty, ty)
 
