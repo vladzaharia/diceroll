@@ -63,7 +63,7 @@ const TRAIT_DEFS := {
 	"boots_sure_foot": {"name": "Sure Foot", "desc": "Traps and ice: dodge on 3+."},
 	"boots_pair_pick": {"name": "Pathfinder's Eye", "desc": "When values tie for the move, the higher value moves."},
 	"boots_treasury_step": {"name": "Tithe", "desc": "Passing the Treasury banks +5."},
-	"charm_cheap_restock": {"name": "Haggle", "desc": "Shop restocks cost 5 gold."},
+	"charm_cheap_restock": {"name": "Haggle", "desc": "Shop restocks cost 7 gold."},
 	"charm_free_restock": {"name": "Regular", "desc": "One free restock per shop."},
 	"charm_shop_potion": {"name": "Apothecary", "desc": "Every shop offers a potion."},
 	"charm_treasury": {"name": "Interest", "desc": "Treasury cash-outs x1.25."},
@@ -72,7 +72,7 @@ const TRAIT_DEFS := {
 const TRAIT_BONUS := {
 	"helm_lap_heal": 0.005, "helm_campfire": 0.10, "helm_bulwark": 4, "blade_pair": 1, "blade_high": 3,
 	"blade_boss_opener": 1.3, "blade_overflow": 0.5, "boots_portal": 2, "boots_sure_foot": 3,
-	"boots_treasury_step": 5, "charm_cheap_restock": 5, "charm_treasury": 1.25,
+	"boots_treasury_step": 5, "charm_cheap_restock": 7, "charm_treasury": 1.25,
 }
 
 ## Crowns to go from `level` to level + 1; {} at max.
