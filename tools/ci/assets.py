@@ -245,6 +245,9 @@ def cmd_pack(args) -> None:
     out = Path(args.out).resolve()
     manifest = load_json(out / "manifest.json", {"schema": 1, "bundles": {}})
     lock = {"schema": 1, "units": {}}
+    # age output is randomized, so re-encrypting an unchanged unit yields a different ciphertext than the
+    # one already in the store: carry the previous lock entry over instead of packing it again.
+    prev = load_json(Path(args.lock), {"units": {}}).get("units", {})
     units = discover()
     if not units:
         die("no asset units found (run tools/import_assets.sh first)")
@@ -254,6 +257,10 @@ def cmd_pack(args) -> None:
         digest, n, size = unit_hash(ROOT / u["dest"], suffixes)
         rel = bundle_rel(name, digest)
         target = out / rel
+        old = prev.get(name)
+        if old and old.get("sha256") == digest and old.get("file") == rel:
+            lock["units"][name] = old
+            continue
         if not target.exists():
             log(f"pack {name} ({n} files, {size / 1e6:.1f} MB)")
             encrypt_dir(ROOT / u["dest"], suffixes, target)
