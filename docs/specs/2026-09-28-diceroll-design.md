@@ -266,6 +266,6 @@ Principles: no premium currency, no paid or random rolls for power. Every upgrad
   - **CI/CD:** tests, sims and a screenshot matrix on every change. Releases build macOS, iOS/iPadOS, Android, Windows, Linux and Web to GitHub Releases. Store uploads are disabled by default. The changelog comes from commits, with LLM player-facing notes.
   - **In-game auto-updates:** store updates plus an "update available" prompt on mobile; on desktop, signed PCK content patches and full binary updates, with rollback safety. Web always serves the latest. Steam and itch handle their own updates.
 - **Open source (Vlad):**
-  - The game repo `vladzaharia/diceroll` is **public** under the **MIT** licence (code and original art). Third-party assets are excluded and credited in THIRD_PARTY_NOTICES, and the README tells forks exactly which KayKit FREE/EXTRA packs to get.
+  - The game repo `vladzaharia/diceroll` is **public** under the **MIT** licence (code and original art). Third-party assets are excluded and credited in THIRD_PARTY_NOTICES, and the README tells forks exactly which KayKit FREE/EXTRA packs to get. (All KayKit packs, including EXTRA, are CC0; they stay out of the public repo by choice, to respect the creator selling EXTRA. Only Mixkit music is non-redistributable.)
   - The asset repo stays **private**.
   - History was rewritten (git-filter-repo) to purge previously tracked asset folders before publishing. A backup of the old `.git` is at `../diceroll-git-backup-20260929-0213`.
