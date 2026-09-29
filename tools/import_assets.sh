@@ -129,6 +129,17 @@ sync "$MM/11 - May 2024 - Clown/assets/gltf" "$KK/mystery/clown"
 sync "$MM/10 - April 2024 - Paladin/assets/gltf" "$KK/mystery/paladin"
 sync "$MM/1 - July 2023 - Orc Raider/assets/gltf" "$KK/mystery/orc" --include='Orc_Wardrum*' --include='*.png' --exclude='*'
 cp -f "$MM/License.txt" "$KK/mystery/License.txt"
+echo "== KayKit Skeletons 1.1 (FREE): the minion's head/jaw/eyes make the Skull Buddy pet"
+SK="KayKit_Skeletons_1.1_FREE"
+sync "$SRC/$SK/characters/gltf" "$KK/skeletons" --include='Skeleton_Minion.glb' --include='*.png' --exclude='*'
+lic "$SK" "$KK/skeletons"
+
+echo "== KayKit ResourceBits EXTRA gems (Crystal Wisp pet; EXTRA = never committed, skipped if absent)"
+RB="KayKit_ResourceBits_1.0_EXTRA"
+if [ -d "$SRC/$RB/Assets/gltf" ]; then
+	sync "$SRC/$RB/Assets/gltf" "$KK/resource" --include='Gem_*' --include='resource_bits_texture.png' --exclude='*'
+	lic "$RB" "$KK/resource"
+fi
 
 echo "== Music beds (mixkit, re-encoded to 96 kbps mp3 to keep the repo lean)"
 MUS="$DST/audio/music"

@@ -1,0 +1,21 @@
+# Third-party assets
+
+No third-party asset is committed to this repo. Some packs, the KayKit **EXTRA** tier, are paid and not redistributable.
+
+## Layout
+- **`third_party/`** (git-ignored, with a `.gdignore` so Godot doesn't import it) is the canonical store. It holds the original packs:
+  - `kaykit/`: all KayKit packs (FREE and EXTRA), as downloaded
+  - `music/mixkit/`: mixkit music beds
+  - `kenney/`: Kenney CC0 SFX packs
+  - `fonts/`: Fredoka and Lilita One (OFL)
+  - `tiny_rpg/`: Tiny RPG character sprite packs (currently unused)
+- **`assets/kaykit/`, `assets/audio/`, `assets/fonts/`** (git-ignored) are the runtime subsets the game loads. `tools/import_assets.sh` builds them from `third_party/`.
+- **`assets/icon/` and `assets/CREDITS.md`** are the project's own files and stay tracked.
+
+## Fresh clone / new machine
+1. Put the packs into `third_party/` using the layout above. Extract KayKit downloads into `third_party/kaykit/<PackName>/`.
+2. Run `tools/import_assets.sh`. Add `--fetch` to download the fonts and Kenney SFX into `third_party/` if they're missing.
+3. Run `godot --headless --path . --import`.
+
+## Adding assets from a new pack
+Extend `tools/import_assets.sh` with a `sync` line that copies the needed subset from `third_party/kaykit/<Pack>/...` into `assets/kaykit/<name>/`. Keep runtime subsets lean.

@@ -42,6 +42,8 @@ var auto_hud: AutoHud
 var auto_settings: AutoSettingsPanel
 ## The Camp hub overlay and its building screens (ui/camp).
 var camp: CampScreen
+## Potion belt + pet charge meter (ui/hud/meta_hud.gd); emits command("use_potion", [slot]).
+var meta_hud: MetaHud
 
 var _flow: GameFlow
 var _modals: Array[UiModal] = []
@@ -71,7 +73,10 @@ func _init() -> void:
 	auto_hud = AutoHud.new()
 	auto_hud.setup(self)
 	auto_settings = AutoSettingsPanel.new()
-	for c in [board_hud, combat_hud, portal, banner, draft, passive, rune_assign, shop, forge, event, summary, auto_hud, inspector, title, class_select, route_card, pause, settings, auto_settings]:
+	meta_hud = MetaHud.new()
+	meta_hud.tops = [board_hud.top, combat_hud.top]
+	meta_hud.command.connect(_cmd)
+	for c in [board_hud, combat_hud, meta_hud, portal, banner, draft, passive, rune_assign, shop, forge, event, summary, auto_hud, inspector, title, class_select, route_card, pause, settings, auto_settings]:
 		add_child(c)
 	_modals = [draft, passive, rune_assign, shop, forge, event, summary]
 	board_hud.visible = false
@@ -233,6 +238,7 @@ func sync(flow: GameFlow) -> void:
 		board_hud.refresh(flow)
 	if in_combat:
 		combat_hud.refresh(flow)
+	meta_hud.refresh(flow)
 	portal.refresh(flow)
 	var want: UiModal = null
 	var kind := String(flow.offer.get("kind", ""))

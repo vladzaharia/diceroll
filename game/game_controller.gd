@@ -38,6 +38,8 @@ var overlay: GameOverlay
 var player: EventPlayer
 ## AUTO (game/auto/auto_pilot.gd): plays Bot.decide steps while enabled.
 var auto: AutoPilot
+## The run's pet familiar in the world (game/pets/pet_host.gd).
+var pets: PetHost
 ## Set by AutoPilot around its own run_command call (anything else counts as manual).
 var from_auto := false
 
@@ -118,6 +120,8 @@ func _ready() -> void:
 	overlay.modal_check = any_modal_open
 
 	player = EventPlayer.new(self)
+	pets = PetHost.new(self)
+	add_child(pets)
 	auto = AutoPilot.new(self)
 	add_child(auto)
 	set_speed(SettingsPanel.game_speed())

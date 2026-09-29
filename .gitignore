@@ -10,3 +10,10 @@
 !assets/icon/**
 !tools/icon/
 !tools/icon/**
+
+# Third-party assets are never committed (EXTRA KayKit packs are not redistributable).
+# Canonical store: third_party/ ; runtime copies populated by tools/import_assets.sh.
+/third_party/
+/assets/kaykit/
+/assets/audio/
+/assets/fonts/
