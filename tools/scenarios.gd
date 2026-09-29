@@ -33,6 +33,7 @@ const PROVIDERS := [
 	"res://ui/icons/rendered/rendered_icons.gd",
 	"res://game/boot/scenarios.gd",
 	"res://game/classes/class_scenarios.gd",
+	"res://ui/camp/wardrobe_scenarios.gd",
 ]
 
 
