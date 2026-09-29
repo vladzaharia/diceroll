@@ -47,7 +47,7 @@ const DEFS := {
 		"perk": "Lava damage -50%.",
 		"l5": "Poison doesn't decay on bosses.", "l10": "Poisoned enemies take +1 from Thunder and Ember."},
 	"crystal_wisp": {"name": "Crystal Wisp", "role": "tempo", "charge_on": "kept", "size": 9, "model": "crystal",
-		"fires": "At turn start: +1 combat reroll, and this turn's combo multiplier +0.1 (+0.01 per level).",
+		"fires": "At turn start: +1 combat reroll, and this turn's combo multiplier +0.05 (+0.01 per level).",
 		"perk": "+1 board reroll on the first board turn of each lap.",
 		"l5": "Also +1 banked reroll and frees a cursed die.", "l10": "Its first reroll each fight doesn't count as rerolled."},
 	"guard_die": {"name": "Guard Die", "role": "defense", "charge_on": "attack_intent", "size": 6, "model": "die",
@@ -64,7 +64,7 @@ const DEFS := {
 		"perk": "Traps deal half damage.",
 		"l5": "Thorns hit every attacker, even when your Block stops the hit.", "l10": "Its Block is doubled."},
 	"frost_mote": {"name": "Frost Mote", "role": "control", "charge_on": "one", "size": 3, "model": "frost",
-		"fires": "Freeze the target (it skips its next action) and chill it for 3 (+2 per level) damage.",
+		"fires": "Freeze the target (it skips its next action) and chill it for 3 (+3 per level) damage.",
 		"perk": "Ice tiles never freeze your dice.",
 		"l5": "Also freezes the enemy with the biggest attack.", "l10": "Frozen enemies lose their Block."},
 	"wick": {"name": "Wick", "role": "burst", "charge_on": "set3", "size": 3, "model": "candle",
@@ -72,7 +72,7 @@ const DEFS := {
 		"perk": "Burn on you ticks 1 lower.",
 		"l5": "Two Pair charges it too.", "l10": "Its fire ignores Block."},
 	"tinker_gear": {"name": "Tinker", "role": "fixing", "charge_on": "reroll", "size": 6, "model": "gear",
-		"fires": "Before your attack, set your lowest die to its highest face; combo multiplier +0.01 per level this attack.",
+		"fires": "Before your attack, set your lowest die to its highest face.",
 		"perk": "Shop restocks cost 3 less.",
 		"l5": "Fixes your two lowest dice.", "l10": "Also banks 1 reroll."},
 	"grimoire": {"name": "Grimoire", "role": "runes", "charge_on": "rune", "size": 5, "model": "book",
@@ -131,7 +131,7 @@ const BITE_MIN := 8
 const LOW_DIE_MAX := 2
 ## Crystal Wisp: rerolls per firing, and the combo multiplier bonus for that turn's attack.
 const WISP_REROLLS := 1
-const WISP_MULT := 0.1
+const WISP_MULT := 0.05
 const WISP_MULT_PER_LEVEL := 0.01
 
 static func wisp_mult(level: int) -> float:
@@ -158,13 +158,10 @@ static func pebble_thorns(level: int) -> int:
 	return 3 + (clampi(level, 1, MAX_LEVEL) - 1) / 2
 
 static func frost_damage(level: int) -> int:
-	return 3 + 2 * (clampi(level, 1, MAX_LEVEL) - 1)
+	return 3 + 3 * (clampi(level, 1, MAX_LEVEL) - 1)
 
 static func wick_damage(level: int) -> int:
 	return 3 + (3 * (clampi(level, 1, MAX_LEVEL) - 1)) / 2
-
-static func tinker_mult(level: int) -> float:
-	return 0.01 * clampi(level, 1, MAX_LEVEL)
 
 static func grimoire_mult(level: int) -> float:
 	var m := 1.0 + 0.05 * (clampi(level, 1, MAX_LEVEL) - 1)

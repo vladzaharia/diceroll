@@ -200,7 +200,6 @@ static func fire_at_attack(run: RunState, c: CombatState) -> Array[Dictionary]:
 					ev.append({"type": "pet_acted", "pet": id, "effect": "fix", "value": dd.faces[hi], "target": "hero", "die_idx": int(i), "face": dd.faces[hi]})
 			if fixed == 0:
 				ev.append(_acted(run, "fix", 0, "hero"))
-			c.pet_mult += PetDefs.tinker_mult(lvl)
 			if lvl >= 10 and run.banked_rerolls < Balance.MAX_BANKED_REROLLS:
 				run.banked_rerolls += 1
 			ev.append({"type": "dice_rolled", "values": c.dice_values.duplicate(), "indices": [], "context": "combat",
