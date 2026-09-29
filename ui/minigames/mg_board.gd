@@ -81,11 +81,11 @@ func unlock() -> void:
 
 
 ## Plays an Audio sfx if the autoload exists (UI scripts stay loadable without it).
-static func sfx(id: String, pitch_var := 0.05, volume_db := 0.0) -> void:
+static func sfx(id: String, pitch_var := 0.05, volume_db := 0.0, pitch := 1.0) -> void:
 	var loop := Engine.get_main_loop() as SceneTree
 	var a: Node = loop.root.get_node_or_null("Audio") if loop else null
 	if a != null and a.has_method("play_sfx"):
-		a.call("play_sfx", id, pitch_var, volume_db)
+		a.call("play_sfx", id, pitch_var, volume_db, pitch)
 
 
 func dur(t: float) -> float:
