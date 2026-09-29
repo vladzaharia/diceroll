@@ -17,7 +17,9 @@ extends RefCounted
 ##  game_biome_change  lap 6 starts mid-move: tier 1 sinks, tier 2 rises (--to=<biome id>
 ##                picks the arriving biome; tier 3 ids start at lap 11). Use --wait and --frames.
 ##  game_boss     final boss fight with its intro (--act=1..3)
-##  game_victory / game_defeat   summary screens (with passives)
+##  game_victory / game_defeat   summary screens (with passives and the route)
+##  route_card    the run-start route card (--route=a,b,c --boss --miniboss)
+##  game_pause    pause menu mid-run with the route strip (--lap=N, default 8)
 ##  game_continue runs --steps=N bot commands, JSON round-trips the run and presents it
 ##  game_manual   drives the UI like a player (ROLL -> GO -> fight -> ATTACK -> draft),
 ##                saving a shot per step: <shot>_step_NN.png
@@ -30,7 +32,7 @@ extends RefCounted
 
 const NAMES := ["game_title", "game_board", "game_rolled", "game_combat", "game_combo", "game_shop", "game_draft",
 	"game_forge", "game_event", "game_portal", "game_boss", "game_victory", "game_defeat", "game_manual", "game_continue",
-	"play_auto", "game_passive", "game_die_inspect", "game_miniboss", "game_biome_change"]
+	"play_auto", "game_passive", "game_die_inspect", "game_miniboss", "game_biome_change", "route_card", "game_pause"]
 ## Passives shown by --passives=N (a mix of rarities, boss tier last).
 const DEMO_PASSIVES := ["pair_master", "iron_skin", "pathfinder", "rune_echo", "treasure_sense", "fast_feet", "midas_fist"]
 
@@ -194,6 +196,13 @@ class _Driver extends Node:
 				await c.play_events(f.debug_open("event", String(args.get("event", "duel"))))
 			"game_portal":
 				await c.play_events(f.debug_open("portal"))
+			"route_card":
+				c.ui.show_route(f)
+			"game_pause":
+				f.run.lap = int(args.get("lap", "8"))
+				f.run.act = Balance.act_for_lap(f.run.lap)
+				c.ui.sync(f)
+				c.ui.open_pause()
 			"game_boss":
 				await c.play_events(f.debug_open("boss", String(args.get("boss", ""))))
 			"game_victory", "game_defeat":

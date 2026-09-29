@@ -474,7 +474,9 @@ func _game_over(ev: Dictionary) -> void:
 		Audio.play_sfx("win")
 		c.board.hero.play_once("cheer", "idle")
 		Fx.level_up(c.world_parent(), c.hero_pos())
-		c.overlay.announce("VICTORY!", "The Bone Throne is yours", UiPalette.GOLD_BRIGHT, 1.4)
+		var r := c.flow.run
+		c.overlay.announce("VICTORY!", "%s is yours" % BiomeDefs.name_of(String(r.route[2]) if r.route.size() >= 3 else "throne"),
+			UiPalette.GOLD_BRIGHT, 1.4)
 	else:
 		Audio.play_sfx("lose")
 		c.board.hero.play_once("death", "")

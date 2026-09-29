@@ -1,7 +1,7 @@
 class_name PauseMenu
 extends UiModal
-## Pause: run info (class, biome, lap N/15 with a 15-lap track split by biome, level, the
-## passives owned), Resume, Settings, Abandon run (with an inline confirm step).
+## Pause: run info (class, biome, lap N/15, level), the run's route (three biomes with lap
+## pips, mini-boss and final boss), the passives owned, Resume, Settings, Abandon run (with an inline confirm step).
 ## Emits resume_pressed, settings_pressed, abandon_confirmed.
 
 signal resume_pressed
@@ -71,27 +71,11 @@ func _build() -> void:
 
 func refresh(flow: GameFlow) -> void:
 	var r := flow.run
-	var biome := String(SummaryScreen.ACT_NAMES[clampi(r.act - 1, 0, 2)])
+	var biome := BiomeDefs.name_of(r.biome())
 	_info.text = "%s  ·  %s  ·  Lap %d/%d  ·  Level %d" % [HeroDefs.DATA[r.class_id].name, biome, r.lap, Balance.TOTAL_LAPS, r.level]
+	# this run's route: the three biomes with lap pips, and the two bosses ahead
 	UiTheme.clear(_track)
-	for a in Balance.ACTS:
-		var group := UiTheme.vbox(4)
-		_track.add_child(group)
-		var pips := UiTheme.hbox(4)
-		group.add_child(pips)
-		var first := int(Balance.BIOME_LAPS[a])
-		for k in Balance.LAPS_PER_ACT:
-			var n := first + k
-			var dot := HudTop._Pip.new()
-			dot.state = 2 if n < r.lap else (1 if n == r.lap else 0)
-			dot.color = HudTop.BIOME_COLORS[a]
-			dot.boss = n == Balance.TOTAL_LAPS
-			dot.custom_minimum_size = Vector2(18, 18)
-			pips.add_child(dot)
-		var nm := UiTheme.label(String(SummaryScreen.ACT_NAMES[a]).to_upper(), 14,
-			HudTop.BIOME_COLORS[a] if a + 1 == r.act else UiPalette.TEXT_MUTED, false, 0, false, 800)
-		nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		group.add_child(nm)
+	_track.add_child(RouteStrip.make(flow.route_info(), r.act, r.lap, true))
 	UiTheme.clear(_passives)
 	for id in r.passives:
 		var p := PassiveIcon.make(String(id), 48, true)

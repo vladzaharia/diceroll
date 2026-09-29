@@ -126,6 +126,11 @@ func new_run(class_id: String, seed := -1) -> void:
 	if seed < 0:
 		seed = int(Time.get_unix_time_from_system()) % 1000000 + randi() % 1000
 	start(GameFlow.new_run(class_id, seed))
+	# a new road every run: show it before the first roll
+	busy = true
+	await wait(0.45)
+	await ui.show_route(flow)
+	busy = false
 
 
 func continue_run() -> bool:
