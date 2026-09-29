@@ -40,7 +40,8 @@ var chill: int = 0
 ## Meta-layer run config (MetaRun.build; {} = legacy run without the meta layer).
 var meta: Dictionary = {}
 ## Run mode: "standard" (15 laps, 3 biomes) or "short" (Short Road: 10 laps, 2 biomes, see
-## Balance.SHORT_*). A short run's `route` has 2 entries: [tier-1 biome, tier-3 biome].
+## Balance.SHORT_*). A short run's `route` has 2 entries: [tier-1 biome, second biome], the second
+## drawn from tier 2 + tier 3 (docs/design/2026-09-29-new-biomes.md §6.2).
 var mode: String = "standard"
 ## Potion belt: potion type ids carried (PotionDefs), belt size, and the count (== belt.size()).
 var belt: Array[String] = []
@@ -54,6 +55,9 @@ var pet_state: Dictionary = {}
 var lap_rerolls: int = 0
 ## A7 biome curse: faces set to 1 until the next Forge visit: [{die, face, value}].
 var cursed_faces: Array[Dictionary] = []
+## Sunscorched Ruins: the lap in which the hero landed on an oasis (0 = none); that lap's heat is
+## skipped.
+var cooled_lap: int = 0
 
 ## opts (all optional, for scenarios/tests): route:[tier1, tier2, tier3], miniboss:id, boss:id.
 ## opts.mode: "standard" (default) | "short".
@@ -105,9 +109,21 @@ static func create(p_class_id: String, p_seed: int, p_board_size: int = Balance.
 	if BiomeDefs.valid_route(forced):
 		r.route.assign(forced.map(func(x): return String(x)))
 	if r.mode == "short":
-		r.route = [r.route[0], r.route[2]] as Array[String]
+		# Short Road: one extra draw for the second biome, uniform over the unlocked tier-2 and
+		# tier-3 biomes. A forced 3-biome route keeps its tier-3 biome; a forced [t1, second] route
+		# is used as is.
+		var cands: Array = []
+		for b in BiomeDefs.short_second_biomes():
+			if r.meta.is_empty() or (r.meta.biomes as Array).has(b):
+				cands.append(b)
+		var second := String(r.rng.pick(cands if not cands.is_empty() else BiomeDefs.short_second_biomes()))
+		if BiomeDefs.valid_route(forced):
+			second = r.route[2]
+		r.route = [r.route[0], second] as Array[String]
+		if BiomeDefs.valid_short_route(forced):
+			r.route.assign(forced.map(func(x): return String(x)))
 	r.miniboss_id = String(r.rng.pick(_allowed(BiomeDefs.DEFS[r.route[1]].minibosses, r.meta.get("minibosses", []))))
-	r.boss_id = String(r.rng.pick(_allowed(BiomeDefs.DEFS[r.route.back()].bosses, r.meta.get("bosses", []))))
+	r.boss_id = String(r.rng.pick(_allowed(BiomeDefs.final_boss_candidates(r.route.back()), r.meta.get("bosses", []))))
 	var fm := String(opts.get("miniboss", ""))
 	if EnemyDefs.MINIBOSSES.has(fm):
 		r.miniboss_id = fm
@@ -309,6 +325,39 @@ func has_passive(id: String) -> bool:
 func biome() -> String:
 	return route[clampi(act - 1, 0, route.size() - 1)]
 
+# ------------------------------------------------------------------ new-biome twists
+
+## The current biome's active twist ("ore", "drums", "moon", "heat"; "" = none).
+func twist() -> String:
+	return BiomeDefs.twist_of(board.biome if board != null else biome())
+
+## Lap `l`'s position in its biome (1..5).
+func biome_lap_pos(l: int = -1) -> int:
+	var x := lap if l < 0 else l
+	var bl := biome_laps()
+	return x - int(bl[act_for_lap(x) - 1]) + 1
+
+## Moonlit Woods phase of lap `l` ("crescent", "half", "full"; "" outside an active Moonlit
+## biome). Derived from the lap and route; no state.
+func moon_phase(l: int = -1) -> String:
+	var x := lap if l < 0 else l
+	var b := route[clampi(act_for_lap(x) - 1, 0, route.size() - 1)]
+	if BiomeDefs.twist_of(b) != "moon":
+		return ""
+	var ph: Array = BiomeDefs.MOON_PHASES
+	return String(ph[clampi(biome_lap_pos(x) - 1, 0, ph.size() - 1)])
+
+## Laps until the Full moon (0 on the Full lap, -1 when it has passed or outside Moonlit).
+func laps_to_full_moon() -> int:
+	if moon_phase() == "":
+		return -1
+	var d := BiomeDefs.MOON_PHASES.find("full") + 1 - biome_lap_pos()
+	return d if d >= 0 else -1
+
+## Final-boss candidates of this run (tier-3 bosses, a tier-2 Short Road biome's short_bosses).
+func boss_candidates() -> Array:
+	return BiomeDefs.final_boss_candidates(route.back())
+
 ## Pool cap: MAX_DICE, +1 with Extra Hand.
 func max_dice() -> int:
 	return Balance.MAX_DICE + (1 if has_passive("extra_hand") else 0)
@@ -362,6 +411,7 @@ func to_dict() -> Dictionary:
 		"route": Array(route), "miniboss_id": miniboss_id, "boss_id": boss_id, "chill": chill,
 		"meta": meta.duplicate(true), "mode": mode, "belt": Array(belt), "potions": potions, "potion_cap": potion_cap,
 		"pet_state": pet_state.duplicate(true), "lap_rerolls": lap_rerolls, "cursed_faces": cursed_faces.duplicate(true),
+		"cooled_lap": cooled_lap,
 	}
 
 static func from_dict(d: Dictionary) -> RunState:
@@ -409,6 +459,7 @@ static func from_dict(d: Dictionary) -> RunState:
 	r.sync_potions()
 	r.potion_cap = int(d.get("potion_cap", 0))
 	r.lap_rerolls = int(d.get("lap_rerolls", 0))
+	r.cooled_lap = int(d.get("cooled_lap", 0))
 	for c in d.get("cursed_faces", []):
 		r.cursed_faces.append({"die": int(c.die), "face": int(c.face), "value": int(c.value)})
 	var pst: Dictionary = d.get("pet_state", {})

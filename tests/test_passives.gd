@@ -229,7 +229,7 @@ func test_final_boss_no_reward() -> void:
 	f.run.pos = 22
 	_force_roll(f, [2, 2])
 	f.choose_move(0)
-	assert_eq(f.combat.enemies[0].id, EnemyDefs.FINAL_BOSS)
+	assert_eq(f.combat.enemies[0].id, f.run.boss_id)
 	_win(f)
 	assert_eq(f.phase, P.VICTORY)
 

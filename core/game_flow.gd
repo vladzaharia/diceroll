@@ -67,7 +67,7 @@ static func new_run(class_id: String, seed: int, board_size: int = Balance.BOARD
 func route_info() -> Dictionary:
 	var r: Array = []
 	for b in run.route:
-		r.append({"id": b, "name": BiomeDefs.name_of(b), "desc": BiomeDefs.desc_of(b)})
+		r.append({"id": b, "name": BiomeDefs.name_of(b), "desc": BiomeDefs.desc_of(b), "twist": BiomeDefs.twist_of(b), "look": BiomeDefs.look_of(b)})
 	return {
 		"route": r,
 		"miniboss": {"id": run.miniboss_id, "name": String(EnemyDefs.def(run.miniboss_id).name)},
@@ -317,6 +317,8 @@ func _move(steps: int, teleport: bool) -> Array[Dictionary]:
 			if String(run.board.tiles[p[k]].type) == "lava":
 				_lava(p[k], false, ev)
 	if crossing:
+		# Sunscorched Ruins: heat at the lap's end, before the lap heal (never lethal)
+		_heat(run.lap, ev)
 		var healed := run.heal(run.pct_of_max(run.lap_heal_pct()))
 		var completed := run.lap
 		if final_lap:
@@ -335,17 +337,18 @@ func _move(steps: int, teleport: bool) -> Array[Dictionary]:
 		if run.act_for_lap(run.lap) != run.act:
 			_new_biome(dest, ev)
 		else:
-			var changes := run.board.mutate(run.rng, run.act, run.eff_lap(), [dest], ["elite"] if run.has_asc("extra_elite") else [])
+			var extra: Array = ["elite"] if run.has_asc("extra_elite") else []
+			if run.moon_phase() == "full":
+				# Moonlit Woods: the mutation into the Full lap spawns +1 Elite
+				extra.append("elite")
+			var changes := run.board.mutate(run.rng, run.act, run.eff_lap(), [dest], extra)
 			if run.lap == run.miniboss_lap():
-				var mb := run.board.spawn_miniboss(run.rng, run.miniboss_id, dest, [dest])
-				if not mb.is_empty():
-					for c in range(changes.size() - 1, -1, -1):
-						if changes[c].idx == mb.idx:
-							changes.remove_at(c)
-					changes.append(mb)
+				_add_change(changes, run.board.spawn_miniboss(run.rng, run.miniboss_id, dest, [dest]))
 			run.roll_change_affixes(changes)
+			_twist_mutation(dest, changes, ev)
 			changes.append_array(run.place_minigames([dest]))
 			ev.append({"type": "board_mutated", "changes": changes})
+		_moon_event(ev)
 		if run.has_passive("piggy_bank"):
 			var interest := mini(Balance.PASSIVE_PIGGY_MAX, int(run.gold * Balance.PASSIVE_PIGGY_PCT))
 			if interest > 0:
@@ -420,6 +423,10 @@ func _trigger_tile(idx: int, ev: Array[Dictionary]) -> void:
 			if not tile.enemies.is_empty():
 				_start_combat(tile.enemies, false, false, idx, ev, true, run.board.affixes_of(idx))
 		"chest":
+			if bool(tile.get("moon", false)):
+				_consume(idx, ev)
+				_moon_chest(ev)
+				return
 			_consume(idx, ev)
 			if run.potion_cap > 0 and run.rng.chance(Balance.CHEST_POTION_CHANCE):
 				_gain_potion(ev, "chest")
@@ -477,6 +484,12 @@ func _trigger_tile(idx: int, ev: Array[Dictionary]) -> void:
 				ev.append({"type": "status", "target": "hero", "status": "chill", "value": run.chill, "pending": true})
 		"lava":
 			_lava(idx, true, ev)
+		"ore":
+			_open_ore(idx, ev)
+		"drum":
+			_smash_drum(idx, ev)
+		"oasis":
+			_oasis(idx, ev)
 		"forge":
 			_lift_curse(ev)
 			var uses := 2 if run.has_passive("blacksmith") else 1
@@ -696,14 +709,19 @@ func _summary() -> Dictionary:
 func _new_biome(dest: int, ev: Array[Dictionary]) -> void:
 	run.act = run.act_for_lap(run.lap)
 	run.shop_reroll_bought = false
-	run.board = Board.generate(run.rng, run.act, run.board_size, run.eff_lap(), run.biome())
+	# The Short Road's second biome starts at eff lap 7 whatever its tier (pools switch after 3 laps).
+	var first := run.eff_lap() if run.mode == "short" else -1
+	run.board = Board.generate(run.rng, run.act, run.board_size, run.eff_lap(), run.biome(), first)
 	if not run.board.is_corner(dest) and Board._is_fight(String(run.board.tiles[dest].type)):
 		run.board.tiles[dest] = Board.make_tile("empty")
 	run.after_board_generated([dest])
+	if run.lap == run.miniboss_lap():
+		# Short Road: the mini-boss arrives with the second biome (lap 6)
+		run.board.spawn_miniboss(run.rng, run.miniboss_id, dest, [dest])
 	run.roll_board_affixes()
 	run.stats.max_act = maxi(int(run.stats.get("max_act", 1)), run.act)
 	ev.append({"type": "act_started", "act": run.act, "biome": run.biome(), "biome_name": BiomeDefs.name_of(run.biome()),
-		"biome_desc": BiomeDefs.desc_of(run.biome()), "lap": run.lap,
+		"biome_desc": BiomeDefs.desc_of(run.biome()), "lap": run.lap, "twist": run.twist(), "look": BiomeDefs.look_of(run.biome()),
 		"board": run.board.to_dict(), "treasury": run.treasury, "pos": run.pos})
 	var h := run.heal(run.pct_of_max(Balance.BIOME_HEAL_PCT))
 	ev.append({"type": "hp_changed", "amount": h, "total": run.hp, "source": "act_start", "max_hp": run.max_hp})
@@ -1187,6 +1205,10 @@ func event_choose(i: int) -> Array[Dictionary]:
 		return [_e("choice disabled")]
 	_record(["event_choose", i])
 	var ev: Array[Dictionary] = []
+	if String(offer.get("kind", "")) == "ore":
+		_mine_ore(choice, ev)
+		_advance(ev)
+		return ev
 	var id := String(offer.id)
 	_close_offer(ev)
 	if (id == "shrine" and String(choice.get("blessing", "")) != "gold") or (id == "dicesmith" and choice.has("kind")) or (id == "idol" and i == 0):
@@ -1279,6 +1301,151 @@ func portal_pick(tile_idx: int) -> Array[Dictionary]:
 	_advance(ev)
 	return ev
 
+# ================================================================ new biomes (docs/design/2026-09-29-new-biomes.md)
+
+## Adds a change to a board_mutated list, replacing an earlier entry for the same tile.
+static func _add_change(changes: Array, c: Dictionary) -> void:
+	if c.is_empty():
+		return
+	for k in range(changes.size() - 1, -1, -1):
+		if changes[k].idx == c.idx:
+			changes.remove_at(k)
+	changes.append(c)
+
+## Twist rules of a lap mutation (after the regular spawns): the Warcamp rebuilds one drum while
+## fewer than WARCAMP_DRUMS stand (change source "rebuild"); the mutation into Moonlit's Full lap
+## places the moon rune chest (tile_changed {idx, type:"tile_changed", tile_type:"chest",
+## moon:true, source:"full_moon"}).
+func _twist_mutation(dest: int, changes: Array, ev: Array[Dictionary]) -> void:
+	match run.twist():
+		"drums":
+			if run.board.count("drum") < BiomeDefs.WARCAMP_DRUMS:
+				var c := run.board.rebuild_drum(run.rng, dest, [dest])
+				if not c.is_empty():
+					c["source"] = "rebuild"
+					_add_change(changes, c)
+		"moon":
+			if run.moon_phase() == "full":
+				var c := run.board.place_moon_chest(dest, [dest])
+				if not c.is_empty():
+					c["source"] = "full_moon"
+					_add_change(changes, c)
+					ev.append(_tile_changed(c))
+
+## A tile_changed event from a board change (the tile's type goes to `tile_type`).
+static func _tile_changed(c: Dictionary) -> Dictionary:
+	var tc := c.duplicate(true)
+	tc["tile_type"] = String(c.type)
+	tc["type"] = "tile_changed"
+	return tc
+
+## moon_phase {phase, lap, laps_to_full} when the current lap is in an active Moonlit biome.
+func _moon_event(ev: Array[Dictionary]) -> void:
+	var ph := run.moon_phase()
+	if ph != "":
+		ev.append({"type": "moon_phase", "phase": ph, "lap": run.lap, "laps_to_full": run.laps_to_full_moon()})
+
+## Sunscorched Ruins heat at the end of lap `completed`: HEAT_PCT of max HP (x hazard mult), never
+## lethal, skipped when the hero landed on an oasis that lap. Emits heat {damage, cooled, lap}
+## (+ hp_changed {source:"heat"}).
+func _heat(completed: int, ev: Array[Dictionary]) -> void:
+	if run.twist() != "heat":
+		return
+	var cooled := run.cooled_lap == completed
+	var dmg := 0
+	if not cooled:
+		var raw := run.pct_of_max(BiomeDefs.HEAT_PCT)
+		if not run.meta.is_empty():
+			raw = int(round(raw * run.hazard_mult()))
+		dmg = maxi(0, mini(raw, run.hp - 1))
+		run.hp -= dmg
+		run.stats.damage_taken = int(run.stats.get("damage_taken", 0)) + dmg
+	ev.append({"type": "heat", "damage": dmg, "cooled": cooled, "lap": completed})
+	if dmg > 0:
+		ev.append({"type": "hp_changed", "amount": -dmg, "total": run.hp, "source": "heat", "max_hp": run.max_hp})
+
+## Oasis landing: heals OASIS_HEAL_PCT and cools the current lap. Emits oasis {idx, healed, lap}.
+func _oasis(idx: int, ev: Array[Dictionary]) -> void:
+	if run.twist() != "heat":
+		return
+	run.cooled_lap = run.lap
+	var h := run.heal(run.pct_of_max(BiomeDefs.OASIS_HEAL_PCT))
+	ev.append({"type": "oasis", "idx": idx, "healed": h, "lap": run.lap})
+	ev.append({"type": "hp_changed", "amount": h, "total": run.hp, "source": "oasis", "max_hp": run.max_hp})
+
+## Orc Warcamp: landing smashes the drum (it becomes Empty) for DRUM_GOLD x gold scale.
+## Emits board_mutated, drum_smashed {idx, gold, drums} (drums = still standing), gold_changed.
+func _smash_drum(idx: int, ev: Array[Dictionary]) -> void:
+	if run.twist() != "drums":
+		return
+	var g := run.gold_bonus(int(round(BiomeDefs.DRUM_GOLD * Balance.gold_scale(run.eff_lap()))))
+	_consume(idx, ev)
+	ev.append({"type": "drum_smashed", "idx": idx, "gold": g, "drums": run.board.count("drum")})
+	_gold(ev, g, "drum")
+
+## Deep Mines ore gold for the current lap.
+func ore_gold() -> int:
+	return run.gold_bonus(int(round(BiomeDefs.ORE_GOLD * Balance.gold_scale(run.eff_lap()))))
+
+## Deep Mines: landing on ore opens offer {kind:"ore", id:"ore", idx, title, text, gold,
+## choices:[{label, desc, enabled, ore:"gold", gold}, {label, desc, enabled, ore:"raise"}]} in phase
+## EVENT, answered with event_choose(i).
+func _open_ore(idx: int, ev: Array[Dictionary]) -> void:
+	if run.twist() != "ore":
+		return
+	var g := ore_gold()
+	var can_raise := false
+	for d in run.dice:
+		for fi in 6:
+			if d.can_raise(fi):
+				can_raise = true
+	var choices: Array = [
+		{"label": "Take %d gold" % g, "desc": "Pocket the ore.", "enabled": true, "ore": "gold", "gold": g},
+		{"label": "Face Raise", "desc": "Smelt it: raise one face of one die by 1.", "enabled": can_raise, "ore": "raise"},
+	]
+	_set_offer({"kind": "ore", "id": "ore", "idx": idx, "title": "Ore Vein",
+		"text": "A vein of ore glitters in the rock. Mining it will bring the ceiling down.", "gold": g,
+		"choices": choices}, Phase.EVENT, ev)
+
+## Resolves an ore choice: ore_mined {idx, choice, gold}, the cave-in (tile_changed {idx,
+## tile_type:"trap", source:"cave_in"} + board_mutated), then the gold or a Forge "raise" offer
+## (source "ore").
+func _mine_ore(choice: Dictionary, ev: Array[Dictionary]) -> void:
+	var idx := int(offer.get("idx", run.pos))
+	var kind := String(choice.get("ore", "gold"))
+	var g := int(choice.get("gold", 0)) if kind == "gold" else 0
+	_close_offer(ev)
+	ev.append({"type": "ore_mined", "idx": idx, "choice": kind, "gold": g})
+	var c := run.board.set_type(idx, "trap")
+	c["source"] = "cave_in"
+	ev.append(_tile_changed(c))
+	ev.append({"type": "board_mutated", "changes": [c]})
+	if kind == "gold":
+		_gold(ev, g, "ore")
+	else:
+		pending.push_front({"kind": "forge", "source": "ore"})
+
+## Moonlit Woods moon rune chest: a 1-of-3 rune choice (source "moon_chest") with at least one
+## Rare or Epic rune (restricted to the unlocked rune pool).
+func _moon_chest(ev: Array[Dictionary]) -> void:
+	var pool := _rune_pool()
+	var ids: Array[String] = Runes.random_runes_in(run.rng, 3, pool)
+	var shiny := false
+	for id in ids:
+		if Runes.rarity(id) != "common":
+			shiny = true
+	if not shiny and not ids.is_empty():
+		var rare: Array = []
+		for id in (pool if not pool.is_empty() else Runes.IDS):
+			if Runes.rarity(String(id)) != "common" and not ids.has(String(id)):
+				rare.append(String(id))
+		if not rare.is_empty():
+			ids[ids.size() - 1] = String(run.rng.pick(rare))
+	var options: Array = []
+	for id in ids:
+		options.append(Runes.option(id))
+	_set_offer({"kind": "draft", "options": options, "source": "moon_chest"}, Phase.DRAFT, ev)
+
 # ================================================================ meta layer: pools, potions, pets
 
 ## Random rune / die kind / passive exclusions honouring the run's unlocked pools (meta layer).
@@ -1327,7 +1494,7 @@ func _stat_add(id: String, key: String) -> void:
 func _second_boss() -> String:
 	if not run.has_asc("double_boss") or int(run.stats.get("boss_stage", 0)) != 0:
 		return ""
-	for b in BiomeDefs.DEFS[run.route.back()].bosses:
+	for b in run.boss_candidates():
 		if String(b) != run.boss_id:
 			return String(b)
 	return ""
