@@ -144,7 +144,8 @@ MM="$SRC/KayKit_Mystery_Monthly_Series_4"
 sync "$MM/4 - October 2023 - Werewolf/assets/gltf" "$KK/mystery/werewolf"
 sync "$MM/11 - May 2024 - Clown/assets/gltf" "$KK/mystery/clown"
 sync "$MM/10 - April 2024 - Paladin/assets/gltf" "$KK/mystery/paladin"
-sync "$MM/1 - July 2023 - Orc Raider/assets/gltf" "$KK/mystery/orc" --include='Orc_Wardrum*' --include='*.png' --exclude='*'
+# (the orc props, war drum included, are synced below with the other Mystery set pieces: a second
+# sync here with --include='*.png' deleted the textures Godot extracts from the GLBs)
 absent_paid "$MM" || cp -f "$MM/License.txt" "$KK/mystery/License.txt"
 
 echo "== KayKit EXTRA props: tile props + rendered UI icons (paid packs; skipped when absent)"
@@ -260,12 +261,31 @@ lic "KayKit_Skeletons_1.1_EXTRA" "$KK/skeleton_props"
 
 echo "== KayKit Mystery Monthly S4 set pieces (orc war drum, woodcutter logs, paladin statue)"
 MYS="$SRC/KayKit_Mystery_Monthly_Series_4"
-sync "$MYS/1 - July 2023 - Orc Raider/assets/gltf" "$KK/mystery/orc" --include='Orc_Wardrum*' --include='Orc_Axe*' \
-	--include='Orc_Club*' --include='Orc_Backpack*' --include='Orc_DrinkingHorn*' --exclude='*'
+# exact names: a pattern like 'Orc_Wardrum*' also matches the texture Godot extracts next to the model
+# (Orc_Wardrum_orc_texture_A.png), which --delete would then remove on every run
+orc_keep=""
+for o in Orc_Wardrum Orc_WardrumStick Orc_Axe Orc_Club Orc_Backpack Orc_DrinkingHorn; do
+	orc_keep="$orc_keep --include=$o.gltf.glb"
+done
+# shellcheck disable=SC2086
+sync "$MYS/1 - July 2023 - Orc Raider/assets/gltf" "$KK/mystery/orc" $orc_keep --exclude='*'
 sync "$MYS/4 - October 2023 - Werewolf/assets/gltf" "$KK/mystery/woodcutter"
 sync "$MYS/10 - April 2024 - Paladin/assets/gltf" "$KK/mystery/paladin" --include='paladin_statue*' \
 	--include='paladin_texture_A.png' --exclude='*'
 cp -f "$MYS/License.txt" "$KK/mystery/License.txt" 2>/dev/null || true
+# Godot extracts a GLB's embedded texture next to it (<model>_<texture>.png + .import). Older runs of
+# this script deleted those PNGs but kept their .import files, so every load logged "Failed loading
+# resource" (exports too) and the models lost their textures. Drop such orphans with the model's
+# .import: the next `godot --import` re-extracts them.
+find "$KK" -name '*.png.import' | while read -r imp; do
+	png="${imp%.import}"
+	[ -f "$png" ] && continue
+	for m in "${png%_*_texture*.png}".gltf.glb "${png%_*_texture*.png}".glb; do
+		[ -f "$m" ] || continue
+		echo "   repairing stale extracted texture: ${png#"$DST"/}"
+		rm -f "$imp" "$m.import"
+	done
+done
 echo "== Minigames (WP-E2): dig treasures, claw prizes, dig tools (EXTRA packs: never commit these)"
 RB="KayKit_ResourceBits_1.0_EXTRA"
 rb_keep=""
