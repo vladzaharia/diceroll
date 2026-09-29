@@ -4,8 +4,8 @@ extends RefCounted
 ## needs two calls):
 ##
 ##   MinigameUi.attach(ui)              creates ui.minigame + ui.minigame_reward, connects them
-##                                      to ui.command (minigame_action / _finish / _auto,
-##                                      pick_draft)
+##                                      to ui.command (minigame_action / _finish,
+##                                      pick_draft; there is no AUTO in minigames)
 ##   want = MinigameUi.sync(ui, flow)   in UiRoot.sync: shows/refreshes/closes the screen for
 ##                                      phase MINIGAME; returns the reward modal for a
 ##                                      minigame reward offer (else null)
@@ -24,7 +24,6 @@ static func attach(ui: UiRoot) -> void:
 	ui.move_child(rew, at + 1)
 	scr.action.connect(func(args: Array) -> void: ui.command.emit("minigame_action", [args]))
 	scr.finish_requested.connect(func() -> void: ui.command.emit("minigame_finish", []))
-	scr.auto_requested.connect(func() -> void: ui.command.emit("minigame_auto", []))
 	rew.reward_picked.connect(func(i: int) -> void: ui.command.emit("pick_draft", [i]))
 
 

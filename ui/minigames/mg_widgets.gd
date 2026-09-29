@@ -4,8 +4,8 @@ extends RefCounted
 
 
 ## Horizontal performance meter: score / median on a 0 .. MAX scale with the bronze,
-## silver and gold zones (MinigameDefs.TIER_SILVER / TIER_GOLD) and a PAR tick (AUTO's
-## result). `value` animates; `target` is where it is heading.
+## silver and gold zones (MinigameDefs.TIER_SILVER / TIER_GOLD). `value` animates. (No PAR
+## tick: players play every minigame; AUTO's par result is a sim-only approximation.)
 class ParMeter:
 	extends Control
 	const MAX := 1.6
@@ -53,9 +53,6 @@ class ParMeter:
 		# zone dividers and the par tick
 		for r: float in [MinigameDefs.TIER_SILVER, MinigameDefs.TIER_GOLD]:
 			draw_line(Vector2(_x(r), y - 2), Vector2(_x(r), y + h + 2), UiPalette.OUTLINE, 3.0)
-		var px := _x(MinigameDefs.PAR)
-		draw_line(Vector2(px, y - 6), Vector2(px, y + h + 6), Color.WHITE, 3.0)
-		draw_colored_polygon(PackedVector2Array([Vector2(px - 7, y - 10), Vector2(px + 7, y - 10), Vector2(px, y - 2)]), Color.WHITE)
 		# needle
 		draw_circle(Vector2(fx, y + h * 0.5), h * 0.62, UiPalette.OUTLINE)
 		draw_circle(Vector2(fx, y + h * 0.5), h * 0.46, Color.WHITE)
@@ -67,8 +64,6 @@ class ParMeter:
 				var s := String(item[0])
 				var w := f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 				draw_string(f, Vector2(_x(float(item[1])) - w * 0.5, ly), s, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, item[2])
-			var pw := f.get_string_size("PAR", HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
-			draw_string(f, Vector2(px - pw * 0.5, y - 12), "PAR", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(1, 1, 1, 0.85))
 
 
 ## Tier medal: a ribboned disc (bronze / silver / gold) with an embossed star and a sweeping

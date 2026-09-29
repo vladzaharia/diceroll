@@ -3,12 +3,14 @@ extends Minigame
 ## Scratch-off: 9 hidden die faces, three copies each of 3 distinct faces (1..6), shuffled.
 ## Scratch 3; action args [idx] (0..8). Low variance by construction: P(three alike) ~ 4%,
 ## P(a pair) ~ 64%, P(nothing) ~ 32%, and nothing still pays a bronze prize.
-## Score (MinigameDefs.MEDIAN.scratch_off = 10): nothing 7 (bronze), pair 10 (silver),
-## three of a kind 13 (gold), three 6s 15 (gold, the jackpot). Unscratched cells stay "?".
+## Score = the pips scratched + PAIR_BONUS for a pair / THREE_BONUS for three alike (three 6s
+## = 28, the jackpot). Rebalanced 2026-09-29 for reward parity: MEDIAN 13 (tiers about 25% /
+## 47% / 29%, was 31 / 66 / 4 with flat prizes). Unscratched cells stay "?".
 
 const CELLS := 9
 const SCRATCHES := 3
-const SCORE := {"none": 7.0, "pair": 10.0, "three": 13.0, "jackpot": 15.0}
+const PAIR_BONUS := 4
+const THREE_BONUS := 10
 
 var faces: Array[int] = []
 var revealed: Array[int] = []
@@ -61,7 +63,14 @@ func outcome() -> String:
 	return "none"
 
 func score() -> float:
-	return float(SCORE[outcome()])
+	var s := 0
+	for i in CELLS:
+		if revealed[i] == 1:
+			s += faces[i]
+	match outcome():
+		"pair": s += PAIR_BONUS
+		"three", "jackpot": s += THREE_BONUS
+	return float(s)
 
 func _public() -> Dictionary:
 	var view: Array = []

@@ -208,8 +208,6 @@ func _present(cmd: Array, hold := 0.0) -> float:
 			var kind := String(c.flow.offer.get("kind", ""))
 			var m: UiModal = ui.passive if kind == "passive" else (ui.minigame_reward if kind == "reward" else ui.draft)
 			return _pick_card(m, int(a[0]), dur)
-		"minigame_auto", "minigame_finish":
-			hud.highlight(ui.minigame.auto_btn, dur)
 		"rune_assign":
 			ui.rune_assign.select(int(a[0]))
 			hud.highlight(_nth(ui.rune_assign.get("_chips"), int(a[0])), dur + PICK_EXTRA / c.speed)

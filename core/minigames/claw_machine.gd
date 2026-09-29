@@ -11,7 +11,7 @@ extends Minigame
 ## ball held + SLIP_DEPTH * its depth (rolled from the minigame Rng, so a save resumes
 ## identically). Won balls open in the tray; score = the points inside them.
 
-const GRABS := 2
+const GRABS := 3
 const BALLS := 18
 const MAX_HOLD := 3
 const REACH := 0.075
@@ -23,10 +23,10 @@ const TIERS := ["common", "rare", "epic", "legendary"]
 const TIER_COUNT := {"common": 10, "rare": 5, "epic": 2, "legendary": 1}
 const TIER_DEPTH := {"common": [0.0, 0.55], "rare": [0.15, 0.7], "epic": [0.45, 0.8], "legendary": [0.78, 0.95]}
 const CONTENTS := {
-	"common": [["coins", 2], ["potion", 2], ["coins", 3]],
-	"rare": [["nugget", 3], ["gem", 4]],
+	"common": [["coins", 3], ["potion", 3], ["coins", 4]],
+	"rare": [["nugget", 4], ["gem", 5]],
 	"epic": [["figure", 6], ["robot", 6]],
-	"legendary": [["chest", 10]],
+	"legendary": [["chest", 8]],
 }
 
 ## Public part per ball + the hidden contents (kind, points) in a parallel array.

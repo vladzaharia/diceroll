@@ -488,6 +488,11 @@ static func decide(f: GameFlow, rules: AutoRules = null) -> Dictionary:
 		rules = AutoRules.new()
 	if f.is_over():
 		return _stop("The run is over.")
+	# Minigames are never played by AUTO (user decision 2026-09-29): the player plays every
+	# one; AUTO turns off here and resumes when switched back on (the reward pick is AUTO's
+	# again). Sims keep BotMeta's par/play handling through Bot.next_command.
+	if f.phase == GameFlow.Phase.MINIGAME:
+		return _stop("Your turn: play the minigame")
 	# Meta layer (potions, minigames, minigame rewards): see core/bot_meta.gd.
 	var meta_d := BotMeta.decide(f, rules)
 	if not meta_d.is_empty():
