@@ -96,14 +96,16 @@ static func make_enemy(rng: Rng, id: String, p_act: int, p_lap: int, p_elite: bo
 		"miniboss": EnemyDefs.is_miniboss(id), "traits": EnemyDefs.traits(id, 1).duplicate(),
 	}
 
-## Meta-layer enemy modifiers (ascension): A6 +12% HP/attack; the final boss gets A9 phase-2
-## traits and +15% HP, A4's +10% HP when the mini-boss was skipped, and 60% HP as A10's second
-## boss (run.stats.boss_stage == 1); A4 gives the mini-boss a trait by biome.
+## Meta-layer enemy modifiers (ascension): A1 elites +15% HP; A6 +4% HP/attack (not bosses);
+## the final boss gets A9 phase-2 traits and +5% HP, A4's +10% HP when the mini-boss was skipped,
+## and 40% HP as A10's second boss (run.stats.boss_stage == 1); A4 gives the mini-boss a trait.
 static func meta_enemy(run: RunState, e: Dictionary) -> void:
 	var hp_m := 1.0
-	if run.has_asc("enemy_stats"):
+	if run.has_asc("enemy_stats") and not bool(e.boss):
 		hp_m *= UnlockDefs.ASC_ENEMY_STATS
 		e.atk_mult = float(e.atk_mult) * UnlockDefs.ASC_ENEMY_STATS
+	if run.has_asc("extra_elite") and bool(e.get("elite", false)):
+		hp_m *= UnlockDefs.ASC_ELITE_HP
 	if bool(e.boss):
 		var stage := int(run.stats.get("boss_stage", 0))
 		if stage == 0 and run.has_asc("boss_phase"):

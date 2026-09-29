@@ -199,15 +199,15 @@ const MAX_ASCENSION := 10
 
 ## Global ladder; level n includes every rule of levels 1..n. One system per level.
 const ASCENSION := [
-	{"level": 1, "key": "extra_elite", "desc": "Lap mutations spawn +1 Elite."},
+	{"level": 1, "key": "extra_elite", "desc": "Lap mutations spawn +1 Elite; elites have +15% HP."},
 	{"level": 2, "key": "lap_heal", "desc": "Lap heal 10% -> 8%."},
 	{"level": 3, "key": "shop_tax", "desc": "Shops cost +10%; restocks cost 12."},
 	{"level": 4, "key": "miniboss_trait", "desc": "The mini-boss gains a trait; skipping it gives the final boss +10% HP."},
 	{"level": 5, "key": "potions", "desc": "Start with 0 potions."},
-	{"level": 6, "key": "enemy_stats", "desc": "Enemies have +5% HP and attack."},
+	{"level": 6, "key": "enemy_stats", "desc": "Enemies (not bosses) have +4% HP and attack."},
 	{"level": 7, "key": "biome_curse", "desc": "Each new biome curses one die face to 1 until you visit a Forge."},
 	{"level": 8, "key": "hazards", "desc": "Traps, ice and lava hurt x1.5; +1 hazard tile per board."},
-	{"level": 9, "key": "boss_phase", "desc": "The final boss starts with its phase-2 traits."},
+	{"level": 9, "key": "boss_phase", "desc": "The final boss starts with its phase-2 traits and +5% HP."},
 	{"level": 10, "key": "double_boss", "desc": "Double final: then face the route's other final boss at 40% HP."},
 ]
 
@@ -217,9 +217,10 @@ const ASC_RESTOCK := 12
 const ASC_SKIP_MINIBOSS_BOSS_HP := 1.10
 ## Potion heal at A5+ (2026-09-28: A5 only removes the starting potion; heal stays 30%).
 const ASC_POTION_HEAL := 0.30
-const ASC_ENEMY_STATS := 1.05
+const ASC_ENEMY_STATS := 1.04
+const ASC_ELITE_HP := 1.15
 const ASC_HAZARD_MULT := 1.5
-const ASC_BOSS_HP := 1.0
+const ASC_BOSS_HP := 1.05
 const ASC_SECOND_BOSS_HP := 0.4
 ## A4 mini-boss trait by the route's mini-boss biome.
 const ASC_MINIBOSS_TRAIT := {"hollow": "thorns", "frost": "armor", "throne": "thorns", "magma": "armor", "glade": "armor", "crypt": "thorns"}
