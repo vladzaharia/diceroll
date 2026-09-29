@@ -224,7 +224,7 @@ func _rod_pts() -> PackedVector2Array:
 	var L := _rod_len() * (1.0 - 0.1 * absf(_swing))
 	var pull := Vector2.ZERO
 	if _bend > 0.0 and _bob == "float":
-		pull = (_fly_to - (b + dir * L)).normalized() * _bend * L * 0.2
+		pull = (_fly_to - (b + dir * L)).normalized() * _bend * L * (0.26 + 0.03 * sin(time * 40.0))
 	var pts := PackedVector2Array()
 	for i in 13:
 		var k := i / 12.0
@@ -302,9 +302,9 @@ func strike() -> void:
 
 
 ## Harness input (scenarios): tap the spot, or strike ~0.15 s after the real plunge. The waiting
-## runs in a detached coroutine and this returns at once: awaiting a suspended coroutine from the
-## harness's match branch corrupts its command-count check (a GDScript VM quirk), and the harness
-## polls for the command anyway.
+## runs in a detached coroutine and this returns at once (Godot 4.7.2 miscompiled the harness's
+## `if not await b.scripted_input(...)` when the override really awaited; the harness polls for
+## the command anyway, so this works with and without that fix).
 func scripted_input(args: Array, drv: Node) -> bool:
 	if args.size() < 2 or not (String(args[0]) in ["cast", "hook"]):
 		return false
@@ -349,6 +349,7 @@ func _tick(dt: float) -> void:
 		_plunge(bp)
 	if _bitten and not _struck and not _surfaced and t > _bite_at + _window:
 		_surfaced = true
+		create_tween().tween_property(self, "_bend", 0.0, 0.2)
 		MgBoard.sfx("plink", 0.05, -6.0)
 		_ripple(bp, 34.0, Color(1, 1, 1, 0.6), 0.6)
 	if _bitten and not _struck and t > _bite_at + _window + MISS_GRACE and not locked:
@@ -373,6 +374,7 @@ func _plunge(bp: Vector2) -> void:
 	_ripple(bp, 36.0, Color(1, 1, 1, 0.6), 0.5)
 	burst(bp, Color("e6fbff"), 16, "chunk", 260.0, 220.0, 7.0 * _u + 2.0)
 	shake(4.0)
+	kick.emit(0.3, Color(1, 1, 1, 0.35))
 	var tw := create_tween()
 	tw.tween_property(self, "_bend", 1.0, 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
@@ -454,18 +456,20 @@ func _play_hook(info: Dictionary, st: Dictionary) -> void:
 			_bend = 0.0
 			_slack = 1.0
 			var junk := kind in ["boot", "weed"]
-			var d := 0.85
-			_flying = {"kind": kind, "from": bp, "to": _slot_pos(slot), "t0": time, "d": dur(d)}
-			await wait(d * 0.45)
-			var kc: Color = (KINDS.get(kind, KINDS.minnow) as Dictionary).body
-			var nm := String((KINDS.get(kind, {}) as Dictionary).get("name", kind)).to_upper()
-			float_text(P(0.5, 0.22), (nm + "..." if junk else nm + "!"), kc.lightened(0.3) if not junk else Color("d8c8a8"), int(34 * _u + 14), 1.1)
+			var d := 0.9
 			if perfect:
-				await wait(0.12)
-				float_text(bp + Vector2(0, -30.0 * _u), "PERFECT!", Color("ffe07a"), int(30 * _u + 12), 1.0)
+				float_text(bp + Vector2(0, -36.0 * _u), "PERFECT!", Color("ffe07a"), int(30 * _u + 12), 0.9)
 				MgBoard.sfx("crit", 0.05, -4.0)
 				burst(bp, Color("ffe07a"), 14, "star", 260.0, 60.0, 9.0 * _u + 2.0)
-			await wait(maxf(0.0, d * 0.55 - (0.12 if perfect else 0.0)))
+			_flying = {"kind": kind, "from": bp, "to": _slot_pos(slot), "t0": time, "d": dur(d)}
+			await wait(d * 0.5)
+			var kc: Color = (KINDS.get(kind, KINDS.minnow) as Dictionary).body
+			var nm := String((KINDS.get(kind, {}) as Dictionary).get("name", kind)).to_upper()
+			var apex := bp.lerp(_slot_pos(slot), 0.5) + Vector2(0, -_s.size.y * 0.3)
+			apex.x = clampf(apex.x, P(0.25, 0).x, P(0.75, 0).x)
+			apex.y = maxf(apex.y, P(0, 0.2).y)
+			float_text(apex, (nm + "..." if junk else nm + "!"), kc.lightened(0.3) if not junk else Color("d8c8a8"), int(34 * _u + 14), 1.1)
+			await wait(d * 0.5)
 			# lands in the tray
 			var sp := _slot_pos(slot)
 			_flying = {}
@@ -649,6 +653,8 @@ func _draw_pond() -> void:
 	# a few shore stones
 	for k in 7:
 		var i := (k * 8 + 3) % _pond.size()
+		if _pond[i].y < P(0, 0.25).y:
+			continue
 		var p := _pond[i].lerp(_sand[i], 0.5)
 		var r := (7.0 + 3.0 * (k % 3)) * u + 2.0
 		draw_circle(p, r + 2.0, UiPalette.OUTLINE)
@@ -733,7 +739,7 @@ func _draw_spots() -> void:
 	for i in 3:
 		var c := _spot_pos(i)
 		var col: Color = SPOT_COLS[i]
-		var a := 1.0 if aiming else (0.0 if i == _spot or _mode == "idle" else 0.25)
+		var a := 1.0 if aiming else 0.0
 		if a <= 0.0:
 			continue
 		var hot := aiming and i == _hover
@@ -803,7 +809,7 @@ func _draw_shadow() -> void:
 	if a <= 0.0:
 		return
 	var L := (58.0 + 8.0 * _spot) * u
-	var col := Color(0.02, 0.1, 0.2, 0.32 * a)
+	var col := Color(0.01, 0.06, 0.14, 0.42 * a)
 	draw_set_transform(p, ang, Vector2(1.0, 0.55))
 	draw_colored_polygon(_ell(Vector2.ZERO, L * 0.42, L * 0.2, 20), col)
 	var wag := sin(time * 9.0) * L * 0.08
@@ -829,7 +835,7 @@ func _draw_line_and_bobber() -> void:
 	var u := _u
 	var tip := _tip()
 	var bp := _bobber_pos()
-	var rb := 11.0 * u + 3.0
+	var rb := 13.0 * u + 4.0
 	var sub := 0.0         # how deep the bobber sits (px); only when floating
 	var under := 0.0
 	if _bob == "float":
@@ -860,7 +866,9 @@ func _draw_floating(sp: Vector2, rb: float, sub: float, under: float) -> void:
 	var c := sp + Vector2(0, -rb * 0.75 + sub)
 	var wc: Color = SPOT_WATER[clampi(_spot, 0, 2)]
 	# the underwater part, seen dimly through the water
-	draw_circle(c, rb, wc.darkened(0.25).lerp(Color("ff6a6a"), 0.25))
+	var sil := wc.darkened(0.2).lerp(Color("ff6a6a"), 0.3)
+	sil.a = clampf(1.0 - under * 0.6, 0.35, 1.0)
+	draw_circle(c, rb, sil)
 	_bobber(c, rb, sp.y)
 	# meniscus ring
 	draw_set_transform(sp, 0.0, Vector2(1.0, 0.38))
@@ -880,11 +888,11 @@ func _draw_floating(sp: Vector2, rb: float, sub: float, under: float) -> void:
 			draw_circle(sp + Vector2(sin(j * 2.1 + time * 3.0) * rb, -bk * 14.0 * u), 3.0 * u + 1.0, Color(1, 1, 1, 1.0 - bk))
 		var pk := clampf((time - _bite_t) / 0.18, 0.0, 1.0)
 		var sc := (1.0 + 0.5 * sin(pk * PI)) * (1.0 + 0.06 * sin(time * 18.0))
-		var bc := sp + Vector2(0, -R - 22.0 * u - 6.0)
-		var br := (19.0 * u + 7.0) * sc
+		var br := (24.0 * u + 9.0) * sc
+		var bc := sp + Vector2(R * 0.95 + br * 0.55, -R * 0.75 - br * 0.5)
 		draw_circle(bc, br + 3.0, UiPalette.OUTLINE)
 		draw_circle(bc, br, Color("fff4c8"))
-		draw_colored_polygon(PackedVector2Array([bc + Vector2(-br * 0.35, br * 0.8), bc + Vector2(br * 0.1, br * 0.8), bc + Vector2(-br * 0.3, br * 1.35)]), Color("fff4c8"))
+		draw_colored_polygon(PackedVector2Array([bc + Vector2(-br * 0.75, br * 0.2), bc + Vector2(-br * 0.35, br * 0.75), bc + Vector2(-br * 1.25, br * 0.9)]), Color("fff4c8"))
 		text_c(bc + Vector2(0, -1), "!", int(br * 1.4), Color("ff3b4a"), 0)
 
 
@@ -1023,7 +1031,7 @@ func _draw_tray() -> void:
 	for i in 3:
 		var sr := _slot_rect(i)
 		var pulse := i == cur and _mode in ["aim", "wait", "cast"] and not _over()
-		rrect(sr, Color("3a2414"), 9.0 * u + 3.0, 2 if not pulse else 3,
+		rrect(sr, Color("4e3220"), 9.0 * u + 3.0, 2 if not pulse else 3,
 			Color(1, 0.9, 0.5, 0.5 + 0.4 * sin(time * 5.0)) if pulse else Color("5a3a22"))
 		var c := sr.get_center()
 		var pop := 1.0
@@ -1101,12 +1109,12 @@ func _draw_prompt() -> void:
 			txt = "STRIKE! TAP!"
 			col = Color("ffe07a")
 			hot = true
-		elif not _struck:
+		elif not _struck and not _surfaced:
 			txt = "WAIT FOR THE PLUNGE..."
 			col = Color(1, 1, 1, 0.85)
 	if txt == "":
 		return
-	var fs := int(clampf((26.0 if hot else 18.0) * u + 5.0, 14.0, 34.0))
+	var fs := int(clampf((30.0 if hot else 18.0) * u + 5.0, 14.0, 38.0))
 	var font := UiTheme.display_font()
 	var w := font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 30.0
 	var c := P(0.5, 0.075)
