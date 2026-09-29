@@ -851,17 +851,6 @@ func _glyph(kind: int, at: Vector2, s: float, col: Color) -> void:
 			_star4(at, s * 1.05, col)
 
 
-## Plays an sfx at a given pitch (rising pop chains). Audio has no pitch argument, so this
-## sets the pitch on the pool player it just used (local workaround; see the WP-E5 report).
+## Plays an sfx at a given base pitch (rising pop chains).
 static func _pitched(id: String, pitch: float, volume_db := 0.0) -> void:
-	var loop := Engine.get_main_loop() as SceneTree
-	var a: Node = loop.root.get_node_or_null("Audio") if loop else null
-	if a == null or not a.has_method("play_sfx"):
-		return
-	a.call("play_sfx", id, 0.0, volume_db)
-	var pool: Variant = a.get("_pool")
-	var nx: Variant = a.get("_next")
-	if pool is Array and nx is int and (pool as Array).size() > 0:
-		var pl := (pool as Array)[(int(nx) - 1 + (pool as Array).size()) % (pool as Array).size()] as AudioStreamPlayer
-		if pl and pl.stream:
-			pl.pitch_scale = clampf(pitch, 0.5, 2.0)
+	MgBoard.sfx(id, 0.0, volume_db, clampf(pitch, 0.5, 2.0))

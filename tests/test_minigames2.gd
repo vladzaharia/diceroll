@@ -70,7 +70,7 @@ func test_determinism_and_mid_game_save() -> void:
 
 ## Each game ends within a bounded number of actions (15-35 s of play) under the bot.
 func test_games_finish() -> void:
-	var cap := {"bubble_shooter": 10, "plinko": 3, "shell_game": 3, "memory_match": 60, "fishing": 6, "lucky_wheel": 4, "high_low": 40}
+	var cap := {"bubble_shooter": 10, "plinko": 3, "shell_game": 3, "memory_match": 60, "fishing": 6, "lucky_wheel": 2 * LuckyWheel.SPINS, "high_low": 40}
 	for id in NEW:
 		for s in 10:
 			var m := Minigames.create(id, 3000 + s, 1)
@@ -280,6 +280,9 @@ func test_lucky_wheel_spin_and_nudge() -> void:
 		assert_eq(bool(r2.info.nudged), true)
 		assert_eq(int(r2.info.segment), LuckyWheel.segment_at(LuckyWheel.angle_at(sp2, t)))
 		nudged += 1 if int(r2.info.segment) != int(r2.info.natural) else 0
+		for k in LuckyWheel.SPINS - 2:
+			m.action(["spin"])
+			m.action(["stop", -1.0])
 		assert_true(m.done)
 		# the bot's brake never does worse than coasting
 		var m2 := Minigames.create("lucky_wheel", 600 + s, 1) as LuckyWheel
@@ -335,8 +338,8 @@ func test_auto_par_and_played_games_through_the_flow() -> void:
 		assert_eq(BotMeta.minigame_command(f), ["minigame_auto"], id)
 		var ev := f.minigame_auto()
 		var res := _first(ev, "minigame_result")
-		assert_eq(String(res.tier), "silver", id)
-		assert_near(float(res.ratio), MinigameDefs.PAR, 0.001, id)
+		assert_eq(String(res.tier), MinigameDefs.tier_for(float(res.ratio)), id)
+		assert_near(float(res.ratio), float(MinigameDefs.SIM_RATIO[res.tier]), 0.001, id)
 		# and played by hand through the flow
 		var g := GameFlow.new_run("knight", 31, 28, {"profile": Profile.fresh().to_dict()})
 		g.debug_open("minigame", id)
@@ -477,3 +480,70 @@ func test_arcade_unlocks_are_minor_milestones() -> void:
 		if String(e.type) == "unlocked" and String(e.id) == "plinko":
 			got = true
 	assert_true(got)
+
+
+# --- balance: all 11 games (stored calibration, review §5.4 + the 2026-09-29 pass) ------
+
+## MinigameDefs.CALIBRATION holds the calibrated numbers (tools/mg_calibrate.gd, human-like
+## MgHuman player, 2,000+ games each). Parity: expected reward within ±10% of the mean;
+## no game gives gold to more than 40% or bronze to more than 45% of players; skill band
+## at most ±15% (Fossil ±5%); 15-35 s of play, except the three short-by-design games.
+func test_parity_bounds_from_the_stored_calibration() -> void:
+	var cal: Dictionary = MinigameDefs.CALIBRATION
+	assert_eq(cal.size(), MinigameDefs.IDS.size(), "every game is calibrated")
+	var mean := 0.0
+	for id in MinigameDefs.IDS:
+		mean += float(cal[id].ev)
+	mean /= cal.size()
+	for id in MinigameDefs.IDS:
+		var c: Dictionary = cal[id]
+		var t: Array = c.tiers
+		assert_near(float(t[0]) + float(t[1]) + float(t[2]), 1.0, 0.011, id)
+		assert_true(absf(float(c.ev) / mean - 1.0) <= 0.10, "%s reward EV %.1f vs mean %.1f" % [id, float(c.ev), mean])
+		assert_true(float(t[2]) <= 0.40, "%s gold share %.2f" % [id, float(t[2])])
+		assert_true(float(t[0]) <= 0.45, "%s bronze share %.2f" % [id, float(t[0])])
+		# MEDIAN = the median player (lumpy scores: between the two central outcomes)
+		assert_near(float(c.median), float(MinigameDefs.MEDIAN[id]), float(MinigameDefs.MEDIAN[id]) * 0.2, id + " MEDIAN ~ the median player")
+		var band := float(MinigameDefs.SKILL_BAND_BY_ID.get(id, MinigameDefs.SKILL_BAND))
+		assert_true(band <= 0.15, id)
+		if MinigameDefs.SHORT_BY_DESIGN.has(id):
+			assert_true(float(c.secs) <= 35.0, id)
+		else:
+			assert_true(float(c.secs) >= 15.0 and float(c.secs) <= 35.0, "%s about %.0f s" % [id, float(c.secs)])
+	assert_near(float(MinigameDefs.SKILL_BAND_BY_ID.fossil_hunter), 0.05)
+
+
+## The stored numbers still describe the rules: a short live run of the human-like player per
+## game lands near the stored median and tier split.
+func test_stored_calibration_matches_a_live_sample() -> void:
+	for id in MinigameDefs.IDS:
+		var n := 30 if id == "bubble_shooter" else 300
+		var hp := MgHuman.new(777)
+		var scores: Array = []
+		var tiers := {"bronze": 0, "silver": 0, "gold": 0}
+		for s in n:
+			var m := Minigames.create(id, 55000 + s * 11, 1)
+			hp.play(m)
+			scores.append(m.score())
+			tiers[MinigameDefs.tier_for(m.score() / float(MinigameDefs.MEDIAN[id]))] += 1
+		scores.sort()
+		var med := float(scores[n / 2])
+		var want := float(MinigameDefs.CALIBRATION[id].median)
+		var tol := 0.25 if n < 100 else 0.15
+		assert_true(absf(med - want) <= want * tol + 1.0, "%s live median %.1f vs stored %.1f" % [id, med, want])
+		if n >= 100:
+			var t: Array = MinigameDefs.CALIBRATION[id].tiers
+			assert_true(absf(float(tiers.gold) / n - float(t[2])) <= 0.09, "%s gold share" % id)
+			assert_true(absf(float(tiers.bronze) / n - float(t[0])) <= 0.09, "%s bronze share" % id)
+
+
+## The sims' stand-in (minigame_auto) reproduces each game's calibrated tier split.
+func test_sim_results_follow_the_calibrated_split() -> void:
+	for id in MinigameDefs.IDS:
+		var c := {"bronze": 0, "silver": 0, "gold": 0}
+		var n := 400
+		for k in n:
+			c[MinigameDefs.tier_for(MinigameDefs.sim_ratio(id, (k + 0.5) / n))] += 1
+		var t: Array = MinigameDefs.CALIBRATION[id].tiers
+		assert_near(float(c.bronze) / n, float(t[0]), 0.01, id)
+		assert_near(float(c.gold) / n, float(t[2]), 0.01, id)

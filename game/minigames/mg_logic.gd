@@ -23,15 +23,15 @@ const GAME_COLORS := {"fossil_hunter": Color("e0a15a"), "bubble_breaker": Color(
 	"high_low": Color("8fd85a")}
 const HINTS := {
 	"fossil_hunter": "Dig for 3 fossils and hidden treasure. Hit a bone? Dig beside it!",
-	"bubble_breaker": "Tap a group of 3+ to pop it. Big pops and chains score more.",
-	"scratch_off": "Scratch 3 faces. A pair pays, three alike pays big, three 6s: JACKPOT!",
+	"bubble_breaker": "Only 3 taps! Pop groups of 3+; groups of 5+ and chains of big pops score extra.",
+	"scratch_off": "Scratch 3 faces: win their pips. A pair adds 4, three alike adds 10, three 6s: JACKPOT!",
 	"claw_machine": "Tap to drop. Every capsule hides a prize: gold ones are rare and deep!",
 	"bubble_shooter": "Drag to aim, release to shoot. Match 3+ to pop; what hangs below falls for double!",
 	"plinko": "Pick a slot and drop. Aim above the rich buckets; the golden peg doubles a drop!",
 	"shell_game": "Watch the gem, follow the cups, tap its cup. Pick fast for a Sharp Eye bonus!",
 	"memory_match": "Flip two cards a turn. Pairs stay up. Remember what you saw: 6 misses and it's over!",
 	"fishing": "Pick a spot and cast. Strike when the bobber plunges, not on a nibble!",
-	"lucky_wheel": "Spin! As it slows, tap BRAKE once to stop on a better prize.",
+	"lucky_wheel": "Three spins! As it slows, tap BRAKE once to stop on a better prize.",
 	"high_low": "Higher or lower? Each right call climbs the ladder. Cash out before you bust!",
 }
 const UNITS := {"fossil_hunter": "DIGS", "bubble_breaker": "TAPS", "scratch_off": "SCRATCHES", "claw_machine": "GRABS",

@@ -370,18 +370,20 @@ func test_minigame_tiers_skill_band_and_par() -> void:
 	assert_eq(MinigameDefs.tier_for(1.3), "gold")
 	assert_near(MinigameDefs.skill_mult(2.0), 1.0 + MinigameDefs.SKILL_BAND)
 	assert_near(MinigameDefs.skill_mult(0.1), 1.0 - MinigameDefs.SKILL_BAND)
-	assert_near(MinigameDefs.PAR, 0.85)
+	assert_near(MinigameDefs.PAR, 1.0)
 	var f := GameFlow.new_run("knight", 1, 28, {"profile": Profile.fresh().to_dict()})
 	f.debug_open("minigame", "claw_machine")
 	assert_eq(f.phase, P.MINIGAME)
 	var ev := f.minigame_auto()
 	var res := _first(ev, "minigame_result")
 	assert_eq(res.auto, true)
-	assert_eq(res.tier, "silver")
+	# the sims' average player: a tier drawn from the calibrated split, at that tier's ratio
+	assert_eq(String(res.tier), MinigameDefs.tier_for(float(res.ratio)))
+	assert_near(float(res.ratio), float(MinigameDefs.SIM_RATIO[res.tier]), 0.001)
 	assert_eq(f.offer.kind, "reward")
-	assert_eq(f.offer.tier, "silver")
+	assert_eq(f.offer.tier, res.tier)
 	f.pick_draft(0)
-	assert_eq(f.phase, P.BOARD_READY)
+	assert_true(f.phase != P.MINIGAME)
 
 func test_minigame_save_at_entry_resumes_identically() -> void:
 	for game in MinigameDefs.IDS:

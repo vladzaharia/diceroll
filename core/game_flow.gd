@@ -1485,13 +1485,15 @@ func minigame_finish() -> Array[Dictionary]:
 	_record(["minigame_finish"])
 	return _minigame_result(float(minigame.score()) / float(MinigameDefs.MEDIAN[minigame.id]), false)
 
-## Skips the game with the par result (MinigameDefs.PAR of median). Sims / headless bots only:
-## players play every minigame and the in-game AUTO pauses at minigames (Bot.decide).
+## Skips the game with a simulated average player's result (MinigameDefs.sim_ratio: a tier
+## drawn from the game's calibrated split with the minigame's own Rng, so the run Rng is
+## untouched). Sims / headless bots only: players play every minigame and the in-game AUTO
+## pauses at minigames (Bot.decide).
 func minigame_auto() -> Array[Dictionary]:
 	if phase != Phase.MINIGAME or minigame == null:
 		return _err("minigame_auto")
 	_record(["minigame_auto"])
-	return _minigame_result(MinigameDefs.PAR, true)
+	return _minigame_result(MinigameDefs.sim_ratio(minigame.id, minigame.rng.randf()), true)
 
 ## Emits minigame_result {id, score, ratio, tier, mult, auto, crowns, state} + offer_closed, banks
 ## the tier's Crowns, then opens the reward choice: offer {kind:"reward", source:"minigame", id,

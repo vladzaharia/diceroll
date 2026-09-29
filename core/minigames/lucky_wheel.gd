@@ -19,7 +19,7 @@ extends Minigame
 
 const SEGMENTS := 12
 const SEG_DEG := 30.0
-const SPINS := 2
+const SPINS := 3
 const SEGMENT_VALUES := [2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 9, 12]
 const NUDGE_WINDOW := 1.1
 const DUR := [4.2, 5.0]
