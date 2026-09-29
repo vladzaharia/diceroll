@@ -53,6 +53,12 @@ func rebuild(p: Profile) -> void:
 	body.add_child(_prestige(p))
 
 
+## Landscape screens: a shorter pedestal and swatches (more of the list fits).
+func _wide() -> bool:
+	var v := get_viewport_rect().size if is_inside_tree() else Vector2(720, 1280)
+	return v.x > v.y * 1.1
+
+
 ## The class carousel: every class as a medallion (owned: tappable; NEW dot on unseen skins).
 func _classes(p: Profile, unseen: Array) -> Control:
 	var grid := GridContainer.new()
@@ -86,7 +92,7 @@ func _stand(p: Profile) -> Control:
 	var col := UiTheme.vbox(4)
 	c.add_child(col)
 	_portrait = HeroPortrait.new()
-	_portrait.custom_minimum_size = Vector2(0, 330)
+	_portrait.custom_minimum_size = Vector2(0, 280 if _wide() else 330)
 	_portrait.ring_color = UiPalette.class_color(view_class)
 	_portrait.set_hero(view_class, shown, p.prestige_on(view_class), false)
 	col.add_child(_portrait)
@@ -122,7 +128,7 @@ func _swatch(p: Profile, skin: String) -> Control:
 	var col := UiTheme.vbox(6)
 	card.add_child(col)
 	var por := HeroPortrait.new()
-	por.custom_minimum_size = Vector2(0, 170)
+	por.custom_minimum_size = Vector2(0, 150 if _wide() else 170)
 	por.spin = 0.0
 	por.zoom = 1.15
 	por.ring_color = UiPalette.class_color(view_class) if owned else Color(0.35, 0.33, 0.45)

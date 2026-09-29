@@ -132,7 +132,7 @@ class _Driver extends Node:
 		c.show_camp()
 		if scenario == "camp_wardrobe":
 			return
-		await get_tree().create_timer(0.2).timeout
+		await get_tree().create_timer(1.2).timeout
 		var w: WardrobeModal = c.ui.camp.wardrobe
 		w.view_class = String(args.get("class", ""))
 		w.preview_skin = String(args.get("preview", ""))

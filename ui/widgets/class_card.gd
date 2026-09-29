@@ -58,7 +58,12 @@ static func secret_hint(id: String) -> String:
 static func unlock_text(p: Profile, id: String) -> String:
 	if is_secret(id):
 		return secret_hint(id)
-	return CampInfo.lock_text("classes", id, p)
+	var m := CampInfo.milestone_for("classes", id)
+	var t := String(m.get("desc", "Locked")).strip_edges()
+	var cost := UnlockDefs.sigil_cost("classes", id, p.unlocks.get("classes", []) if p != null else null)
+	if not cost.is_empty():
+		t += " Or %d Sigils." % int(cost.sigils)
+	return t
 
 
 func _build() -> void:

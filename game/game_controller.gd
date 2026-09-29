@@ -162,6 +162,7 @@ func show_title() -> void:
 func show_class_select() -> void:
 	mode = "class"
 	tray.visible = false
+	ui.class_select.set_profile(profile)
 	ui.show_class_select()
 
 
