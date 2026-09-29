@@ -11,8 +11,11 @@ extends Node3D
 ##   rig.shake(0.6, 0.4)
 ##
 ## Framing solves for the closest camera position that keeps a set of world points inside
-## a normalised screen rect ("safe rect"), which by default reserves the bottom ~30% of a
-## portrait screen (dice tray + HUD) and ~24% of a landscape one.
+## a normalised screen rect ("safe rect"). With `insets_source` set (the game does, via
+## ScreenInsets.measure) the rects are rebuilt live from the actual HUD / tray rects, so the
+## framing follows safe areas, the UI-size setting and HUD changes (passives, AUTO row).
+## In a tall free area the overview looks down more steeply and the follow/home box grows
+## in depth, so the board fills the height instead of leaving an empty band.
 
 enum Mode { OVERVIEW, FOLLOW, COMBAT, POINTS }
 
@@ -33,6 +36,10 @@ enum Mode { OVERVIEW, FOLLOW, COMBAT, POINTS }
 @export var combat_rect_portrait := Rect2(0.07, 0.1, 0.86, 0.56)
 @export var combat_rect_landscape := Rect2(0.18, 0.08, 0.64, 0.62)
 
+## Optional live HUD measurement (ScreenInsets.measure-shaped Dictionary, canvas px). When
+## set, the safe / combat rects are rebuilt from it whenever the HUD or the view changes,
+## so the framing always fits the space the UI actually leaves (safe areas, UI size).
+var insets_source: Callable
 var camera: Camera3D
 var mode := Mode.OVERVIEW
 
@@ -51,6 +58,11 @@ var _trauma_decay := 1.5
 var _shake_strength := 0.0
 var _t := 0.0
 var _snap := true
+var _defaults: Array[Rect2] = []
+var _insets_key := ""
+## Cached fill search (follow box depth factor / overview pitch) for the current layout.
+var _fill_key := ""
+var _fill_val := 1.0
 
 
 func _init() -> void:
@@ -64,6 +76,7 @@ func _init() -> void:
 
 
 func _ready() -> void:
+	_defaults = [safe_rect_portrait, safe_rect_landscape, combat_rect_portrait, combat_rect_landscape]
 	camera.fov = fov
 	camera.current = true
 	get_viewport().size_changed.connect(_on_resize)
@@ -73,6 +86,7 @@ func _ready() -> void:
 
 
 func _on_resize() -> void:
+	_poll_insets()
 	_recompute()
 	_current = _desired
 
@@ -174,10 +188,51 @@ func _begin(instant: bool) -> void:
 		_apply(Vector3.ZERO, Vector3.ZERO)
 
 
+# --- HUD-aware rects -------------------------------------------------------------------
+
+## Rebuilds the framing rects from insets_source; true when they changed.
+func _poll_insets() -> bool:
+	if not insets_source.is_valid():
+		return false
+	var d: Dictionary = insets_source.call()
+	var key := str(d)
+	if key == _insets_key:
+		return false
+	_insets_key = key
+	if d.is_empty():
+		if _defaults.size() == 4:
+			safe_rect_portrait = _defaults[0]
+			safe_rect_landscape = _defaults[1]
+			combat_rect_portrait = _defaults[2]
+			combat_rect_landscape = _defaults[3]
+		return true
+	var v: Vector2 = d.view
+	if v.x <= 0.0 or v.y <= 0.0:
+		return false
+	var top := float(d.top) / v.y
+	var l := float(d.left) / v.x
+	var r := float(d.right) / v.x
+	# portrait: the whole width (the board is width-bound); landscape: keep the far sides
+	# free (floating island edges) - the board reads better centred
+	var side_p := maxf(0.03, l)
+	var side_l := maxf(0.1, maxf(l, r) + 0.02)
+	safe_rect_portrait = _rect(side_p, top, 1.0 - side_p - maxf(0.03, r), float(d.board_bottom) / v.y)
+	safe_rect_landscape = _rect(side_l, top, 1.0 - side_l * 2.0, float(d.board_bottom) / v.y)
+	combat_rect_portrait = _rect(maxf(0.05, l), top, 1.0 - maxf(0.05, l) - maxf(0.05, r), float(d.combat_bottom) / v.y)
+	combat_rect_landscape = _rect(side_l, top, 1.0 - side_l * 2.0, float(d.combat_bottom) / v.y)
+	return true
+
+
+static func _rect(x: float, top: float, w: float, bottom: float) -> Rect2:
+	return Rect2(x, top, w, maxf(bottom - top, 0.25))
+
+
 # --- update -------------------------------------------------------------------------------
 
 func _process(dt: float) -> void:
 	_t += dt
+	if _poll_insets() and mode != Mode.FOLLOW:
+		_recompute()
 	if mode == Mode.FOLLOW and _follow_target and is_instance_valid(_follow_target):
 		_recompute()
 	elif mode == Mode.FOLLOW and _follow_target != null:
@@ -225,6 +280,10 @@ func safe_rect() -> Rect2:
 
 func _recompute() -> void:
 	var portrait := is_portrait()
+	var rect := safe_rect()
+	if mode == Mode.COMBAT:
+		rect = combat_rect_portrait if portrait else combat_rect_landscape
+	var view := _viewport_size()
 	var pts := PackedVector3Array()
 	match mode:
 		Mode.OVERVIEW:
@@ -232,6 +291,14 @@ func _recompute() -> void:
 			_pitch = 56.0 if portrait else 50.0
 			for i in 8:
 				pts.append(_bounds.get_endpoint(i))
+			if portrait:
+				# a tall free area leaves a band under a width-bound board: look down more
+				# steeply (up to 72°) until the ring fills the height too
+				var key := "o|%s|%s|%s" % [rect, view, _bounds]
+				if key != _fill_key:
+					_fill_key = key
+					_fill_val = _search_fill(func(p: float) -> Array: return [pts, p], 56.0, 72.0, rect, view)
+				_pitch = _fill_val
 		Mode.FOLLOW:
 			_yaw = 0.0
 			_pitch = 50.0 if portrait else 44.0
@@ -248,11 +315,14 @@ func _recompute() -> void:
 			var bc := _bounds.get_center()
 			var far := clampf((bc.z - c.z) / maxf(_bounds.size.z * 0.5, 0.1), 0.0, 1.0)
 			_pitch += 12.0 * far
-
-			for x in [-1.0, 1.0]:
-				for z in [-1.0, 1.0]:
-					pts.append(c + Vector3(x * r, 0.0, z * r * 0.8))
-					pts.append(c + Vector3(x * r, 1.6, z * r * 0.8))
+			# the framed box's depth grows (0.8r .. 1.7r) until it fills a tall free area,
+			# so phones show more of the ring instead of an empty band
+			var key := "f|%s|%s|%d|%.2f" % [rect, view, int(_pitch * 4.0), _follow_wide]
+			if key != _fill_key:
+				_fill_key = key
+				var p0 := _pitch
+				_fill_val = _search_fill(func(k: float) -> Array: return [_follow_box(Vector3.ZERO, r, k), p0], 0.8, 1.7, rect, view)
+			pts = _follow_box(c, r, _fill_val)
 		Mode.COMBAT:
 			_pitch = 36.0 if portrait else 30.0
 			pts = _points
@@ -260,12 +330,56 @@ func _recompute() -> void:
 			pts = _points
 	if pts.is_empty():
 		return
-	var rect := safe_rect()
-	if mode == Mode.COMBAT and portrait:
-		rect = combat_rect_portrait
-	elif mode == Mode.COMBAT:
-		rect = combat_rect_landscape
-	_desired = solve_framing(pts, _yaw, deg_to_rad(_pitch), rect, _viewport_size(), camera.fov)
+	_desired = solve_framing(pts, _yaw, deg_to_rad(_pitch), rect, view, camera.fov)
+
+
+static func _follow_box(c: Vector3, r: float, zk: float) -> PackedVector3Array:
+	var pts := PackedVector3Array()
+	for x in [-1.0, 1.0]:
+		for z in [-1.0, 1.0]:
+			pts.append(c + Vector3(x * r, 0.0, z * r * zk))
+			pts.append(c + Vector3(x * r, 1.6, z * r * zk))
+	return pts
+
+
+## Smallest parameter in [lo, hi] (searched by bisection) whose framing fills the rect's
+## height as well as its width. `build(param)` returns [points, pitch_deg]. Returns hi when
+## even hi leaves vertical slack, lo when lo is already height-bound.
+func _search_fill(build: Callable, lo: float, hi: float, rect: Rect2, view: Vector2) -> float:
+	if _fill_h(build.call(lo), rect, view) >= 0.985:
+		return lo
+	if _fill_h(build.call(hi), rect, view) < 0.985:
+		return hi
+	for i in 7:
+		var mid := (lo + hi) * 0.5
+		if _fill_h(build.call(mid), rect, view) >= 0.985:
+			hi = mid
+		else:
+			lo = mid
+	return hi
+
+
+func _fill_h(spec: Array, rect: Rect2, view: Vector2) -> float:
+	var pts: PackedVector3Array = spec[0]
+	var xf := solve_framing(pts, _yaw, deg_to_rad(float(spec[1])), rect, view, camera.fov)
+	return framing_fill(pts, xf, rect, view, camera.fov).y
+
+
+## Fraction (x, y) of `rect` that `points` span on screen through camera transform `xf`.
+static func framing_fill(points: PackedVector3Array, xf: Transform3D, rect: Rect2, size: Vector2,
+		fov_deg: float) -> Vector2:
+	var ty := tan(deg_to_rad(fov_deg) * 0.5)
+	var tx := ty * size.x / maxf(size.y, 1.0)
+	var inv := xf.affine_inverse()
+	var lo := Vector2(INF, INF)
+	var hi := Vector2(-INF, -INF)
+	for p in points:
+		var v := inv * p
+		var depth := maxf(-v.z, 0.01)
+		var n := Vector2(v.x / (depth * tx), v.y / (depth * ty))
+		lo = lo.min(n)
+		hi = hi.max(n)
+	return Vector2((hi.x - lo.x) / maxf(rect.size.x * 2.0, 1e-4), (hi.y - lo.y) / maxf(rect.size.y * 2.0, 1e-4))
 
 
 ## Closest camera transform (fixed yaw/pitch) that keeps every point inside `rect`

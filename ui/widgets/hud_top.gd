@@ -11,6 +11,8 @@ extends Control
 signal pause_pressed
 
 const MAX_W := 980.0
+## Gap between the HUD row and the AUTO cluster sharing its line (landscape).
+const SIDE_GAP := 18.0
 const ROMAN := ["I", "II", "III", "IV"]
 ## Biome accent per act (lap pips, chip rim).
 const BIOME_COLORS := [Color("ffb36a"), Color("ff8a3a"), Color("b58aff")]
@@ -42,6 +44,11 @@ var _block := 0
 var burn_badge: Control
 var _burn_label: Label
 var _burn := 0
+## Landscape: width reserved right of the HUD row for the AUTO / speed cluster, so the row
+## and the cluster form one centred group inside the layout column (0 = none).
+var side_reserve := 0.0
+## Scale applied to the HUD row when the screen is narrower than its natural width.
+var _fit := 1.0
 
 
 func _init() -> void:
@@ -151,23 +158,61 @@ func _layout() -> void:
 	if view.x <= 0.0:
 		return
 	var safe := UiTheme.safe_margins(self)
-	var w := minf(MAX_W, view.x - safe.left - safe.right)
-	_row.position = Vector2((view.x - w) * 0.5, safe.top)
-	_row.size = Vector2(w, 0)
+	var col := UiTheme.column_width(view, safe)
+	var reserve := side_reserve + SIDE_GAP if side_reserve > 0.0 else 0.0
+	var w := minf(MAX_W, col - reserve)
+	var group := w + reserve
+	# too narrow for the row's natural width (small phones, big UI size): shrink it to fit
+	_row.scale = Vector2.ONE
+	var need := _row.get_combined_minimum_size().x
+	_fit = clampf(w / maxf(need, 1.0), 0.6, 1.0)
+	var lw := w / _fit
+	_row.position = Vector2(round((view.x - group) * 0.5), safe.top)
+	_row.size = Vector2(lw, 0)
 	_row.reset_size()
-	_row.size.x = w
-	passives.position = Vector2(_row.position.x + 4.0, _row.position.y + _row.size.y + 8.0)
+	_row.size.x = lw
+	_row.scale = Vector2(_fit, _fit)
+	var rh := _row.size.y * _fit
+	passives.position = Vector2(_row.position.x + 4.0, _row.position.y + rh + 8.0)
 	passives.size = Vector2(w - 8.0, 0)
 	passives.reset_size()
 	passives.size.x = w - 8.0
 	var extra := passives.size.y + 8.0 if not _passive_ids.is_empty() else 0.0
 	_scrim.position = Vector2.ZERO
-	_scrim.size = Vector2(view.x, safe.top + _row.size.y + extra + 90.0)
+	_scrim.size = Vector2(view.x, safe.top + rh + extra + 90.0)
+
+
+## True when a `w`-wide cluster fits on the HUD row's line (landscape, with a usable row).
+func side_fits(w: float) -> bool:
+	if size.x <= 0.0 or UiTheme.is_tall(size):
+		return false
+	return UiTheme.column_width(size, UiTheme.safe_margins(self)) - w - SIDE_GAP >= 640.0
+
+
+## Reserves room on the HUD row's line for the AUTO cluster (0 clears it).
+func set_side_reserve(w: float) -> void:
+	if absf(w - side_reserve) < 0.5:
+		return
+	side_reserve = w
+	_layout()
+
+
+## The HUD row's rect (local), e.g. to right-align the AUTO cluster under it.
+func row_rect() -> Rect2:
+	return Rect2(_row.position, _row.size * _fit)
+
+
+## Where a cluster of size `sz` sits beside the row (right end of the HUD group).
+func side_pos(sz: Vector2) -> Vector2:
+	var r := row_rect()
+	var x := r.end.x + SIDE_GAP
+	var y := r.position.y + minf(12.0, maxf(r.size.y - sz.y, 0.0) * 0.5)
+	return Vector2(x, y)
 
 
 ## Bottom edge of the HUD block (row + passives bar), in local coordinates.
 func content_bottom() -> float:
-	var b := _row.position.y + _row.size.y
+	var b := _row.position.y + _row.size.y * _fit
 	if not _passive_ids.is_empty():
 		b = passives.position.y + passives.size.y
 	return b

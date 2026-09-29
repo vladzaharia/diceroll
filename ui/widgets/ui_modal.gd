@@ -17,6 +17,8 @@ var panel: PanelContainer
 var ribbon: Ribbon
 var scrim: ColorRect
 var _frame: VBoxContainer
+## Panel scale when its content is wider than the screen allows (1 = natural size).
+var _fit := 1.0
 var _center: Control
 var _scroll: ScrollContainer
 var _inner: MarginContainer
@@ -86,7 +88,7 @@ func open() -> void:
 	_layout()
 	scrim.modulate.a = 0.0
 	_frame.modulate.a = 0.0
-	_frame.scale = Vector2(0.86, 0.86)
+	_frame.scale = Vector2(0.86, 0.86) * _fit
 	await get_tree().process_frame
 	_layout()
 	_frame.pivot_offset = _frame.size * 0.5
@@ -96,7 +98,7 @@ func open() -> void:
 	t.tween_property(scrim, "modulate:a", 1.0, 0.18)
 	t.tween_property(_frame, "modulate:a", 1.0, 0.14)
 	t.tween_property(_frame, "position", target, 0.3).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	t.tween_property(_frame, "scale", Vector2.ONE, 0.32).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t.tween_property(_frame, "scale", Vector2.ONE * _fit, 0.32).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	UiTheme.sfx("open")
 	opened.emit()
 
@@ -107,8 +109,8 @@ func show_now() -> void:
 	_is_open = true
 	scrim.modulate.a = 1.0
 	_frame.modulate.a = 1.0
-	_frame.scale = Vector2.ONE
 	_layout()
+	_frame.scale = Vector2.ONE * _fit
 
 
 func close(free_after := false) -> void:
@@ -120,7 +122,7 @@ func close(free_after := false) -> void:
 	_close_tween = t
 	t.tween_property(scrim, "modulate:a", 0.0, 0.16)
 	t.tween_property(_frame, "modulate:a", 0.0, 0.14)
-	t.tween_property(_frame, "scale", Vector2(0.92, 0.92), 0.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	t.tween_property(_frame, "scale", Vector2(0.92, 0.92) * _fit, 0.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	await t.finished
 	if _is_open:
 		return
@@ -151,8 +153,15 @@ func _layout() -> void:
 	_scroll.custom_minimum_size.y = minf(natural, avail_h - chrome)
 	_frame.reset_size()
 	_frame.size.x = w
-	_frame.position = Vector2((view.x - w) * 0.5, maxf(safe.top, (view.y - _frame.size.y) * 0.5))
+	# content wider than the screen (narrow phone + large UI size): shrink the whole panel
+	var was := _fit
+	_fit = clampf(w / maxf(_frame.size.x, 1.0), 0.6, 1.0)
+	if not is_equal_approx(was, _fit) and is_equal_approx(_frame.scale.x, was):
+		_frame.scale = Vector2.ONE * _fit
+	var fh := _frame.size.y * _fit
+	var c := Vector2(view.x * 0.5, maxf(safe.top, (view.y - fh) * 0.5) + fh * 0.5)
 	_frame.pivot_offset = _frame.size * 0.5
+	_frame.position = c - _frame.size * 0.5
 
 
 ## Re-layout after content changed (call at the end of refresh()). Coalesced per frame.

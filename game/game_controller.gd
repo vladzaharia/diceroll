@@ -676,30 +676,18 @@ static func _seg_dist(p: Vector2, a: Vector2, b: Vector2) -> float:
 
 func _layout_tray() -> void:
 	var vs := get_viewport().get_visible_rect().size
-	var th := UiTheme.tray_height(vs)
-	var w := UiTheme.tray_width(vs)
-	tray.position = Vector2((vs.x - w) * 0.5, vs.y - th + 4.0)
-	tray.size = Vector2(w, th - 16.0)
+	var r := UiTheme.tray_rect(vs, UiTheme.safe_margins(tray))
+	tray.position = r.position
+	tray.size = r.size
 	_update_combat_rect()
 
 
-## Keeps the combat framing between the top HUD and the combat panel above the tray.
+## The camera frames the board / fight in the space the HUD leaves, measured live.
 func _update_combat_rect() -> void:
-	var vs := get_viewport().get_visible_rect().size
-	if vs.y <= 0.0 or ui == null:
+	if ui == null or rig.insets_source.is_valid():
 		return
-	var bottom := (ui.combat_hud.content_top(vs) - 14.0) / vs.y
-	if vs.y > vs.x:
-		var top := 0.12
-		rig.combat_rect_portrait = Rect2(0.05, top, 0.9, maxf(bottom - top, 0.3))
-
-	else:
-		# the bottom controls sit beside the tray: the world gets everything above it
-		var top := 0.1
-		rig.combat_rect_landscape = Rect2(0.1, top, 0.8, maxf(bottom - top, 0.3))
-		var bar_top := (ui.board_hud.content_top(vs) - 6.0) / vs.y
-		rig.safe_rect_landscape = Rect2(0.12, 0.09, 0.76, maxf(bar_top - 0.09, 0.3))
-
+	rig.insets_source = func() -> Dictionary:
+		return ScreenInsets.measure(ui, get_viewport().get_visible_rect().size)
 
 
 func _process(dt: float) -> void:

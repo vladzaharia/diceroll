@@ -264,10 +264,18 @@ func _layout() -> void:
 	var right := (view.x + w) * 0.5
 	var y := (top.content_bottom() if top else safe.top + 110.0) + 10.0
 	cluster.reset_size()
-	if view.x - safe.right - right >= cluster.size.x + 56.0:
-		# landscape: the free corner right of the top HUD (clear of enemy intents / HP bars)
-		cluster.position = Vector2(view.x - safe.right - 28.0 - cluster.size.x, safe.top + 12.0)
+	if top and top.side_fits(cluster.size.x):
+		# landscape: on the HUD row's line, as one centred group with it (UiTheme column)
+		for t: HudTop in [ui.board_hud.top, ui.combat_hud.top]:
+			t.set_side_reserve(cluster.size.x)
+		cluster.position = top.side_pos(cluster.size)
 	else:
+		if ui:
+			for t: HudTop in [ui.board_hud.top, ui.combat_hud.top]:
+				t.set_side_reserve(0.0)
+		if top:
+			right = top.row_rect().end.x
+			y = top.content_bottom() + 10.0
 		cluster.position = Vector2(right - cluster.size.x, y)
 	_place_ticker()
 	if _stop_card.visible:
