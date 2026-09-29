@@ -22,7 +22,7 @@ const DATA := {
 		"kinds": ["twin", "standard"], "tags": ["", ""], "combat_rerolls": 2, "mechanic": "oath", "style": "melee_1h"},
 	"ranger": {"name": "Ranger", "model": "ranger", "hp": 52, "atk": 0, "runes": ["blade", ""], "board_rerolls": 1,
 		"kinds": ["loaded", "standard"], "tags": ["", ""], "combat_rerolls": 2, "mechanic": "aim", "style": "ranged"},
-	"ninja": {"name": "Ninja", "model": "ninja", "hp": 56, "atk": 0, "runes": ["thunder", ""], "board_rerolls": 1,
+	"ninja": {"name": "Ninja", "model": "ninja", "hp": 55, "atk": 0, "runes": ["thunder", ""], "board_rerolls": 1,
 		"kinds": ["standard", "odd"], "tags": ["", ""], "combat_rerolls": 3, "mechanic": "shadow_step", "style": "dual"},
 	"druid": {"name": "Druid", "model": "druid", "hp": 56, "atk": 0, "runes": ["", ""], "board_rerolls": 1,
 		"kinds": ["odd", "standard"], "tags": ["seed", ""], "combat_rerolls": 2, "mechanic": "overgrowth", "style": "magic"},

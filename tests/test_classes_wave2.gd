@@ -245,7 +245,7 @@ func test_boo_weakens_bosses() -> void:
 	for e in ev:
 		if e.type == "damage" and str(e.target) == "hero":
 			hit += int(e.amount) + int(e.blocked)
-	assert_eq(hit, 14, "-30%")
+	assert_eq(hit, int(round(20 * (1.0 - ClassLogic.BOO_WEAKEN))), "weakened")
 
 func test_monster_kid_is_secret_and_not_for_sale() -> void:
 	assert_eq(UnlockDefs.sigil_cost("classes", "monster_kid"), {})
