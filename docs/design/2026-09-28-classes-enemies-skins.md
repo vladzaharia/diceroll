@@ -475,7 +475,7 @@ Biome affixes have weight 3 each, and `gilded` has weight 1 everywhere.
 - New sim flag `--affixes=off|on|force:<id>` measures each affix alone at 100% on elites, which
   gives a pp table like `--items`.
   - Target: no single affix costs more than **4 pp** when forced on every elite.
-  - `warded` and `piercing` are the likely offenders, and piercing hits Knight and Paladin
+  - `warded` and `piercing` are the likely offenders, and piercing hits the Knight
     hardest. If the per-class spread from piercing exceeds 5 pp, cut its weight to 2.
 
 #### 3A.5 Visual language (extends WP-F2's `game/enemies/skin_rules.gd`)
