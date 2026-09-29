@@ -29,6 +29,12 @@ const FOV := 24.0
 
 var dice: Array[DieVisual] = []
 var interactive := true
+## The Engineer's Clockwork Turret die: a 6th slot on a brass side stand at the right end of
+## the row. Not part of `dice` (never picked, marked or cursed); null for other classes.
+var turret: DieVisual = null
+var _stand: Node3D = null
+var _turret_label: Label = null
+var _badge: PanelContainer = null
 
 var _viewport := SubViewport.new()
 var _view := TextureRect.new()
@@ -192,6 +198,169 @@ func set_dice(new_dice: Array) -> void:
 			dice[i].position = _slot_pos(i)
 
 
+## A small chip in the tray's top-left corner (the Paladin's "OATH 4"); "" hides it.
+func set_badge(text: String, color := Color(1.0, 0.82, 0.3), icon := "") -> void:
+	if _badge == null:
+		if text == "":
+			return
+		_badge = PanelContainer.new()
+		_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 6)
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_badge.add_child(row)
+		add_child(_badge)
+	_badge.visible = text != ""
+	if text == "":
+		return
+	var row := _badge.get_child(0) as HBoxContainer
+	for ch in row.get_children():
+		ch.queue_free()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.04, 0.03, 0.08, 0.82)
+	sb.set_corner_radius_all(14)
+	sb.set_border_width_all(2)
+	sb.border_color = Color(color, 0.85)
+	sb.content_margin_left = 10
+	sb.content_margin_right = 12
+	sb.content_margin_top = 3
+	sb.content_margin_bottom = 3
+	_badge.add_theme_stylebox_override("panel", sb)
+	if icon != "" and UiIcons.exists(icon):
+		row.add_child(UiIcons.rect(icon, 26))
+	var l := Label.new()
+	l.text = text
+	var font: Font = load("res://assets/fonts/LilitaOne-Regular.ttf") if ResourceLoader.exists("res://assets/fonts/LilitaOne-Regular.ttf") else null
+	if font:
+		l.add_theme_font_override("font", font)
+	l.add_theme_font_size_override("font_size", 20)
+	l.add_theme_color_override("font_color", color.lightened(0.25))
+	l.add_theme_color_override("font_outline_color", Color(0.08, 0.05, 0.03))
+	l.add_theme_constant_override("outline_size", 6)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(l)
+	_badge.reset_size()
+	_badge.position = Vector2(FRAME_PX + 8.0, FRAME_PX + 6.0)
+
+
+## Shows (or removes, with null) the Engineer's turret die on its side stand.
+func set_turret(d: Variant) -> void:
+	if d == null:
+		if turret:
+			turret.queue_free()
+			_stand.queue_free()
+			_turret_label.queue_free()
+			turret = null
+			_layout()
+		return
+	if turret == null:
+		turret = DieVisual.new()
+		turret.name = "TurretDie"
+		_dice_root.add_child(turret)
+		var start: Basis = DieMesh.up_basis(0)
+		turret.body.basis = start
+		turret.rest_basis = start
+		turret.scale = Vector3.ONE * 0.82
+		_stand = _build_stand()
+		_dice_root.add_child(_stand)
+		_turret_label = Label.new()
+		_turret_label.text = "TURRET"
+		var font: Font = load("res://assets/fonts/LilitaOne-Regular.ttf") if ResourceLoader.exists("res://assets/fonts/LilitaOne-Regular.ttf") else null
+		if font:
+			_turret_label.add_theme_font_override("font", font)
+		_turret_label.add_theme_font_size_override("font_size", 17)
+		_turret_label.add_theme_color_override("font_color", Color(1.0, 0.78, 0.42))
+		_turret_label.add_theme_color_override("font_outline_color", Color(0.1, 0.06, 0.03))
+		_turret_label.add_theme_constant_override("outline_size", 6)
+		_turret_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_turret_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_turret_label)
+		turret.set_data(d)
+		_layout()
+	else:
+		turret.set_data(d)
+	_place_turret_label()
+
+
+## Throws the turret die (it lands on its stand showing `value`).
+func roll_turret(value: int) -> void:
+	if turret == null:
+		return
+	var p := _turret_pos()
+	turret.start_roll(value, p, _rng, 0.0, roll_duration * 0.7, Vector3(-0.1, 0.0, -0.2), 0.8 * _air)
+	_play("dice_roll", -4.0)
+
+
+## Screen (global canvas) rect of the turret die (Rect2() without one).
+func get_turret_screen_rect() -> Rect2:
+	if turret == null or not _camera.is_inside_tree():
+		return Rect2()
+	var c := turret.global_position + turret.pivot.position * turret.scale.x
+	var a := _camera.unproject_position(c + Vector3(-0.45, 0.45, 0.0)) / _oversample
+	var b := _camera.unproject_position(c + Vector3(0.45, -0.45, 0.0)) / _oversample
+	var r := Rect2(a, Vector2.ZERO).expand(b)
+	r.position += _view.global_position
+	return r
+
+
+func _turret_pos() -> Vector3:
+	return (_slots[dice.size()] if _slots.size() > dice.size() else Vector3.ZERO) + Vector3.UP * 0.1
+
+
+func _build_stand() -> Node3D:
+	var root := Node3D.new()
+	root.name = "TurretStand"
+	var brass := StandardMaterial3D.new()
+	brass.albedo_color = Color(0.78, 0.55, 0.24)
+	brass.metallic = 0.85
+	brass.roughness = 0.32
+	var dark := StandardMaterial3D.new()
+	dark.albedo_color = Color(0.22, 0.18, 0.16)
+	dark.metallic = 0.6
+	dark.roughness = 0.45
+	var base := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.66
+	cm.bottom_radius = 0.74
+	cm.height = 0.1
+	cm.radial_segments = 24
+	base.mesh = cm
+	base.material_override = brass
+	base.position.y = 0.05
+	root.add_child(base)
+	var ring := MeshInstance3D.new()
+	var tm := TorusMesh.new()
+	tm.inner_radius = 0.64
+	tm.outer_radius = 0.72
+	tm.rings = 24
+	ring.mesh = tm
+	ring.material_override = dark
+	ring.position.y = 0.1
+	root.add_child(ring)
+	for k in 6:
+		var bolt := MeshInstance3D.new()
+		var sm := SphereMesh.new()
+		sm.radius = 0.05
+		sm.height = 0.1
+		bolt.mesh = sm
+		bolt.material_override = dark
+		var a := TAU * k / 6.0
+		bolt.position = Vector3(cos(a) * 0.6, 0.1, sin(a) * 0.6)
+		root.add_child(bolt)
+	return root
+
+
+func _place_turret_label() -> void:
+	if turret == null or _turret_label == null or not is_inside_tree():
+		return
+	var r := get_turret_screen_rect()
+	_turret_label.reset_size()
+	var s := _turret_label.get_combined_minimum_size()
+	_turret_label.size = s
+	_turret_label.position = Vector2(r.get_center().x - s.x * 0.5, r.end.y + 12.0) - global_position
+	_turret_label.position.y = minf(_turret_label.position.y, size.y - FRAME_PX - s.y)
+
+
 ## Shows values instantly (one per die). No animation, no signal.
 func set_values(values: Array) -> void:
 	for i in mini(values.size(), dice.size()):
@@ -337,6 +506,8 @@ func _emit_settled() -> void:
 func _process(dt: float) -> void:
 	for d in dice:
 		d.tick(dt, speed_scale)
+	if turret:
+		turret.tick(dt, speed_scale)
 	if _rolling:
 		var any := false
 		for d in dice:
@@ -446,9 +617,10 @@ func _layout() -> void:
 
 	# Camera: fit the dice row (at least 4 wide) horizontally and a fixed height band.
 	var n := dice.size()
+	var slots_n := n + (1 if turret else 0)
 	var aspect := _view.size.x / _view.size.y
 	var tan_v := tan(deg_to_rad(FOV * 0.5))
-	var need_w := (float(maxi(n, 4)) * MIN_SPACING) * 0.5 + 0.3
+	var need_w := (float(maxi(slots_n, 4)) * MIN_SPACING) * 0.5 + 0.3
 	var need_h := 1.6
 	var dist := maxf(need_w / (tan_v * aspect), need_h / tan_v)
 	var pitch := deg_to_rad(PITCH_DEG)
@@ -459,16 +631,23 @@ func _layout() -> void:
 	_half_w = vis_w * 0.5
 	# Short (landscape) trays get lower arcs so dice stay inside the frame.
 	_air = clampf((dist * tan_v - 0.9) / 1.0, 0.5, 1.0)
-	_spacing = clampf((vis_w - 1.1) / maxf(float(n), 1.0), MIN_SPACING, MAX_SPACING)
+	_spacing = clampf((vis_w - 1.1) / maxf(float(slots_n), 1.0), MIN_SPACING, MAX_SPACING)
 	_slots.clear()
-	for i in n:
-		_slots.append(Vector3((float(i) - (n - 1) * 0.5) * _spacing, 0.0, 0.0))
+	for i in slots_n:
+		_slots.append(Vector3((float(i) - (slots_n - 1) * 0.5) * _spacing, 0.0, 0.0))
+	if turret:
+		var tp := _turret_pos()
+		_stand.position = tp - Vector3.UP * 0.1
+		if not turret.is_rolling():
+			turret.position = tp
+			turret.rest_pos = tp
 	for i in n:
 		if not dice[i].is_rolling():
 			dice[i].position = _slot_pos(i)
 			dice[i].rest_pos = _slot_pos(i)
 	_felt_mat.set_shader_parameter("falloff", maxf(vis_w * 0.55, 4.0))
 	_update_labels()
+	_place_turret_label.call_deferred()
 
 
 func _rebuild_labels() -> void:

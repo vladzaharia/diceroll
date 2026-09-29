@@ -26,6 +26,8 @@ const RUNE_LOOKS := {
 	"wild": [Color(0.97, 0.96, 0.99), Color(0.86, 0.84, 0.95), Color(0.1, 0.08, 0.14), Color(1, 1, 1), 0.0, 0.2, 0.8],
 	"gilded": [Color(0.92, 0.68, 0.28), Color(0.7, 0.45, 0.14), Color(0.16, 0.08, 0.02), Color(1.0, 0.78, 0.35), 0.75, 0.3, 0.5],
 }
+## Bone die: body, edge, pips, rim.
+const BONE_LOOK := [Color(0.93, 0.84, 0.6), Color(0.5, 0.42, 0.3), Color(0.12, 0.2, 0.14), Color(0.35, 1.0, 0.62)]
 const RIM_STRENGTH := 0.9
 const MARK_LIFT := 0.34
 const GLOW_COLOR := Color(1.0, 0.78, 0.35)
@@ -36,6 +38,8 @@ var edited := PackedByteArray([0, 0, 0, 0, 0, 0])
 var rune := ""
 ## Die kind id (DiceKinds): drawn as a small corner mark on every face.
 var kind := "standard"
+## Die tags (Die.tags): "seed" draws the Druid's leaf mark, "bone" the Necromancer's bone die.
+var tags := PackedStringArray()
 ## Board move: this die is one of the two moving dice (lifted, steady gold glow).
 var chosen := false
 ## Board move: this die is not moving (darkened).
@@ -129,10 +133,13 @@ func set_data(d: Variant) -> void:
 	var e: Variant = d.get("edited") if d != null else null
 	var k: Variant = d.get("kind") if d != null else null
 	kind = String(k) if k != null else "standard"
+	var tg: Variant = d.get("tags") if d != null else null
+	tags = PackedStringArray(tg) if tg != null else PackedStringArray()
 	faces = PackedInt32Array([1, 2, 3, 4, 5, 6])
 	if f != null:
 		for i in mini(6, f.size()):
-			faces[i] = clampi(int(f[i]), DiceKinds.MIN_VALUE, DiceKinds.MAX_VALUE)
+			var fv := int(f[i])
+			faces[i] = fv if fv == Die.PRETEND else clampi(fv, DiceKinds.MIN_VALUE, DiceKinds.MAX_VALUE)
 	rune = String(r) if r != null else ""
 	if not RUNE_LOOKS.has(rune):
 		rune = ""
@@ -158,12 +165,22 @@ func _apply_look() -> void:
 		edge_c = edge_c.lerp(kc, 0.62)
 	elif special:
 		edge_c = edge_c.lerp(kc, 0.3)
+	var pip_c: Color = look[2]
+	var rim_c: Color = look[3]
+	var rim_k := 0.0 if rune == "" else RIM_STRENGTH
+	if kind == "bone" and rune == "":
+		# a temporary Bone die: bleached bone with a green soul-flame rim
+		body_c = BONE_LOOK[0]
+		edge_c = BONE_LOOK[1]
+		pip_c = BONE_LOOK[2]
+		rim_c = BONE_LOOK[3]
+		rim_k = 1.1
 	mat.set_shader_parameter("body_color", body_c)
 	mat.set_shader_parameter("edge_color", edge_c)
 
-	mat.set_shader_parameter("pip_color", look[2])
-	mat.set_shader_parameter("rim_color", look[3])
-	mat.set_shader_parameter("rim_strength", 0.0 if rune == "" else RIM_STRENGTH)
+	mat.set_shader_parameter("pip_color", pip_c)
+	mat.set_shader_parameter("rim_color", rim_c)
+	mat.set_shader_parameter("rim_strength", rim_k)
 	mat.set_shader_parameter("metallic", look[4])
 	mat.set_shader_parameter("roughness", look[5])
 	mat.set_shader_parameter("clearcoat", look[6])
@@ -179,6 +196,7 @@ func _apply_look() -> void:
 	mat.set_shader_parameter("lock_tint", LOCK_TINT)
 	mat.set_shader_parameter("kind_mark", UiPalette.kind_mark(kind))
 	mat.set_shader_parameter("kind_color", UiPalette.kind_color(kind))
+	mat.set_shader_parameter("tag_mark", 1 if tags.has("seed") else 0)
 
 
 func _build_chains() -> void:
@@ -265,6 +283,9 @@ func slots_for(value: int) -> Array[int]:
 ## Picks the slot to show `value`; falls back to the closest value with a warning.
 func pick_slot(value: int, rng: RandomNumberGenerator) -> int:
 	var s := slots_for(value)
+	if s.is_empty() and faces.has(Die.PRETEND):
+		# a board value the Pretend die doesn't carry is its ★ face's copy (restored rolls)
+		return faces.find(Die.PRETEND)
 	if s.is_empty():
 		push_warning("DieVisual: value %d not on faces %s, using closest" % [value, faces])
 		var best := 0

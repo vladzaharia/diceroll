@@ -27,9 +27,15 @@ uniform vec3 lock_tint : source_color = vec3(0.42, 0.22, 0.62);
 uniform float locked = 0.0;
 uniform float time_offset = 0.0;
 // Kind corner mark: 0 none, 1 low (down chevron), 2 high (up chevron), 3 even (diamond),
-// 4 odd (ring), 5 loaded (weight), 6 twin (double bar), 7 gambler (spark), 8 giant (crown).
+// 4 odd (ring), 5 loaded (weight), 6 twin (double bar), 7 gambler (spark), 8 giant (crown),
+// 9 bone (a bone), 10 pretend (a three-toed dino print).
 uniform int kind_mark = 0;
 uniform vec3 kind_color : source_color = vec3(1.0, 0.75, 0.3);
+// Die tag mark on the other two corners: 0 none, 1 seed (a sprouting leaf).
+uniform int tag_mark = 0;
+uniform vec3 tag_color : source_color = vec3(0.35, 0.9, 0.45);
+// The Pretend face (value 10): a bold star, never a number.
+uniform vec3 star_color : source_color = vec3(1.0, 0.8, 0.22);
 // 0..1: darken (dice not moving this turn).
 uniform float dim = 0.0;
 
@@ -137,6 +143,19 @@ float sd_kind(vec2 q, int k) {
 	if (k == 5) return sd_round_box(q - vec2(0.0, -0.12), vec2(0.72, 0.56), 0.3);
 	if (k == 6) return min(sd_seg(q, vec2(-0.38, -0.7), vec2(-0.38, 0.7)), sd_seg(q, vec2(0.38, -0.7), vec2(0.38, 0.7))) - 0.24;
 	if (k == 7) return sd_star5(vec2(q.x, q.y), 0.95, 0.42);
+	if (k == 9) {
+		float shaft = sd_seg(q, vec2(-0.5, -0.5), vec2(0.5, 0.5)) - 0.2;
+		float k1 = min(length(q - vec2(-0.72, -0.42)), length(q - vec2(-0.42, -0.72))) - 0.26;
+		float k2 = min(length(q - vec2(0.72, 0.42)), length(q - vec2(0.42, 0.72))) - 0.26;
+		return min(shaft, min(k1, k2));
+	}
+	if (k == 10) {
+		float pad = length((q - vec2(0.0, -0.35)) * vec2(1.0, 1.25)) - 0.42;
+		float t1 = sd_seg(q, vec2(-0.2, -0.05), vec2(-0.7, 0.65)) - 0.16;
+		float t2 = sd_seg(q, vec2(0.0, 0.0), vec2(0.0, 0.85)) - 0.16;
+		float t3 = sd_seg(q, vec2(0.2, -0.05), vec2(0.7, 0.65)) - 0.16;
+		return min(pad, min(t1, min(t2, t3)));
+	}
 	// 8 giant: crown
 	float base = sd_round_box(q - vec2(0.0, -0.45), vec2(0.8, 0.22), 0.08);
 	float spikes = min(min(sd_seg(q, vec2(-0.65, -0.3), vec2(-0.8, 0.65)), sd_seg(q, vec2(0.0, -0.3), vec2(0.0, 0.8))),
@@ -188,6 +207,20 @@ void fragment() {
 		pip_off = rp.xy;
 		float pa = fwidth(rp.z) * 0.9;
 		pip_mask = 1.0 - smoothstep(pip_r - pa, pip_r + pa, rp.z);
+	} else if (val == 10) {
+		// the Pretend face: a big glossy gold star with a dark outline (never a numeral)
+		vec2 sp = p - vec2(0.0, -0.06);
+		float ds = sd_star5(vec2(sp.x, -sp.y), 0.6, 0.47);
+		float aa = fwidth(ds) * 0.9;
+		float star = 1.0 - smoothstep(-aa, aa, ds);
+		float outline = 1.0 - smoothstep(-aa, aa, ds - 0.07);
+		float inner = clamp(-ds / 0.22, 0.0, 1.0);
+		vec3 sc = mix(star_color * 0.78, star_color * 1.12, inner);
+		albedo = mix(albedo, pip_color, outline);
+		albedo = mix(albedo, sc, star);
+		emission += star_color * star * (0.28 + 0.12 * sin(TIME * 3.0 + time_offset * 6.28));
+		rough = mix(rough, 0.22, star);
+		metal = mix(metal, 0.35, star);
 	} else if (val >= 7) {
 		// numeral, engraved like a pip (y up in glyph space)
 		vec2 q = vec2(p.x, -p.y) * 1.02;
@@ -231,6 +264,23 @@ void fragment() {
 		albedo = mix(albedo, kind_color, km * 0.95);
 		emission += kind_color * km * 0.12;
 		rough = mix(rough, 0.3, km);
+	}
+	// --- tag mark (seed leaf) on the other diagonal -----------------------------------
+	if (tag_mark > 0 && wild < 0.5) {
+		float tm = 0.0;
+		for (int c = 0; c < 2; c++) {
+			vec2 at = (c == 0) ? vec2(-0.63, 0.63) : vec2(0.63, -0.63);
+			vec2 q = (p - at) / 0.12;
+			q.y = -q.y;
+			// a leaf: two arcs meeting at the tips, tilted 45 degrees
+			vec2 r = vec2(q.x + q.y, q.y - q.x) * 0.7071;
+			float d = max(length(r - vec2(0.0, -0.55)) - 0.95, length(r - vec2(0.0, 0.55)) - 0.95) * 0.12;
+			float ka = fwidth(d) * 0.9;
+			tm = max(tm, 1.0 - smoothstep(-ka, ka, d));
+		}
+		albedo = mix(albedo, tag_color, tm * 0.95);
+		emission += tag_color * tm * 0.25;
+		rough = mix(rough, 0.35, tm);
 	}
 	// Engraved dimple: the inside of the pip tilts toward its centre.
 	float inside = clamp(1.0 - length(pip_off) / max(pip_r, 1e-3), 0.0, 1.0);

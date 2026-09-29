@@ -366,7 +366,7 @@ static func _second_boss(c: GameController, ev: Dictionary) -> void:
 ## A7: a random face of a random die becomes 1 until the next Forge visit.
 static func _face_cursed(c: GameController, ev: Dictionary) -> void:
 	var di := int(ev.get("die_idx", 0))
-	c.tray.set_dice(c.flow.run.dice)
+	ClassBeats.sync_tray(c)
 	c.tray.highlight_group([di] as Array[int], UiPalette.CURSE)
 	c.tray.set_locked(di, true)
 	var r := c.tray.get_die_screen_rect(di)

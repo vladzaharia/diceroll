@@ -493,6 +493,45 @@ func enemy_die(i: int) -> void:
 				break
 
 
+## A scared enemy runs off the board (Monster Kid BOO! flee): it turns tail, runs away from the
+## hero and fades out. Its HUD fades; the enemy is gone like a death, but it isn't one.
+func enemy_flee(i: int) -> void:
+	if i >= enemies.size():
+		return
+	var ch := enemies[i]
+	data[i]["hp"] = 0
+	refresh_wards()
+	var hud := huds[i]
+	var ht := hud.create_tween().set_speed_scale(speed)
+	ht.tween_method(hud.set_opacity, 1.0, 0.0, 0.25)
+	ht.tween_callback(func() -> void: hud.visible = false)
+	var away := ch.global_position - hero_home
+	away.y = 0.0
+	away = away.normalized() if away.length() > 0.01 else -facing
+	away = (away + side * (0.6 if (i % 2) == 0 else -0.6)).normalized()
+	_face(ch, ch.global_position + away, 0.12)
+	# a startled hop, then the run
+	var pos := ch.global_position
+	var hop := ch.create_tween().set_speed_scale(speed)
+	hop.tween_property(ch, "global_position", pos + Vector3.UP * 0.45, 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	hop.tween_property(ch, "global_position", pos, 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	await hop.finished
+	ch.play("run" if ch.has_anim("run") else "walk", 0.05, 1.4)
+	Audio.play_sfx("step")
+	var t := ch.create_tween().set_speed_scale(speed)
+	t.tween_property(ch, "global_position", pos + away * 5.5, 0.9).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	t.parallel().tween_property(ch, "scale", ch.scale * 0.6, 0.9).set_delay(0.45)
+	Fx.burst(self, pos + Vector3.UP * 0.1, {"amount": 14, "lifetime": 0.6, "speed": Vector2(0.6, 1.6), "size": 0.4,
+		"color": Color(0.8, 0.72, 0.6, 0.7), "tex": "dot", "additive": false, "spread": 60.0, "gravity": Vector3(0, 0.5, 0)})
+	await t.finished
+	ch.visible = false
+	if target == i:
+		for k in enemies.size():
+			if enemies[k].visible and int(data[k].get("hp", 0)) > 0:
+				set_target(k)
+				break
+
+
 ## Hero attacks enemy i. style: melee | magic | ranged | "" (auto from the hero model).
 func hero_attack(target_i: int, style := "") -> void:
 	if target_i >= enemies.size() or hero == null:

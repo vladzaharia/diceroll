@@ -16,7 +16,13 @@ const TEX_DIRS := ["res://assets/kaykit/foes/adventurers/textures/", "res://asse
 	"res://assets/kaykit/foes/monthly/paladin/textures/", "res://assets/kaykit/foes/monthly/ninja/textures/",
 	"res://assets/kaykit/foes/monthly/monster/textures/"]
 const MONSTER_GLB := "res://assets/kaykit/foes/monthly/monster/Monster.glb"
+const TURRET_GLB := "res://assets/kaykit/adventurers_x/assets/turret_base.gltf"
+## Where the Engineer's Clockwork Turret stands, beside the hero (hero-local).
+const TURRET_AT := Vector3(-1.0, 0.0, 0.3)
 const GOLD := Color(1.0, 0.78, 0.3)
+## Per-class body wash [colour, default-skin strength, other skins' strength]: the Necromancer's hooded-rogue
+## palettes are bright, so a dusk-violet wash keeps him a grave-caller (never the Rogue).
+const SHADE := {"necromancer": [Color(0.25, 0.08, 0.38), 0.75, 0.3]}
 static func color(class_id: String) -> Color:
 	return UiPalette.class_color(class_id)
 
@@ -30,11 +36,46 @@ static func create(class_id: String, skin := "default", prestige := false) -> Ch
 	var tex := texture_of(class_id, skin)
 	if tex != null:
 		ch.set_texture(tex)
+	if SHADE.has(class_id) and not (prestige and String(SkinDefs.def(class_id, "prestige").get("overlay", "")) == "statue"):
+		var sh: Array = SHADE[class_id]
+		var k := float(sh[1]) if skin in ["", "default"] else float(sh[2])
+		ch.tint_where(func(mi: MeshInstance3D) -> bool: return mi.get_parent() == ch.skeleton, sh[0], k)
 	ch.set_meta("class_id", class_id)
 	ch.set_meta("skin", skin if skin != "" else "default")
 	if prestige:
 		apply_overlay(ch, class_id)
+	if HeroDefs.mechanic(class_id) == "turret":
+		add_turret(ch, prestige and String(SkinDefs.def(class_id, "prestige").get("overlay", "")) == "gold_turret")
 	return ch
+
+
+## The Engineer's Clockwork Turret prop beside the hero (gold for the prestige skin).
+static func add_turret(ch: Character, gold := false) -> Node3D:
+	if not ResourceLoader.exists(TURRET_GLB):
+		return null
+	var holder := Node3D.new()
+	holder.name = "Turret"
+	holder.position = TURRET_AT
+	ch.add_child(holder)
+	var t: Node3D = (load(TURRET_GLB) as PackedScene).instantiate()
+	t.name = "Model"
+	t.scale = Vector3.ONE * 0.8
+	holder.add_child(t)
+	if gold:
+		for mi in t.find_children("*", "MeshInstance3D", true, false):
+			var m := StandardMaterial3D.new()
+			m.albedo_color = Color(1.0, 0.76, 0.3)
+			m.metallic = 0.9
+			m.roughness = 0.25
+			m.emission_enabled = true
+			m.emission = Color(0.5, 0.32, 0.05)
+			(mi as MeshInstance3D).material_override = m
+	return holder
+
+
+## The hero's turret prop (null for other classes).
+static func turret_of(ch: Node3D) -> Node3D:
+	return ch.get_node_or_null("Turret") as Node3D if ch else null
 
 
 ## The kit loadout for a class in a skin (model swaps and the Paladin helm applied).

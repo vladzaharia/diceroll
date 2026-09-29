@@ -215,7 +215,8 @@ func start(f: GameFlow) -> void:
 	else:
 		rig.overview(board.ring_bounds(), true)
 	tray.visible = true
-	tray.set_dice(f.run.dice)
+	tray.set_badge("")
+	ClassBeats.sync_tray(self)
 	if f.phase == GameFlow.Phase.BOARD_ROLLED and not f.board_roll.is_empty():
 		tray.set_values(f.board_roll)
 		tray.set_chosen(f.board_choice)
@@ -384,8 +385,8 @@ func _enter_idle() -> void:
 	ui.board_hud.busy = false
 	ui.combat_hud.busy = false
 	var ph := flow.phase
-	if tray.dice.size() != flow.run.dice.size():
-		tray.set_dice(flow.run.dice)
+	if tray.dice.size() != ClassBeats.pool(flow).size():
+		ClassBeats.sync_tray(self)
 	ui.sync(flow)
 	match ph:
 		GameFlow.Phase.BOARD_READY:
@@ -531,6 +532,7 @@ func _boss_intro(tile: int, enemies: Array) -> void:
 
 
 func end_combat(ev: Dictionary) -> void:
+	tray.set_badge("")
 	# swap to the board HUD (bottom bar stays hidden while the rest of the batch plays); its
 	# top bar takes over the combat HUD's numbers so rewards animate from there
 	ui.combat_hud.visible = false

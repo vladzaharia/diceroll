@@ -652,6 +652,14 @@ ICONS["mech_turret"] = (fill("M4.4 20.6h15.2l-2-5.4H6.4z") + fill("M7.6 15.2a4.4
 ICONS["mech_boo"] = (fill(poly(star_pts(12, 12, 10.2, 6.2, 9, -90))) + shade(poly([(12, 12)] + star_pts(12, 12, 10.2, 6.2, 9, -90)[1:8]), 0.14)
                      + dark("M10.8 6.6h2.4l-.4 7.4h-1.6z") + circ(12, 16.6, 1.3, "#1B1530", False))
 
+# ---------------------------------------------------------------- BOO! (Monster Kid): cowering face, brave badge
+ICONS["intent_cower"] = (circ(11.2, 12.8, 8.4) + shade("M11.2 4.4a8.4 8.4 0 0 1 0 16.8c3-2.2 4.8-5.2 4.8-8.4s-1.8-6.2-4.8-8.4z", 0.16)
+                         + dark("M6.6 10.4l3 1.6-3 1.2zM15.8 10.4l-3 1.6 3 1.2z")
+                         + f'<path d="M7.6 17.6c1.2-1.4 2.4-1.4 3.6 0s2.4 1.4 3.6 0" fill="none" stroke="{O}" stroke-width="1.5" stroke-linecap="round"/>'
+                         + f'<path d="M19.6 2.6c1.6 2.2 2.4 3.6 2.4 4.6a2.4 2.4 0 0 1-4.8 0c0-1 .8-2.4 2.4-4.6z" fill="#8FD8FF" stroke="{O}" stroke-width="1.2"/>')
+ICONS["trait_brave"] = (fill(SHIELD) + shade("M12 2.9v18.3c4.4-1.4 7.6-5 7.6-9.7V5.8z")
+                        + f'<path d="{poly(star_pts(12, 11.6, 4.6, 2.0))}" fill="{O}"/>')
+
 for pid, body in P.items():
     ICONS["passive_" + pid] = body
 
