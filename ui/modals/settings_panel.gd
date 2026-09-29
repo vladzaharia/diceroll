@@ -19,6 +19,7 @@ var _sliders: Dictionary = {}
 var _values: Dictionary = {}
 var _speed_btns: Array[GameButton] = []
 var _size_btns: Array[GameButton] = []
+var _update_btn: GameButton
 
 
 static func game_speed() -> float:
@@ -105,6 +106,7 @@ func _build() -> void:
 		b.pressed.connect(_set_ui_size.bind(z))
 		zr.add_child(b)
 		_size_btns.append(b)
+	body.add_child(_update_row())
 	var auto := GameButton.make("AUTO SETTINGS", "auto", GameButton.Kind.SECONDARY, 28)
 	auto.icon_tint = AutoButton.ACCENT
 	auto.min_height = 84
@@ -148,6 +150,36 @@ func _volume_row(bus: String, icon: String) -> Control:
 	return col
 
 
+## Auto-update toggle ([update] auto, owned by the Updater autoload) + manual "CHECK".
+func _update_row() -> Control:
+	var r := UiTheme.hbox(10)
+	r.add_child(UiIcons.rect("gear", 40, UiPalette.GOLD))
+	var l := UiTheme.label("Auto-update", 30, UiPalette.TEXT, true, 0)
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	r.add_child(l)
+	_update_btn = GameButton.make("ON", "", GameButton.Kind.SECONDARY, 24)
+	_update_btn.toggle_mode = true
+	_update_btn.toggle_primary = true
+	_update_btn.min_height = 72
+	_update_btn.pad_x = 14
+	_update_btn.toggled.connect(func(on: bool) -> void:
+		_updater().call("set_auto_enabled", on)
+		_update_btn.text = "ON" if on else "OFF")
+	r.add_child(_update_btn)
+	var chk := GameButton.make("CHECK", "", GameButton.Kind.SECONDARY, 24)
+	chk.min_height = 72
+	chk.pad_x = 14
+	chk.pressed.connect(func() -> void: _updater().call("check_now", true))
+	r.add_child(chk)
+	var up := _updater()
+	r.visible = up != null and bool(up.call("can_check"))
+	return r
+
+
+func _updater() -> Node:
+	return (Engine.get_main_loop() as SceneTree).root.get_node_or_null("Updater")
+
+
 func refresh(_flow: GameFlow = null) -> void:
 	var a := _audio()
 	for bus in _sliders:
@@ -158,6 +190,11 @@ func refresh(_flow: GameFlow = null) -> void:
 	for i in _speed_btns.size():
 		_speed_btns[i].set_pressed_no_signal(is_equal_approx(sp, SPEEDS[i]))
 		_speed_btns[i].call("_refresh")
+	if _update_btn:
+		var on: bool = _update_btn.get_parent().visible and bool(_updater().call("is_auto_enabled"))
+		_update_btn.set_pressed_no_signal(on)
+		_update_btn.text = "ON" if on else "OFF"
+		_update_btn.call("_refresh")
 	var us := ui_size()
 	for i in _size_btns.size():
 		_size_btns[i].set_pressed_no_signal(is_equal_approx(us, UI_SIZES[i]))
