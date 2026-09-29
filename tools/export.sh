@@ -8,7 +8,7 @@
 #           (build/ios_dd/Build/Products/Release-iphonesimulator/Diceroll.app)
 #   web     build/web/index.html (single-threaded "nothreads" template: no COOP/COEP needed)
 #   all     macos + ios + web
-#   icon    re-render assets/icon/icon.png (1024x1024) via tools/shoot.sh app_icon
+#   icon    re-render the app icon + derived assets (tools/icon/build_icons.sh -> assets/icon/)
 #
 # Options:
 #   --debug             export with debug templates (default: release)
@@ -201,12 +201,8 @@ do_web() {
 
 # --- Icon ----------------------------------------------------------------------------
 do_icon() {
-	local out="$ROOT/assets/icon/icon.png"
-	step "rendering app icon -> $out"
-	mkdir -p "$(dirname "$out")"
-	"$ROOT/tools/shoot.sh" app_icon "$out" 1024x1024 --wait=1.5
-	[ -f "$out" ] || die "icon render failed"
-	sips -g pixelWidth -g pixelHeight "$out" | tail -2
+	# Renders tools/icon (scenario app_icon) and derives iOS/macOS/icns assets in assets/icon/.
+	"$ROOT/tools/icon/build_icons.sh"
 }
 
 case "$TARGET" in
