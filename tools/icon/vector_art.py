@@ -386,63 +386,6 @@ def d_path(x0, y0, x1, y1, r_left=70):
                r_left, r_left, x0, y1 - r_left, x0, y0 + r_left, r_left, r_left, x0 + r_left, y0))
 
 
-def monogram(face=GOLD, face_hi=GOLD_BRIGHT, side=GOLD_DEEP, pip=NAVY, bg="navy", tilt=0.0,
-             depth=46, outline=INK, pips=((0.2, 0.2), (0.5, 0.5), (0.8, 0.8)), glow=GOLD, scale=1.0,
-             pip_hi=None):
-    if bg == "navy":
-        defs, body = bg_navy(glow, 0.3, 0.46)
-    else:
-        defs = radial("bg", [(0, bg[0], 1), (0.75, bg[1], 1), (1, bg[2], 1)], 0.5, 0.4, 0.85)
-        body = '<rect width="1024" height="1024" fill="url(#bg)"/>'
-    defs += linear("gf", [(0, face_hi, 1), (1, face, 1)], 0, 0, 0.6, 1)
-    defs += blur_filter("sh", 22)
-    s = 600 * scale
-    x0 = 512 - s * 0.5 - depth * 0.35
-    y0 = 512 - s * 0.5 - depth * 0.5
-    x1, y1 = x0 + s, y0 + s
-    p = d_path(x0, y0, x1, y1, 110 * scale)
-    g = []
-    # soft ground shadow
-    g.append('<path d="%s" fill="%s" opacity="0.55" transform="translate(%.1f,%.1f)" filter="url(#sh)"/>'
-             % (p, INK, depth * 0.8, depth * 1.6))
-    # ink outline around face + extrusion
-    if outline:
-        for k in range(0, depth + 1, 4):
-            g.append('<path d="%s" fill="%s" stroke="%s" stroke-width="30" stroke-linejoin="round" '
-                     'transform="translate(%.1f,%.1f)"/>' % (p, outline, outline, k * 0.35, k * 0.9))
-    # extrusion (side walls): stacked copies, darker toward the back
-    for k in range(depth, 0, -2):
-        c = mix(side, INK, 0.25 * k / depth)
-        g.append('<path d="%s" fill="%s" transform="translate(%.1f,%.1f)"/>' % (p, c, k * 0.35, k * 0.9))
-    g.append('<path d="%s" fill="url(#gf)"/>' % p)
-    # thin top-edge highlight
-    g.append('<path d="%s" fill="none" stroke="#ffffff" stroke-opacity="0.35" stroke-width="10" '
-             'transform="translate(0,5)" clip-path="url(#fc)"/>' % p)
-    defs += '<clipPath id="fc"><path d="%s"/></clipPath>' % p
-    pr = 64 * scale
-    for fx, fy in pips:
-        cx, cy = x0 + s * (0.1 + fx * 0.72), y0 + s * (0.1 + fy * 0.8)
-        g.append('<circle cx="%.1f" cy="%.1f" r="%.1f" fill="%s"/>' % (cx, cy, pr, mix(pip, INK, 0.3)))
-        g.append('<circle cx="%.1f" cy="%.1f" r="%.1f" fill="%s"/>' % (cx, cy + 7, pr - 3, pip))
-        if pip_hi:
-            g.append('<circle cx="%.1f" cy="%.1f" r="%.1f" fill="%s" opacity="0.9"/>' % (cx - pr * 0.3, cy - pr * 0.3, pr * 0.22, pip_hi))
-    grp = '<g transform="rotate(%.1f 512 512)">%s</g>' % (tilt, "".join(g))
-    return svg_doc(body + grp, defs)
-
-
-def c_mono_gold():
-    return monogram()
-
-
-def c_mono_cream():
-    return monogram(face=CREAM, face_hi="#ffffff", side="#cdbf9f", pip=NAVY, tilt=-8)
-
-
-def c_mono_inverse():
-    return monogram(face=NAVY_2, face_hi="#343b8a", side=NAVY, pip=GOLD, pip_hi=GOLD_BRIGHT,
-                    bg=(GOLD_BRIGHT, GOLD, GOLD_DEEP), tilt=-8)
-
-
 def c_loop2(arrow=GOLD, tiles=False):
     """Loop v2: a real die (5 / 3 / 2 faces) wrapped by a gold loop arrow (the lap, the reroll)."""
     defs, body = bg_navy(GOLD, 0.3, 0.5)
@@ -479,9 +422,6 @@ def c_loop2(arrow=GOLD, tiles=False):
 
 
 CONCEPTS = {
-    "mono_gold": c_mono_gold,
-    "mono_cream": c_mono_cream,
-    "mono_inverse": c_mono_inverse,
     "loop2": c_loop2,
     "ring": c_ring,
     "pair": c_pair,

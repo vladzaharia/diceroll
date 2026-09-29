@@ -117,6 +117,22 @@ def font(size):
     return ImageFont.load_default()
 
 
+def _wrap(d, xy, text, f, width, fill=(20, 20, 20), lh=26):
+    """Draws `text` word-wrapped to `width` px."""
+    x, y = xy
+    line = ""
+    for w in text.split():
+        t = (line + " " + w).strip()
+        if d.textlength(t, font=f) > width and line:
+            d.text((x, y), line, fill=fill, font=f)
+            y += lh
+            line = w
+        else:
+            line = t
+    if line:
+        d.text((x, y), line, fill=fill, font=f)
+
+
 def cmd_sheet(out, items):
     sizes = [180, 120, 60, 29]
     big = 300
@@ -137,7 +153,7 @@ def cmd_sheet(out, items):
         art = load_rgb(path).convert("RGBA")
         mask = squircle_mask(1024)
         art.putalpha(mask)
-        d.text((pad, y0 + pad), label, fill=(20, 20, 20), font=f)
+        _wrap(d, (pad, y0 + pad), label, f, 200 - 2 * pad)
         sheet.paste(art.resize((big, big), Image.LANCZOS), (200, y0 + pad), art.resize((big, big), Image.LANCZOS))
         for g, bgc in enumerate((light, dark)):
             gx = 200 + big + pad + g * group_w
@@ -186,15 +202,19 @@ def cmd_grid(out, cands, refs):
         pages.append((label, lt, dk))
     pw, ph = pages[0][1].size
     head = 30
-    W = 2 * pw + 3 * 16
-    H = len(pages) * (ph + head + 16) + 16
+    cols = 1 if len(pages) < 3 else (2 if len(pages) < 7 else 3)  # candidate columns (light + dark each)
+    rows = (len(pages) + cols - 1) // cols
+    cw = 2 * pw + 16 + 40
+    W = cols * cw + 16
+    H = rows * (ph + head + 16) + 16
     sheet = Image.new("RGB", (W, H), (245, 243, 238))
     d = ImageDraw.Draw(sheet)
     for i, (label, lt, dk) in enumerate(pages):
-        y = 16 + i * (ph + head + 16)
-        d.text((16, y + 4), label, fill=(20, 20, 20), font=font(18))
-        sheet.paste(lt, (16, y + head))
-        sheet.paste(dk, (32 + pw, y + head))
+        x = 16 + (i % cols) * cw
+        y = 16 + (i // cols) * (ph + head + 16)
+        d.text((x, y + 4), label, fill=(20, 20, 20), font=font(20))
+        sheet.paste(lt, (x, y + head))
+        sheet.paste(dk, (x + 16 + pw, y + head))
     sheet.save(out)
 
 

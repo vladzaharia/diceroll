@@ -8,7 +8,8 @@
 #           (build/ios_dd/Build/Products/Release-iphonesimulator/Diceroll.app)
 #   web     build/web/index.html (single-threaded "nothreads" template: no COOP/COEP needed)
 #   all     macos + ios + web
-#   icon    re-render the app icon + derived assets (tools/icon/build_icons.sh -> assets/icon/)
+#   icon    re-render the app icon + derived assets (tools/icon/build_icons.sh -> assets/icon/);
+#           ICON_COLOURWAY=inverse for the navy-D-on-gold colourway
 #
 # Options:
 #   --debug             export with debug templates (default: release)

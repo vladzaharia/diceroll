@@ -9,7 +9,7 @@ extends Control
 ## Render square & in the background only:  tools/shoot.sh icon_hero /abs/out.png 1024x1024 --wait=2
 
 const CONCEPTS := ["hero", "hero_dark", "solo", "tumble", "doubles", "knight", "orbit", "tile"]
-## The concept the shipped icon uses (scenario `app_icon`).
+## The 3D pick (scenario `app_icon`). Exploration only: the shipped icon is tools/icon/monogram.py.
 const FINAL := "hero"
 
 const INK := Color(0.043, 0.047, 0.1)
