@@ -7,6 +7,7 @@ extends RefCounted
 ##   UiIcons.tex("heart", 48)                    # default colour for that icon
 ##   UiIcons.tex("rune_frost", 64, Color.WHITE)  # explicit tint
 ##   UiIcons.rect("coin", 40)                    # ready-made TextureRect
+##   UiIcons.rect("3d:coins", 40)                # rendered prop (RenderedIcons), glyph fallback
 
 const DIR := "res://ui/icons/"
 const TINT_SLOT := "#FFFFFF"
@@ -47,6 +48,10 @@ static func default_color(icon: String) -> Color:
 
 
 static func tex(icon: String, px: int = 48, tint: Variant = null) -> Texture2D:
+	if icon.begins_with("3d:"):
+		# rendered 3D prop (ui/icons/rendered), or its vector stand-in when not rendered
+		var rt := RenderedIcons.texture_at(icon.substr(3), px)
+		return rt if rt != null else tex(RenderedIcons.fallback(icon.substr(3)), px, tint)
 	var c: Color = tint if tint is Color else default_color(icon)
 	var key := "%s|%d|%s" % [icon, px, c.to_html()]
 	if _cache.has(key):

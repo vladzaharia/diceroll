@@ -8,7 +8,10 @@ extends RefCounted
 ##  combat_act1     hero vs 3 enemies, intents/HP visible, mid-attack
 ##  boss_act1..3    boss fights (Bone Warden, Hollow King, Lich + minions)
 ##  fx_gallery      every FX firing in a loop on the act 1 board
-##  board_<biome>   overview of a biome by id (glade, crypt, hollow, frost, throne, magma)
+##  board_<biome>   overview of a biome by id (glade, crypt, hollow, frost, throne, magma);
+##                  --variant=N picks the dressing variant seed (default 0; see Dressing)
+##  biome_variants  contact sheet: biomes x dressing variants (--biomes=a,b --variants=0,1,2)
+##  dressing_catalog  labelled grid of a runtime asset folder (--dir=forest --filter=Tree_+Color1)
 ##  enemy_gallery   moved to game/enemies/foe_scenarios.gd (served via game/actors/scenarios.gd)
 ##  combat_sequence full beat loop (attack, hit, death, enemy attack, hero hit, summon, end)
 ##  tiles_ice_lava  close-up of the Frostpeak ice and Magma lava tiles (--biome=frost|magma)
@@ -20,7 +23,7 @@ extends RefCounted
 const NAMES := ["board_glade", "board_crypt", "board_hollow", "board_frost", "board_throne", "board_magma",
 	"board_act1", "board_act2", "board_act3", "board_follow", "board_mutate", "board_portal", "combat_act1",
 	"combat_act2", "combat_act3", "boss_act1", "boss_act2", "boss_act3", "fx_gallery", "combat_sequence",
-	"combat_hero_check", "tiles_ice_lava"]
+	"combat_hero_check", "tiles_ice_lava", "dressing_catalog", "biome_variants", "tiles_props"]
 
 
 static func names() -> PackedStringArray:
@@ -30,6 +33,14 @@ static func names() -> PackedStringArray:
 static func build(name: String) -> Node:
 	if not NAMES.has(name):
 		return null
+	if name == "dressing_catalog":
+		var cat := DressingCatalog.new()
+		cat.name = "DressingCatalog"
+		return cat
+	if name == "biome_variants":
+		var sheet := DressingSheet.new()
+		sheet.name = "BiomeVariants"
+		return sheet
 	var root := _Driver.new()
 	root.name = "WorldScenario"
 	root.scenario = name
@@ -158,6 +169,7 @@ class _Driver extends Node3D:
 		add_child(board)
 		board.hero_class = String(args.get("hero", ["knight", "barbarian", "mage"][act - 1]))
 		board.hero_idx = int(args.get("tile", "0"))
+		board.variant_seed = int(args.get("variant", "0"))
 		var tiles: Array = BoardScenarios.mock_tiles(act) if scenario.ends_with(str(act)) and not args.has("biome") \
 			else BoardScenarios.biome_tiles(biome_id)
 		board.build(biome_id, tiles)
@@ -210,6 +222,18 @@ class _Driver extends Node3D:
 					pts.append(board.tile_global_position(k))
 				pts.append(board.tile_global_position(3) + Vector3.UP * 2.0)
 				rig.frame_points(pts, 0.0, 42.0, true)
+			"tiles_props":
+				# one of each prop tile in a row, close up (--biome=<id> to check a biome)
+				var kinds := ["forge", "treasury", "chest", "event", "campfire", "trap", "portal"]
+				for k in kinds.size():
+					board.set_tile(k + 1, {"type": kinds[k]})
+				board.place_hero(0)
+				await get_tree().create_timer(0.1).timeout
+				var pts := PackedVector3Array()
+				for k in kinds.size() + 1:
+					pts.append(board.tile_global_position(k))
+				pts.append(board.tile_global_position(4) + Vector3.UP * 1.6)
+				rig.frame_points(pts, float(args.get("yaw", "90")), float(args.get("pitch", "40")), true)
 			"fx_gallery":
 				board.place_hero(3)
 				rig.follow(board.hero, true)

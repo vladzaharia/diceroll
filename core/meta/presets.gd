@@ -4,7 +4,7 @@ extends RefCounted
 ##   fresh  a brand-new profile: Knight only, starter pack, Glade/Hollow/Throne, no pet,
 ##          Scratch-off + Claw Machine, belt 2 with 1 Healing Draught, no gear
 ##   mid    run 10 of a typical campaign (tools/sim.gd --campaign --snapshot=10, realistic bot):
-##          3 classes, the biomes owned by run 10 (not Warcamp/Moonlit/Ruins), 5 packs, gear L3-4 with the L4 traits, belt 2, Starter Kit,
+##          4 classes (Knight, Barbarian, Paladin, Mage), the biomes owned by run 10 (not Warcamp/Moonlit/Ruins), 5 packs, gear L3-4 with the L4 traits, belt 2, Starter Kit,
 ##          Pumpkin Sprite at XP level 4, 3 minigames owned (2 equipped)
 ##   max    everything unlocked and maxed: all packs/classes/biomes/bosses, gear L8 with traits,
 ##          every pet L10, every minigame mastered, all Crowns upgrades, 3 minigame slots
@@ -25,7 +25,7 @@ static func get_preset(name: String, asc := 0) -> Dictionary:
 static func mid() -> Profile:
 	var p := Profile.fresh()
 	var grants := {
-		"classes": ["barbarian", "mage"], "biomes": ["crypt", "frost", "magma", "mines"], "minibosses": ["mini_grave_mage"],
+		"classes": ["barbarian", "paladin", "mage"], "biomes": ["crypt", "frost", "magma", "mines"], "minibosses": ["mini_grave_mage"],
 		"bosses": ["boss_cinder_king", "boss_magma_golem"],
 		"pets": ["pumpkin_sprite", "skull_buddy"], "minigames": ["fossil_hunter"],
 		"packs": ["gamblers_kit", "cold_steel", "numerology", "colossus"], "gear": ["helm", "blade", "boots", "charm"],

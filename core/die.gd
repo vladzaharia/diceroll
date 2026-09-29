@@ -7,6 +7,10 @@ var faces: PackedInt32Array = PackedInt32Array([1, 2, 3, 4, 5, 6])
 var rune: String = ""
 var edited: PackedByteArray = PackedByteArray([0, 0, 0, 0, 0, 0])
 var kind: String = "standard"
+## Sentinel face value of the Monster Kid's ★ "pretend" face (DiceKinds "pretend"): a Wild in
+## combat (sharing Balance.WILD_MAX_DICE), the most common other value on the board. Never
+## edited, never a SIX/ONE rune trigger.
+const PRETEND := 10
 ## Generic class-mechanic tags (e.g. "seed" for the Druid's growing dice, "bone" for the
 ## Necromancer's temporary dice). Serialised; old saves load with none.
 var tags: PackedStringArray = PackedStringArray()
@@ -32,6 +36,9 @@ func raise_cap() -> int:
 func can_raise(face_idx: int) -> bool:
 	return face_idx >= 0 and face_idx <= 5 and faces[face_idx] < raise_cap()
 
+func has_pretend() -> bool:
+	return faces.has(PRETEND)
+
 ## Rolls the die and returns the face index (0..5).
 func roll(rng: Rng) -> int:
 	return rng.randi_range(0, 5)
@@ -49,7 +56,7 @@ func raise_face(face_idx: int) -> bool:
 func mirror_face(face_idx: int, src_face: int) -> bool:
 	if face_idx < 0 or face_idx > 5 or src_face < 0 or src_face > 5 or face_idx == src_face:
 		return false
-	if faces[face_idx] == faces[src_face]:
+	if faces[face_idx] == faces[src_face] or faces[face_idx] == PRETEND or faces[src_face] == PRETEND:
 		return false
 	faces[face_idx] = faces[src_face]
 	edited[face_idx] = 1
@@ -63,10 +70,11 @@ func lowest_face() -> int:
 			best = i
 	return best
 
+## Sum of the faces (a ★ pretend face counts as 3.5 -> 3).
 func face_sum() -> int:
 	var s := 0
 	for f in faces:
-		s += f
+		s += 3 if f == PRETEND else f
 	return s
 
 func to_dict() -> Dictionary:

@@ -43,6 +43,15 @@ var last_overkill: int = 0         # damage_enemy: overkill of the last lethal h
 var moon: int = -99                # the Moon King's moon meter (MOON_NONE = no meter in this fight)
 var transform_at: float = 0.5      # HP share at or below which transformers change (Half moon: 0.65)
 var moon_full: bool = false        # fought on Moonlit's Full lap (gold x MOON_FULL_GOLD)
+# pets (PetLogic)
+var pet_thorns: int = 0            # Pebble: thorns against attackers this enemy phase
+var pet_block_turn: int = 0        # Block the pet gave this turn (Pebble's charge ignores it)
+var last_runes: Array[Dictionary] = []
+# Necromancer (ClassLogic "bone_harvest")
+var extra_dice: Array[Die] = []    # temporary dice for this fight (Bone dice), after run.dice
+var pending_bones: int = 0         # Bone dice raised this turn: they join the pool next turn
+var attack_target: int = -1        # the main attack's target this turn (BOO!)
+var bones_raised: int = 0          # Bone dice raised this fight (max ClassLogic.BONE_MAX)  # runes that triggered in the last attack [{rune, value, die}] (Grimoire)
 
 # ---------------------------------------------------------------- setup
 
@@ -115,6 +124,7 @@ static func make_enemy(rng: Rng, id: String, p_act: int, p_lap: int, p_elite: bo
 		"miniboss": EnemyDefs.is_miniboss(id), "traits": EnemyDefs.traits(id, 1).duplicate(),
 		"frenzy": 0, "form": EnemyDefs.form(id, 1),
 		"affixes": [], "thorns_value": Balance.ENEMY_THORNS, "actions": 0, "chilled": false, "rallied": 0,
+		"brave": false, "cower": false, "weakened": false, "fled": false,
 	}
 
 ## Meta-layer enemy modifiers (ascension): A1 elites +15% HP; A6 +4% HP/attack (not bosses);
@@ -153,6 +163,18 @@ func _note_seen(run: RunState) -> void:
 				sa.append(String(a))
 	run.stats["seen_enemies"] = se
 	run.stats["seen_affixes"] = sa
+
+## The die at combat index i (run.dice; the Necromancer's temporary dice come after them).
+func die_at(run: RunState, i: int) -> Die:
+	return run.dice[i] if i < run.dice.size() else extra_dice[i - run.dice.size()]
+
+## The combat pool: run.dice, then the fight's temporary dice (CombatState.extra_dice).
+func pool_dice(run: RunState) -> Array[Die]:
+	if extra_dice.is_empty():
+		return run.dice
+	var out: Array[Die] = run.dice.duplicate()
+	out.append_array(extra_dice)
+	return out
 
 static func has_affix(e: Dictionary, a: String) -> bool:
 	return (e.get("affixes", []) as Array).has(a)
@@ -216,12 +238,17 @@ func roll_intent(rng: Rng, i: int) -> void:
 func start_turn(run: RunState) -> Array[Dictionary]:
 	var ev: Array[Dictionary] = []
 	turn += 1
+	# class dice that join from this turn (the Necromancer's Bone dice)
+	var cev := ClassLogic.before_turn(run, self)
+	var pd := pool_dice(run)
 	run.stats.combat_turns = int(run.stats.get("combat_turns", 0)) + 1
 	run.block = 0
 	rerolls_left = run.combat_rerolls + run.banked_rerolls
 	run.banked_rerolls = 0
 	rerolls_used_this_turn = 0
 	refunds_this_turn = 0
+	pet_thorns = 0
+	pet_block_turn = 0
 	var pev: Array[Dictionary] = []
 	if run.has_passive("loaded_hands") and turn == 1:
 		rerolls_left += 1
@@ -244,7 +271,7 @@ func start_turn(run: RunState) -> Array[Dictionary]:
 			pev.append({"type": "block_gained", "target": "hero", "amount": extra, "total": run.block})
 		if boost:
 			rerolls_left += 1
-	var n := run.dice.size()
+	var n := pd.size()
 	marked.resize(n)
 	marked.fill(false)
 	locked.resize(n)
@@ -263,13 +290,14 @@ func start_turn(run: RunState) -> Array[Dictionary]:
 		pending_curse = 0
 	lock_list.sort()
 	ev.append({"type": "combat_turn_started", "turn": turn, "rerolls_left": rerolls_left, "locked": lock_list, "hero_block": run.block})
+	ev.append_array(cev)
 	ev.append_array(pev)
 	for i in lock_list:
 		ev.append({"type": "status", "target": "hero", "status": "curse", "value": 1, "die_idx": i})
 	var all: Array[int] = []
 	for i in n:
-		dice_faces[i] = run.dice[i].roll(run.rng)
-		dice_values[i] = run.dice[i].value(dice_faces[i])
+		dice_faces[i] = pd[i].roll(run.rng)
+		dice_values[i] = pd[i].value(dice_faces[i])
 		all.append(i)
 	ev.append({"type": "dice_rolled", "values": dice_values.duplicate(), "indices": all, "context": "combat", "faces": dice_faces.duplicate(), "rerolls_left": rerolls_left})
 	ev.append_array(PetLogic.on_turn_start(run, self))
@@ -287,6 +315,7 @@ func toggle(i: int) -> Array[Dictionary]:
 	return [{"type": "die_marked", "die_idx": i, "marked": marked[i]}]
 
 func reroll(run: RunState) -> Array[Dictionary]:
+	var pd := pool_dice(run)
 	if rerolls_left <= 0:
 		return [_err("no rerolls left")]
 	var idx: Array[int] = []
@@ -303,8 +332,8 @@ func reroll(run: RunState) -> Array[Dictionary]:
 	if free:
 		wisp_free -= 1
 	for i in idx:
-		dice_faces[i] = run.dice[i].roll(run.rng)
-		dice_values[i] = run.dice[i].value(dice_faces[i])
+		dice_faces[i] = pd[i].roll(run.rng)
+		dice_values[i] = pd[i].value(dice_faces[i])
 		if not free:
 			rerolled[i] = true
 		marked[i] = false
@@ -315,6 +344,7 @@ func reroll(run: RunState) -> Array[Dictionary]:
 		refunded = true
 		ev.append(_passive("encore", 1))
 	ev.append_array(ClassLogic.on_reroll(run, self, idx, refunded))
+	ev.append_array(PetLogic.on_reroll(run))
 	ev.push_front({"type": "dice_rolled", "values": dice_values.duplicate(), "indices": idx, "context": "combat", "faces": dice_faces.duplicate(), "rerolls_left": rerolls_left})
 	return ev
 
@@ -326,15 +356,24 @@ func set_target(i: int) -> Array[Dictionary]:
 
 ## Best combo for the current dice (Wild aware), without resolving anything.
 func current_combo(run: RunState) -> Dictionary:
+	var pd := pool_dice(run)
 	var wild: Array[bool] = []
 	var left := Balance.WILD_MAX_DICE
-	for d in run.dice:
-		# anti-stacking: only the first WILD_MAX_DICE Wild dice act as Wild
-		var w := d.rune == "wild" and left > 0
+	var vals := dice_values
+	for i in pd.size():
+		var d := pd[i]
+		# anti-stacking: only the first WILD_MAX_DICE Wild dice act as Wild; the Monster Kid's
+		# ★ face shares the cap
+		var star := i < dice_values.size() and dice_values[i] == Die.PRETEND
+		var w := (d.rune == "wild" or star) and left > 0
 		if w:
 			left -= 1
+		elif star:
+			if vals == dice_values:
+				vals = dice_values.duplicate()
+			vals[i] = 0 # a ★ beyond the Wild cap scores nothing
 		wild.append(w)
-	return Combo.evaluate(dice_values, wild)
+	return Combo.evaluate(vals, wild)
 
 func _fix_target() -> void:
 	if not alive(target):
@@ -358,18 +397,19 @@ static func passive_mult(run: RunState, combo_id: String, base: float) -> float:
 ## rune_cap(rune) dice in pool order whose trigger fires (combo runes: in the scoring group;
 ## Ember: shows 6; Frost: shows 1; Thunder: rerolled; Lucky: kept; Guard: always).
 func rune_active(run: RunState, group: Array, eff: Array) -> Array[bool]:
+	var pd := pool_dice(run)
 	var out: Array[bool] = []
 	var used := {}
-	for i in run.dice.size():
-		var r := run.dice[i].rune
+	for i in pd.size():
+		var r := pd[i].rune
 		var ok := false
 		match r:
 			"blade", "venom", "vampire", "echo", "heavy", "gilded":
 				ok = group.has(i)
 			"ember":
-				ok = int(eff[i]) == 6
+				ok = int(eff[i]) == 6 and dice_values[i] != Die.PRETEND
 			"frost":
-				ok = int(eff[i]) == 1
+				ok = int(eff[i]) == 1 and dice_values[i] != Die.PRETEND
 			"thunder":
 				ok = rerolled[i]
 			"lucky":
@@ -384,6 +424,7 @@ func rune_active(run: RunState, group: Array, eff: Array) -> Array[bool]:
 	return out
 
 func attack(run: RunState) -> Array[Dictionary]:
+	var pd := pool_dice(run)
 	var ev: Array[Dictionary] = []
 	ev.append_array(PetLogic.fire_at_attack(run, self))
 	if all_dead():
@@ -407,10 +448,10 @@ func attack(run: RunState) -> Array[Dictionary]:
 	mult += float(cls_bonus[0])
 	# How many times each die's rune triggers (Resonance: combo dice x2; Rune Echo: 25% x2).
 	var times: Array[int] = []
-	for i in run.dice.size():
+	for i in pd.size():
 		var t := 1
 		# anti-stacking: the multiplier runes (Heavy, Echo) never trigger twice
-		if run.dice[i].rune != "" and group.has(i) and not Balance.NO_DOUBLE_TRIGGER.has(run.dice[i].rune):
+		if pd[i].rune != "" and group.has(i) and not Balance.NO_DOUBLE_TRIGGER.has(pd[i].rune):
 			if run.has_passive("resonance"):
 				t = 2
 			elif run.has_passive("rune_echo") and run.rng.chance(Balance.PASSIVE_RUNE_ECHO_CHANCE):
@@ -421,13 +462,20 @@ func attack(run: RunState) -> Array[Dictionary]:
 	var bonus := int(cls_bonus[1])
 	var flat := 0
 	var act := rune_active(run, group, eff)
+	last_runes.clear()
+	for i in act.size():
+		if act[i]:
+			last_runes.append({"rune": pd[i].rune, "value": int(eff[i]), "die": i})
+	run.stats.rune_triggers = int(run.stats.get("rune_triggers", 0)) + last_runes.size()
+	if cid in ["three_kind", "full_house", "four_kind", "five_kind", "six_kind"]:
+		run.stats.sets3 = int(run.stats.get("sets3", 0)) + 1
 	var wild_left := Balance.WILD_MAX_DICE
 	var steady := 0
 	var boxcars := 0
 	var snakes := 0
-	for i in run.dice.size():
+	for i in pd.size():
 		var pips := int(eff[i])
-		var rune := run.dice[i].rune
+		var rune := pd[i].rune
 		var in_group := group.has(i)
 		if rune == "heavy" and act[i]:
 			# anti-stacking: Heavy doubles only inside the scoring group, at most 2 dice
@@ -503,6 +551,7 @@ func attack(run: RunState) -> Array[Dictionary]:
 	var thorny := alive(target) and has_trait(enemies[target], "thorns")
 	var soak := int(enemies[target].hp) + int(enemies[target].block) if alive(target) else 0
 	var tgt0 := target
+	attack_target = tgt0
 	ev.append_array(damage_enemy(target, total, "attack", run))
 	ev.append_array(ClassLogic.after_main_hit(run, self, tgt0, last_overkill))
 	if run.has_trait("blade_overflow") and not alive(tgt0) and total > soak:
@@ -527,16 +576,16 @@ func attack(run: RunState) -> Array[Dictionary]:
 			run.stats.damage_taken = int(run.stats.get("damage_taken", 0)) + th
 			ev.append({"type": "damage", "target": "hero", "amount": th, "blocked": 0, "source": "thorns", "attacker": target, "lethal": false, "hp": run.hp, "max_hp": run.max_hp, "block": run.block})
 	# Ember (SIX): 6 to all
-	for i in run.dice.size():
-		if run.dice[i].rune == "ember" and act[i]:
+	for i in pd.size():
+		if pd[i].rune == "ember" and act[i]:
 			for k in times[i]:
 				ev.append(_rune(i, "ember", "damage_all", 6))
 				for j in enemies.size():
 					if alive(j):
 						ev.append_array(damage_enemy(j, 6, "ember", run))
 	# Thunder (REROLLED): pips to a random enemy
-	for i in run.dice.size():
-		if run.dice[i].rune == "thunder" and act[i]:
+	for i in pd.size():
+		if pd[i].rune == "thunder" and act[i]:
 			for k in times[i]:
 				var a := alive_indices()
 				if a.is_empty():
@@ -546,7 +595,7 @@ func attack(run: RunState) -> Array[Dictionary]:
 				ev.append_array(damage_enemy(j, int(eff[i]), "thunder", run))
 	if run.has_passive("gold_tooth"):
 		var sixes := 0
-		for i in run.dice.size():
+		for i in pd.size():
 			if int(eff[i]) == 6:
 				sixes += 1
 		if sixes > 0:
@@ -560,8 +609,8 @@ func attack(run: RunState) -> Array[Dictionary]:
 		ev.append({"type": "hp_changed", "amount": fh, "total": run.hp, "source": "full_house_party", "max_hp": run.max_hp})
 	var killed := alive_before - alive_indices().size()
 	_fix_target()
-	for i in run.dice.size():
-		var rune := run.dice[i].rune
+	for i in pd.size():
+		var rune := pd[i].rune
 		var pips := int(eff[i])
 		if not act[i]:
 			continue
@@ -574,6 +623,8 @@ func attack(run: RunState) -> Array[Dictionary]:
 						ev.append({"type": "status", "target": target, "status": "poison", "value": int(enemies[target].poison)})
 				"frost":
 					if alive(target):
+						if not bool(enemies[target].frozen):
+							run.stats.freezes = int(run.stats.get("freezes", 0)) + 1
 						enemies[target].frozen = true
 						ev.append(_rune(i, rune, "freeze", 1))
 						ev.append({"type": "status", "target": target, "status": "frozen", "value": 1})
@@ -597,6 +648,7 @@ func attack(run: RunState) -> Array[Dictionary]:
 					if run.banked_rerolls < Balance.MAX_BANKED_REROLLS:
 						run.banked_rerolls += 1
 						ev.append(_rune(i, rune, "bank_reroll", 1))
+	ev.append_array(ClassLogic.after_attack(run, self))
 	ev.append_array(PetLogic.on_attack_resolved(run, self, cid, eff))
 	ev.append_array(_moon_clouds(run))
 	if all_dead():
@@ -668,12 +720,12 @@ func damage_enemy(i: int, amount: int, source: String, run: RunState, ignore_blo
 		ev.append({"type": "enemy_transformed", "enemy_idx": i, "form": String(e.form), "id": String(e.id)})
 		ev.append({"type": "enemy_intent", "enemy_idx": i, "intent": e.intent.duplicate()})
 	elif e.boss and int(e.phase) == 1 and int(e.hp) * 2 <= int(e.max_hp):
-		ev.append_array(_boss_phase2(i))
+		ev.append_array(_boss_phase2(i, run))
 	return ev
 
 ## Switches boss i to phase 2 (HP threshold, or forced by the Moon King's Moonrise):
 ## boss_phase {enemy_idx, phase, traits, form, forced, source}.
-func _boss_phase2(i: int, forced := false) -> Array[Dictionary]:
+func _boss_phase2(i: int, run: RunState, forced := false) -> Array[Dictionary]:
 	var ev: Array[Dictionary] = []
 	var e := enemies[i]
 	var was_armored := has_trait(e, "armor")
@@ -691,6 +743,7 @@ func _boss_phase2(i: int, forced := false) -> Array[Dictionary]:
 		var lost := int(e.block)
 		e.block = 0
 		ev.append({"type": "block_gained", "target": i, "amount": -lost, "total": 0, "source": "shatter"})
+	ev.append_array(ClassLogic.on_boss_phase(run, self, i))
 	return ev
 
 ## Frenzy: +FRENZY_STEP attack after surviving a main-attack hit, up to +FRENZY_MAX per fight.
@@ -749,6 +802,10 @@ func _enemy_phase(run: RunState) -> Array[Dictionary]:
 		if bool(e.frozen):
 			e.frozen = false
 			ev.append({"type": "status", "target": i, "status": "frozen", "value": 0, "skipped": true})
+		elif bool(e.get("cower", false)):
+			# BOO!: a scared regular/elite enemy cowers instead of acting
+			e.cower = false
+			ev.append({"type": "status", "target": i, "status": "cower", "value": 0, "skipped": true})
 		else:
 			ev.append_array(_affix_before_action(run, i))
 			ev.append_array(_execute_intent(run, i))
@@ -774,7 +831,7 @@ func _tick_burn(run: RunState) -> Array[Dictionary]:
 	var ev: Array[Dictionary] = []
 	if hero_burn <= 0 or result != "":
 		return ev
-	var dmg := mini(hero_burn, run.hp)
+	var dmg := mini(maxi(0, hero_burn - (1 if run.has_pet("wick") else 0)), run.hp)
 	var hp_before := run.hp
 	run.hp -= dmg
 	var saved := ""
@@ -817,6 +874,9 @@ func _hit_hero(run: RunState, i: int, v: int, out_dealt: Array = [], force_pierc
 	elif dealt > 0 and run.has_passive("thorns"):
 		ev.append(_passive("thorns", Balance.PASSIVE_THORNS))
 		ev.append_array(damage_enemy(i, Balance.PASSIVE_THORNS, "thorns", run))
+	if result == "" and pet_thorns > 0 and alive(i) and (dealt > 0 or run.pet_level() >= 5):
+		ev.append({"type": "pet_acted", "pet": run.pet_id(), "effect": "thorns", "value": pet_thorns, "target": i})
+		ev.append_array(damage_enemy(i, pet_thorns, "pet", run))
 	out_dealt.append(dealt)
 	return ev
 
@@ -857,6 +917,10 @@ func _execute_intent(run: RunState, i: int) -> Array[Dictionary]:
 	var ev: Array[Dictionary] = []
 	var e := enemies[i]
 	var v := int(e.intent.value)
+	if bool(e.get("weakened", false)) and ["attack", "chill", "drain"].has(String(e.intent.kind)):
+		# BOO! on a boss or mini-boss: its next attack deals -ClassLogic.BOO_WEAKEN
+		e.weakened = false
+		v = int(round(v * (1.0 - ClassLogic.BOO_WEAKEN)))
 	match String(e.intent.kind):
 		"attack":
 			ev.append_array(_hit_hero(run, i, v))
@@ -881,7 +945,7 @@ func _execute_intent(run: RunState, i: int) -> Array[Dictionary]:
 			var opts: Array = []
 			for d in run.dice.size():
 				for f in 6:
-					if run.dice[d].faces[f] > 0:
+					if run.dice[d].faces[f] > 0 and run.dice[d].faces[f] != Die.PRETEND:
 						opts.append([d, f])
 			if not opts.is_empty():
 				var pk: Array = run.rng.pick(opts)
@@ -935,7 +999,7 @@ func _execute_intent(run: RunState, i: int) -> Array[Dictionary]:
 			var options: Array = []
 			for d in run.dice.size():
 				for f in 6:
-					if run.dice[d].faces[f] > 1:
+					if run.dice[d].faces[f] > 1 and run.dice[d].faces[f] != Die.PRETEND:
 						options.append([d, f])
 			if not options.is_empty():
 				var pick: Array = run.rng.pick(options)
@@ -959,8 +1023,10 @@ func _win(run: RunState) -> Array[Dictionary]:
 		var def := EnemyDefs.def(e.id)
 		var m := Balance.ELITE_REWARD_MULT if e.elite else 1.0
 		var am := AffixDefs.reward_mult(e.get("affixes", []))
-		g += float(def.gold) * m * (1.0 if e.boss else gold_mult) * float(am[0])
-		x += float(def.xp) * m * float(am[1])
+		var fled := bool(e.get("fled", false))
+		g += float(def.gold) * m * (1.0 if e.boss else gold_mult) * float(am[0]) * (ClassLogic.FLEE_GOLD if fled else 1.0)
+		if not fled:
+			x += float(def.xp) * m * float(am[1])
 	if run.has_passive("scholar"):
 		x *= Balance.PASSIVE_SCHOLAR
 	if moon_full:
@@ -1069,7 +1135,7 @@ func moon_king() -> int:
 ## in phase 1 forces phase 2 (Moonrise: boss_phase {forced, source:"moonrise"}, a fresh phase-2
 ## intent); in phase 2 it turns the next intent into Moonfall (enemy_intent {kind:"moonfall"}).
 ## Either way the meter resets to 0 (moon_meter {source:"moonrise"|"moonfall"}).
-func _moon_tide(_run: RunState) -> Array[Dictionary]:
+func _moon_tide(run: RunState) -> Array[Dictionary]:
 	var ev: Array[Dictionary] = []
 	var i := moon_king()
 	if i < 0:
@@ -1082,8 +1148,8 @@ func _moon_tide(_run: RunState) -> Array[Dictionary]:
 	var was := moon
 	moon = 0
 	if int(e.phase) == 1:
-		ev.append_array(_boss_phase2(i, true))
-		roll_intent(_run.rng, i)
+		ev.append_array(_boss_phase2(i, run, true))
+		roll_intent(run.rng, i)
 		ev.append({"type": "moon_meter", "value": 0, "delta": -was, "source": "moonrise", "max": EnemyDefs.MOON_MAX})
 	else:
 		e.intent = {"kind": "moonfall", "value": EnemyDefs.MOONFALL + int(e.atk_bonus)}
@@ -1128,6 +1194,9 @@ func to_dict() -> Dictionary:
 		"potion_turn": potion_turn, "stoneskin": stoneskin, "boost": boost, "pet_mult": pet_mult,
 		"rerolls_used_this_turn": rerolls_used_this_turn, "refunds_this_turn": refunds_this_turn, "oath": oath,
 		"moon": moon, "transform_at": transform_at, "moon_full": moon_full,
+		"pet_thorns": pet_thorns, "pet_block_turn": pet_block_turn, "last_runes": last_runes.duplicate(true),
+		"extra_dice": extra_dice.map(func(d): return d.to_dict()), "pending_bones": pending_bones, "bones_raised": bones_raised,
+		"attack_target": attack_target,
 	}
 
 static func from_dict(d: Dictionary) -> CombatState:
@@ -1164,6 +1233,15 @@ static func from_dict(d: Dictionary) -> CombatState:
 	c.moon = int(d.get("moon", MOON_NONE))
 	c.transform_at = float(d.get("transform_at", 0.5))
 	c.moon_full = bool(d.get("moon_full", false))
+	c.pet_thorns = int(d.get("pet_thorns", 0))
+	c.pet_block_turn = int(d.get("pet_block_turn", 0))
+	for xd in d.get("extra_dice", []):
+		c.extra_dice.append(Die.from_dict(xd))
+	c.pending_bones = int(d.get("pending_bones", 0))
+	c.bones_raised = int(d.get("bones_raised", 0))
+	c.attack_target = int(d.get("attack_target", -1))
+	for lr in d.get("last_runes", []):
+		c.last_runes.append({"rune": String(lr.rune), "value": int(lr.value), "die": int(lr.die)})
 	c.last_combo = _norm_combo(d.last_combo)
 	for ch in d.chaos:
 		c.chaos.append({"die": int(ch.die), "face": int(ch.face), "value": int(ch.value)})
@@ -1181,6 +1259,8 @@ static func _norm_enemy(ed: Dictionary) -> Dictionary:
 		"affixes": _strings(ed.get("affixes", [])), "thorns_value": int(ed.get("thorns_value", Balance.ENEMY_THORNS)),
 		"actions": int(ed.get("actions", 0)), "chilled": bool(ed.get("chilled", false)),
 		"rallied": int(ed.get("rallied", 0)),
+		"brave": bool(ed.get("brave", false)), "cower": bool(ed.get("cower", false)),
+		"weakened": bool(ed.get("weakened", false)), "fled": bool(ed.get("fled", false)),
 	}
 
 static func _strings(a: Array) -> Array:

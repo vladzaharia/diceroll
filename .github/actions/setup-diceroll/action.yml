@@ -1,0 +1,210 @@
+name: Setup Diceroll
+description: >
+  Godot 4.7.2 (+ export templates, cached and pruned per OS), the private third-party assets
+  (per-unit age-encrypted bundles, cached encrypted) and the headless import (the .godot cache is
+  stored encrypted too: it is derived from the licensed assets). Never logs or uploads plaintext
+  assets or keys. On forks (no secrets) assets are skipped and outputs.assets is 'false'.
+
+inputs:
+  godot-version:
+    description: Godot version (stable)
+    default: "4.7.2"
+  templates:
+    description: Install export templates ('none', 'desktop' = linux/windows/web/android, 'apple' = macos/ios)
+    default: none
+  assets:
+    description: Fetch the private asset bundles (needs age-key + deploy-key)
+    default: "true"
+  import:
+    description: Run `godot --headless --import` (with the encrypted import cache)
+    default: "true"
+  age-key:
+    description: secrets.ASSETS_AGE_KEY (age identity that decrypts the bundles)
+    default: ""
+  deploy-key:
+    description: secrets.ASSETS_DEPLOY_KEY (read-only SSH deploy key of the assets repo)
+    default: ""
+  assets-repo:
+    description: SSH URL of the private assets repo
+    default: git@github.com:vladzaharia/diceroll-assets.git
+
+outputs:
+  assets:
+    description: "'true' when the real assets were installed"
+    value: ${{ steps.fetch.outputs.assets }}
+  godot:
+    description: Path of the Godot binary (also on PATH as `godot`)
+    value: ${{ steps.godot.outputs.bin }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve Godot paths
+      id: paths
+      shell: bash
+      env:
+        GODOT_VERSION: ${{ inputs.godot-version }}
+      run: |
+        case "$RUNNER_OS-$RUNNER_ARCH" in
+          Linux-X64) pkg="linux.x86_64"; tpl="$HOME/.local/share/godot/export_templates" ;;
+          Linux-ARM64) pkg="linux.arm64"; tpl="$HOME/.local/share/godot/export_templates" ;;
+          macOS-*) pkg="macos.universal"; tpl="$HOME/Library/Application Support/Godot/export_templates" ;;
+          *) echo "::error::unsupported runner $RUNNER_OS-$RUNNER_ARCH"; exit 1 ;;
+        esac
+        {
+          echo "pkg=$pkg"
+          echo "dir=$HOME/.godot-ci/$GODOT_VERSION"
+          echo "tpl=$tpl/$GODOT_VERSION.stable"
+        } >>"$GITHUB_OUTPUT"
+
+    - name: Cache Godot + templates
+      id: cache-godot
+      uses: actions/cache@v6
+      with:
+        path: |
+          ${{ steps.paths.outputs.dir }}
+          ${{ steps.paths.outputs.tpl }}
+        key: godot-${{ inputs.godot-version }}-${{ steps.paths.outputs.pkg }}-tpl-${{ inputs.templates }}-v1
+
+    - name: Download Godot
+      if: steps.cache-godot.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        GODOT_VERSION: ${{ inputs.godot-version }}
+        PKG: ${{ steps.paths.outputs.pkg }}
+        DIR: ${{ steps.paths.outputs.dir }}
+        TPL: ${{ steps.paths.outputs.tpl }}
+        TEMPLATES: ${{ inputs.templates }}
+      run: |
+        set -euo pipefail
+        base="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable"
+        mkdir -p "$DIR" && cd "$DIR"
+        curl -fsSL --retry 3 -o SHA512-SUMS.txt "$base/SHA512-SUMS.txt"
+        file="Godot_v${GODOT_VERSION}-stable_${PKG}.zip"
+        curl -fsSL --retry 3 -o "$file" "$base/$file"
+        grep " $file\$" SHA512-SUMS.txt | shasum -a 512 -c -
+        unzip -q "$file" && rm -f "$file"
+        if [ "$TEMPLATES" != none ]; then
+          tpz="Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/$tpz" "$base/$tpz"
+          (cd "$RUNNER_TEMP" && grep " $tpz\$" "$DIR/SHA512-SUMS.txt" | shasum -a 512 -c -)
+          mkdir -p "$TPL"
+          # Keep only what this runner exports (the full .tpz is ~1 GB).
+          case "$TEMPLATES" in
+            desktop) keep='templates/linux_* templates/windows_*_x86_64* templates/web_nothreads_* templates/android_* templates/version.txt' ;;
+            apple) keep='templates/macos.zip templates/ios.zip templates/version.txt' ;;
+            *) keep='templates/*' ;;
+          esac
+          # shellcheck disable=SC2086
+          unzip -q -o -j "$RUNNER_TEMP/$tpz" $keep -d "$TPL"
+          rm -f "$RUNNER_TEMP/$tpz"
+          ls -la "$TPL"
+        fi
+
+    - name: Put Godot on PATH
+      id: godot
+      shell: bash
+      env:
+        DIR: ${{ steps.paths.outputs.dir }}
+      run: |
+        set -euo pipefail
+        if [ "$RUNNER_OS" = macOS ]; then
+          bin="$DIR/Godot.app/Contents/MacOS/Godot"
+        else
+          bin="$(find "$DIR" -maxdepth 1 -name 'Godot_v*' -type f | head -1)"
+          chmod +x "$bin"
+        fi
+        mkdir -p "$HOME/.local/bin"
+        ln -sf "$bin" "$HOME/.local/bin/godot"
+        echo "$HOME/.local/bin" >>"$GITHUB_PATH"
+        echo "bin=$bin" >>"$GITHUB_OUTPUT"
+        "$bin" --version
+
+    - name: Install age + zstd
+      if: inputs.assets == 'true' && inputs.age-key != ''
+      shell: bash
+      run: |
+        if [ "$RUNNER_OS" = Linux ]; then
+          command -v age >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq age zstd >/dev/null; }
+        else
+          command -v age >/dev/null || brew install -q age
+          command -v zstd >/dev/null || brew install -q zstd
+        fi
+
+    - name: Asset lock digest
+      id: lock
+      shell: bash
+      run: echo "hash=$(python3 tools/ci/assets.py hash)" >>"$GITHUB_OUTPUT"
+
+    - name: Restore encrypted bundle cache
+      if: inputs.assets == 'true' && inputs.age-key != ''
+      uses: actions/cache@v6
+      with:
+        path: .ci-cache/bundles
+        key: asset-bundles-${{ steps.lock.outputs.hash }}
+        # Older caches still hold most units: only changed ones are downloaded.
+        restore-keys: asset-bundles-
+
+    - name: Fetch + decrypt assets
+      id: fetch
+      shell: bash
+      env:
+        ASSETS_AGE_KEY: ${{ inputs.age-key }}
+        ASSETS_DEPLOY_KEY: ${{ inputs.deploy-key }}
+        ASSETS_GIT_URL: ${{ inputs.assets-repo }}
+        WANT: ${{ inputs.assets }}
+      run: |
+        set -euo pipefail
+        if [ "$WANT" != true ] || [ -z "$ASSETS_AGE_KEY" ]; then
+          echo "::notice::Private asset bundles unavailable (fork or no secrets): asset-dependent steps are skipped."
+          echo "assets=false" >>"$GITHUB_OUTPUT"
+          exit 0
+        fi
+        python3 tools/ci/assets.py fetch --cache .ci-cache
+        echo "assets=true" >>"$GITHUB_OUTPUT"
+
+    - name: Restore encrypted import cache
+      id: import-cache
+      if: inputs.import == 'true' && steps.fetch.outputs.assets == 'true'
+      uses: actions/cache/restore@v6
+      with:
+        path: .ci-cache/import.tar.zst.age
+        key: godot-import-${{ runner.os }}-${{ inputs.godot-version }}-${{ steps.lock.outputs.hash }}-${{ hashFiles('project.godot', '**/*.gdshader') }}
+        restore-keys: |
+          godot-import-${{ runner.os }}-${{ inputs.godot-version }}-${{ steps.lock.outputs.hash }}-
+          godot-import-${{ runner.os }}-${{ inputs.godot-version }}-
+
+    - name: Import
+      if: inputs.import == 'true'
+      shell: bash
+      env:
+        ASSETS_AGE_KEY: ${{ inputs.age-key }}
+        HAVE_CACHE: ${{ steps.import-cache.outputs.cache-matched-key != '' }}
+      run: |
+        set -euo pipefail
+        mkdir -p build && touch build/.gdignore
+        if [ "$HAVE_CACHE" = true ] && [ -f .ci-cache/import.tar.zst.age ]; then
+          python3 tools/ci/assets.py unseal .ci-cache/import.tar.zst.age .godot
+        fi
+        start=$(date +%s)
+        # Godot exits 0 even when an import fails; surface errors in the log instead.
+        godot --headless --path . --import >"$RUNNER_TEMP/import.log" 2>&1 || true
+        grep -E "^ERROR|SCRIPT ERROR" "$RUNNER_TEMP/import.log" | head -20 || true
+        echo "import took $(( $(date +%s) - start ))s"
+        test -d .godot/imported
+
+    - name: Seal import cache
+      if: inputs.import == 'true' && steps.fetch.outputs.assets == 'true' && steps.import-cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        ASSETS_AGE_KEY: ${{ inputs.age-key }}
+      run: |
+        rm -f .ci-cache/import.tar.zst.age
+        python3 tools/ci/assets.py seal .godot .ci-cache/import.tar.zst.age
+
+    - name: Save import cache
+      if: inputs.import == 'true' && steps.fetch.outputs.assets == 'true' && steps.import-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: .ci-cache/import.tar.zst.age
+        key: godot-import-${{ runner.os }}-${{ inputs.godot-version }}-${{ steps.lock.outputs.hash }}-${{ hashFiles('project.godot', '**/*.gdshader') }}

@@ -32,6 +32,7 @@ const SFX := {
 	"block": [[IMPACT + "impactMetal_heavy_000.ogg", IMPACT + "impactMetal_heavy_001.ogg", IMPACT + "impactMetal_heavy_002.ogg"], -3.0],
 	"swing": [[RPG + "knifeSlice.ogg", RPG + "knifeSlice2.ogg", RPG + "drawKnife1.ogg"], -3.0],
 	"death": [[IMPACT + "impactSoft_heavy_000.ogg", IMPACT + "impactSoft_heavy_001.ogg"], 0.0],
+	"drum": [[IMPACT + "impactSoft_heavy_000.ogg", IMPACT + "impactSoft_heavy_001.ogg", IMPACT + "impactWood_heavy_000.ogg"], 1.0],
 	"heal": [[DIGI + "powerUp2.ogg"], -6.0],
 	"buff": [[DIGI + "powerUp7.ogg"], -6.0],
 	"levelup": [[JINGLE + "jingles_PIZZI10.ogg"], -2.0],
@@ -46,22 +47,53 @@ const SFX := {
 	"portal": [[DIGI + "phaseJump1.ogg", DIGI + "zapThreeToneUp.ogg"], -6.0],
 	"trap": [[IMPACT + "impactMining_000.ogg", IMPACT + "impactMining_001.ogg", IMPACT + "impactMining_002.ogg"], -1.0],
 	"chest": [[RPG + "creak1.ogg", RPG + "creak2.ogg", RPG + "metalLatch.ogg"], -2.0],
+	# minigames (ui/minigames)
+	"dig": [[IMPACT + "impactMining_003.ogg", IMPACT + "impactMining_004.ogg", IMPACT + "footstep_snow_000.ogg"], -3.0],
+	"clink": [[IMPACT + "impactPlate_light_000.ogg", IMPACT + "impactPlate_light_001.ogg", IMPACT + "impactPlate_light_002.ogg"], -4.0],
+	"pop": [[UI + "drop_001.ogg", UI + "drop_002.ogg", UI + "drop_003.ogg", UI + "drop_004.ogg"], -2.0],
+	"scratch": [[UI + "scratch_001.ogg", UI + "scratch_002.ogg", UI + "scratch_003.ogg", UI + "scratch_004.ogg", UI + "scratch_005.ogg"], -3.0],
+	"reveal": [[UI + "confirmation_001.ogg", UI + "confirmation_002.ogg"], -5.0],
+	"tick": [[UI + "tick_001.ogg", UI + "tick_002.ogg", UI + "tick_004.ogg"], -4.0],
+	"claw": [[RPG + "metalClick.ogg"], -2.0],
+	"fwump": [[IMPACT + "impactSoft_medium_000.ogg", IMPACT + "impactSoft_medium_001.ogg", IMPACT + "impactSoft_medium_002.ogg"], -3.0],
+	"whirr": [[UI + "maximize_003.ogg", UI + "maximize_006.ogg"], -6.0],
+	# Minigames 2.0
+	"card_flip": [[CASINO + "card-place-1.ogg", CASINO + "card-place-2.ogg", CASINO + "card-place-3.ogg", CASINO + "card-place-4.ogg"], -3.0],
+	"card_slide": [[CASINO + "card-slide-1.ogg", CASINO + "card-slide-2.ogg", CASINO + "card-slide-3.ogg", CASINO + "card-slide-4.ogg"], -4.0],
+	"card_shuffle": [[CASINO + "card-shuffle.ogg", CASINO + "card-fan-1.ogg", CASINO + "card-fan-2.ogg"], -3.0],
+	"chips": [[CASINO + "chips-stack-1.ogg", CASINO + "chips-stack-2.ogg", CASINO + "chips-stack-3.ogg", CASINO + "chips-handle-1.ogg"], -2.0],
+	"chip_tick": [[CASINO + "chips-collide-1.ogg", CASINO + "chips-collide-2.ogg", CASINO + "chips-collide-3.ogg", CASINO + "chips-collide-4.ogg"], -6.0],
+	"cup_knock": [[IMPACT + "impactWood_light_000.ogg", IMPACT + "impactWood_light_001.ogg", IMPACT + "impactWood_light_002.ogg", IMPACT + "impactWood_light_003.ogg"], -3.0],
+	"wood": [[IMPACT + "impactWood_medium_000.ogg", IMPACT + "impactWood_medium_001.ogg", IMPACT + "impactWood_medium_002.ogg"], -3.0],
+	"plink": [[IMPACT + "impactGlass_light_000.ogg", IMPACT + "impactGlass_light_001.ogg", IMPACT + "impactGlass_light_002.ogg", IMPACT + "impactGlass_light_003.ogg", IMPACT + "impactGlass_light_004.ogg"], -8.0],
+	"glass": [[UI + "glass_001.ogg", UI + "glass_002.ogg", UI + "glass_003.ogg", UI + "glass_004.ogg", UI + "glass_005.ogg", UI + "glass_006.ogg"], -4.0],
+	"pluck": [[UI + "pluck_001.ogg", UI + "pluck_002.ogg"], -3.0],
+	"bell": [[IMPACT + "impactBell_heavy_000.ogg", IMPACT + "impactBell_heavy_001.ogg", IMPACT + "impactBell_heavy_002.ogg"], -6.0],
+	"bong": [[UI + "bong_001.ogg"], -3.0],
+	"splash": [[IMPACT + "impactSoft_heavy_000.ogg", IMPACT + "impactSoft_heavy_001.ogg", UI + "drop_003.ogg"], -4.0],
+	"reel": [[UI + "scroll_001.ogg", UI + "scroll_002.ogg", UI + "scroll_003.ogg", UI + "scroll_004.ogg", UI + "scroll_005.ogg"], -5.0],
+	"swoosh": [[RPG + "cloth1.ogg", RPG + "cloth2.ogg", RPG + "cloth3.ogg", RPG + "cloth4.ogg"], -4.0],
+	"question": [[UI + "question_001.ogg", UI + "question_002.ogg", UI + "question_003.ogg"], -4.0],
+	"tin": [[IMPACT + "impactTin_medium_000.ogg", IMPACT + "impactTin_medium_001.ogg", IMPACT + "impactTin_medium_002.ogg"], -5.0],
 }
 
 const M := "res://assets/audio/music/"
+## CC0 beds from OpenGameArt (RandomMind, cynicmusic); see assets/CREDITS.md.
 const MUSIC := {
-	"title": M + "mixkit-zanarkand-forest-169.mp3",
-	"act1": M + "mixkit-spirit-in-the-woods-2-147.mp3",
-	"act2": M + "mixkit-ambient-251.mp3",
-	"act3": M + "mixkit-vastness-184.mp3",
-	"calm": M + "mixkit-nature-meditation-345.mp3",
+	"title": M + "bards-tale.mp3",
+	"calm": M + "old-tower-inn.mp3",
+	"boss": M + "battle-theme-a.mp3",
 	# biome beds (by BiomeDefs id)
-	"glade": M + "mixkit-nature-meditation-345.mp3",
-	"crypt": M + "mixkit-spirit-in-the-woods-2-147.mp3",
-	"hollow": M + "mixkit-ambient-251.mp3",
-	"frost": M + "mixkit-zanarkand-forest-169.mp3",
-	"throne": M + "mixkit-vastness-184.mp3",
-	"magma": M + "mixkit-vastness-184.mp3",
+	"glade": M + "harvest-season.mp3",
+	"crypt": M + "lament-for-a-warriors-soul.mp3",
+	"hollow": M + "dark-forest.mp3",
+	"frost": M + "rising-moon.mp3",
+	"throne": M + "medieval-battle.mp3",
+	"magma": M + "battle-theme-b.mp3",
+	# legacy act ids (default route: crypt -> hollow -> throne)
+	"act1": M + "lament-for-a-warriors-soul.mp3",
+	"act2": M + "dark-forest.mp3",
+	"act3": M + "medieval-battle.mp3",
 }
 const MUSIC_DB := -8.0
 
@@ -114,7 +146,8 @@ func stop_all() -> void:
 
 
 ## Plays a one-shot SFX by id. Unknown ids warn and do nothing.
-func play_sfx(id: String, pitch_var := 0.05, volume_db := 0.0) -> void:
+## `pitch` sets the base pitch (a rising combo), `pitch_var` jitters around it.
+func play_sfx(id: String, pitch_var := 0.05, volume_db := 0.0, pitch := 1.0) -> void:
 	if not SFX.has(id):
 		push_warning("Audio: unknown sfx id '%s'" % id)
 		return
@@ -127,7 +160,7 @@ func play_sfx(id: String, pitch_var := 0.05, volume_db := 0.0) -> void:
 	_next = (_next + 1) % _pool.size()
 	p.stream = stream
 	p.volume_db = def[1] + volume_db
-	p.pitch_scale = 1.0 + randf_range(-pitch_var, pitch_var)
+	p.pitch_scale = maxf(0.05, pitch * (1.0 + randf_range(-pitch_var, pitch_var)))
 	p.play()
 
 

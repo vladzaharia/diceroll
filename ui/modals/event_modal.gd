@@ -10,7 +10,7 @@ const ART := {
 	"garden": ["rune_lucky", Color("7ad35a")], "merchant": ["coin", UiPalette.COIN], "idol": ["curse", UiPalette.CURSE],
 }
 const CHOICE_ICONS := {
-	"atk": "sword", "max_hp": "heart", "gold": "coin", "face": "anvil",
+	"atk": "sword", "max_hp": "heart", "gold": "3d:coins", "face": "anvil",
 }
 
 var _art: CenterContainer
@@ -68,5 +68,5 @@ static func _choice_icon(id: String, ch: Dictionary, i: int) -> String:
 		"outbreak":
 			return "skull"
 		"garden":
-			return "chest"
+			return "3d:chest_gems"
 	return "arrow_right"

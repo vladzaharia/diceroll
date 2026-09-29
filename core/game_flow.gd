@@ -8,6 +8,8 @@ extends RefCounted
 enum Phase { BOARD_READY, BOARD_ROLLED, COMBAT, DRAFT, SHOP, FORGE, EVENT, PORTAL, GAME_OVER, VICTORY, MINIGAME }
 
 const SAVE_VERSION := 1
+## Die index that addresses the Engineer's Turret die in rune_assign, shop_buy and forge_apply.
+const TURRET := -2
 
 var run: RunState
 var phase: Phase = Phase.BOARD_READY
@@ -116,7 +118,13 @@ func _do_board_roll() -> Array[Dictionary]:
 	for i in run.dice.size():
 		values.append(run.dice[i].value(run.dice[i].roll(run.rng)))
 		idx.append(i)
-	ev.append({"type": "dice_rolled", "values": values.duplicate(), "indices": idx, "context": "board"})
+	var stars: Array[int] = []
+	for i in values.size():
+		if values[i] == Die.PRETEND:
+			stars.append(i)
+	for i in stars:
+		values[i] = ClassLogic.pretend_board_value(values, i)
+	ev.append({"type": "dice_rolled", "values": values.duplicate(), "indices": idx, "context": "board", "pretend": stars})
 	_select_move(values)
 	# Doubles feed the Treasury bank: +pair value * TREASURY_PAIR_MULT.
 	var added := 0
@@ -256,6 +264,12 @@ func confirm_move() -> Array[Dictionary]:
 		if run.dice[i].rune == "gilded" and board_roll[i] > 0:
 			ev.append({"type": "rune_fired", "die_idx": i, "rune": "gilded", "effect": "gold", "value": board_roll[i]})
 			_gold(ev, board_roll[i], "gilded")
+	if run.turret != null and run.turret.rune == "gilded":
+		# the Turret's MOVE trigger: it rolls with the board move
+		var tv := run.turret.value(run.turret.roll(run.rng))
+		if tv > 0:
+			ev.append({"type": "rune_fired", "die_idx": TURRET, "rune": "gilded", "effect": "gold", "value": tv, "turret": true})
+			_gold(ev, tv, "gilded")
 	var hop := board_pair_value()
 	var doubles := hop > 0
 	if doubles:
@@ -396,7 +410,10 @@ func _advance(ev: Array[Dictionary]) -> void:
 			"victory":
 				_finish(true, ev)
 			"forge":
-				_set_offer({"kind": "forge", "ops": ["raise"], "source": String(step.get("source", "reward"))}, Phase.FORGE, ev)
+				var fo := {"kind": "forge", "ops": step.get("ops", ["raise"]), "source": String(step.get("source", "reward"))}
+				if int(step.get("uses", 1)) > 1:
+					fo["uses"] = int(step.uses)
+				_set_offer(fo, Phase.FORGE, ev)
 
 func _set_offer(o: Dictionary, p: Phase, ev: Array[Dictionary]) -> void:
 	offer = o
@@ -431,7 +448,7 @@ func _trigger_tile(idx: int, ev: Array[Dictionary]) -> void:
 			if run.potion_cap > 0 and run.rng.chance(Balance.CHEST_POTION_CHANCE):
 				_gain_potion(ev, "chest")
 			if run.rng.chance(Balance.CHEST_RUNE_CHANCE):
-				_open_rune_choice("chest", ev)
+				_open_rune_choice("chest", ev, 4 if run.has_pet("grimoire") else 3)
 			else:
 				var roll := run.rng.randi_range(Balance.CHEST_GOLD_MIN, Balance.CHEST_GOLD_MAX)
 				if run.has_pet("coin_mimic") and run.pet_level() >= 10:
@@ -456,7 +473,8 @@ func _trigger_tile(idx: int, ev: Array[Dictionary]) -> void:
 		"trap":
 			var roll := run.rng.randi_range(1, 6)
 			var dodged := roll + _dodge_bonus() >= _dodge_min()
-			var dmg := 0 if dodged else mini(run.hp, maxi(1, int(round(run.pct_of_max(Balance.TRAP_DAMAGE_PCT) * run.hazard_mult()))))
+			var dmg := 0 if dodged else mini(run.hp, maxi(1, int(round(run.pct_of_max(Balance.TRAP_DAMAGE_PCT) * run.hazard_mult()
+				* (PetDefs.PEBBLE_TRAP_MULT if run.has_pet("pebble_golem") else 1.0)))))
 			var hp_before := run.hp
 			run.hp -= dmg
 			var saved := run.survive_lethal(hp_before) if run.hp <= 0 else ""
@@ -477,6 +495,8 @@ func _trigger_tile(idx: int, ev: Array[Dictionary]) -> void:
 			# Frostpeak: slip (fail the dodge roll) and a die freezes for your next fight.
 			var roll := run.rng.randi_range(1, 6)
 			var dodged := roll + _dodge_bonus() >= _dodge_min()
+			if run.has_pet("frost_mote"):
+				dodged = true # Frost Mote perk: ice never freezes your dice
 			if not dodged:
 				run.chill = mini(Balance.ICE_CHILL_MAX, run.chill + Balance.ICE_CHILL)
 			ev.append({"type": "trap", "roll": roll, "dodged": dodged, "damage": 0, "ice": true, "chill": run.chill})
@@ -614,6 +634,9 @@ func _on_combat_won(ev: Array[Dictionary]) -> void:
 		_stat_add(run.miniboss_id if c.enemies.is_empty() else String(c.enemies[0].id), "minibosses_killed")
 	if run.pet_id() != "":
 		run.stats.pet_fights = int(run.stats.get("pet_fights", 0)) + 1
+		ev.append_array(PetLogic.on_fight_won(run))
+		if run.has_pet("cauldron") and PetLogic.is_full(run):
+			_cauldron_brew(ev)
 	if c.gold_reward > 0:
 		_gold(ev, run.gold_bonus(c.gold_reward), "combat")
 	if c.tile >= 0 and not c.boss:
@@ -644,6 +667,25 @@ func _on_combat_won(ev: Array[Dictionary]) -> void:
 		front.append({"kind": "passive_choice", "source": "elite", "tier": tier})
 	front.append_array(pending)
 	pending = front
+
+## Bubbles (cauldron pet) fires after a won fight: a potion for the belt (a random unlocked type
+## at L5+, two at L10), healing 15% instead when the belt is full, plus 1% of max HP per level.
+func _cauldron_brew(ev: Array[Dictionary]) -> void:
+	var lvl := run.pet_level()
+	var types: Array = run.meta.get("potion_types", ["healing"])
+	var n := 2 if lvl >= 10 else 1
+	for k in n:
+		var pt := "healing"
+		if lvl >= 5 and types.size() > 1:
+			pt = String(run.rng.pick(types))
+		if k == 0:
+			ev.append(PetLogic._acted(run, "potion", 1, "hero"))
+			ev.back()["potion"] = pt
+		if not _gain_potion(ev, "pet", pt):
+			var hf := run.heal(run.pct_of_max(PetDefs.CAULDRON_FULL_HEAL))
+			ev.append({"type": "hp_changed", "amount": hf, "total": run.hp, "source": "pet", "max_hp": run.max_hp})
+	var h := run.heal(run.pct_of_max(PetDefs.cauldron_heal_pct(lvl)))
+	ev.append({"type": "hp_changed", "amount": h, "total": run.hp, "source": "pet", "max_hp": run.max_hp})
 
 ## Automatic, slow levels (no choice): each level gives LEVEL_MAX_HP max HP and heals
 ## LEVEL_MAX_HP + LEVEL_HEAL_PCT of max HP. Emits level_up {level, xp, next, auto:true,
@@ -828,9 +870,9 @@ func _collector_hp(runes: int, ev: Array[Dictionary]) -> void:
 
 ## Puts `rune` on a die (replacing any rune). Collector adds max HP when a blank die gains one.
 func _assign_rune(die_idx: int, rune: String, ev: Array[Dictionary]) -> void:
-	var old := run.dice[die_idx].rune
-	run.dice[die_idx].rune = rune
-	ev.append({"type": "rune_assigned", "die_idx": die_idx, "rune": rune, "replaced": old})
+	var old := _die(die_idx).rune
+	_die(die_idx).rune = rune
+	ev.append({"type": "rune_assigned", "die_idx": die_idx, "rune": rune, "replaced": old, "turret": die_idx == TURRET})
 	if old == "" and run.has_passive("collector"):
 		_collector_hp(1, ev)
 
@@ -904,7 +946,7 @@ func _weakest_die() -> int:
 func rune_assign(die_idx: int) -> Array[Dictionary]:
 	if phase != Phase.DRAFT or offer.get("kind", "") != "rune_assign":
 		return _err("rune_assign")
-	if die_idx < 0 or die_idx >= run.dice.size():
+	if not _valid_die(die_idx, String(offer.rune)):
 		return [_e("bad die index")]
 	_record(["rune_assign", die_idx])
 	var ev: Array[Dictionary] = []
@@ -924,9 +966,10 @@ func _open_shop(ev: Array[Dictionary]) -> void:
 
 ## Restock price: A3 raises it, the Charm's Haggle trait lowers it.
 func _restock_price() -> int:
+	var off := PetDefs.TINKER_RESTOCK_OFF if run.has_pet("tinker_gear") else 0
 	if run.has_trait("charm_cheap_restock"):
-		return int(GearDefs.TRAIT_BONUS.charm_cheap_restock)
-	return UnlockDefs.ASC_RESTOCK if run.has_asc("shop_tax") else Balance.SHOP_RESTOCK_PRICE
+		return maxi(0, int(GearDefs.TRAIT_BONUS.charm_cheap_restock) - off)
+	return maxi(0, (UnlockDefs.ASC_RESTOCK if run.has_asc("shop_tax") else Balance.SHOP_RESTOCK_PRICE) - off)
 
 ## 3-4 items. While the pool is below MAX_DICE the first item is always a die (random kind);
 ## at most 2 dice per stock (distinct kinds), runes repeat (distinct), anything else once.
@@ -982,7 +1025,7 @@ func _shop_item(id: String, used: Dictionary) -> Dictionary:
 			item.desc = String(DiceKinds.DEFS[kind].desc)
 			item.price = int(DiceKinds.DEFS[kind].price)
 		"potion":
-			item.price = Balance.SHOP_POTION_PRICE
+			item.price = Balance.SHOP_POTION_PRICE - (PetDefs.CAULDRON_POTION_OFF if run.has_pet("cauldron") else 0)
 			if run.potion_cap > 0:
 				var types: Array = run.meta.get("potion_types", ["healing"])
 				var pt := String(types[0]) if types.size() <= 1 else String(run.rng.pick(types))
@@ -1028,14 +1071,14 @@ func shop_buy(i: int, die_idx := -1) -> Array[Dictionary]:
 		return [_e("sold out")]
 	if run.gold < int(item.price):
 		return [_e("not enough gold")]
-	if item.needs_die and (die_idx < 0 or die_idx >= run.dice.size()):
+	if item.needs_die and not _valid_die(die_idx, String(item.get("rune", ""))):
 		return [_e("choose a die")]
 	match String(item.id):
 		"die":
 			if run.dice.size() >= run.max_dice():
 				return [_e("dice pool is full")]
 		"face_raise":
-			if not run.dice[die_idx].can_raise(run.dice[die_idx].lowest_face()):
+			if not _die(die_idx).can_raise(_die(die_idx).lowest_face()):
 				return [_e("die is maxed")]
 		"combat_reroll":
 			if run.combat_rerolls >= Balance.MAX_COMBAT_REROLLS or run.shop_reroll_bought:
@@ -1066,8 +1109,9 @@ func shop_buy(i: int, die_idx := -1) -> Array[Dictionary]:
 				var h := run.heal(run.pct_of_max(Balance.SHOP_POTION_PCT))
 				ev.append({"type": "hp_changed", "amount": h, "total": run.hp, "source": "potion", "max_hp": run.max_hp})
 		"face_raise":
-			var f := run.dice[die_idx].lowest_face()
-			run.dice[die_idx].raise_face(f)
+			var f := _die(die_idx).lowest_face()
+			_die(die_idx).raise_face(f)
+			run.stats.face_edits = int(run.stats.get("face_edits", 0)) + 1
 			ev.append(_face_ev(die_idx, f))
 		"combat_reroll":
 			run.combat_rerolls += 1
@@ -1109,23 +1153,25 @@ func forge_apply(die_idx: int, face_idx: int, op: String, src_face := -1) -> Arr
 	if op != "skip":
 		if not Array(offer.get("ops", [])).has(op):
 			return [_e("operation not allowed: " + op)]
-		if die_idx < 0 or die_idx >= run.dice.size() or face_idx < 0 or face_idx > 5:
+		if not _valid_die(die_idx) or face_idx < 0 or face_idx > 5:
 			return [_e("bad die or face")]
-		var d := run.dice[die_idx]
+		var d := _die(die_idx)
 		if op == "raise" and not d.can_raise(face_idx):
 			return [_e("face is already at its cap (%d)" % d.raise_cap())]
-		if op == "mirror" and (src_face < 0 or src_face > 5 or src_face == face_idx or d.faces[src_face] == d.faces[face_idx]):
+		if op == "mirror" and (src_face < 0 or src_face > 5 or src_face == face_idx or d.faces[src_face] == d.faces[face_idx]
+				or d.faces[src_face] == Die.PRETEND or d.faces[face_idx] == Die.PRETEND):
 			return [_e("bad mirror source")]
 	_record(["forge_apply", die_idx, face_idx, op, src_face])
 	var ev: Array[Dictionary] = []
 	if op != "skip":
 		var fs := String(offer.get("source", "tile"))
 		_upgrade("forge" if fs == "tile" else fs)
+		run.stats.face_edits = int(run.stats.get("face_edits", 0)) + 1
 	if op == "raise":
-		run.dice[die_idx].raise_face(face_idx)
+		_die(die_idx).raise_face(face_idx)
 		ev.append(_face_ev(die_idx, face_idx))
 	elif op == "mirror":
-		run.dice[die_idx].mirror_face(face_idx, src_face)
+		_die(die_idx).mirror_face(face_idx, src_face)
 		ev.append(_face_ev(die_idx, face_idx))
 	var uses := int(offer.get("uses", 1))
 	if op != "skip" and uses > 1:
@@ -1133,7 +1179,8 @@ func forge_apply(die_idx: int, face_idx: int, op: String, src_face := -1) -> Arr
 		var again := offer.duplicate(true)
 		again["uses"] = uses - 1
 		_close_offer(ev)
-		ev.append(_passive_ev("blacksmith", uses - 1))
+		if String(again.get("source", "tile")) == "tile":
+			ev.append(_passive_ev("blacksmith", uses - 1))
 		_set_offer(again, Phase.FORGE, ev)
 		return ev
 	_close_offer(ev)
@@ -1141,7 +1188,18 @@ func forge_apply(die_idx: int, face_idx: int, op: String, src_face := -1) -> Arr
 	return ev
 
 func _face_ev(die_idx: int, face_idx: int) -> Dictionary:
-	return {"type": "face_changed", "die_idx": die_idx, "face_idx": face_idx, "value": run.dice[die_idx].faces[face_idx], "faces": Array(run.dice[die_idx].faces)}
+	return {"type": "face_changed", "die_idx": die_idx, "face_idx": face_idx, "value": _die(die_idx).faces[face_idx], "faces": Array(_die(die_idx).faces)}
+
+## run.dice[idx], or the Engineer's Turret for GameFlow.TURRET.
+func _die(idx: int) -> Die:
+	return run.turret if idx == TURRET else run.dice[idx]
+
+## A die index offers may target: a pool die, or the Turret (only for its allowed runes:
+## ClassLogic.TURRET_RUNES; `rune` "" = a face edit).
+func _valid_die(idx: int, rune := "") -> bool:
+	if idx == TURRET:
+		return run.turret != null and (rune == "" or ClassLogic.TURRET_RUNES.has(rune))
+	return idx >= 0 and idx < run.dice.size()
 
 # ================================================================ events
 
@@ -1278,6 +1336,8 @@ func event_choose(i: int) -> Array[Dictionary]:
 					var f := run.dice[d].lowest_face()
 					if run.dice[d].raise_face(f):
 						ev.append(_face_ev(d, f))
+	if run.board.biome == "hollow":
+		run.stats.hollow_events = int(run.stats.get("hollow_events", 0)) + 1
 	if run.board.biome == "hollow" and run.hp > 0:
 		# Hollow twist: restless spirits mend you after every event.
 		var hh := run.heal(run.pct_of_max(Balance.HOLLOW_EVENT_HEAL_PCT))
@@ -1511,7 +1571,7 @@ func _biome_curse(ev: Array[Dictionary]) -> void:
 	var opts: Array = []
 	for d in run.dice.size():
 		for f in 6:
-			if run.dice[d].faces[f] > 1:
+			if run.dice[d].faces[f] > 1 and run.dice[d].faces[f] != Die.PRETEND:
 				opts.append([d, f])
 	if opts.is_empty():
 		return
@@ -1648,12 +1708,15 @@ func minigame_finish() -> Array[Dictionary]:
 	_record(["minigame_finish"])
 	return _minigame_result(float(minigame.score()) / float(MinigameDefs.MEDIAN[minigame.id]), false)
 
-## AUTO: skips the game and takes the par result (MinigameDefs.PAR of median).
+## Skips the game with a simulated average player's result (MinigameDefs.sim_ratio: a tier
+## drawn from the game's calibrated split with the minigame's own Rng, so the run Rng is
+## untouched). Sims / headless bots only: players play every minigame and the in-game AUTO
+## pauses at minigames (Bot.decide).
 func minigame_auto() -> Array[Dictionary]:
 	if phase != Phase.MINIGAME or minigame == null:
 		return _err("minigame_auto")
 	_record(["minigame_auto"])
-	return _minigame_result(MinigameDefs.PAR, true)
+	return _minigame_result(MinigameDefs.sim_ratio(minigame.id, minigame.rng.randf()), true)
 
 ## Emits minigame_result {id, score, ratio, tier, mult, auto, crowns, state} + offer_closed, banks
 ## the tier's Crowns, then opens the reward choice: offer {kind:"reward", source:"minigame", id,
@@ -1662,7 +1725,7 @@ func _minigame_result(ratio: float, auto: bool) -> Array[Dictionary]:
 	var ev: Array[Dictionary] = []
 	var id := minigame.id
 	var tier := MinigameDefs.tier_for(ratio)
-	var mult := MinigameDefs.skill_mult(ratio) * MinigameDefs.mastery_mult(minigame.level)
+	var mult := MinigameDefs.skill_mult(ratio, id) * MinigameDefs.mastery_mult(minigame.level)
 	var crowns := int(Economy.CROWNS_MINIGAME[tier])
 	run.stats.minigame_crowns = int(run.stats.get("minigame_crowns", 0)) + crowns
 	ev.append({"type": "minigame_result", "id": id, "score": minigame.score(), "ratio": snappedf(ratio, 0.001), "tier": tier,
@@ -1701,12 +1764,29 @@ func _reward_options(id: String, tier: String, mult: float) -> Array:
 				"desc": "+1 combat reroll every turn for the next %d fights." % MinigameDefs.REROLL_BOOST_FIGHTS})
 		"passive_common":
 			opts.append({"id": "passive_common", "label": "Common passive", "desc": "Pick 1 of 3 common passives."})
+		"sharpshooter":
+			opts.append({"id": "sharpshooter", "label": "Sharpshooter", "desc": "+%d ATK for the rest of the run." % Balance.SHRINE_ATK})
+		"rare_rune":
+			opts.append({"id": "rare_rune", "rune": _rand_rune("rare"), "label": "Rare rune", "desc": "A rare rune for one of your dice."})
+		"heart_gem":
+			opts.append({"id": "heart_gem", "label": "Heart Gem", "desc": "+%d max HP (and heal it)." % Balance.SHRINE_MAX_HP})
+		"mirror_forge":
+			opts.append({"id": "mirror_forge", "label": "Mirror Forge", "desc": "Two edits: raise a face, or copy one face onto another."})
+		"potion_pair":
+			opts.append({"id": "potion_pair", "potion": "healing", "potion2": _second_potion(), "label": "The Catch",
+				"desc": "A Healing Draught and a %s." % PotionDefs.name_of(_second_potion())})
+		"passive_uncommon":
+			opts.append({"id": "passive_uncommon", "label": "Uncommon passive", "desc": "Pick 1 of 3 uncommon passives."})
+		"high_roller":
+			opts.append({"id": "high_roller", "label": "High Roller", "desc": "Raise the lowest face of every die by 1."})
 		_:
 			var d: int = g.call(MinigameDefs.SIGNATURE_GOLD)
 			opts.append({"id": "gold", "amount": d, "label": "%d gold" % d, "desc": "The jackpot purse."})
 	return opts
 
 func _pick_reward(opt: Dictionary, ev: Array[Dictionary]) -> void:
+	if _pick_signature(opt, ev):
+		return
 	match String(opt.id):
 		"gold":
 			_gold(ev, int(opt.amount), "minigame")
@@ -1732,10 +1812,11 @@ func _pick_reward(opt: Dictionary, ev: Array[Dictionary]) -> void:
 			_upgrade("minigame")
 			run.pet_state["boost"] = int(opt.get("fights", MinigameDefs.REROLL_BOOST_FIGHTS))
 			ev.append({"type": "stat_changed", "stat": "reroll_boost", "value": int(run.pet_state.boost)})
-		"passive_common":
+		"passive_common", "passive_uncommon":
+			var rarity := "common" if opt.id == "passive_common" else "uncommon"
 			var skip := _passive_excluded()
 			for pid in Passives.IDS:
-				if Passives.rarity(pid) != "common" and not skip.has(pid):
+				if Passives.rarity(pid) != rarity and not skip.has(pid):
 					skip.append(pid)
 			var ids := Passives.roll_regular(run.rng, 3, skip)
 			if not ids.is_empty():
@@ -1743,6 +1824,50 @@ func _pick_reward(opt: Dictionary, ev: Array[Dictionary]) -> void:
 				for pid in ids:
 					options.append(Passives.option(pid))
 				_set_offer({"kind": "passive", "options": options, "source": "minigame"}, Phase.DRAFT, ev)
+
+## Minigames 2.0 signature prizes (gold tier): each reuses an existing reward rule.
+func _pick_signature(opt: Dictionary, ev: Array[Dictionary]) -> bool:
+	match String(opt.id):
+		"sharpshooter":
+			_upgrade("minigame")
+			run.atk += Balance.SHRINE_ATK
+			ev.append({"type": "stat_changed", "stat": "atk", "value": run.atk})
+		"rare_rune":
+			_set_offer({"kind": "rune_assign", "rune": String(opt.get("rune", _rand_rune("rare"))), "source": "minigame"}, Phase.DRAFT, ev)
+		"heart_gem":
+			_upgrade("minigame")
+			run.max_hp += Balance.SHRINE_MAX_HP
+			var hh := run.heal(Balance.SHRINE_MAX_HP)
+			ev.append({"type": "hp_changed", "amount": hh, "total": run.hp, "source": "minigame", "max_hp": run.max_hp})
+		"mirror_forge":
+			pending.push_front({"kind": "forge", "source": "minigame", "ops": ["raise", "mirror"], "uses": 2})
+		"potion_pair":
+			for key in ["potion", "potion2"]:
+				var type := String(opt.get(key, "healing"))
+				if not _gain_potion(ev, "minigame", type):
+					ev.append_array(_drink(type, "minigame"))
+		"high_roller":
+			_upgrade("minigame")
+			for d in run.dice.size():
+				var f := run.dice[d].lowest_face()
+				if run.dice[d].raise_face(f):
+					ev.append(_face_ev(d, f))
+		_:
+			return false
+	return true
+
+## The Catch's second potion: the first unlocked non-healing potion type in content order that
+## the belt doesn't hold yet (Healing Draught when none is unlocked). No Rng: the reward
+## options stay stable for the screen.
+func _second_potion() -> String:
+	var types: Array = run.meta.get("potion_types", [])
+	for t in PotionDefs.IDS:
+		if t != "healing" and types.has(t) and not run.belt.has(t):
+			return t
+	for t in PotionDefs.IDS:
+		if t != "healing" and types.has(t):
+			return t
+	return "healing"
 
 # ================================================================ scenarios (presentation/testing aid)
 

@@ -10,6 +10,10 @@ extends RefCounted
 ## is still accepted and read as a legacy act number (1 crypt, 2 hollow, 3 throne). The three
 ## BlockBits biomes (glade, frost, magma) are dressed in BiomeBlocks.
 ##
+## Each biome keeps a fixed frame (floor / terrain, walls, sky); the rest is seeded dressing
+## (game/world/dressing/: set piece, side / front kits, moat corners, palettes, MultiMesh
+## scatter) picked from `variant_seed`, so the same biome looks different between runs.
+##
 ## Layout contract (world units): the dressing is authored for a 7x7 ring whose outer tile
 ## edge is at |x|,|z| = BASE_EXTENT (7.35). build() scales the layout to the real ring
 ## extent: dressing positions spread out by s = extent / BASE_EXTENT (walls and fences are
@@ -92,7 +96,10 @@ static func seed_of(id: String) -> int:
 	return IDS.find(id) + 1
 
 
-static func build(b: Variant, extent := BASE_EXTENT) -> Node3D:
+## `variant_seed` picks the seeded dressing (set piece, kits, palettes, scatter; see
+## Dressing): the same seed always builds the same board, the game passes one derived from
+## the run seed so every run looks different.
+static func build(b: Variant, extent := BASE_EXTENT, variant_seed := 0) -> Node3D:
 	var id := id_of(b)
 	_s = maxf(extent / BASE_EXTENT, 0.6)
 	var root := Node3D.new()
@@ -105,7 +112,7 @@ static func build(b: Variant, extent := BASE_EXTENT) -> Node3D:
 	var sd := seed_of(id)
 	island.mesh = island_mesh(ISLAND_HALF * _s, 13.0 * sqrt(_s), lk.island_top, lk.island_side, lk.island_bottom, sd * 17)
 	root.add_child(island)
-	_add_floating_rocks(root, lk, sd)
+	_add_floating_rocks(root, lk, sd, 0 if id == "magma" else variant_seed)
 	root.add_child(_lava_sea() if String(lk.get("sea", "clouds")) == "lava" else _cloud_sea(lk))
 	var dressing := Node3D.new()
 	dressing.name = "Dressing"
@@ -113,6 +120,7 @@ static func build(b: Variant, extent := BASE_EXTENT) -> Node3D:
 	var centre := Node3D.new()
 	centre.name = "SetPiece"
 	root.add_child(centre)
+	Dressing.begin(id, variant_seed, _s, extent, dressing)
 	match id:
 		"crypt":
 			_crypt(dressing, centre)
@@ -126,6 +134,7 @@ static func build(b: Variant, extent := BASE_EXTENT) -> Node3D:
 	centre.scale = Vector3.ONE * minf(1.0 + (_s - 1.0) * 1.4, 1.45)
 	if _s > 1.05:
 		_inner_corners(root, id, centre.scale.x)
+	Dressing.finish()
 	var amb := ambient_particles(String(lk.particles))
 	amb.scale = Vector3(_s, 1.0, _s)
 	root.add_child(amb)
@@ -357,13 +366,31 @@ static func _lava_sea() -> MeshInstance3D:
 	return mi
 
 
-static func _add_floating_rocks(root: Node3D, lk: Dictionary, sd: int) -> void:
+## Floating rock islets around the island (background silhouettes). `variant_seed` shifts,
+## resizes and sometimes adds or drops them so the skyline differs between boards (0 = the
+## authored layout).
+static func _add_floating_rocks(root: Node3D, lk: Dictionary, sd: int, variant_seed := 0) -> void:
 	var spots := [Vector3(-15.5, -3.5, -9.0), Vector3(15.0, -5.0, -12.0), Vector3(-13.0, -7.0, 9.0),
 		Vector3(16.5, -2.0, 4.0), Vector3(-6.0, -4.0, -17.0), Vector3(8.0, -6.5, -18.0)]
+	var sizes := [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+	if variant_seed != 0:
+		var rng := RandomNumberGenerator.new()
+		rng.seed = hash([sd, variant_seed, "rocks"])
+		if rng.randf() < 0.5:
+			spots.append(Vector3(rng.randf_range(-4.0, 4.0), -3.0, -19.0))
+			sizes.append(0.0)
+		if rng.randf() < 0.3:
+			spots.remove_at(rng.randi() % 4)
+			sizes.remove_at(0)
+		for i in spots.size():
+			var a := atan2(spots[i].z, spots[i].x) + rng.randf_range(-0.28, 0.28)
+			var r := Vector2(spots[i].x, spots[i].z).length() * rng.randf_range(0.92, 1.1)
+			spots[i] = Vector3(cos(a) * r, spots[i].y + rng.randf_range(-1.5, 1.5), sin(a) * r)
+			sizes[i] = rng.randf_range(-0.25, 0.45)
 	for i in spots.size():
 		spots[i] = Vector3(spots[i].x * _s, spots[i].y, spots[i].z * _s)
 		var mi := MeshInstance3D.new()
-		var h := 0.9 + 0.35 * float(i % 3)
+		var h := 0.9 + 0.35 * float(i % 3) + float(sizes[i])
 		mi.mesh = island_mesh(h, h * 2.2, lk.island_top, lk.island_side, lk.island_bottom, sd * 31 + i)
 		mi.position = spots[i]
 		mi.rotation.y = float(i) * 1.3
@@ -585,36 +612,46 @@ static func _crypt(d: Node3D, c: Node3D) -> void:
 		Props.put(d, D + "torch_mounted.gltf", Vector3(x, 2.2, -9.35))
 		flame(d, Vector3(x, 3.05, -9.05))
 		flicker_light(d, Vector3(x, 3.0, -8.6), Color(1.0, 0.6, 0.28), 2.2, 7.0)
-	Props.put(d, D + "banner_patternA_red.gltf", Vector3(-8.0, 0.2, -9.75))
-	Props.put(d, D + "banner_patternA_red.gltf", Vector3(8.0, 0.2, -9.75))
-	Props.put(d, D + "banner_shield_red.gltf", Vector3(0.0, 0.2, -9.75))
+	# the run's banner colour and patterns (see DressCrypt)
+	var ban := DressCrypt.banners()
+	Props.put(d, DressCrypt.banner_path(ban[0], ban[2]), Vector3(-8.0, 0.2, -9.75))
+	Props.put(d, DressCrypt.banner_path(ban[0], ban[2]), Vector3(8.0, 0.2, -9.75))
+	Props.put(d, DressCrypt.banner_path(ban[1], ban[2]), Vector3(0.0, 0.2, -9.75))
 	# side walls, stepping down toward the camera
 	for side in [-1.0, 1.0]:
 		Props.put(d, D + "wall.gltf", Vector3(side * 9.9, 0.0, -6.0), 90.0)
 		Props.put(d, D + "wall_half.gltf", Vector3(side * 9.9, 0.0, -2.0), 90.0)
 		Props.put(d, D + "wall_broken.gltf", Vector3(side * 9.9, 0.0, 2.0), 90.0)
 		Props.put(d, D + "pillar.gltf", Vector3(side * 9.7, 0.0, -8.0), 90.0)
-		Props.put(d, D + "barrel_large.gltf", Vector3(side * 8.7, 0.0, -8.4), 20.0 * side, 0.75)
-		Props.put(d, D + "crates_stacked.gltf", Vector3(side * 8.6, 0.0, -3.6), 70.0, 0.8)
-		Props.put(d, D + "barrel_small_stack.gltf", Vector3(side * 8.7, 0.0, 0.8), 0.0, 0.8)
 		Props.put(d, D + "column.gltf", Vector3(side * 9.0, 0.0, 8.6))
 		Props.put(d, D + "candle_triple.gltf", Vector3(side * 9.0, 1.4, 8.6))
 		flame(d, Vector3(side * 9.0, 2.3, 8.6), Color(1.0, 0.6, 0.25), 0.22, 6)
 		flicker_light(d, Vector3(side * 9.0, 2.5, 8.6), Color(1.0, 0.6, 0.3), 1.4, 5.0)
-		Props.put(d, D + "box_small.gltf", Vector3(side * 8.7, 0.0, 5.6), 30.0, 0.7)
 		Props.put(d, D + "torch_lit.gltf", Vector3(side * 8.4, 0.4, -6.0))
 		flame(d, Vector3(side * 8.4, 1.1, -6.0))
 		flicker_light(d, Vector3(side * 8.2, 1.6, -6.0), Color(1.0, 0.6, 0.28), 1.8, 6.0)
+		Dressing.occupy(side * 8.4 * _s, -6.0 * _s, 0.5)
+		Dressing.occupy(side * 9.0 * _s, 8.6 * _s, 0.6)
+		Dressing.occupy(side * 9.7 * _s, -8.0 * _s, 0.9)
 	for x in [-6.0, -2.0, 2.0, 6.0]:
 		Props.put(d, D + "barrier.gltf", Vector3(x, 0.0, 10.2), 180.0)
-	Props.put(d, D + "chest_gold.gltf", Vector3(-8.6, 0.0, 4.2), 80.0, 0.6)
-	Props.put(d, D + "coin_stack_medium.gltf", Vector3(-8.7, 0.0, 6.2), 0.0, 0.7)
-	Props.put(d, D + "keg_decorated.gltf", Vector3(8.7, 0.0, 4.4), -60.0, 0.7)
+	# storeroom / library / armoury along the side walls (seeded kits)
+	DressCrypt.sides(d, ban[2])
+	for i in 17:
+		Dressing.occupy((-8.0 + i) * _s, 10.2 * _s, 0.45)
+	DressCrypt.front()
+	match Dressing.kit(0):
+		1:
+			DressCrypt.shrine(c, ban[2])
+			return
+		2:
+			DressCrypt.hoard(c)
+			return
 	# set piece: a stone dais with a giant floating die
 	var dais := Props.put(c, D + "floor_foundation_allsides.gltf", Vector3(0, -1.55, 0), 0.0, 1.0)
 	dais.scale = Vector3(1.7, 1.0, 1.7)
 	for p in [Vector3(-1.5, 0.45, -1.5), Vector3(1.5, 0.45, -1.5), Vector3(-1.5, 0.45, 1.5), Vector3(1.5, 0.45, 1.5)]:
-		Props.put(c, D + "candle_triple.gltf", p, randf() * 360.0, 0.9)
+		Props.put(c, D + "candle_triple.gltf", p, Dressing.rng.randf() * 360.0, 0.9)
 		flame(c, p + Vector3(0, 0.85, 0), Color(1.0, 0.6, 0.25), 0.2, 5)
 	var die := Props.put(c, Props.BGB + "D20_red.gltf", Vector3(0, 2.4, 0), 0.0, 2.1)
 	_spin_bob(die, 2.4)
@@ -630,25 +667,11 @@ static func _hollow(d: Node3D, c: Node3D) -> void:
 	var H := Props.HAL
 	_floor(d, [H + "floor_dirt.gltf"], 0.0, 10.0, 4.0, 3, Color(0.62, 0.46, 0.36, 0.45))
 	for x in [-5.0, 0.5, 5.5]:
-		Props.put(d, H + "fence_seperate_broken.gltf", Vector3(x, 0, 10.1), 180.0 + randf_range(-6.0, 6.0), 0.9)
+		Props.put(d, H + "fence_seperate_broken.gltf", Vector3(x, 0, 10.1), 180.0 + Dressing.rng.randf_range(-6.0, 6.0), 0.9)
 	for p in [Vector3(-3.0, 0, 9.0), Vector3(2.8, 0, 9.3), Vector3(7.6, 0, 9.0)]:
-		Props.put(d, H + "pumpkin_orange_small.gltf", p, randf() * 360.0, 0.9)
-	var trees := [
-		[H + "tree_pine_orange_large.gltf", Vector3(-9.0, 0, -9.4), 1.0],
-		[H + "tree_dead_large.gltf", Vector3(-4.8, 0, -10.0), 1.1],
-		[H + "tree_pine_yellow_large.gltf", Vector3(-1.0, 0, -10.2), 1.0],
-		[H + "tree_pine_orange_medium.gltf", Vector3(3.2, 0, -9.6), 1.0],
-		[H + "tree_dead_large_decorated.gltf", Vector3(6.4, 0, -10.0), 1.0],
-		[H + "tree_pine_yellow_large.gltf", Vector3(9.6, 0, -8.6), 0.95],
-		[H + "tree_pine_orange_medium.gltf", Vector3(-9.8, 0, -4.4), 0.9],
-		[H + "tree_pine_yellow_medium.gltf", Vector3(9.8, 0, -3.6), 0.9],
-		[H + "tree_dead_medium.gltf", Vector3(-9.4, 0, 1.0), 1.0],
-		[H + "tree_pine_orange_small.gltf", Vector3(9.6, 0, 1.6), 1.0],
-		[H + "tree_pine_yellow_small.gltf", Vector3(-9.3, 0, 7.0), 0.9],
-		[H + "tree_pine_orange_small.gltf", Vector3(9.4, 0, 8.0), 0.9],
-	]
-	for t in trees:
-		Props.put(d, t[0], t[1], randf() * 360.0, t[2])
+		Props.put(d, H + "pumpkin_orange_small.gltf", p, Dressing.rng.randf() * 360.0, 0.9)
+	# the tree line (autumn pines / broadleaves / bare snags; see DressHollow)
+	DressHollow.trees(d)
 	for x in [-6.0, -2.0, 2.0]:
 		Props.put(d, H + "fence.gltf", Vector3(x, 0, -8.1))
 	Props.put(d, H + "fence_broken.gltf", Vector3(6.0, 0, -8.1))
@@ -656,14 +679,29 @@ static func _hollow(d: Node3D, c: Node3D) -> void:
 		Props.put(d, H + "fence_seperate.gltf", Vector3(side * 8.2, 0, -5.8), 90.0)
 		Props.put(d, H + "post_lantern.gltf", Vector3(side * 8.3, 0, -1.4), 90.0 if side < 0 else -90.0)
 		flicker_light(d, Vector3(side * 7.8, 2.6, -1.4), Color(1.0, 0.6, 0.25), 2.0, 6.5)
-		Props.put(d, H + "gravestone.gltf", Vector3(side * 8.6, 0, 4.2), -side * 70.0)
-		Props.put(d, H + "grave_A.gltf", Vector3(side * 8.8, 0, -7.2), side * 80.0, 0.9)
 		Props.put(d, H + "pumpkin_orange_jackolantern.gltf", Vector3(side * 8.4, 0, 8.4), side * -30.0, 0.8)
 		flicker_light(d, Vector3(side * 8.4, 0.9, 8.9), Color(1.0, 0.5, 0.15), 1.4, 4.0)
 		Props.put(d, H + "pumpkin_yellow_small.gltf", Vector3(side * 7.8, 0, 9.3), 40.0, 0.9)
 		Props.put(d, H + "lantern_standing.gltf", Vector3(side * 8.3, 0, 6.2), 0.0, 0.9)
 		flicker_light(d, Vector3(side * 8.3, 0.7, 6.2), Color(1.0, 0.65, 0.3), 1.0, 3.0)
 	Props.put(d, H + "arch_gate.gltf", Vector3(0.0, 0, -8.3), 0.0, 0.9)
+	for side in [-1.0, 1.0]:
+		for at in [Vector3(8.2, 0, -5.8), Vector3(8.3, 0, -1.4), Vector3(8.4, 0, 8.4), Vector3(8.3, 0, 6.2)]:
+			Dressing.occupy(side * at.x * _s, at.z * _s, 0.7)
+	for x in [-5.0, 0.5, 5.5]:
+		for i in 4:
+			Dressing.occupy((x - 1.5 + i) * _s, 10.1 * _s, 0.45)
+	for p in [Vector3(-3.0, 0, 9.0), Vector3(2.8, 0, 9.3), Vector3(7.6, 0, 9.0)]:
+		Dressing.occupy(p.x * _s, p.z * _s, 0.5)
+	DressHollow.sides(d)
+	DressHollow.front()
+	match Dressing.kit(0):
+		1:
+			DressHollow.bonfire(c)
+			return
+		2:
+			DressHollow.giant(c)
+			return
 	# set piece: a haunted dead tree over a ring of graves and glowing pumpkins
 	Props.put(c, H + "tree_dead_large_decorated.gltf", Vector3(0.2, 0, -0.6), 20.0, 1.3)
 	Props.put(c, H + "floor_dirt_grave.gltf", Vector3(0.0, -0.49, 0.2), 0.0, 0.55)
@@ -696,25 +734,34 @@ static func _throne(d: Node3D, c: Node3D) -> void:
 	for x in [-10.0, 10.0]:
 		Props.put(d, D + "pillar_decorated.gltf", Vector3(x, 0, -9.4))
 	for side in [-1.0, 1.0]:
-		Props.put(d, H + "tree_dead_large.gltf", Vector3(side * 9.5, 0, -6.4), side * 40.0, 1.0)
-		Props.put(d, H + "post_skull.gltf", Vector3(side * 8.4, 0, -3.0), 0.0, 1.0)
-		Props.put(d, H + "coffin_decorated.gltf", Vector3(side * 8.8, 0, 0.6), 90.0, 0.8)
-		Props.put(d, D + "pillar.gltf", Vector3(side * 9.2, 0, 4.4), 0.0, 0.8)
 		Props.put(d, H + "skull_candle.gltf", Vector3(side * 8.6, 0, 7.8), side * 20.0, 0.9)
 		flame(d, Vector3(side * 8.6, 1.2, 7.8), Color(0.6, 0.4, 1.0), 0.22, 6)
 		flicker_light(d, Vector3(side * 8.6, 1.5, 7.8), Color(0.7, 0.45, 1.0), 1.6, 4.5)
 		Props.put(d, H + "bone_A.gltf", Vector3(side * 8.0, 0, 5.8), 60.0, 0.9)
 		Props.put(d, H + "ribcage.gltf", Vector3(side * 9.2, 0, -8.4), 30.0, 0.9)
-		Props.put(d, H + "shrine_candles.gltf", Vector3(side * 8.4, 0, -8.0), 0.0, 0.9)
 		flicker_light(d, Vector3(side * 8.4, 1.6, -7.6), Color(1.0, 0.6, 0.3), 1.2, 4.0)
+		for at in [Vector3(8.6, 0, 7.8), Vector3(8.0, 0, 5.8), Vector3(9.2, 0, -8.4), Vector3(10.0, 0, -9.4)]:
+			Dressing.occupy(side * at.x * _s, at.z * _s, 0.6)
+	# coffins / war trophies / royal hall along the sides (seeded kits, see DressThrone)
+	DressThrone.sides(d)
+	for p in [Vector3(-4.5, 0, 9.4), Vector3(0.5, 0, 9.8), Vector3(5.0, 0, 9.3), Vector3(-7.0, 0, 9.6), Vector3(7.0, 0, 9.6)]:
+		Dressing.occupy(p.x * _s, p.z * _s, 0.7)
+	DressThrone.front()
 	for p in [Vector3(-4.5, 0, 9.4), Vector3(0.5, 0, 9.8), Vector3(5.0, 0, 9.3)]:
-		Props.put(d, [H + "bone_B.gltf", H + "bone_C.gltf", H + "skull.gltf"][int(absf(p.x)) % 3], p, randf() * 360.0, 0.8)
+		Props.put(d, [H + "bone_B.gltf", H + "bone_C.gltf", H + "skull.gltf"][int(absf(p.x)) % 3], p, Dressing.rng.randf() * 360.0, 0.8)
 	for x in [-7.0, 7.0]:
 		Props.put(d, H + "gravestone.gltf", Vector3(x, 0, 9.6), 180.0 + x * 2.0, 0.8)
+	match Dressing.kit(0):
+		1:
+			DressThrone.bone_throne(c)
+			return
+		2:
+			DressThrone.kings_tomb(c)
+			return
 	# set piece: the crypt with a purple rune circle and candles
 	Props.put(c, H + "crypt.gltf", Vector3(0, 0, 0.1), 0.0, 0.46)
 	for p in [Vector3(-2.2, 0, 1.7), Vector3(2.2, 0, 1.7), Vector3(-2.2, 0, -2.0), Vector3(2.2, 0, -2.0)]:
-		Props.put(c, H + "candle_triple.gltf", p, randf() * 360.0, 1.0)
+		Props.put(c, H + "candle_triple.gltf", p, Dressing.rng.randf() * 360.0, 1.0)
 		flame(c, p + Vector3(0, 0.9, 0), Color(0.65, 0.4, 1.0), 0.2, 5)
 	var ring := _rune_circle(Color(0.6, 0.35, 1.0), 2.8)
 	ring.position = Vector3(0, 0.08, 0.2)
@@ -724,12 +771,11 @@ static func _throne(d: Node3D, c: Node3D) -> void:
 
 ## Larger rings leave a wider moat: low, lit props on its four inner corners keep it
 ## dressed (they sit off the combat lanes and are sunk by the occluder pass if needed).
+## The vignette comes from the board's corner kit (Dressing.kit(2); see game/world/dressing).
 static func _inner_corners(root: Node3D, id: String, k: float) -> void:
 	var holder := Node3D.new()
 	holder.name = "InnerCorners"
 	root.add_child(holder)
-	var D := Props.DUN
-	var H := Props.HAL
 	var r := 3.55 * k
 	for sx in [-1.0, 1.0]:
 		for sz in [-1.0, 1.0]:
@@ -737,20 +783,11 @@ static func _inner_corners(root: Node3D, id: String, k: float) -> void:
 			var yaw := rad_to_deg(atan2(-sx, -sz))
 			match id:
 				"crypt":
-					Props.put(holder, D + "pillar.gltf", p, yaw, 0.32)
-					Props.put(holder, D + "candle_triple.gltf", p + Vector3(0, 1.28, 0), yaw, 0.7)
-					flame(holder, p + Vector3(0, 1.9, 0), Color(1.0, 0.6, 0.25), 0.18, 5)
-					Props.put(holder, D + "barrel_small.gltf", p + Vector3(-sx * 0.75, 0, sz * 0.15), yaw, 0.55)
+					DressCrypt.corner(holder, p, yaw, sx, sz)
 				"hollow":
-					Props.put(holder, H + "pumpkin_orange_jackolantern.gltf", p, yaw, 0.62)
-					Props.put(holder, H + "gravemarker_A.gltf", p + Vector3(-sx * 0.2, 0, -sz * 0.75), yaw + 10.0, 0.7)
-					Props.put(holder, H + "pumpkin_yellow_small.gltf", p + Vector3(-sx * 0.7, 0, sz * 0.1), yaw, 0.7)
-					flicker_light(holder, p + Vector3(0, 0.7, 0), Color(1.0, 0.5, 0.15), 1.2, 3.2)
+					DressHollow.corner(holder, p, yaw, sx, sz)
 				"throne":
-					Props.put(holder, H + "skull_candle.gltf", p, yaw, 0.85)
-					Props.put(holder, H + "bone_B.gltf", p + Vector3(-sx * 0.6, 0, sz * 0.2), yaw + 40.0, 0.7)
-					flame(holder, p + Vector3(0, 1.15, 0), Color(0.62, 0.4, 1.0), 0.18, 5)
-					flicker_light(holder, p + Vector3(0, 1.3, 0), Color(0.65, 0.4, 1.0), 1.2, 3.2)
+					DressThrone.corner(holder, p, yaw, sx, sz)
 				_:
 					BiomeBlocks.inner_corner(id, holder, p, yaw, sx, sz)
 

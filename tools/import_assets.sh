@@ -14,12 +14,29 @@ SRC="$TP/kaykit"
 DST="$ROOT/assets"
 KK="$DST/kaykit"
 
+# Paid packs (*_EXTRA, Mystery Monthly) are optional: a FREE-only store (open-source forks)
+# just skips their content, with one note per absent pack. A missing FREE pack still fails.
+SKIPPED=" "
+absent_paid() { # absent_paid <path>: true (and notes it once) when <path> is in an absent paid pack
+	local rel="${1#"$SRC"/}" pack
+	[ -e "$1" ] && return 1
+	pack="${rel%%/*}"
+	case "$pack" in *_EXTRA | KayKit_Mystery_Monthly_*) ;; *) return 1 ;; esac
+	[ -d "$SRC/$pack" ] && return 1
+	case "$SKIPPED" in *" $pack "*) ;; *)
+		echo "   (no $pack: paid pack absent, skipping its content)"
+		SKIPPED="$SKIPPED$pack " ;;
+	esac
+	return 0
+}
 sync() { # sync <src_dir> <dst_dir> [rsync args...]
 	local s="$1" d="$2"; shift 2
+	absent_paid "$s" && return 0
 	mkdir -p "$d"
 	rsync -a --delete --filter="P *.import" --filter="P *.uid" --filter="P *_texture.png" "$@" "$s/" "$d/"
 }
 lic() { # lic <pack_dir> <dst_dir>
+	absent_paid "$SRC/$1" && return 0
 	cp -f "$SRC/$1/License.txt" "$2/License.txt"
 }
 
@@ -128,7 +145,30 @@ sync "$MM/4 - October 2023 - Werewolf/assets/gltf" "$KK/mystery/werewolf"
 sync "$MM/11 - May 2024 - Clown/assets/gltf" "$KK/mystery/clown"
 sync "$MM/10 - April 2024 - Paladin/assets/gltf" "$KK/mystery/paladin"
 sync "$MM/1 - July 2023 - Orc Raider/assets/gltf" "$KK/mystery/orc" --include='Orc_Wardrum*' --include='*.png' --exclude='*'
-cp -f "$MM/License.txt" "$KK/mystery/License.txt"
+absent_paid "$MM" || cp -f "$MM/License.txt" "$KK/mystery/License.txt"
+
+echo "== KayKit EXTRA props: tile props + rendered UI icons (paid packs; skipped when absent)"
+xsync() { # xsync <pack> <dst> <texture.png> <names...>: copies <name>.gltf/.bin + the texture
+	local pack="$1" d="$2" tex="$3"; shift 3
+	[ -d "$SRC/$pack" ] || { echo "   (no $pack, skipping)"; return 0; }
+	local keep="--include=$tex"
+	for n in "$@"; do keep="$keep --include=$n.gltf --include=$n.bin"; done
+	# shellcheck disable=SC2086
+	sync "$SRC/$pack/Assets/gltf" "$d" $keep --exclude='*'
+	lic "$pack" "$d"
+}
+xsync KayKit_ResourceBits_1.0_EXTRA "$KK/resources" resource_bits_texture.png \
+	Gold_Bars_Stack_Small Gold_Bars_Stack_Medium Gold_Nuggets Gold_Bar Money_Coins_Stack_Large \
+	Money_Coins_Stack_Medium Money_Coins_Stack_Small Money_Pile_Small Gem_Large Gem_Medium Gem_Small \
+	Gems_Pile_Small Gems_Chest Gems_Sack Iron_Bars_Stack_Small Wood_Log_Stack Wood_Log_A \
+	Food_Basket_A_Berries Food_Crate_Small_Berries Food_Cheese Food_Apple_Red Food_Apple_Green
+xsync KayKit_RPGToolsBits_1.0_EXTRA "$KK/tools_x" tools_bits_texture.png \
+	anvil grindstone tongs lantern key_A key_B lock_A lock_B map_rolled
+xsync KayKit_Dungeon_Pack_1.1_EXTRA "$KK/dungeon_x" dungeon_texture.png \
+	chest_large_gold chest_large key_gold candle_triple candle_lit rocks_gold pickaxe_gold
+xsync KayKit_Adventurers_2.0_EXTRA "$KK/potions" druid_texture.png \
+	potion_medium_red potion_medium_blue potion_medium_green potion_large_red
+
 echo "== KayKit Skeletons 1.1 (FREE): the minion's head/jaw/eyes make the Skull Buddy pet"
 SK="KayKit_Skeletons_1.1_FREE"
 sync "$SRC/$SK/characters/gltf" "$KK/skeletons" --include='Skeleton_Minion.glb' --include='*.png' --exclude='*'
@@ -162,8 +202,9 @@ lic "$ADX" "$FOES/adventurers"
 MMS="$SRC/KayKit_Mystery_Monthly_Series_4"
 sync "$MMS/1 - July 2023 - Orc Raider/character" "$FOES/monthly/orc" --include='OrcRaider.glb' --exclude='*'
 sync "$MMS/1 - July 2023 - Orc Raider/textures" "$FOES/monthly/orc/textures"
-sync "$MMS/1 - July 2023 - Orc Raider/assets/gltf" "$FOES/monthly/orc/weapons" --include='Orc_Axe.gltf.glb' --include='Orc_Club.gltf.glb' --exclude='*'
-sync "$MMS/4 - October 2023 - Werewolf/characters/gltf" "$FOES/monthly/werewolf" --include='Werewolf_Wolf.glb' --exclude='*'
+sync "$MMS/1 - July 2023 - Orc Raider/assets/gltf" "$FOES/monthly/orc/weapons" --include='Orc_Axe.gltf.glb' --include='Orc_Club.gltf.glb' \
+	--include='Orc_Wardrum.gltf.glb' --include='Orc_WardrumStick.gltf.glb' --include='Orc_Backpack.gltf.glb' --include='Orc_DrinkingHorn.gltf.glb' --exclude='*'
+sync "$MMS/4 - October 2023 - Werewolf/characters/gltf" "$FOES/monthly/werewolf" --include='Werewolf_Wolf.glb' --include='Werewolf_Man.glb' --exclude='*'
 sync "$MMS/4 - October 2023 - Werewolf/textures" "$FOES/monthly/werewolf/textures"
 sync "$MMS/4 - October 2023 - Werewolf/assets/gltf" "$FOES/monthly/werewolf/weapons" --include='axe.*' --include='werewolf_A.png' --exclude='*'
 sync "$MMS/10 - April 2024 - Paladin/characters/gltf" "$FOES/monthly/paladin" --include='*.glb' --exclude='*'
@@ -172,10 +213,11 @@ sync "$MMS/10 - April 2024 - Paladin/assets/gltf" "$FOES/monthly/paladin/weapons
 	--include='paladin_hammer.*' --include='paladin_shield.*' --include='paladin_texture_A.png' --exclude='*'
 sync "$MMS/8 - February 2024 - Ninja/character" "$FOES/monthly/ninja" --include='Ninja.glb' --exclude='*'
 sync "$MMS/8 - February 2024 - Ninja/texture" "$FOES/monthly/ninja/textures"
-sync "$MMS/8 - February 2024 - Ninja/assets/gltf" "$FOES/monthly/ninja/weapons" --include='Ninja_Katana.*' --include='ninja_texture_A.png' --exclude='*'
-sync "$MMS/3 - September 2023 - Monster Costume/character/gltf" "$FOES/monthly/monster" --include='Monster.glb' --exclude='*'
+sync "$MMS/8 - February 2024 - Ninja/assets/gltf" "$FOES/monthly/ninja/weapons" --include='Ninja_Katana.*' --include='Ninja_Shuriken.*' --include='ninja_texture_A.png' --exclude='*'
+sync "$MMS/3 - September 2023 - Monster Costume/character/gltf" "$FOES/monthly/monster" --include='Monster.glb' \
+	--include='MonsterCostume.glb' --exclude='*'
 sync "$MMS/3 - September 2023 - Monster Costume/textures" "$FOES/monthly/monster/textures" --include='monstercostume_texture_*.png' --exclude='*'
-cp -f "$MMS/License.txt" "$FOES/monthly/License.txt"
+absent_paid "$MMS" || cp -f "$MMS/License.txt" "$FOES/monthly/License.txt"
 FWX="KayKit_FantasyWeaponsBits_1.0_EXTRA"
 fwx_keep=""
 for w in axe_D dagger_C hammer_D scythe shield_D spear_B staff_C staff_D sword_F sword_G wand_B; do
@@ -185,20 +227,109 @@ done
 sync "$SRC/$FWX/Assets/gltf" "$FOES/weapons" $fwx_keep --include='*.png' --exclude='*'
 lic "$FWX" "$FOES/weapons"
 
-echo "== Music beds (mixkit, re-encoded to 96 kbps mp3 to keep the repo lean)"
+echo "== KayKit Forest Nature (EXTRA): trees, bare trees, bushes, rocks, grass (biome dressing)"
+# All colours share one atlas (forest_texture.png), so the kept colours go into one folder.
+# Colour1 green, 2 deep green, 3 lime, 4 teal, 5 gold, 6 orange (7 red / 8 pink unused).
+FOR="$SRC/KayKit_Forest_Nature_Pack_1.0_EXTRA/Assets/gltf"
+absent_paid "$FOR" || { mkdir -p "$KK/forest"; rsync -a --delete --filter="P *.import" --filter="P *.uid" \
+	--include='Tree_[1-7]_*' --include='Tree_Bare_*' --include='Bush_[1-4]_*' --include='Rock_[1-6]_*' \
+	--include='Grass_[12]_[A-D]_Color?.*' --include='forest_texture.png' --exclude='*' \
+	"$FOR/Color1/" "$FOR/Color2/" "$FOR/Color3/" "$FOR/Color4/" "$FOR/Color5/" "$FOR/Color6/" "$KK/forest/"; }
+lic "KayKit_Forest_Nature_Pack_1.0_EXTRA" "$KK/forest"
+
+echo "== KayKit Dungeon (EXTRA): banners, furniture, props (no walls / floors / stairs)"
+sync "$SRC/KayKit_Dungeon_Pack_1.1_EXTRA/Assets/gltf" "$KK/dungeon_x" \
+	--exclude='wall*' --exclude='floor_*' --exclude='stairs*' --exclude='ceiling*' --exclude='bar_*' \
+	--exclude='bartop_*' --exclude='bed_*' --exclude='scaffold_beam*'
+lic "KayKit_Dungeon_Pack_1.1_EXTRA" "$KK/dungeon_x"
+
+echo "== KayKit ResourceBits (EXTRA): crates, piles, ores, bars, food, logs"
+sync "$SRC/KayKit_ResourceBits_1.0_EXTRA/Assets/gltf" "$KK/resources" \
+	--exclude='Money_Bill*' --exclude='Pallet_Plastic_*' --exclude='Fuel_*' --exclude='Money_Coins_Stack_Single*'
+lic "KayKit_ResourceBits_1.0_EXTRA" "$KK/resources"
+
+echo "== KayKit RPG Tools (EXTRA), Fantasy Weapons (EXTRA), Skeleton props (EXTRA)"
+sync "$SRC/KayKit_RPGToolsBits_1.0_EXTRA/Assets/gltf" "$KK/tools_x" \
+	--exclude='fishing_*' --exclude='pencil_*' --exclude='screw*' --exclude='blueprint*' --exclude='*blueprint.png' \
+	--exclude='drafting_*' --exclude='compass_*' --exclude='lockpick_*' --exclude='nail*' --exclude='journal_*'
+lic "KayKit_RPGToolsBits_1.0_EXTRA" "$KK/tools_x"
+sync "$SRC/KayKit_FantasyWeaponsBits_1.0_EXTRA/Assets/gltf" "$KK/weapons_x"
+lic "KayKit_FantasyWeaponsBits_1.0_EXTRA" "$KK/weapons_x"
+sync "$SRC/KayKit_Skeletons_1.1_EXTRA/assets/gltf" "$KK/skeleton_props"
+lic "KayKit_Skeletons_1.1_EXTRA" "$KK/skeleton_props"
+
+echo "== KayKit Mystery Monthly S4 set pieces (orc war drum, woodcutter logs, paladin statue)"
+MYS="$SRC/KayKit_Mystery_Monthly_Series_4"
+sync "$MYS/1 - July 2023 - Orc Raider/assets/gltf" "$KK/mystery/orc" --include='Orc_Wardrum*' --include='Orc_Axe*' \
+	--include='Orc_Club*' --include='Orc_Backpack*' --include='Orc_DrinkingHorn*' --exclude='*'
+sync "$MYS/4 - October 2023 - Werewolf/assets/gltf" "$KK/mystery/woodcutter"
+sync "$MYS/10 - April 2024 - Paladin/assets/gltf" "$KK/mystery/paladin" --include='paladin_statue*' \
+	--include='paladin_texture_A.png' --exclude='*'
+cp -f "$MYS/License.txt" "$KK/mystery/License.txt" 2>/dev/null || true
+echo "== Minigames (WP-E2): dig treasures, claw prizes, dig tools (EXTRA packs: never commit these)"
+RB="KayKit_ResourceBits_1.0_EXTRA"
+rb_keep=""
+for f in Gem_Large Gem_Medium Gem_Small Gems_Pile_Small Gems_Chest Money_Pile_Small Money_Coins_Stack_Medium Gold_Nugget_Large; do
+	rb_keep="$rb_keep --include=$f.gltf --include=$f.bin"
+done
+# shellcheck disable=SC2086
+sync "$SRC/$RB/Assets/gltf" "$KK/resources" $rb_keep --include='resource_bits_texture.png' --exclude='*'
+lic "$RB" "$KK/resources"
+TX="KayKit_RPGToolsBits_1.0_EXTRA"
+tx_keep=""
+for f in pickaxe magnifying_glass map_rolled trowel lantern shovel; do
+	tx_keep="$tx_keep --include=$f.gltf --include=$f.bin"
+done
+# shellcheck disable=SC2086
+sync "$SRC/$TX/Assets/gltf" "$KK/tools_extra" $tx_keep --include='tools_bits_texture.png' --exclude='*'
+lic "$TX" "$KK/tools_extra"
+MM="KayKit_Mystery_Monthly_Series_4"
+sync "$SRC/$MM/11 - May 2024 - Clown/assets/gltf" "$KK/mystery/clown" --include='balloon_dog_*' --include='clown_ball.*' \
+	--include='clown_texture.png' --exclude='*'
+if ! absent_paid "$SRC/$MM"; then
+	mkdir -p "$KK/mystery/figures"
+	cp -f "$SRC/$MM/12 - June 2024 - Robot/characters/Robot_One.glb" "$KK/mystery/figures/Robot_One.glb"
+	cp -f "$SRC/$MM/6 - December 2023 - Action Figure/character/gltf/ActionFigure.glb" "$KK/mystery/figures/ActionFigure.glb"
+fi
+lic "$MM" "$KK/mystery"
+
+echo "== Music beds (CC0, OpenGameArt: RandomMind + cynicmusic) -> mp3, -16 LUFS"
+# out name | source dir under third_party/music | source file | trim (1 = strip leading/trailing
+# silence from full-length tracks; 0 = author's seamless loop version, left untouched).
+# Two-pass loudnorm (linear) to -16 LUFS integrated, -1.5 dBTP, then LAME VBR q4 (~165 kbps;
+# the LAME tag's delay/padding keeps loops gapless in Godot). Homebrew ffmpeg has no libvorbis.
 MUS="$DST/audio/music"
 mkdir -p "$MUS"
-for name in zanarkand-forest-169 spirit-in-the-woods-2-147 ambient-251 vastness-184 nature-meditation-345; do
-	in="$TP/music/mixkit/mixkit-$name.mp3"
-	out="$MUS/mixkit-$name.mp3"
-	[ -f "$in" ] || { echo "missing $in" >&2; exit 1; }
-	if [ ! -f "$out" ] || [ "$in" -nt "$out" ]; then
-		if command -v ffmpeg >/dev/null; then
-			ffmpeg -loglevel error -y -i "$in" -vn -c:a libmp3lame -b:a 96k "$out"
-		else
-			cp -f "$in" "$out"
-		fi
-	fi
+command -v ffmpeg >/dev/null || { echo "ffmpeg is required to import music" >&2; exit 1; }
+keep=" "
+while IFS='|' read -r name dir file trim; do
+	in="$TP/music/$dir/$file"
+	out="$MUS/$name.mp3"
+	keep="$keep$name.mp3 $name.mp3.import "
+	# a missing track only mutes that bed
+	[ -f "$in" ] || { echo "   warning: missing $in (that music bed stays silent)" >&2; continue; }
+	[ -f "$out" ] && [ ! "$in" -nt "$out" ] && continue
+	pre="anull"
+	[ "$trim" = 1 ] && pre="silenceremove=start_periods=1:start_threshold=-60dB,areverse,silenceremove=start_periods=1:start_threshold=-60dB,areverse"
+	m="$(ffmpeg -nostdin -hide_banner -nostats -i "$in" -af "$pre,loudnorm=I=-16:TP=-1.5:LRA=11:print_format=json" -f null - 2>&1)"
+	j() { echo "$m" | sed -n "s/.*\"$1\" : \"\([^\"]*\)\".*/\1/p" | tail -1; }
+	ln="loudnorm=I=-16:TP=-1.5:LRA=11:linear=true:measured_I=$(j input_i):measured_TP=$(j input_tp)"
+	ln="$ln:measured_LRA=$(j input_lra):measured_thresh=$(j input_thresh):offset=$(j target_offset)"
+	ffmpeg -nostdin -loglevel error -y -i "$in" -vn -af "$pre,$ln" -ar 44100 -c:a libmp3lame -q:a 4 "$out"
+done <<'EOF'
+bards-tale|randommind|Loop_The_Bards_Tale.wav|0
+old-tower-inn|randommind|Loop_The_Old_Tower_Inn.wav|0
+harvest-season|randommind|harvestseason.wav|1
+lament-for-a-warriors-soul|randommind|Lament_for_a_Warriors_Soul_REUPLOAD.mp3|1
+rising-moon|randommind|Rising_Moon_0.mp3|1
+medieval-battle|randommind|battle_1.wav|1
+dark-forest|cynicmusic|GameMusic_ForestTheme_24_0.mp3|1
+battle-theme-b|cynicmusic|battleThemeB.mp3|1
+battle-theme-a|cynicmusic|battleThemeA.mp3|1
+EOF
+# drop any retired beds so they can't ship in an export
+for f in "$MUS"/*; do
+	case "$keep" in *" ${f##*/} "*) ;; *) rm -f "$f" ;; esac
 done
 
 if [ "${1:-}" = "--fetch" ]; then

@@ -1,20 +1,37 @@
 class_name ClawMachine
 extends Minigame
-## Claw Machine: a row of 5 visible prizes, each {pos (centre, 0..1), width (hitbox), kind,
-## points}. The UI runs the deterministic swing and sends the drop point as action args
-## [position: float 0..1]. The claw grabs the prize whose hitbox contains the point (closest
-## centre wins); no hidden slip, so the result depends only on the input. 2 grabs.
-## Kinds (better = narrower, the legendary sits at the bottom of the pile visually):
-## small 3 pts / 0.18 wide, medium 5 / 0.14, big 8 / 0.10, legendary 12 / 0.06.
-## Score = points grabbed.
+## Claw Machine (capsule pile, user direction): the cabinet holds a pile of BALLS capsules,
+## each with a prize inside. Public per ball: {pos (x, 0..1), depth (0 = top of the pile ..
+## 1 = bottom), tier (common / rare / epic / legendary: the capsule's colour), taken}. What is
+## inside is HIDDEN until the ball is won (contents come from the minigame Rng at setup).
+## GRABS grabs; action args [position: float 0..1] (the UI's deterministic sweep).
+## A grab scoops up to MAX_HOLD balls: every ball whose reach contains the point, the reach
+## shrinking with depth (REACH * (1 - DEEP * depth), so the deep ones need a centred drop),
+## closest first. On the lift each held ball may slip out: chance SLIP_PER_BALL per extra
+## ball held + SLIP_DEPTH * its depth (rolled from the minigame Rng, so a save resumes
+## identically). Won balls open in the tray; score = the points inside them.
 
-const GRABS := 2
-const KINDS := ["small", "small", "medium", "big", "legendary"]
-const POINTS := {"small": 3, "medium": 5, "big": 8, "legendary": 12}
-const WIDTH := {"small": 0.18, "medium": 0.14, "big": 0.10, "legendary": 0.06}
-const JITTER := 0.03
+const GRABS := 3
+const BALLS := 18
+const MAX_HOLD := 3
+const REACH := 0.075
+const DEEP := 0.8
+const SLIP_PER_BALL := 0.14
+const SLIP_DEPTH := 0.22
+## Tier counts, depth ranges [min, max] and contents [[kind, points], ...] (one is drawn).
+const TIERS := ["common", "rare", "epic", "legendary"]
+const TIER_COUNT := {"common": 10, "rare": 5, "epic": 2, "legendary": 1}
+const TIER_DEPTH := {"common": [0.0, 0.55], "rare": [0.15, 0.7], "epic": [0.45, 0.8], "legendary": [0.78, 0.95]}
+const CONTENTS := {
+	"common": [["coins", 3], ["potion", 3], ["coins", 4]],
+	"rare": [["nugget", 4], ["gem", 5]],
+	"epic": [["figure", 6], ["robot", 6]],
+	"legendary": [["chest", 8]],
+}
 
-var prizes: Array[Dictionary] = []
+## Public part per ball + the hidden contents (kind, points) in a parallel array.
+var balls: Array[Dictionary] = []
+var contents: Array[Dictionary] = []
 var grabs: Array[Dictionary] = []
 
 func _init() -> void:
@@ -22,71 +39,102 @@ func _init() -> void:
 
 func _setup() -> void:
 	actions_left = GRABS
-	var kinds := KINDS.duplicate()
-	rng.shuffle(kinds)
-	prizes.clear()
-	for k in kinds.size():
-		var kind := String(kinds[k])
-		var centre := (k + 0.5) / kinds.size() + (rng.randf() * 2.0 - 1.0) * JITTER
-		prizes.append({"pos": snappedf(centre, 0.001), "width": float(WIDTH[kind]), "kind": kind,
-			"points": int(POINTS[kind]), "taken": false})
+	balls.clear()
+	contents.clear()
+	var tiers: Array = []
+	for t in TIERS:
+		for k in int(TIER_COUNT[t]):
+			tiers.append(t)
+	rng.shuffle(tiers)
+	for k in tiers.size():
+		var t := String(tiers[k])
+		var dr: Array = TIER_DEPTH[t]
+		var pos := 0.04 + 0.92 * (k + rng.randf()) / tiers.size()
+		balls.append({"pos": snappedf(pos, 0.001), "depth": snappedf(lerpf(float(dr[0]), float(dr[1]), rng.randf()), 0.01),
+			"tier": t, "taken": false})
+		var opts: Array = CONTENTS[t]
+		var c: Array = opts[rng.randi_range(0, opts.size() - 1)]
+		contents.append({"kind": String(c[0]), "points": int(c[1])})
 	grabs.clear()
 
-## Index of the prize under `x` (closest centre whose hitbox contains x), or -1.
-func prize_at(x: float) -> int:
-	var best := -1
-	var best_d := INF
-	for i in prizes.size():
-		var p: Dictionary = prizes[i]
-		if bool(p.taken):
+## Reach of the claw for a ball (half width around its centre).
+static func reach_of(b: Dictionary) -> float:
+	return REACH * (1.0 - DEEP * float(b.get("depth", 0.0)))
+
+## The balls a drop at `x` scoops (public data only: positions and depths), closest first,
+## at most MAX_HOLD.
+static func scoop(pub_balls: Array, x: float) -> Array:
+	var cand: Array = []
+	for i in pub_balls.size():
+		var b: Dictionary = pub_balls[i]
+		if bool(b.get("taken", false)):
 			continue
-		var d := absf(float(p.pos) - x)
-		if d <= float(p.width) / 2.0 and d < best_d:
-			best_d = d
-			best = i
-	return best
+		var d := absf(float(b.pos) - x)
+		if d <= reach_of(b):
+			cand.append([d, i])
+	cand.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0] or (a[0] == b[0] and a[1] < b[1]))
+	var out: Array = []
+	for c in cand.slice(0, MAX_HOLD):
+		out.append(int(c[1]))
+	return out
 
 func _action(args: Array) -> Dictionary:
 	if args.is_empty():
 		return {"error": "drop needs [position]"}
-	var x := clampf(float(args[0]), 0.0, 1.0)
+	var x := snappedf(clampf(float(args[0]), 0.0, 1.0), 0.001)
 	actions_left -= 1
-	var i := prize_at(x)
-	var info := {"x": x, "prize": i, "grabbed": i >= 0}
-	if i >= 0:
-		prizes[i].taken = true
-		info["kind"] = String(prizes[i].kind)
-	grabs.append(info.duplicate())
+	var held := scoop(balls, x)
+	var won: Array = []
+	var slipped: Array = []
+	for i in held:
+		var p := SLIP_PER_BALL * (held.size() - 1) + SLIP_DEPTH * float(balls[i].depth)
+		if rng.randf() < p:
+			slipped.append(i)
+		else:
+			balls[i].taken = true
+			won.append({"ball": i, "kind": String(contents[i].kind), "points": int(contents[i].points), "tier": String(balls[i].tier)})
+	var info := {"x": x, "held": held, "won": won, "slipped": slipped}
+	grabs.append({"x": x, "held": held.duplicate(), "won": won.duplicate(true), "slipped": slipped.duplicate()})
 	return {"info": info}
 
 func score() -> float:
 	var s := 0
-	for p in prizes:
-		if bool(p.taken):
-			s += int(p.points)
+	for i in balls.size():
+		if bool(balls[i].taken):
+			s += int(contents[i].points)
 	return float(s)
 
-## Centre of the best prize still in the machine (bot / AUTO aim), or -1.0.
+## Centre of the most valuable-looking ball left (bot / AUTO aim), or -1.0.
 func best_target() -> float:
 	var best := -1
-	for i in prizes.size():
-		if not bool(prizes[i].taken) and (best < 0 or int(prizes[i].points) > int(prizes[best].points)):
+	for i in balls.size():
+		if not bool(balls[i].taken) and (best < 0 or TIERS.find(balls[i].tier) > TIERS.find(balls[best].tier)):
 			best = i
-	return float(prizes[best].pos) if best >= 0 else -1.0
+	return float(balls[best].pos) if best >= 0 else -1.0
 
 func _public() -> Dictionary:
-	return {"prizes": prizes.duplicate(true), "grabs": grabs.duplicate(true)}
+	# contents only for balls already won (they were opened in the tray)
+	var won: Array = []
+	for g in grabs:
+		won.append_array(g.won)
+	return {"balls": balls.duplicate(true), "grabs": grabs.duplicate(true), "won": won}
 
 func _save() -> Dictionary:
-	return {"prizes": prizes.duplicate(true), "grabs": grabs.duplicate(true)}
+	return {"balls": balls.duplicate(true), "contents": contents.duplicate(true), "grabs": grabs.duplicate(true)}
 
 func _load(d: Dictionary) -> void:
-	prizes.clear()
-	for p in d.get("prizes", []):
-		prizes.append({"pos": float(p.pos), "width": float(p.width), "kind": String(p.kind), "points": int(p.points), "taken": bool(p.taken)})
+	balls.clear()
+	for b in d.get("balls", []):
+		# re-snap: JSON round trips must give back the exact doubles the rules compare
+		balls.append({"pos": snappedf(float(b.pos), 0.001), "depth": snappedf(float(b.depth), 0.01), "tier": String(b.tier),
+			"taken": bool(b.taken)})
+	contents.clear()
+	for c in d.get("contents", []):
+		contents.append({"kind": String(c.kind), "points": int(c.points)})
 	grabs.clear()
 	for q in d.get("grabs", []):
-		var g := {"x": float(q.x), "prize": int(q.prize), "grabbed": bool(q.grabbed)}
-		if q.has("kind"):
-			g["kind"] = String(q.kind)
-		grabs.append(g)
+		var won: Array = []
+		for w in q.get("won", []):
+			won.append({"ball": int(w.ball), "kind": String(w.kind), "points": int(w.points), "tier": String(w.get("tier", ""))})
+		grabs.append({"x": snappedf(float(q.x), 0.001), "held": Minigame.ints(q.get("held", [])), "won": won,
+			"slipped": Minigame.ints(q.get("slipped", []))})

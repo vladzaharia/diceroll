@@ -145,6 +145,7 @@ func show_title() -> void:
 	var b := Board.generate(rng, 1)
 	board.hero_class = HeroDefs.IDS[randi() % HeroDefs.IDS.size()]
 	board.hero_idx = 0
+	board.variant_seed = randi()
 	board.build(1, b.to_dict().tiles)
 	board.clear_targets()
 	_title_t = 0.0
@@ -201,6 +202,7 @@ func start(f: GameFlow) -> void:
 
 	board.hero_idx = f.run.pos
 	EnemyLooks.run_seed = f.run.seed  # per-run enemy variants
+	board.variant_seed = hash([f.run.seed, f.run.biome()])
 	board.build(f.run.biome(), f.run.board.to_dict().tiles)
 	if f.phase == GameFlow.Phase.BOARD_READY:
 		rig.home(board.hero, true)
@@ -216,7 +218,8 @@ func start(f: GameFlow) -> void:
 		show_move_target(t, steps if steps > 0 or f.board_move == 0 else f.run.board.size(), f.is_board_double())
 	if f.phase == GameFlow.Phase.PORTAL:
 		player._show_portal(f.offer)
-	Audio.play_music(f.run.biome())
+	var boss_fight := f.phase == GameFlow.Phase.COMBAT and f.combat != null and f.combat.boss
+	Audio.play_music("boss" if boss_fight else f.run.biome())
 	overlay.set_black(true)
 	overlay.fade_in(0.5)
 	if f.phase == GameFlow.Phase.COMBAT and f.combat != null:
@@ -509,7 +512,7 @@ func _boss_intro(tile: int, enemies: Array) -> void:
 		await get_tree().process_frame
 	stage.reframe()
 	overlay.vignette(0.0, 0.8)
-	Audio.play_music(flow.run.biome(), 1.2)
+	Audio.play_music("boss", 1.2)
 	ui.combat_hud.visible = true
 	ui.combat_hud.modulate.a = 0.0
 	var ht := ui.combat_hud.create_tween()
@@ -543,6 +546,8 @@ func end_combat(ev: Dictionary) -> void:
 	var title := "VICTORY"
 	if bool(ev.get("boss", false)):
 		title = "BOSS DEFEATED!"
+		if flow:
+			Audio.play_music(flow.run.biome(), 1.5)
 	elif bool(ev.get("miniboss", false)):
 		title = "MINI-BOSS SLAIN!"
 	overlay.announce(title, "  ·  ".join(parts), UiPalette.GOLD_BRIGHT, 0.9)
@@ -574,6 +579,7 @@ func change_biome(ev: Dictionary) -> void:
 	var centre := hero_screen(0.8) / Vector2(maxf(vs.x, 1.0), maxf(vs.y, 1.0))
 	await overlay.dissolve(true, Color(look.sky_top).lerp(Color(look.sky_glow), 0.25), Color(look.sky_glow), 0.7, centre)
 	board.hero_idx = pos
+	board.variant_seed = hash([flow.run.seed, bid])
 	board.build(bid, tiles)
 	board.hide_tiles()
 	rig.overview(board.ring_bounds(), true)
@@ -721,30 +727,18 @@ static func _seg_dist(p: Vector2, a: Vector2, b: Vector2) -> float:
 
 func _layout_tray() -> void:
 	var vs := get_viewport().get_visible_rect().size
-	var th := UiTheme.tray_height(vs)
-	var w := UiTheme.tray_width(vs)
-	tray.position = Vector2((vs.x - w) * 0.5, vs.y - th + 4.0)
-	tray.size = Vector2(w, th - 16.0)
+	var r := UiTheme.tray_rect(vs, UiTheme.safe_margins(tray))
+	tray.position = r.position
+	tray.size = r.size
 	_update_combat_rect()
 
 
-## Keeps the combat framing between the top HUD and the combat panel above the tray.
+## The camera frames the board / fight in the space the HUD leaves, measured live.
 func _update_combat_rect() -> void:
-	var vs := get_viewport().get_visible_rect().size
-	if vs.y <= 0.0 or ui == null:
+	if ui == null or rig.insets_source.is_valid():
 		return
-	var bottom := (ui.combat_hud.content_top(vs) - 14.0) / vs.y
-	if vs.y > vs.x:
-		var top := 0.12
-		rig.combat_rect_portrait = Rect2(0.05, top, 0.9, maxf(bottom - top, 0.3))
-
-	else:
-		# the bottom controls sit beside the tray: the world gets everything above it
-		var top := 0.1
-		rig.combat_rect_landscape = Rect2(0.1, top, 0.8, maxf(bottom - top, 0.3))
-		var bar_top := (ui.board_hud.content_top(vs) - 6.0) / vs.y
-		rig.safe_rect_landscape = Rect2(0.12, 0.09, 0.76, maxf(bar_top - 0.09, 0.3))
-
+	rig.insets_source = func() -> Dictionary:
+		return ScreenInsets.measure(ui, get_viewport().get_visible_rect().size)
 
 
 func _process(dt: float) -> void:

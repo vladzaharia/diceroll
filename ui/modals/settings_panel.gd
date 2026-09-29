@@ -2,6 +2,9 @@ class_name SettingsPanel
 extends UiModal
 ## Settings: Master / Music / SFX volume (via the Audio autoload, which persists them) and
 ## game speed 1× / 2× / 4× (persisted in user://settings.cfg [game] speed).
+## UI size 90 / 100 / 115 / 130 % (accessibility; [display] ui_size) scales the whole 2D UI
+## via the window's content_scale_factor; every layout (HUD column, tray, camera framing)
+## adapts to the resulting logical canvas.
 ## Emits speed_changed(speed) and closed (from UiModal) when DONE is pressed.
 
 signal speed_changed(speed: float)
@@ -10,10 +13,13 @@ signal auto_settings_pressed
 
 const CFG := "user://settings.cfg"
 const SPEEDS := [1.0, 2.0, 4.0]
+const UI_SIZES := [0.9, 1.0, 1.15, 1.3]
 
 var _sliders: Dictionary = {}
 var _values: Dictionary = {}
 var _speed_btns: Array[GameButton] = []
+var _size_btns: Array[GameButton] = []
+var _update_btn: GameButton
 
 
 static func game_speed() -> float:
@@ -28,6 +34,39 @@ static func set_game_speed(v: float) -> void:
 	cfg.load(CFG)
 	cfg.set_value("game", "speed", v)
 	cfg.save(CFG)
+
+
+static func ui_size() -> float:
+	# screenshot runs are deterministic: saved value ignored, `--ui-size=F` overrides
+	var args := OS.get_cmdline_user_args()
+	for a in args:
+		if a.begins_with("--ui-size="):
+			return clampf(float(a.substr(10)), 0.5, 2.0)
+	for a in args:
+		if a.begins_with("--scenario="):
+			return 1.0
+	var cfg := ConfigFile.new()
+	if cfg.load(CFG) != OK:
+		return 1.0
+	return clampf(float(cfg.get_value("display", "ui_size", 1.0)), 0.5, 2.0)
+
+
+static func set_ui_size(v: float) -> void:
+	var cfg := ConfigFile.new()
+	cfg.load(CFG)
+	cfg.set_value("display", "ui_size", v)
+	cfg.save(CFG)
+
+
+## Applies the saved UI size to `win` on top of its base content scale (the first call
+## remembers the base, so OS / harness scaling is kept).
+static func apply_ui_size(win: Window, v: float = -1.0) -> void:
+	if win == null:
+		return
+	if not win.has_meta("ui_base_scale"):
+		win.set_meta("ui_base_scale", win.content_scale_factor)
+	var k := ui_size() if v <= 0.0 else v
+	win.content_scale_factor = float(win.get_meta("ui_base_scale")) * k
 
 
 func _build() -> void:
@@ -51,6 +90,23 @@ func _build() -> void:
 		b.pressed.connect(_set_speed.bind(s))
 		sp.add_child(b)
 		_speed_btns.append(b)
+	# UI size (one compact row, like game speed)
+	var zr := UiTheme.hbox(10)
+	body.add_child(zr)
+	zr.add_child(UiIcons.rect("plus", 40, UiPalette.GOLD))
+	var zl := UiTheme.label("UI size", 30, UiPalette.TEXT, true, 0)
+	zl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	zr.add_child(zl)
+	for z in UI_SIZES:
+		var b := GameButton.make("%d%%" % int(round(z * 100.0)), "", GameButton.Kind.SECONDARY, 24)
+		b.toggle_mode = true
+		b.toggle_primary = true
+		b.min_height = 72
+		b.pad_x = 10
+		b.pressed.connect(_set_ui_size.bind(z))
+		zr.add_child(b)
+		_size_btns.append(b)
+	body.add_child(_update_row())
 	var auto := GameButton.make("AUTO SETTINGS", "auto", GameButton.Kind.SECONDARY, 28)
 	auto.icon_tint = AutoButton.ACCENT
 	auto.min_height = 84
@@ -94,6 +150,36 @@ func _volume_row(bus: String, icon: String) -> Control:
 	return col
 
 
+## Auto-update toggle ([update] auto, owned by the Updater autoload) + manual "CHECK".
+func _update_row() -> Control:
+	var r := UiTheme.hbox(10)
+	r.add_child(UiIcons.rect("gear", 40, UiPalette.GOLD))
+	var l := UiTheme.label("Auto-update", 30, UiPalette.TEXT, true, 0)
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	r.add_child(l)
+	_update_btn = GameButton.make("ON", "", GameButton.Kind.SECONDARY, 24)
+	_update_btn.toggle_mode = true
+	_update_btn.toggle_primary = true
+	_update_btn.min_height = 72
+	_update_btn.pad_x = 14
+	_update_btn.toggled.connect(func(on: bool) -> void:
+		_updater().call("set_auto_enabled", on)
+		_update_btn.text = "ON" if on else "OFF")
+	r.add_child(_update_btn)
+	var chk := GameButton.make("CHECK", "", GameButton.Kind.SECONDARY, 24)
+	chk.min_height = 72
+	chk.pad_x = 14
+	chk.pressed.connect(func() -> void: _updater().call("check_now", true))
+	r.add_child(chk)
+	var up := _updater()
+	r.visible = up != null and bool(up.call("can_check"))
+	return r
+
+
+func _updater() -> Node:
+	return (Engine.get_main_loop() as SceneTree).root.get_node_or_null("Updater")
+
+
 func refresh(_flow: GameFlow = null) -> void:
 	var a := _audio()
 	for bus in _sliders:
@@ -104,6 +190,15 @@ func refresh(_flow: GameFlow = null) -> void:
 	for i in _speed_btns.size():
 		_speed_btns[i].set_pressed_no_signal(is_equal_approx(sp, SPEEDS[i]))
 		_speed_btns[i].call("_refresh")
+	if _update_btn:
+		var on: bool = _update_btn.get_parent().visible and bool(_updater().call("is_auto_enabled"))
+		_update_btn.set_pressed_no_signal(on)
+		_update_btn.text = "ON" if on else "OFF"
+		_update_btn.call("_refresh")
+	var us := ui_size()
+	for i in _size_btns.size():
+		_size_btns[i].set_pressed_no_signal(is_equal_approx(us, UI_SIZES[i]))
+		_size_btns[i].call("_refresh")
 
 
 func _set_speed(s: float) -> void:
@@ -112,10 +207,17 @@ func _set_speed(s: float) -> void:
 	speed_changed.emit(s)
 
 
+func _set_ui_size(z: float) -> void:
+	set_ui_size(z)
+	apply_ui_size(get_window(), z)
+	refresh()
+
+
 func _audio() -> Node:
 	return get_tree().root.get_node_or_null("Audio") if is_inside_tree() else null
 
 
 func _ready() -> void:
 	super._ready()
+	apply_ui_size(get_window())
 	refresh()

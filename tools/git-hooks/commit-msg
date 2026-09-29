@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Conventional Commits check (docs/CONVENTIONAL_COMMITS.md).
+# Enable: git config core.hooksPath tools/git-hooks
+msg="$(head -1 "$1")"
+types='feat|fix|perf|balance|refactor|docs|test|build|ci|chore|style|revert'
+if [[ "$msg" =~ ^(${types})(\([a-z0-9._/-]+\))?!?:\ .+ ]] || [[ "$msg" =~ ^(Merge|Revert|fixup!|squash!) ]]; then
+	exit 0
+fi
+echo "commit-msg: '$msg' is not a Conventional Commit: <type>(<scope>)?: <summary>" >&2
+echo "  types: ${types//|/, }  (see docs/CONVENTIONAL_COMMITS.md)" >&2
+exit 1

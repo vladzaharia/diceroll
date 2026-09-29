@@ -35,6 +35,8 @@ var tiles: Array = []
 var hero: Character
 var hero_class := "knight"
 var hero_idx := 0
+## Seeds the biome's dressing variant (set before build(); see Biome.build / Dressing).
+var variant_seed := 0
 var biome: Node3D
 
 var _tiles_root: Node3D
@@ -73,7 +75,7 @@ func build(p_biome: Variant, p_tiles: Array) -> void:
 	side = ring_size / 4 + 1
 	for i in ring_size:
 		tiles.append(_norm(p_tiles[i] if i < p_tiles.size() else {}))
-	biome = Biome.build(biome_id, ring_extent())
+	biome = Biome.build(biome_id, ring_extent(), variant_seed)
 	add_child(biome)
 	_tiles_root = Node3D.new()
 	_tiles_root.name = "Tiles"
@@ -168,7 +170,10 @@ func _norm(t: Dictionary) -> Dictionary:
 	if type == "":
 		type = "empty"
 	var enemies: Array = t.get("enemies", [])
-	return {"type": type, "enemies": enemies.duplicate(), "elite": bool(t.get("elite", type == "elite"))}
+	# affixes: board tiles carry `enemy_affixes`, board_mutated changes `affixes` (parallel to enemies)
+	var affixes: Array = t.get("enemy_affixes", t.get("affixes", []))
+	return {"type": type, "enemies": enemies.duplicate(), "elite": bool(t.get("elite", type == "elite")),
+		"game": String(t.get("game", "")), "enemy_affixes": affixes.duplicate(true)}
 
 
 func _build_tile(i: int) -> void:
@@ -228,11 +233,12 @@ func _dress_tile(i: int, animate: bool) -> void:
 	holder.position = Vector3(0, TILE_TOP, 0)
 	_tile_nodes[i].add_child(holder)
 	var type := String(t.type)
-	holder.add_child(TileStyle.make_prop(type))
+	holder.add_child(TileStyle.make_prop(type, String(t.get("game", ""))))
 	var figs: Array[Character] = []
 	var ids: Array = t.enemies
+	var affs: Array = t.get("enemy_affixes", [])
 	if type == "miniboss" and not ids.is_empty():
-		figs.append(_dress_miniboss(holder, String(ids[0]), i))
+		figs.append(_dress_miniboss(holder, String(ids[0]), i, affs[0] if not affs.is_empty() else []))
 	if (type == "enemy" or type == "elite") and ids.is_empty():
 		ids = ["skeleton_minion"]
 	if type == "enemy" or type == "elite":
@@ -243,7 +249,7 @@ func _dress_tile(i: int, animate: bool) -> void:
 		for k in n:
 			var id := String(ids[k])
 			# same variant / tier / elite skin as the fight on this tile (EnemyLooks.spawn_context)
-			var ctx := EnemyLooks.spawn_context(id, i, ids.slice(0, k), biome_id, elite)
+			var ctx := EnemyLooks.spawn_context({"id": id, "affixes": affs[k] if k < affs.size() else []}, i, ids.slice(0, k), biome_id, elite)
 			var ch := EnemyLooks.create(id, false, ctx)
 			var s := PREVIEW_SCALE * (1.0 if n == 1 else 0.85) * (1.15 if elite else 1.0)
 			s *= clampf(EnemyLooks.scale_of(id), 1.0, 1.25)
@@ -254,6 +260,7 @@ func _dress_tile(i: int, animate: bool) -> void:
 			ch.rotation.y = deg_to_rad(randf_range(-25.0, 25.0))
 			holder.add_child(ch)
 			figs.append(ch)
+		AffixLooks.tile_chips(holder, affs.slice(0, n))
 		if elite:
 			Fx.elite_sparkle(holder, Vector3(0, 0.1, 0), 0.62, 1.1)
 			var crown := Props.put(holder, Props.PLAT + "yellow/star_yellow.gltf", Vector3(0.55, 0.25, 0.55), 0.0, 0.28)
@@ -270,8 +277,9 @@ func _dress_tile(i: int, animate: bool) -> void:
 
 ## Mini-boss tile: a larger preview figure between two skull posts with red flames, a
 ## hovering skull emblem and a slow red ground glow. Returns the figure.
-func _dress_miniboss(holder: Node3D, id: String, idx := -1) -> Character:
-	var ch := EnemyLooks.create(id, false, EnemyLooks.spawn_context(id, idx, [], biome_id))
+func _dress_miniboss(holder: Node3D, id: String, idx := -1, affixes: Array = []) -> Character:
+	var ch := EnemyLooks.create(id, false, EnemyLooks.spawn_context({"id": id, "affixes": affixes}, idx, [], biome_id))
+	AffixLooks.tile_chips(holder, [affixes], 2.0)
 	ch.scale = Vector3.ONE * PREVIEW_SCALE * 1.35 * EnemyLooks.scale_of(id) / 1.3
 	ch.position = Vector3(0, 0, 0.02)
 	ch.rotation.y = deg_to_rad(12.0)

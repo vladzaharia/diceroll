@@ -11,11 +11,11 @@ extends Minigame
 const W := 6
 const H := 6
 const COLORS := 4
-const TAPS := 5
+const TAPS := 3
 const MIN_CLUSTER := 3
-const BIG_FROM := 6
+const BIG_FROM := 5
 const CHAIN_SIZE := 4
-const CHAIN_BONUS := 1
+const CHAIN_BONUS := 2
 
 var grid: Array[int] = []
 var popped: int = 0
@@ -127,7 +127,7 @@ func score() -> float:
 	return float(popped + bonus)
 
 func _public() -> Dictionary:
-	return {"w": W, "h": H, "colors": COLORS, "min_cluster": MIN_CLUSTER, "grid": Array(grid), "popped": popped,
+	return {"w": W, "h": H, "colors": COLORS, "min_cluster": MIN_CLUSTER, "grid": grid.duplicate(), "popped": popped,
 		"chain": chain, "best": best}
 
 func _save() -> Dictionary:

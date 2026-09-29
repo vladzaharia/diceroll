@@ -5,11 +5,400 @@ Numbers live in `core/content/` (`balance.gd`, `heroes.gd`, `enemies.gd`, `biome
 `gear.gd`, `pets.gd`, `potions.gd`, `minigames.gd`, `unlocks.gd`), `core/runes.gd`,
 `core/combo.gd` and the profile presets in `core/meta/presets.gd`.
 
-## Current balance (2026-09-28 meta rules + rebalance)
+## Current balance (2026-09-29: 11 classes, new enemies, affixes, 12 pets, skins)
 
 This section is authoritative. Later sections are kept as history; where they disagree with
-this one (shop laps, XP, drafts, enemy scaling, combo multipliers, greedy win rates) this one
-wins.
+this one, this one wins. The design behind it is
+`docs/design/2026-09-28-classes-enemies-skins.md`.
+
+### How to measure
+
+```
+godot --headless --path . -s tools/sim.gd -- --runs=300 --class=<id>[,<id>...] --seed=1 \
+    --policy=greedy|realistic|expert --profile=fresh|mid|max [--asc=N] [--mode=standard|short]
+godot --headless --path . -s tools/sim.gd -- --runs=100 --class=all --force --profile=fresh ...
+godot --headless --path . -s tools/sim.gd -- --campaign=40 --campaigns=5 --policy=realistic [--snapshot=10]
+godot --headless --path . -s tools/sim.gd -- --runs=100 --class=all --profile=max --affixes=off|on|force:<id>
+godot --headless --path . -s tools/sim.gd -- --runs=100 --class=all --profile=max --pet=<id>|none
+```
+
+- **Policies.**
+  - `greedy` is `Bot.next_command`, the naive floor.
+  - `realistic` is `Bot.decide` with `AutoRules.skill = "realistic"`. Per decision it lapses
+    with probability `Bot.real_heur` = 0.62 into a rule of thumb. It is AUTO's default and **the
+    balance reference**.
+  - `expert` is the full smart policy.
+- **Profiles.**
+  - `fresh` is a new profile. An explicit `--class=` (or `--force`) grants the class, so every
+    class has a fresh row.
+  - `mid` is the realistic campaign at run 10: Knight, Barbarian, Paladin and Mage, all biomes,
+    5 packs, gear L4, the Pumpkin Sprite at L4, and affixes on.
+  - `max` is everything unlocked and maxed: all 11 classes, the Pumpkin Sprite L10 and affixes on.
+- **Sim flags and output.**
+  - Machine-readable lines: `#row`, `#death`, `#route`, `#up`, and in campaigns `#u`, `#ms` and
+    `#camp`. Seed shards can be summed.
+  - `--hero=<class>.<field>=<value>` and `--cl=<ClassLogic knob>=<value>` are analysis dials; the
+    shipped numbers are in `heroes.gd` and `class_logic.gd`.
+  - The campaign report adds per-class and per-pet median/p90 unlock runs, "runs unlocking 2+
+    classes" and "every class by run 40".
+- **Sample sizes.** Seed-set noise is about ±4 pp at 300 runs, so class rows below use 600 runs
+  (about ±2 pp) and pet/affix rows 1,100 runs (11 classes × 100). All rows are A0, standard mode
+  and the realistic policy unless noted.
+
+### Targets and results per class (11 classes)
+
+Targets (Vlad, unchanged):
+- Realistic class average: fresh 30–40%, mid 45–50%, max 55–65%, max A10 20–30%.
+- Every class within **±5 pp of the 11-class average** at each profile.
+- Greedy fresh ≥ 10% per class; expert fresh ≤ 80%.
+- No class above 20% act-1 deaths.
+
+| class | fresh | mid | max | act-1 deaths (fresh) | greedy fresh | expert fresh | max A10 |
+|---|---|---|---|---|---|---|---|
+| Knight | 40.8 | 46.3 | 62.2 | 7% | 20.0 | 78.0 | 26.5 |
+| Barbarian | 36.8 | 48.3 | 61.7 | 2% | 18.3 | 91.3 | 21.5 |
+| Paladin | 38.5 | 52.3 | 56.8 | 14% | 14.7 | 86.7 | 24.5 |
+| Mage | 40.7 | 52.0 | 60.3 | 4% | 13.7 | 86.7 | 22.5 |
+| Ranger | 37.3 | 47.3 | 59.0 | 6% | 10.7 | 85.3 | 26.5 |
+| Rogue | 39.0 | 49.8 | 60.5 | 4% | 13.0 | 90.0 | 28.0 |
+| Ninja | 41.0 | 45.0 | 64.2 | 8% | 9.0 | 92–95 | 23.0 |
+| Druid | 41.0 | 45.7 | 62.2 | 15% | 19.3 | 83.3 | 19.5 |
+| Engineer | 41.5 | 48.5 | 57.0 | 6% | 15.7 | 93.3 | 27.0 |
+| Necromancer | 39.0 | 44.0 | 55.7 | 5% | 17.0 | 86.0 | 22.0 |
+| Monster Kid | 44.5 | 43.7 | 54.3 | 6% | 18.0 | 90.0 | 20.0 |
+| **average** | **40.0** | **47.5** | **59.4** | | **15.5** | **87** | **24** |
+
+Status:
+- **Met:**
+  - Every class average is in band, and every class is within ±5 pp at fresh and mid.
+  - At max every class is within ±5 pp except the Monster Kid (−5.1, inside the noise).
+  - A10: every class is 19.5–28%.
+  - Act-1 deaths are ≤ 15% for every class.
+- **Not met:**
+  - Ninja greedy is 9.0% (about ±1.7 pp noise).
+  - Expert fresh is 78–95%. The Knight-only baseline was 80%, and the old Barbarian, Mage and
+    Rogue show the same gap, so this is a skill-ceiling property of the policy rather than of
+    the new classes. It is left for the planned whole-game pass (luck and expert ceiling).
+- Fresh-profile class average: 40.0%. The old Knight-only fresh number was 35.8%.
+
+**Short Road** (10 laps, 300 runs per row; target: the same ±5 pp per-class rule):
+
+| class | fresh | mid | max |
+|---|---|---|---|
+| Knight | 40.7 | 52.3 | 59.7 |
+| Barbarian | 34.3 | 53.0 | 54.0 |
+| Paladin | 28.0 | 43.7 | 55.0 |
+| Mage | 34.0 | 52.7 | 58.7 |
+| Ranger | 25.3 | 45.7 | 58.3 |
+| Rogue | 32.0 | 48.0 | 47.3 |
+| Ninja | 30.3 | 48.0 | 59.0 |
+| Druid | 31.3 | 39.0 | 51.0 |
+| Engineer | 35.7 | 48.0 | 54.7 |
+| Necromancer | 35.3 | 46.7 | 52.3 |
+| Monster Kid | 37.0 | 46.7 | 52.7 |
+| **average** | **33.1** | **47.7** | **54.8** |
+
+Short Road misses the ±5 pp rule in 6 cells:
+- fresh: Knight +7.6, Ranger −7.8, Paladin −5.1
+- mid: Druid −8.7, Barbarian +5.3
+- max: Rogue −7.5
+
+The Druid grows ×1.5 per lap and plants two seeds at its single biome change on the Short Road,
+which took it from 22/29/43 to 31/39/51. The rest is left for the whole-game pass.
+
+### Classes (`core/content/heroes.gd`, `core/class_logic.gd`)
+
+| class | HP | starting pool | rerolls | mechanic (shipped numbers) |
+|---|---|---|---|---|
+| Knight | 62 | Standard+Guard, Standard | 2 | – |
+| Barbarian | 60 (+2 ATK) | Standard+Heavy, Standard | 2 | – |
+| Paladin | 60 | **Twin**, Standard | 2 | Oath = the pool's most common face (ties high). Oath sets: +0.5 mult, +0 pip per Oath die. Sanctify ×2 per run. Shop Twin/Even ×2 |
+| Mage | 64 | Standard+Ember, Standard+Echo | 2 | – |
+| Ranger | 52 | Loaded+Blade, Standard | 2 | Aim ×1.3 with ≤3 dice, ×1.15 with more (no reroll this turn). Piercing Shot carries 50% of the overkill once |
+| Rogue | 54 | Standard+Venom, Standard+Lucky | 2 (+1 board) | – |
+| Ninja | 55 | Standard+Thunder, Odd | 3 | Shadow Step: 2 refunds per turn, 1 board refund on doubles |
+| Druid | 56 | **Odd** (seed), Standard | 2 | +1 lowest seed face per lap (×1.5 on the Short Road). A new seed per biome change (2 on the Short Road), max 3. Pet +1 charge per fight |
+| Engineer | 54 | Standard, Standard + Turret (Gilded) | 2 | Turret shot = pips × 0.25 / 0.75 / 1.0 by biome tier. Turret runes: guard, heavy, ember, frost, gilded |
+| Necromancer | 54 | Standard+Vampire, Standard | 2 | Bone die (1 2 2 3 3 4) per kill, max 2, pool max 6. Lone foe: turns 3 and 6. Boss phase 2: one. Heal 2 each at the end |
+| Monster Kid | 60 | Pretend (1 2 3 4 5 ★), Standard | 2 | ★ = Wild in combat (shares the Wild cap), the mode on the board. BOO!: cower, flee ≤25% (50% gold), bosses −35% |
+
+Changes from the design's starting values, with why:
+- **Paladin:** the Twin+Twin starter with +0.5 and +1 pip won 57/73/75%. Twin+Standard with
+  +0.5 and no pip bonus keeps the Twin/sets identity.
+- **Ranger:** HP 54 → 52 and the pierce carry halved (it scaled with the meta). Aim is steadier
+  with a small pool.
+- **Engineer:** the turret was worth about 16 pp at T=1 in tier 1, so T is 0.25/0.75/1.0 and the
+  Gilded rune moved from a pool die onto the turret.
+- **Druid:** the Low starter caused 25% act-1 deaths, so it starts with an Odd seed.
+- **HP changes:** Knight 60 → 62, Mage 60 → 64, Rogue 58 → 54, Ninja 52 → 55, Monster Kid
+  56 → 60. This brought the old four into the ±5 pp band. At 600 runs, 2 HP is worth about
+  2–4 pp.
+
+### Enemies and affixes (`core/content/enemies.gd`, `biomes.gd`, `affixes.gd`)
+
+- **New enemies:** 8 ids, plus the `frenzy` trait (+2 attack per main-attack hit survived, max
+  +6), the `rally` intent and `transform` (a once-only phase switch at ≤50% HP that drops Block).
+- **Pools:** the 3.2 table of the design. Crypt's elite leader is the Bone Golem and Hollow's is
+  the Fallen Paladin. Moonfang is a Hollow mini-boss candidate and the Orc Warchief a Frost one;
+  both unlock with `warden_slayer`.
+- **Affixes:**
+  - They roll at tile spawn from a derived Rng, and are off until the `affixes` feature (the
+    `brawler` milestone, run ~3).
+  - Rates by lap band: regular 0/6/10/15/20%; elite leader 0/50/75/100/100% with a second affix
+    0/0/0/15/30%.
+  - Reward ×1.5 gold/XP per affix (Gilded: ×3 gold, ×1.5 XP, ×1.4 HP).
+  - Thorned reflects **2/3** (the design said 3/4; forced it cost 5 pp).
+  - At A4+ the mini-boss gets one biome affix. This replaces `ASC_MINIBOSS_TRAIT`.
+
+Forced on every elite leader (max, 1,100 runs per row; off = 61.4%, on at normal rates = 62.5%):
+
+| affix | Δ pp | affix | Δ pp |
+|---|---|---|---|
+| armored | +2.2 | regenerating | +0.2 |
+| thorned | −2.9 | vampiric | −3.3 |
+| warded | +1.9 | hexing | +1.4 |
+| piercing | +2.3 | frostbound | +2.4 |
+| frenzied | +1.7 | gilded | −2.1 |
+
+Every affix is within ±4 pp (target ≤ 4 pp cost), because the ×1.5 rewards roughly pay for the
+extra danger. With affixes on, the bands hold at mid and max.
+
+**Routes** (max, 6,600 runs; target ±3 pp of the mean):
+
+| route | Δ pp |
+|---|---|
+| crypt, frost, magma | +7.5 |
+| crypt, frost, throne | −11.0 |
+| crypt, hollow, magma | +14.9 |
+| crypt, hollow, throne | −13.8 |
+| glade, frost, magma | +12.8 |
+| glade, frost, throne | −11.8 |
+| glade, hollow, magma | +12.3 |
+| glade, hollow, throne | −10.9 |
+
+**This gate is not met, and the gap was already there.** On the old four classes before any of
+this work, every Throne route was 42–50% and every Magma route 69–79% (±15 pp). The tier-3
+final bosses (Lich and Bone Warden vs Cinder King and Magma Golem) set it, and the new enemies
+and affixes did not change the shape. The boss retune belongs to the new-biomes pass.
+
+### Pets (`core/content/pets.gd`, `core/meta/pet_logic.gd`)
+
+There are 12 pets, each with a meter of 3–9 (the new six have 3–6). They fire automatically; XP
+levels 1–5 come from fights won and Crowns buy levels 6–10.
+
+| pet | charges on | size | fires (level L) | Δ pp at L10 (max, none = 48.3%) |
+|---|---|---|---|---|
+| Pumpkin Sprite | Pair or better | 6 | heal 2% + 0.5%·(L−1) | +11.3 |
+| Skull Buddy | each die ≤ 2 | 4 | bite 30% + 5%·(L−1) of the combo damage | +11.3 |
+| Lantern Ghost | each 6 | 5 | poison 1 + 0.7·(L−1) on every enemy | +11.6 |
+| Crystal Wisp | each kept die | 9 | turn start: +1 reroll, combo ×+(0.05 + 0.01·(L−1)) | +12.6 |
+| Guard Die | each attack intent | 6 | Block d6 + (L−1)/3 | +11.7 |
+| Coin Mimic | each board double | 3 | +8 + 2·(L−1) gold and a bite | +11.0 |
+| Pebble | 1 per 3 Block held at the attack | 4 | Block 3 + (L−1)/2 (L10 ×2), Thorns 3 + (L−1)/2 this turn | +9.1 |
+| Frost Mote | each die showing 1 | 3 | freeze the target, chill it for 3 + 3·(L−1) (L5: also the biggest attacker) | +7.1 |
+| Wick | Three of a Kind or better (L5: Two Pair) | 3 | 3 + 1.5·(L−1) to every enemy (L10: ignores Block) | +11.5 |
+| Tinker | each combat reroll | 6 | your lowest die → its highest face (L5: two dice, L10: +1 banked reroll) | +14.8 |
+| Grimoire | an attack with a rune trigger | 5 | re-fire the last rune at 1 + 0.05·(L−1) (L5: the last two, L10 ×1.25) | +12.4 |
+| Bubbles | each fight won | 4 | brew a potion (L5: any type, L10: two), heal 1.5%·L | +13.7 |
+
+- **Perks:** Pebble halves trap damage, Frost Mote stops ice freezing your dice, Wick lowers
+  Burn ticks by 1, Tinker makes restocks −3, Grimoire makes chests offer 4 runes, and Bubbles
+  makes shop potions −5.
+- **Band:** every pet is +7 to +15 pp at L10 (before this pass the six pets were +10 to +17).
+  Pet rows carry about ±3 pp of noise.
+
+### Unlock pacing (`core/content/unlocks.gd`; realistic campaign, 20 fresh profiles × 40 runs)
+
+Rules:
+- **Classes by Sigils:** Sigils buy only the **next two** locked classes (`buyable_classes`).
+  Prices are 8, with Paladin 12, Ninja and Druid 10, Engineer and Necromancer 12. The secret
+  Monster Kid is never for sale.
+- **One major per run:** at most **one major unlock (a class or pet)** comes from milestones per
+  run; the rest wait for the next banked run. The campaign bot also doesn't buy a class or pet
+  in a run that just gave one.
+
+| class | milestone (condition, or play N runs) | target | median | p90 |
+|---|---|---|---|---|
+| Barbarian | brawler: win 45 fights | 1–3 | 3 | 3 |
+| Paladin | oathsworn: win 3 runs with the Knight, or 8 runs | 6 | 8 | 8 |
+| Mage | champion: defeat **5** mini-bosses | 10 | 10 | 13 |
+| Ranger | pathfinder_trail: reach the final boss with **4** classes, or 16 | 13 | 11 | 16 |
+| Rogue | veteran: win 8 runs, or 15 | 15 | 15 | 15 |
+| Ninja | shadow_pact: win 2 runs with the Rogue, or **1,700** rerolls, or 22 | 19 | 21 | 23 |
+| Druid | long_road: **320** laps, or 26 | 23 | 25 | 26 |
+| Engineer | tinker_bench: **125** face edits, or 30 | 27 | 27 | 30 |
+| Necromancer | grave_calling: Bone Warden ×2, or 1,000 kills, or 36 | ≤ 32 | 30 | 32 |
+| Monster Kid (secret) | trick_or_treat: **36** Hollow events while owning 6 classes, or 40 | 20–25, ≤ 26 | 25 | 30 |
+
+Pets arrive at:
+- Pumpkin Sprite 1
+- Skull Buddy 6
+- Crystal Wisp 14
+- Frost Mote, Lantern Ghost and Coin Mimic 18
+- Guard Die 19
+- Wick 21
+- Grimoire 24
+- Pebble 26
+- Tinker 28
+- Bubbles 30
+
+The new pets' milestones are Frost Mote "visit Frostpeak 6 times", Wick "500 Three of a Kinds",
+Grimoire "3,300 rune triggers", Pebble "3,600 Block", Tinker "2,600 rerolls" and Bubbles "drink
+95 potions".
+
+Pass criteria:
+- Every class is within ±2 runs of its target: Paladin and Ninja are +2, Druid +2, and the rest
+  closer.
+- Every class arrives by a median of run ≤ 30, and all 20 profiles own every class by run 40.
+- **No run unlocks 2 classes (0 of 800).**
+- 35 of 800 runs unlock two majors (class, pet or biome). All of these involve a biome, which
+  arrives bundled with a win.
+
+### Meta numbers (all deterministic; `core/content/*.gd`)
+
+- **Crowns per run:** unchanged from the previous pass: about 78 per run in the realistic
+  campaign.
+- **Crowns sink ≈ 8,330.** It was 5,930; the 6 new pets add levels 6–10.
+- **Skins:**
+  - Four per class plus an A10 prestige variant (`SkinDefs`). Victor = first win, Ascendant = an
+    A3+ win, Bossbane = all 4 final bosses or an A6+ win, Prestige = an A10 win.
+  - After every Crowns sink is maxed, any non-prestige skin costs 250 Crowns. Prestige skins can
+    never be bought.
+  - The Profile is version 2; v1 files load, and wins recorded before v2 still earn Victor.
+- **Sigils:** as before, plus the per-id class prices and the next-two rule above.
+- **Unchanged:** potions, minigames, gear and ascension. The ascension ladder table of the
+  previous pass still describes the rules. A4 now gives the mini-boss one biome affix instead of
+  a fixed trait.
+
+### Tools and sweep notes
+
+- The parallel runners used for this pass sharded the sim by seed:
+  - class rows: `--class=<id> --runs=30 --seed=1+k·30·7919`
+  - campaigns: one process per profile, `--campaigns=1 --seed=1+k·104729`
+- **HP is the strongest single lever.** +4 HP moved the Knight and Mage by 7–12 pp at mid.
+  Mechanic numbers like Aim moved rows by only 1–3 pp.
+- Pre-existing, not changed:
+  - `Bot.danger_lo/hi` (0.8 / 1.2).
+  - The upgrades-per-run table of the previous pass (Knight-only fresh profile).
+
+### API for presentation (classes, enemies, affixes, skins, pets; 2026-09-29)
+
+All additions; no contract name was renamed. Everything below is in `core/`.
+
+**Classes (`HeroDefs.DATA[id]`).** New fields on every class: `kinds` and `tags` (one entry per
+starting die, parallel to `runes`), `combat_rerolls`, `mechanic` (a `ClassLogic` id, "" for the
+old four), `style` (`melee_1h | melee_2h | ranged | magic | dual | unarmed`) and `secret` (the
+Monster Kid). The Engineer also has `turret_rune`. `HeroDefs.IDS` is the unlock order: knight,
+barbarian, paladin, mage, ranger, rogue, ninja, druid, engineer, necromancer, monster_kid.
+`HeroDefs.MECHANIC_NAMES[mechanic]` names the class badge. Models: `model` = paladin, ranger,
+ninja, druid, engineer, necromancer, monster_kid.
+
+**Class events.**
+- `class_triggered {id, class, value, ...}` pulses the class badge. Ids:
+  - Paladin: `oath` (value = the Oath), `oath_kept` {oath, mult}, `sanctify` {die_idx, face_idx}
+  - Ranger: `aim` (value = ×100), `piercing_shot` {from, enemy_idx}
+  - Ninja: `shadow_step` {rerolls_left, refunds_left | board: true}
+  - Druid: `overgrowth`, `seed` {die_idx}, `wild_bond`
+  - Necromancer: `bone_harvest` {reason: kill | lone | phase}, `bone_crumble`
+  - Monster Kid: `boo` {enemy_idx}
+- `face_changed.source`: "growth" (Druid) and "sanctify" (Paladin).
+- `die_tagged {die_idx, tag, tags}` (Druid seed).
+- `die_added {die_idx, kind: "bone", temporary: true, tag: "bone", die}` when a Bone die joins at
+  a turn start, and `die_removed {die_idx, temporary: true, tag}` when it crumbles.
+- `turret_fired {value, damage, rune, target}`. Turret runes also emit `rune_fired` with
+  `die_idx: -2, turret: true`, and `rune_assigned` carries `turret`.
+- `enemy_scared {enemy_idx, effect: cower | flee | weaken}`, `enemy_fled {enemy_idx, gold, id}`,
+  and `status {status: "cower", skipped: true}` when a scared enemy skips its action.
+- `board_rolled` / `dice_rolled` (board): `pretend: [die indices whose ★ face showed]`. Board
+  values are already resolved.
+
+**Class state.**
+- `Die.tags` (PackedStringArray; `has_tag`, `add_tag`). `Die.PRETEND` = 10 is the ★ face value
+  (kind `pretend`, faces 1 2 3 4 5 ★; draw it as a ★, never as a numeral). Kind `bone`
+  (1 2 2 3 3 4).
+- `RunState.turret: Die` (null unless Engineer). It is addressed as die index
+  `GameFlow.TURRET` (-2) in `rune_assign`, `shop_buy` (runes and Face Raise) and
+  `forge_apply`. Allowed turret runes: `ClassLogic.TURRET_RUNES` (guard, heavy, ember, frost,
+  gilded).
+- `CombatState`: `oath`, `rerolls_used_this_turn`, `refunds_this_turn`, `extra_dice`
+  (temporary dice; the combat pool is `pool_dice(run)` = `run.dice + extra_dice`, and
+  `dice_values`, `marked`, `locked` and `rerolled` span it; `die_at(run, i)`),
+  `pending_bones`, `bones_raised`, `attack_target`, `pet_thorns`, `pet_block_turn`,
+  `last_runes`. All serialised. `GameFlow.board_refunds`.
+- `ClassLogic.pool_oath(dice)` gives the "→ Oath" hint for the Forge.
+  `ClassLogic.pretend_board_value(values, idx)` shows what a ★ copies on the board.
+- `RunState.skin` and `RunState.skin_prestige` (for Continue).
+
+**Enemies.**
+- New ids:
+  - regulars: `bone_cutthroat`, `orc_raider`, `orc_drummer`, `werewolf`
+  - elites: `bone_golem` (Crypt), `fallen_paladin` (Hollow)
+  - mini-bosses: `mini_moonfang` (Hollow), `mini_orc_warchief` (Frost)
+- New traits: `frenzy` and `ward_allies`. New intent: `rally`.
+- Enemy dicts gain `frenzy` (attack gained), `form` ("man" / "wolf" for transformers),
+  `affixes`, `thorns_value`, `actions`, `chilled`, `brave`, `cower`, `weakened` and `fled`.
+- Events:
+  - `enemy_transformed {enemy_idx, form, id}` (followed by the new `enemy_intent`)
+  - `status {status: "frenzy", value, max}`
+  - `status {status: "buff", rally: true, source}` for each rallied enemy
+- `EnemyDefs.pattern(id, phase)`, `transforms(id)` and `form(id, phase)`.
+
+**Affixes.**
+- `AffixDefs.IDS` (armored, thorned, warded, piercing, frenzied, regenerating, vampiric,
+  hexing, frostbound, gilded); `AffixDefs.card(id)` gives {id, name, desc}; `AffixDefs.BIOME`.
+- Board tiles carry `enemy_affixes` (one array per enemy, only when any are present).
+  `Board.affixes_of(idx)` always returns the parallel list. Every board change dict with
+  enemies has `affixes` (generation, `board_mutated`, events). `combat_started.enemies[i].affixes`.
+- Procs emit `affix_triggered {enemy_idx, affix, value}`: thorned reflect, regenerating heal,
+  hexing curse, frostbound chill, frenzied stack, gilded pet charge. A Warded hit shows
+  `damage.warded: true`.
+- Run stats: `seen_enemies`, `seen_affixes`, `affixed_kills`, `kills`. Profile
+  `records.seen {enemies, affixes}` feeds the Bestiary and first-encounter popups.
+- Feature unlock `affixes` (the `brawler` milestone): show the one-time popup on
+  `unlocked {kind: "features", id: "affixes"}`.
+
+**Pets 7–12.**
+- Ids: `pebble_golem`, `frost_mote`, `wick`, `tinker_gear`, `grimoire`, `cauldron`.
+  `PetDefs.card()` has `model` hints: pebble, frost, candle, gear, book, cauldron.
+- `pet_acted` effects:
+  - Pebble `block`, plus a second `pet_acted` `thorns` {value} (again with target = attacker
+    when thorns hit)
+  - Frost Mote `freeze` {target, value}
+  - Wick `burn` {target: "all", value}
+  - Tinker `fix` {die_idx, face}; a `dice_rolled {source: "pet"}` follows with the fixed values
+  - Grimoire `rune` {rune, die_idx, value}
+  - Bubbles `potion` {potion} (after a won fight)
+
+**Meta.**
+- Unlock and Sigil rules:
+  - `UnlockDefs.buyable_classes(owned)` gives the next-two rule; `SIGIL_PRICE_BY_ID`.
+  - `sigil_cost(kind, id, owned_classes)` returns {} for a class outside the next two and for
+    secret classes.
+  - Milestones may be `hidden` with a `hint` (`trick_or_treat`).
+  - Only one class unlocks from milestones per banked run.
+- Profile v2 (`Profile.VERSION = 2`; v1 files load and are migrated):
+  - `cosmetics {owned, equipped, prestige, unseen}`
+  - new records `best_asc_by_class`, `bosses_by_class`, `bosses_reached_by_class`, `boss_kills`,
+    `seen`
+  - new counters `face_edits`, `kills`, `hollow_events`, `freezes`, `sets3`, `rune_triggers`,
+    `potions`; derived counters `classes_at_boss` and `classes_owned`
+  - helpers `owns_skin`, `equipped_skin`, `prestige_on`, `crowns_capped`
+- `SkinDefs.of(class)`: {id, name, texture, mesh, helmet, overlay, cond, prestige, buyable} for
+  slots default, victor, ascendant, bossbane and prestige. Also `SkinDefs.cond_text(class,
+  skin)` and `BUY_PRICE` (250).
+- Camp commands:
+  - `equip_skin(class, skin)`
+  - `buy_skin(class, skin)` (only when `crowns_capped()`; never the prestige skin)
+  - `set_prestige(class, on)`
+  - `mark_skins_seen(class = "")`
+- Camp events: `skin_unlocked {class, skin, source: record | crowns}`, `skin_equipped`,
+  `prestige_set`, `skins_seen`. `run_banked` and `apply_run_result()` carry
+  `skins_unlocked: [[class, skin]]`. `catalog()` lists `buy_skin` entries after the caps.
+
+## Previous pass (2026-09-28 meta rules + rebalance; superseded where the current section differs)
+
+Kept for its rule changes, the upgrades-per-run table, the mechanic nerfs and the ascension
+ladder, which still hold. Its win-rate tables were Knight-only (fresh) or four classes.
 
 ### How to measure
 
@@ -81,8 +470,8 @@ Kills give gold, XP and pet charge only. An "upgrade" is a die, a rune, a face e
 | minigame | 0.0 | 0.0 | 0.0 |
 | **total** | **21.93** | **25.46** | **27.82** |
 
-Minigame rewards are real but show as 0 here: AUTO's par result is silver, and the bots take the
-potion or the gold. A played gold tier offers a rune, a die, a passive or +1 reroll (all counted).
+Minigame rewards are real but show as 0 here: the sims' average-player result is usually
+silver (see "Minigame calibration"), and the bots take the potion or the gold. A played gold tier offers a rune, a die, a passive or +1 reroll (all counted).
 Upgrades are the whole growth curve now: the old level-up drafts gave about 17 per run on top.
 
 ### Rule changes in this pass
@@ -153,9 +542,102 @@ Upgrades are the whole growth curve now: the old level-up drafts gave about 17 p
   potion goes on the belt, or is drunk at once when the belt is full.
 - **Minigames:** one tile per equipped minigame (2 slots, 3 with the Arcade upgrade), and each
   tile respawns on lap mutation. The score is compared with `MinigameDefs.MEDIAN`: below 0.8 is
-  bronze, 0.8 to 1.2 is silver, and 1.2+ is gold. Gold rewards scale by ±15% (the skill band).
-  AUTO takes the par result of 0.85 (silver) without playing. The run is saved when a minigame
-  starts (`minigame_started.save_point`).
+  bronze, 0.8 to 1.2 is silver, and 1.2+ is gold. Gold rewards scale by the skill band (±15%,
+  luck games less). **Players play every minigame (user decision 2026-09-29):** the in-game
+  AUTO pauses on a minigame tile ("Your turn: play the minigame") and resumes when switched
+  back on; the screen has no AUTO button. The sims and headless bots use `minigame_auto` as a
+  stand-in for an average player: it draws the tier from the game's calibrated split
+  (`MinigameDefs.CALIBRATION[id].tiers`) with the minigame's own Rng (the run Rng is untouched)
+  at a typical ratio per tier (bronze 0.65, silver 1.0, gold 1.35). The run is saved when a
+  minigame starts (`minigame_started.save_point`).
+
+### Minigame calibration (all 11 games, 2026-09-29 balance pass)
+
+Rules in `core/minigames/<id>.gd` (deterministic from the minigame Rng + inputs, public state
+only, save/load mid-game). Every number below comes from `tools/mg_calibrate.gd`: the
+human-like `MgHuman` player (its own noise Rng; `--policy=expert|random` for the bounds), 2,000
+games per game, stored in `MinigameDefs.CALIBRATION` and checked by
+`test_minigames2.gd::test_parity_bounds_from_the_stored_calibration` and a live sample test.
+EV = the expected prize in gold equivalents (bronze 12, silver 25, gold 45 x skill band); the
+mean over the 11 games is 28.6 and every game is within ±6% of it (target ±10%). No game gives
+gold to more than 36% or bronze to more than 35% of players (limits 40% / 45%). Seconds = play
+time at 1x, actions x a per-game think + animation estimate (intro and results beat not
+counted).
+
+| game | actions | est. seconds | MEDIAN (human median) | tier split b/s/g | reward EV | skill band | expert / random median |
+|---|---|---|---|---|---|---|---|
+| Fossil Hunter | 10 digs | 20 | 8 (8) | 33/36/32 | 27.8 (-3%) | ±5% | - |
+| Bubble Breaker | 3 taps (2.9) | 13 * | 17 (17) | 33/36/31 | 28.9 (+1%) | ±15% | 19 / 14 |
+| Scratch-off | 3 scratches | 9 * | 13 (13) | 25/47/28 | 29.1 (+2%) | ±15% | luck |
+| Claw Machine | 3 grabs | 18 | 16 (16) | 34/34/32 | 29.1 (+2%) | ±15% | - |
+| Bubble Shooter | 10 shots (9.6) | 25 | 43 (43) | 34/35/31 | 29.0 (+1%) | ±15% | 55 / 10 |
+| Plinko | 3 drops | 15 | 16 (15) | 33/36/30 | 27.4 (-4%) | ±5% | 17 / 11 |
+| Shell Game | 3 picks | 20 | 11 (11) | 31/34/35 | 30.2 (+5%) | ±15% | 18 / 3 |
+| Memory Match | ~21 flips | 27 | 9 (8) | 34/30/35 | 30.0 (+5%) | ±15% | 18 / 0 |
+| Fishing | 3 casts (6 actions) | 18 | 11 (10) | 35/39/27 | 27.0 (-6%) | ±10% | 16 / 0 |
+| Lucky Wheel | 3 spins (6 actions) | 20 | 20 (20) | 22/50/28 | 28.3 (-1%) | ±5% | 25 / 15 |
+| High-Low Ladder | ~4 guesses | 10 * | 6 (5) | 21/55/24 | 28.0 (-2%) | ±10% | 5 / 2 |
+
+\* Short by design (`MinigameDefs.SHORT_BY_DESIGN`): Scratch-off is the breather, Bubble
+Breaker has 3 taps (user feedback), High-Low ends when the player cashes out.
+
+**Changes in the 2026-09-29 pass:**
+- **Bubble Breaker:** 5 taps -> **3** (user feedback: fewer lives). Big clusters and chains
+  matter more: the big-cluster bonus starts at 5 (was 6: +1 per bubble from the 5th) and each
+  chained big pop (4+ right after another) adds +2 (was +1). MEDIAN 17 for a human who takes
+  the biggest group about half the time (the old 17/5-tap number was a perfect bot's).
+- **Scratch-off:** the flat prizes (7 / 10 / 13 / 15) gave 31/66/4 and EV -25%. Now the score
+  is the pips scratched + 4 for a pair + 10 for three alike (three 6s = 28, the jackpot):
+  MEDIAN 13, 25/47/28.
+- **Claw Machine:** 2 grabs -> **3** (18 s) and flatter capsule prizes (common 3/3/4, rare
+  4/5, epic 6, legendary chest 8; was 2/2/3, 3/4, 6, 10), because the two-grab pile gave
+  39/15/47 (gold-heavy, EV +11%). MEDIAN 16 (a human-ish aimer, sigma 0.045).
+- **Lucky Wheel:** 2 spins -> **3** (20 s), MEDIAN 20.
+- **MEDIAN notes:** Memory Match's, High-Low's and Fishing's scores are lumpy (even pair
+  scores, ladder rungs), so their MEDIAN sits between the two central outcomes (memory 8|10 ->
+  9; high-low's rungs map bust -> bronze, rungs 1-3 -> silver, 4+ -> gold).
+
+**Rules and signatures of the seven new games (WP-E5, spec §16 "More minigames"):**
+
+| game | rules (one thumb) | gold signature |
+|---|---|---|
+| Bubble Shooter | hex cluster 8 wide, 4 colours, 10 shots aimed with a quantised angle (121 steps, walls bounce); pop 3+ = 1/bubble, dropped = 2/bubble, clear +10 | Sharpshooter: +1 ATK (shrine value) |
+| Plinko | 8 peg rows, 9 shuffled buckets (1,1,2,2,3,3,5,6,10), pick a slot, 3 drops; golden peg x2 | Rare rune for a die |
+| Shell Game | 3 cups, 3 rounds: 5/8/11 swaps at 0.46/0.34/0.25 s; right pick 2/3/4, x2 within 1.2 s of the shuffle (Sharp Eye) | Heart Gem: +10 max HP (shrine value) |
+| Memory Match | 4x4, 8 pairs (faces 1-6, Star, Skull), 6 misses; 2 per pair, +1 per miss left on a clear | Mirror Forge: 2 edits, raise or mirror |
+| Fishing | 3 casts at shallows / reeds / deep; strike in the bite window (0.8/0.62/0.48 s), fake nibbles before; fish 1-10, perfect strike +1 | The Catch: Healing Draught + another potion |
+| Lucky Wheel | 12 shuffled segments (2,2,3,3,4,4,5,5,6,7,9,12), 3 spins, one brake tap in the last 1.1 s | Uncommon passive (1 of 3) |
+| High-Low Ladder | d6 higher/lower, ladder 2,5,6,7,9,11,14,18,24, safety rungs 0/1/3/5, push on equal, cash out any time | High Roller: every die's lowest face +1 |
+
+The human models (`core/minigames/mg_human.gd`): fossil follows the bones like the bot; bubble
+breaker takes the biggest group 55% of the time, else one of the three biggest; scratch is pure
+luck; the claw aims at the best capsule with sigma 0.045; shooter best-looking shot 65% else a
+decent one, aim noise sd 2 steps; plinko best-odds slot 50%, above the top bucket 30%, random
+20%; shell loses track per gem-moving swap 2.5/6/11% and taps at once 70% when sure; memory
+forgets a seen card with 0.97 x 0.9^turns; fishing deep 45% / reeds 35% / shallows 20%, fooled
+by a nibble 12%, reaction 0.34 ± 0.09 s; wheel brakes on the best window segment 65% (± 0.09
+s); high-low cashes at a personal nerve (rung 4-7, or 2-4 when the die shows 3 or 4).
+Fossil Hunter: 7x7 site, three fossils (4, 3, 2 long) plus a gem (3 pts) and two coin pouches
+(2 pts), 10 digs, no hints (a dig reveals only its own cell). Claw Machine: 18 capsules (10
+common, 5 rare, 2 epic, 1 legendary, deeper by tier), the tier colour public and the prize
+hidden until won; a drop scoops up to 3 capsules whose reach (0.075 x (1 - 0.8 x depth))
+contains it; each slips with 0.14 per extra capsule held + 0.22 x depth.
+
+**Arcade unlocks (minor unlocks, one milestone each, Sigils 6 as before):** the realistic
+campaign (`--campaign=30 --campaigns=8`) gets them at the median runs below, spread between the
+class/biome majors (never two minigames on one run).
+
+| minigame | milestone | condition | target run | campaign median |
+|---|---|---|---|---|
+| Plinko | arcade_newbie | Play 6 minigames | 2 | 2 |
+| (Fossil Hunter) | arcade_regular | Play 14 minigames | 5 | 4 |
+| High-Low Ladder | lucky_streak | Cash out the Treasury 12 times | 6 | 5 |
+| Fishing | angler | Complete 105 laps in total | 8 | 8 |
+| Memory Match | sharp_memory | Keep 1,350 dice unrerolled | 9 | 10 |
+| Bubble Shooter | arcade_ace | Play 30 minigames | 11 | 11 |
+| (Bubble Breaker) | arcade_fan | Play 40 minigames | 13 | 14 |
+| Shell Game | sleight_of_hand | Use 1,500 combat rerolls | 16 | 17 |
+| Lucky Wheel | high_roller | Play 56 minigames | 20 | 21 |
 
 ### Ascension (global, 10 levels, max profile, realistic bot, standard mode)
 

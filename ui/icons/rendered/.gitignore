@@ -1,0 +1,4 @@
+# Rendered from KayKit models (partly paid EXTRA packs): never committed.
+# Rebuild: tools/render_icons.sh (see rendered_icons.gd).
+*.png
+*.png.import

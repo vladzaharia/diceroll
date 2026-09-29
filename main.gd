@@ -9,6 +9,11 @@ var controller: GameController
 
 
 func _ready() -> void:
+	# Source checkouts without the git-ignored third-party assets get a plain explanation
+	# screen instead of a broken game (see game/boot/asset_check.gd).
+	if not AssetCheck.run().is_empty():
+		add_child(AssetCheck.screen())
+		return
 	controller = GameController.new()
 	add_child(controller)
 	controller.show_title()

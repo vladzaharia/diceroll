@@ -4,7 +4,7 @@ extends RefCounted
 ## layer owns the file (user://profile.json) and uses to_dict()/from_dict() (or to_json /
 ## from_json). Mutations go through Camp (command -> events), except apply_run_result().
 ##
-## Schema (version 1):
+## Schema (version 2; version-1 files load through the tolerant loader, see from_dict):
 ##   crowns:int, sigils:int
 ##   flags: {lock_classes: bool (default true: a fresh profile has the Knight only)}
 ##   unlocks: {classes, biomes, bosses, minibosses, pets, minigames, packs, gear, potions,
@@ -19,13 +19,19 @@ extends RefCounted
 ##   milestones: [ids reached]
 ##   records: {runs, wins, best_lap, loss_streak, crowns_earned, sigils_earned,
 ##             best_ascension_win, wins_by_class:{}, runs_by_class:{}, counters:{...},
-##             firsts:{biome, miniboss, boss, class_win, route_win, asc_clear, short_win: [ids]}}
+##             firsts:{biome, miniboss, boss, class_win, route_win, asc_clear, short_win: [ids]},
+##             best_asc_by_class:{class: highest ascension won (-1 none)},
+##             bosses_by_class:{class: [final boss ids beaten]}, bosses_reached_by_class:{class: runs},
+##             boss_kills:{boss id: n}, seen:{enemies: [ids], affixes: [ids]}}
+##   cosmetics (v2): {owned: {class: [skin ids]} ("default" implicit), equipped: {class: skin},
+##             prestige: {class: bool} (A10 overlay toggle), unseen: ["class:skin"] (Wardrobe dots)}
 
-const VERSION := 1
+const VERSION := 2
 
 const COUNTERS := ["runs", "laps", "fights", "minigames", "rerolls", "kept", "poison_kills", "cashouts", "block",
 	"straights", "minibosses_reached", "minibosses_killed", "bosses_reached", "wins", "act2_runs", "act3_runs",
-	"frost_visits", "throne_wins", "mage_wins", "full_runes", "kills"]
+	"frost_visits", "throne_wins", "mage_wins", "full_runes", "face_edits", "kills", "hollow_events",
+	"freezes", "sets3", "rune_triggers", "potions"]
 
 var crowns: int = 0
 var sigils: int = 0
@@ -43,6 +49,7 @@ var loadout: Dictionary = {}
 var ascension: Dictionary = {}
 var milestones: Array = []
 var records: Dictionary = {}
+var cosmetics: Dictionary = {}
 
 static func fresh(lock_classes := true) -> Profile:
 	var p := Profile.new()
@@ -66,7 +73,10 @@ static func fresh(lock_classes := true) -> Profile:
 	for k in Economy.SIGIL_FIRST:
 		firsts[k] = []
 	p.records = {"runs": 0, "wins": 0, "best_lap": 0, "loss_streak": 0, "crowns_earned": 0, "sigils_earned": 0,
-		"best_ascension_win": -1, "wins_by_class": {}, "runs_by_class": {}, "counters": counters, "firsts": firsts}
+		"best_ascension_win": -1, "wins_by_class": {}, "runs_by_class": {}, "counters": counters, "firsts": firsts,
+		"best_asc_by_class": {}, "bosses_by_class": {}, "bosses_reached_by_class": {}, "boss_kills": {},
+		"seen": {"enemies": [], "affixes": []}}
+	p.cosmetics = {"owned": {}, "equipped": {}, "prestige": {}, "unseen": []}
 	return p
 
 # ------------------------------------------------------------------ queries
@@ -117,12 +127,87 @@ func active_traits() -> Array:
 	return out
 
 func counter(stat: String) -> int:
-	if stat == "best_lap":
-		return int(records.get("best_lap", 0))
-	if stat == "boss_kinds":
-		# distinct final bosses defeated (the Sigil firsts list)
-		return ((records.get("firsts", {}) as Dictionary).get("boss", []) as Array).size()
+	match stat:
+		"best_lap":
+			return int(records.get("best_lap", 0))
+		"boss_kinds":
+			# distinct final bosses defeated (the Sigil firsts list)
+			return ((records.get("firsts", {}) as Dictionary).get("boss", []) as Array).size()
+		"classes_at_boss":
+			var n := 0
+			var r: Dictionary = records.get("bosses_reached_by_class", {})
+			for k in r:
+				if int(r[k]) > 0:
+					n += 1
+			return n
+		"classes_owned":
+			return (unlocks.get("classes", []) as Array).size()
 	return int((records.get("counters", {}) as Dictionary).get(stat, 0))
+
+## True once every Crowns sink is maxed: owned gear at L8, every Crowns upgrade bought and every
+## owned pet at L10 (skins can then be bought for SkinDefs.BUY_PRICE Crowns).
+func crowns_capped() -> bool:
+	for slot in GearDefs.SLOTS:
+		if gear_level(slot) < GearDefs.MAX_LEVEL:
+			return false
+	for track in UnlockDefs.UPGRADES:
+		for id in UnlockDefs.UPGRADES[track]:
+			if int(upgrades.get(id, 0)) < 1:
+				return false
+	for id in unlocks.get("pets", []):
+		if pet_level(String(id)) < PetDefs.MAX_LEVEL:
+			return false
+	return true
+
+func owns_skin(class_id: String, skin: String) -> bool:
+	if skin == "default":
+		return owns("classes", class_id) or not bool(flags.get("lock_classes", true))
+	return ((cosmetics.get("owned", {}) as Dictionary).get(class_id, []) as Array).has(skin)
+
+func equipped_skin(class_id: String) -> String:
+	var s := String((cosmetics.get("equipped", {}) as Dictionary).get(class_id, "default"))
+	return s if owns_skin(class_id, s) and not SkinDefs.is_prestige(s) else "default"
+
+func prestige_on(class_id: String) -> bool:
+	return owns_skin(class_id, "prestige") and bool((cosmetics.get("prestige", {}) as Dictionary).get(class_id, true))
+
+## Grants a skin (no cost). Returns false if already owned or unknown.
+func grant_skin(class_id: String, skin: String) -> bool:
+	if not SkinDefs.has(class_id, skin) or skin == "default" or owns_skin(class_id, skin):
+		return false
+	var owned: Dictionary = cosmetics.get("owned", {})
+	var have: Array = owned.get(class_id, [])
+	have.append(skin)
+	owned[class_id] = have
+	cosmetics["owned"] = owned
+	var un: Array = cosmetics.get("unseen", [])
+	un.append("%s:%s" % [class_id, skin])
+	cosmetics["unseen"] = un
+	return true
+
+## True when the records meet a skin's condition (SkinDefs.CONDS).
+func skin_earned(class_id: String, skin: String) -> bool:
+	var cond: Dictionary = SkinDefs.CONDS.get(skin, {})
+	var best := int((records.get("best_asc_by_class", {}) as Dictionary).get(class_id, -1))
+	var wins := int((records.get("wins_by_class", {}) as Dictionary).get(class_id, 0))
+	if cond.has("class_win") and wins < int(cond.class_win):
+		return false
+	if cond.has("class_bosses"):
+		var beaten: Array = (records.get("bosses_by_class", {}) as Dictionary).get(class_id, [])
+		return beaten.size() >= int(cond.class_bosses) or best >= int(cond.get("or_class_asc", 99))
+	if cond.has("class_asc") and best < int(cond.class_asc):
+		return false
+	return not cond.is_empty() or skin == "default"
+
+## Skins newly earned by the records: grants them and returns [[class, skin]].
+func check_skins() -> Array:
+	var out: Array = []
+	for cid in HeroDefs.IDS:
+		for skin in SkinDefs.SLOTS:
+			if skin != "default" and not owns_skin(cid, skin) and skin_earned(cid, skin):
+				grant_skin(cid, skin)
+				out.append([cid, skin])
+	return out
 
 func can_afford(cost: Dictionary) -> bool:
 	if cost.is_empty():
@@ -145,9 +230,10 @@ func grant(kind: String, id: String) -> bool:
 # ------------------------------------------------------------------ run results
 
 ## Banks a finished run (the game_over event's stats): Crowns, pet XP, minigame mastery,
-## records and counters, first-time Sigils, milestone unlocks and the ascension ladder.
-## Returns {crowns, sigils, firsts:[[kind, id]], milestones:[ids], unlocked:[[kind, id]],
-## ascension_unlocked:int (-1 = none)}.
+## records and counters, first-time Sigils, milestone unlocks, skins and the ascension ladder.
+## At most one MAJOR unlock (a class, pet or biome: UnlockDefs.MAJOR_KINDS) comes from milestones
+## per run: a second major milestone waits for the next banked run. Returns {crowns, sigils, firsts:[[kind, id]], milestones:[ids],
+## unlocked:[[kind, id]], ascension_unlocked:int (-1 = none), skins_unlocked:[[class, skin]]}.
 func apply_run_result(stats: Dictionary) -> Dictionary:
 	var r: Dictionary = stats.get("rewards", {})
 	var victory := bool(stats.get("victory", false))
@@ -177,12 +263,16 @@ func apply_run_result(stats: Dictionary) -> Dictionary:
 		wbc[cls] = int(wbc.get(cls, 0)) + 1
 		records.wins_by_class = wbc
 		records.best_ascension_win = maxi(int(records.get("best_ascension_win", -1)), asc)
+		var bac: Dictionary = records.get("best_asc_by_class", {})
+		bac[cls] = maxi(int(bac.get(cls, -1)), asc)
+		records.best_asc_by_class = bac
 		if asc >= int(ascension.get("unlocked", 0)) and asc < UnlockDefs.MAX_ASCENSION:
 			ascension.unlocked = asc + 1
 			unlocked_asc = asc + 1
 	else:
 		records.loss_streak = int(records.get("loss_streak", 0)) + 1
 	_count(stats, victory)
+	_class_records(stats, cls)
 	# first-time Sigils
 	var firsts: Array = []
 	var s := 0
@@ -206,15 +296,51 @@ func apply_run_result(stats: Dictionary) -> Dictionary:
 	# milestones
 	var hit: Array = []
 	var unlocked: Array = []
+	var major_given := false
 	for m in UnlockDefs.MILESTONES:
 		if milestones.has(m.id) or not _cond(m.cond):
 			continue
+		var gives_major := false
+		for u in m.unlocks:
+			var uk := String(u[0])
+			if UnlockDefs.MAJOR_KINDS.has(uk) and not owns(uk, String(u[1])) and UnlockDefs.all_ids(uk).has(String(u[1])):
+				gives_major = true
+		if gives_major and major_given:
+			continue # one major unlock per run: this milestone fires on a later banked run
+		major_given = major_given or gives_major
 		milestones.append(m.id)
 		hit.append(m.id)
 		for u in m.unlocks:
 			if grant(String(u[0]), String(u[1])):
 				unlocked.append([String(u[0]), String(u[1])])
-	return {"crowns": c, "sigils": s, "firsts": firsts, "milestones": hit, "unlocked": unlocked, "ascension_unlocked": unlocked_asc}
+	var skins := check_skins()
+	return {"crowns": c, "sigils": s, "firsts": firsts, "milestones": hit, "unlocked": unlocked, "ascension_unlocked": unlocked_asc,
+		"skins_unlocked": skins}
+
+## Per-class and per-boss records (skins, class milestones, Bestiary).
+func _class_records(st: Dictionary, cls: String) -> void:
+	if bool(st.get("boss_reached", false)):
+		var r: Dictionary = records.get("bosses_reached_by_class", {})
+		r[cls] = int(r.get(cls, 0)) + 1
+		records.bosses_reached_by_class = r
+	var bk: Dictionary = records.get("boss_kills", {})
+	var bbc: Dictionary = records.get("bosses_by_class", {})
+	var mine: Array = bbc.get(cls, [])
+	for b in st.get("bosses_killed", []):
+		bk[String(b)] = int(bk.get(String(b), 0)) + 1
+		if not mine.has(String(b)):
+			mine.append(String(b))
+	bbc[cls] = mine
+	records.boss_kills = bk
+	records.bosses_by_class = bbc
+	var seen: Dictionary = records.get("seen", {"enemies": [], "affixes": []})
+	for k in [["seen_enemies", "enemies"], ["seen_affixes", "affixes"]]:
+		var have: Array = seen.get(k[1], [])
+		for id in st.get(k[0], []):
+			if not have.has(String(id)):
+				have.append(String(id))
+		seen[k[1]] = have
+	records.seen = seen
 
 func _first(kind: String, id: String, out: Array) -> int:
 	var f: Dictionary = records.get("firsts", {})
@@ -242,7 +368,6 @@ func _count(st: Dictionary, victory: bool) -> void:
 	add.call("block", int(st.get("block_gained", 0)))
 	add.call("straights", int(st.get("straights", 0)))
 	add.call("full_runes", 1 if int(st.get("full_rune_fights", 0)) > 0 else 0)
-	add.call("kills", int(st.get("kills", 0)))
 	add.call("minibosses_reached", 1 if bool(st.get("miniboss_reached", false)) else 0)
 	add.call("minibosses_killed", (st.get("minibosses_killed", []) as Array).size())
 	add.call("bosses_reached", 1 if bool(st.get("boss_reached", false)) else 0)
@@ -253,14 +378,56 @@ func _count(st: Dictionary, victory: bool) -> void:
 	var route: Array = st.get("route", [])
 	add.call("throne_wins", 1 if victory and route.has("throne") else 0)
 	add.call("mage_wins", 1 if victory and String(st.get("class_id", "")) == "mage" else 0)
+	add.call("face_edits", int(st.get("face_edits", 0)))
+	add.call("kills", int(st.get("kills", 0)))
+	add.call("hollow_events", int(st.get("hollow_events", 0)))
+	add.call("freezes", int(st.get("freezes", 0)))
+	add.call("sets3", int(st.get("sets3", 0)))
+	add.call("rune_triggers", int(st.get("rune_triggers", 0)))
+	add.call("potions", int(st.get("potions_used", 0)))
 	records.counters = c
 
+## [current, needed] toward a milestone condition, for progress bars: every form of _cond ({stat},
+## {class_wins}, {boss_kills}, {any}: the closest branch, {all}: the furthest branch).
+func cond_progress(cond: Dictionary) -> Array:
+	if cond.has("any") or cond.has("all"):
+		var subs: Array = cond.get("any", cond.get("all", []))
+		var pick := [0, 1]
+		var pick_r := -1.0 if cond.has("any") else 2.0
+		for sub in subs:
+			var pr := cond_progress(sub)
+			var r := float(pr[0]) / maxf(1.0, float(pr[1]))
+			if (cond.has("any") and r > pick_r) or (cond.has("all") and r < pick_r):
+				pick_r = r
+				pick = pr
+		return pick
+	var need := int(cond.get("min", 1))
+	var cur := 0
+	if cond.has("class_wins"):
+		cur = int((records.get("wins_by_class", {}) as Dictionary).get(String(cond.class_wins), 0))
+	elif cond.has("boss_kills"):
+		cur = int((records.get("boss_kills", {}) as Dictionary).get(String(cond.boss_kills), 0))
+	else:
+		cur = counter(String(cond.get("stat", "")))
+	return [mini(cur, need), need]
+
+## Milestone conditions: {stat, min} (counter), {class_wins: id, min}, {boss_kills: id, min},
+## {any: [conds]}, {all: [conds]}.
 func _cond(cond: Dictionary) -> bool:
 	if cond.has("any"):
 		for sub in cond.any:
 			if _cond(sub):
 				return true
 		return false
+	if cond.has("all"):
+		for sub in cond.all:
+			if not _cond(sub):
+				return false
+		return true
+	if cond.has("class_wins"):
+		return int((records.get("wins_by_class", {}) as Dictionary).get(String(cond.class_wins), 0)) >= int(cond.min)
+	if cond.has("boss_kills"):
+		return int((records.get("boss_kills", {}) as Dictionary).get(String(cond.boss_kills), 0)) >= int(cond.min)
 	return counter(String(cond.stat)) >= int(cond.min)
 
 # ------------------------------------------------------------------ serialisation
@@ -273,10 +440,13 @@ func to_dict() -> Dictionary:
 		"pet_xp": pet_xp.duplicate(true), "pet_bought": pet_bought.duplicate(true),
 		"minigame_plays": minigame_plays.duplicate(true), "loadout": loadout.duplicate(true),
 		"ascension": ascension.duplicate(true), "milestones": milestones.duplicate(), "records": records.duplicate(true),
+		"cosmetics": cosmetics.duplicate(true),
 	}
 
 ## Tolerant loader: missing fields take fresh defaults, unknown ids are dropped, JSON floats
-## become ints. Future versions migrate here.
+## become ints. Version 1 -> 2: the new records start empty (best_asc_by_class is seeded from
+## wins_by_class at A0 and best_ascension_win for the wins' classes is unknown, so it stays
+## conservative), cosmetics start empty, and skins already earned by the old records are granted.
 static func from_dict(d: Dictionary) -> Profile:
 	var fl: Dictionary = d.get("flags", {})
 	var p := Profile.fresh(bool(fl.get("lock_classes", true)))
@@ -330,7 +500,19 @@ static func from_dict(d: Dictionary) -> Profile:
 	var rec: Dictionary = d.get("records", {})
 	for k in rec:
 		var v: Variant = rec[k]
-		if k == "firsts":
+		if k in ["bosses_by_class", "seen"]:
+			var lists := {}
+			for lk in v:
+				var a2: Array = []
+				for x in v[lk]:
+					a2.append(String(x))
+				lists[String(lk)] = a2
+			if k == "seen":
+				for lk in ["enemies", "affixes"]:
+					if not lists.has(lk):
+						lists[lk] = []
+			p.records[k] = lists
+		elif k == "firsts":
 			var f := {}
 			for fk in v:
 				var a: Array = []
@@ -352,6 +534,36 @@ static func from_dict(d: Dictionary) -> Profile:
 			p.records[k] = int(v)
 		else:
 			p.records[k] = v
+	if int(d.get("version", 1)) < 2:
+		# v1: a class win means at least an A0 win with it
+		var bac: Dictionary = p.records.get("best_asc_by_class", {})
+		for cid in (p.records.get("wins_by_class", {}) as Dictionary):
+			if int(p.records.wins_by_class[cid]) > 0:
+				bac[cid] = maxi(int(bac.get(cid, -1)), 0)
+		p.records.best_asc_by_class = bac
+	var cz: Dictionary = d.get("cosmetics", {})
+	var owned := {}
+	var co: Dictionary = cz.get("owned", {})
+	for cid in co:
+		var lst: Array = []
+		for sk in co[cid]:
+			if SkinDefs.has(String(cid), String(sk)) and String(sk) != "default" and not lst.has(String(sk)):
+				lst.append(String(sk))
+		owned[String(cid)] = lst
+	var eq := {}
+	var ce: Dictionary = cz.get("equipped", {})
+	for cid in ce:
+		if SkinDefs.has(String(cid), String(ce[cid])):
+			eq[String(cid)] = String(ce[cid])
+	var pr := {}
+	var cp: Dictionary = cz.get("prestige", {})
+	for cid in cp:
+		pr[String(cid)] = bool(cp[cid])
+	var unseen: Array = []
+	for x in cz.get("unseen", []):
+		unseen.append(String(x))
+	p.cosmetics = {"owned": owned, "equipped": eq, "prestige": pr, "unseen": unseen}
+	p.check_skins()
 	return p
 
 static func _int_map(v: Variant) -> Dictionary:

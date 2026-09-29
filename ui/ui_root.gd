@@ -44,6 +44,9 @@ var auto_settings: AutoSettingsPanel
 var camp: CampScreen
 ## Potion belt + pet charge meter (ui/hud/meta_hud.gd); emits command("use_potion", [slot]).
 var meta_hud: MetaHud
+## Minigames (ui/minigames): the full-screen game (phase MINIGAME) and its reward modal.
+var minigame: MinigameScreen
+var minigame_reward: MinigameRewardModal
 
 var _flow: GameFlow
 var _modals: Array[UiModal] = []
@@ -79,6 +82,8 @@ func _init() -> void:
 	for c in [board_hud, combat_hud, meta_hud, portal, banner, draft, passive, rune_assign, shop, forge, event, summary, auto_hud, inspector, title, class_select, route_card, pause, settings, auto_settings]:
 		add_child(c)
 	_modals = [draft, passive, rune_assign, shop, forge, event, summary]
+	MinigameUi.attach(self)
+	_modals.append(minigame_reward)
 	board_hud.visible = false
 	combat_hud.visible = false
 	title.visible = false
@@ -178,6 +183,7 @@ func _hide_run() -> void:
 	for m in _modals:
 		if m.visible:
 			m.close()
+	minigame.visible = false
 
 
 func open_pause() -> void:
@@ -240,11 +246,13 @@ func sync(flow: GameFlow) -> void:
 		combat_hud.refresh(flow)
 	meta_hud.refresh(flow)
 	portal.refresh(flow)
-	var want: UiModal = null
+	var want: UiModal = MinigameUi.sync(self, flow)
 	var kind := String(flow.offer.get("kind", ""))
 	match ph:
 		GameFlow.Phase.DRAFT:
-			if kind == "rune_assign":
+			if want != null:
+				pass
+			elif kind == "rune_assign":
 				want = rune_assign
 			elif kind == "passive":
 				want = passive

@@ -20,4 +20,11 @@ static func _new(id: String) -> Minigame:
 		"bubble_breaker": return BubbleBreaker.new()
 		"scratch_off": return ScratchOff.new()
 		"claw_machine": return ClawMachine.new()
+		"bubble_shooter": return BubbleShooter.new()
+		"plinko": return Plinko.new()
+		"shell_game": return ShellGame.new()
+		"memory_match": return MemoryMatch.new()
+		"fishing": return Fishing.new()
+		"lucky_wheel": return LuckyWheel.new()
+		"high_low": return HighLow.new()
 	return null

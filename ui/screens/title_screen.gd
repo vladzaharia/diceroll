@@ -3,6 +3,7 @@ extends Control
 ## Title: animated DICEROLL logo, PLAY (opens the Camp hub), Continue (enabled when
 ## user://save.json exists), Settings. Emits new_run_pressed (PLAY), continue_pressed,
 ## settings_pressed.
+## Hosts the hidden DevGesture (5 taps in the bottom-right corner open the Developer menu).
 
 signal new_run_pressed
 signal continue_pressed
@@ -14,6 +15,7 @@ var logo: Logo
 var new_btn: GameButton
 var continue_btn: GameButton
 var settings_btn: GameButton
+var dev_gesture: DevGesture
 var _col: VBoxContainer
 var _logo_box: Control
 var _tag: Label
@@ -62,6 +64,9 @@ func _init() -> void:
 	_footer = UiTheme.label("v0.1  ·  Fredoka & Lilita One (OFL)  ·  KayKit & Kenney (CC0)", 18, UiPalette.TEXT_MUTED, false, 0, false, 500)
 	_footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(_footer)
+	# hidden Developer menu: 5 quick taps in the bottom-right corner (ui/widgets/dev_gesture.gd)
+	dev_gesture = DevGesture.new()
+	add_child(dev_gesture)
 	resized.connect(_layout)
 
 

@@ -122,12 +122,14 @@ func test_camp_traits_are_switchable_after_level_4() -> void:
 func test_camp_sigil_unlocks_and_pool_toggle() -> void:
 	var p := Profile.fresh()
 	var camp := Camp.new(p)
-	assert_eq(camp.unlock("classes", "mage")[0].type, "error", "no Sigils")
+	assert_eq(camp.unlock("classes", "paladin")[0].type, "error", "no Sigils")
 	p.sigils = 20
-	var ev := camp.unlock("classes", "mage")
-	assert_eq(_first(ev, "unlocked"), {"type": "unlocked", "kind": "classes", "id": "mage", "source": "sigils"})
-	assert_eq(p.sigils, 20 - int(UnlockDefs.SIGIL_PRICE.classes))
-	assert_eq(camp.unlock("classes", "mage")[0].type, "error", "already owned")
+	assert_eq(camp.unlock("classes", "mage")[0].type, "error", "only the next two locked classes")
+	var ev := camp.unlock("classes", "paladin")
+	assert_eq(_first(ev, "unlocked"), {"type": "unlocked", "kind": "classes", "id": "paladin", "source": "sigils"})
+	assert_eq(p.sigils, 20 - int(UnlockDefs.sigil_cost("classes", "paladin").sigils))
+	assert_eq(camp.unlock("classes", "paladin")[0].type, "error", "already owned")
+	assert_eq(UnlockDefs.buyable_classes(p.unlocks.classes), ["barbarian", "mage"])
 	# pool toggle: at most 25% of each unlocked pool off
 	var owned := p.pool("runes").size()
 	var allowed := int(floor(owned * UnlockDefs.POOL_TOGGLE_MAX))
@@ -330,15 +332,25 @@ func test_pet_charge_persists_across_fights_and_fires_automatically() -> void:
 
 func test_every_pet_acts() -> void:
 	var expect := {"pumpkin_sprite": "heal", "skull_buddy": "bite", "lantern_ghost": "poison", "guard_die": "block",
-		"coin_mimic": "gold", "crystal_wisp": "reroll"}
+		"coin_mimic": "gold", "crystal_wisp": "reroll", "pebble_golem": "block", "frost_mote": "freeze", "wick": "burn",
+		"tinker_gear": "fix", "grimoire": "rune", "cauldron": "potion"}
 	for pet in PetDefs.IDS:
 		var f := _pet_flow(pet, 10)
 		assert_eq(f.run.pet_level(), 10)
 		_fight(f, "skeleton_minion,skeleton_minion")
 		f.run.pet_state.charge = PetDefs.size(pet)
+		f.run.pet_state["rune"] = Runes.IDS.find("blade")
+		f.run.pet_state["rune_v"] = 4
 		f.combat.dice_values.assign([4, 4])
 		var ev: Array[Dictionary] = []
-		if pet == "crystal_wisp":
+		if pet == "cauldron":
+			# Bubbles charges per fight won and brews right after the fight
+			f.run.pet_state.charge = PetDefs.size(pet) - 1
+			f.combat.enemies[0].hp = 1
+			f.combat.enemies[1].hp = 0
+			f.combat.target = 0
+			ev = f.combat_attack()
+		elif pet == "crystal_wisp":
 			ev = f.combat.start_turn(f.run)
 		else:
 			ev = f.combat_attack()
@@ -370,18 +382,20 @@ func test_minigame_tiers_skill_band_and_par() -> void:
 	assert_eq(MinigameDefs.tier_for(1.3), "gold")
 	assert_near(MinigameDefs.skill_mult(2.0), 1.0 + MinigameDefs.SKILL_BAND)
 	assert_near(MinigameDefs.skill_mult(0.1), 1.0 - MinigameDefs.SKILL_BAND)
-	assert_near(MinigameDefs.PAR, 0.85)
+	assert_near(MinigameDefs.PAR, 1.0)
 	var f := GameFlow.new_run("knight", 1, 28, {"profile": Profile.fresh().to_dict()})
 	f.debug_open("minigame", "claw_machine")
 	assert_eq(f.phase, P.MINIGAME)
 	var ev := f.minigame_auto()
 	var res := _first(ev, "minigame_result")
 	assert_eq(res.auto, true)
-	assert_eq(res.tier, "silver")
+	# the sims' average player: a tier drawn from the calibrated split, at that tier's ratio
+	assert_eq(String(res.tier), MinigameDefs.tier_for(float(res.ratio)))
+	assert_near(float(res.ratio), float(MinigameDefs.SIM_RATIO[res.tier]), 0.001)
 	assert_eq(f.offer.kind, "reward")
-	assert_eq(f.offer.tier, "silver")
+	assert_eq(f.offer.tier, res.tier)
 	f.pick_draft(0)
-	assert_eq(f.phase, P.BOARD_READY)
+	assert_true(f.phase != P.MINIGAME)
 
 func test_minigame_save_at_entry_resumes_identically() -> void:
 	for game in MinigameDefs.IDS:
@@ -403,39 +417,30 @@ func test_minigame_save_at_entry_resumes_identically() -> void:
 			assert_eq(JSON.stringify(a), JSON.stringify(b), "%s step %d" % [game, k])
 
 func test_minigame_medians_are_calibrated() -> void:
-	# luck/deduction games: the bot's played median sits near MinigameDefs.MEDIAN; dexterity
-	# games (claw, bubbles): the bot's perfect aim scores at least the human median
+	# luck/deduction games: the bot's played median sits near MinigameDefs.MEDIAN; dexterity and
+	# tracking games (claw, bubbles, shooter, shell, fishing): the bot's perfect play scores at
+	# least the human median. Memory Match is skipped: the bot has no memory (tools/mg_calibrate
+	# models the human one; test_minigames2 checks a perfect memory clears the board).
+	var skill := ["claw_machine", "bubble_breaker", "bubble_shooter", "shell_game", "fishing"]
 	for game in MinigameDefs.IDS:
+		if game == "memory_match":
+			continue
 		var scores: Array = []
-		for s in 60:
+		for s in (60 if game != "bubble_shooter" else 12):
 			var m := Minigames.create(game, 1000 + s * 7, 1)
 			var guard := 0
-			while not m.done and m.actions_left > 0 and guard < 20:
+			while not m.done and m.actions_left > 0 and guard < 40:
 				guard += 1
-				var st := m.public_state()
-				var cmd: Array
-				match game:
-					"fossil_hunter":
-						var c := BotMeta.fossil_pick(st)
-						cmd = [c % int(st.w), c / int(st.w)]
-					"bubble_breaker":
-						var cl := BotMeta.bubble_pick(st)
-						if cl < 0:
-							break
-						cmd = [cl / int(st.h), cl % int(st.h)]
-					"scratch_off":
-						cmd = [BotMeta.scratch_pick(st, s)]
-					"claw_machine":
-						var best := 0
-						for i in st.prizes.size():
-							if not bool(st.prizes[i].taken) and int(st.prizes[i].points) > int(st.prizes[best].points):
-								best = i
-						cmd = [float(st.prizes[best].pos)]
+				var cmd := BotMeta.play_args(game, m.public_state(), s)
+				if game == "claw_machine":
+					cmd = [(m as ClawMachine).best_target()]
+				if cmd.is_empty():
+					break
 				m.action(cmd)
 			scores.append(m.score())
 		scores.sort()
 		var med := float(scores[scores.size() / 2]) / float(MinigameDefs.MEDIAN[game])
-		if game == "claw_machine" or game == "bubble_breaker":
+		if skill.has(game):
 			assert_true(med >= 0.9, "%s perfect-aim median ratio %.2f" % [game, med])
 		else:
 			assert_true(med > 0.7 and med < 1.35, "%s played median ratio %.2f" % [game, med])

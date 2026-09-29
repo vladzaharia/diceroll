@@ -15,6 +15,27 @@ const KINDS := ["classes", "biomes", "bosses", "minibosses", "pets", "minigames"
 const SIGIL_PRICE := {
 	"classes": 8, "biomes": 5, "bosses": 4, "minibosses": 4, "pets": 6, "minigames": 6, "packs": 6, "gear": 4, "potions": 4,
 }
+## "Major" unlocks (a big toast and a Camp reveal): at most one class or pet arrives from
+## milestones per run (biomes come bundled with their bosses on the first win, so they don't wait).
+const MAJOR_KINDS := ["classes", "pets"]
+## Per-id Sigil price overrides (the late classes cost more).
+const SIGIL_PRICE_BY_ID := {"classes": {"paladin": 12, "ninja": 10, "druid": 10, "engineer": 12, "necromancer": 12}}
+## Sigils can buy only the next SIGIL_NEXT_CLASSES locked classes in HeroDefs.IDS order.
+const SIGIL_NEXT_CLASSES := 2
+## Secret classes: never sold for Sigils, outside the next-two rule (HeroDefs.DATA[id].secret).
+static func is_secret_class(id: String) -> bool:
+	return bool((HeroDefs.DATA.get(id, {}) as Dictionary).get("secret", false))
+
+## The locked classes Sigils may buy now (the next two in unlock order, secrets excluded).
+static func buyable_classes(owned: Array) -> Array:
+	var out: Array = []
+	for id in HeroDefs.IDS:
+		if owned.has(id) or is_secret_class(String(id)):
+			continue
+		out.append(id)
+		if out.size() >= SIGIL_NEXT_CLASSES:
+			break
+	return out
 
 ## A fresh profile. Classes: Knight only (all four when the profile's lock_classes flag is off).
 ## Route: Glade -> Hollow -> Throne with the Pumpkin Knight and the Lich. No pet on run 1.
@@ -93,17 +114,26 @@ static func pool_from_packs(packs: Array, kind: String) -> Array:
 			out.append(id)
 	return out
 
-## Sigil price to unlock `id` of `kind` early; {} when it can't be bought.
-static func sigil_cost(kind: String, id: String) -> Dictionary:
+## Sigil price to unlock `id` of `kind` early; {} when it can't be bought. Classes: pass the
+## owned classes to apply the next-two rule (null skips it, e.g. for price labels).
+static func sigil_cost(kind: String, id: String, owned_classes: Variant = null) -> Dictionary:
 	if not SIGIL_PRICE.has(kind) or not all_ids(kind).has(id):
 		return {}
-	return {"sigils": int(SIGIL_PRICE[kind])}
+	if kind == "classes":
+		if is_secret_class(id):
+			return {}
+		if owned_classes is Array and not buyable_classes(owned_classes).has(id):
+			return {}
+	return {"sigils": int((SIGIL_PRICE_BY_ID.get(kind, {}) as Dictionary).get(id, SIGIL_PRICE[kind]))}
 
 # ------------------------------------------------------------------ milestones
 
 ## Milestones, checked after every banked run against Profile.records (counters are cumulative
 ## over all runs; best_* are records). A milestone fires once and grants its unlocks for free.
-## cond: {stat, min} or {any: [cond, ...]}. Stats: runs, laps, fights, minigames, rerolls, kept,
+## cond: {stat, min}, {class_wins: id, min}, {boss_kills: id, min}, {any: [...]} or {all: [...]}.
+## A milestone may be `hidden` (a secret: the shelf shows its hint only). Stats: runs, laps,
+## fights, minigames, rerolls, kept, face_edits, kills, hollow_events, classes_at_boss,
+## classes_owned,
 ## poison_kills, cashouts, block, straights, minibosses_reached, minibosses_killed,
 ## bosses_reached, wins, act2_runs, act3_runs, frost_visits, throne_wins, mage_wins,
 ## full_runes, best_lap.
@@ -127,7 +157,7 @@ const MILESTONES := [
 		"unlocks": [["pets", "skull_buddy"], ["gear", "charm"], ["features", "potion_belt"]]},
 	{"id": "frostbitten", "run": 8, "desc": "Visit Frostpeak.", "cond": {"stat": "frost_visits", "min": 1},
 		"unlocks": [["packs", "cold_steel"]]},
-	{"id": "champion", "run": 10, "desc": "Defeat 7 mini-bosses.", "cond": {"stat": "minibosses_killed", "min": 7},
+	{"id": "champion", "run": 10, "desc": "Defeat 5 mini-bosses.", "cond": {"stat": "minibosses_killed", "min": 5},
 		"unlocks": [["classes", "mage"], ["minibosses", "mini_grave_mage"]]},
 	{"id": "straight_talk", "run": 11, "desc": "Score 70 Straights.", "cond": {"stat": "straights", "min": 70},
 		"unlocks": [["packs", "numerology"]]},
@@ -153,6 +183,53 @@ const MILESTONES := [
 		"unlocks": [["minibosses", "mini_frost_warden"], ["minibosses", "mini_briar_beast"], ["minibosses", "mini_cinder_brute"]]},
 	{"id": "archmage", "run": 20, "desc": "Win 3 runs with the Mage.", "cond": {"stat": "mage_wins", "min": 3},
 		"unlocks": [["packs", "pyromancy"]]},
+	# --- pets 7-12 (2026-09-29): thematic milestones, spread over runs ~20-30
+	{"id": "stone_skin", "run": 25, "desc": "Gain 3,600 Block.", "cond": {"stat": "block", "min": 3600},
+		"unlocks": [["pets", "pebble_golem"]]},
+	{"id": "cold_snap", "run": 21, "desc": "Visit Frostpeak 6 times.", "cond": {"stat": "frost_visits", "min": 6},
+		"unlocks": [["pets", "frost_mote"]]},
+	{"id": "bonfire", "run": 20, "desc": "Score 500 Three of a Kinds or better.", "cond": {"stat": "sets3", "min": 500},
+		"unlocks": [["pets", "wick"]]},
+	{"id": "gearhead", "run": 28, "desc": "Use 2,600 combat rerolls.", "cond": {"stat": "rerolls", "min": 2600},
+		"unlocks": [["pets", "tinker_gear"]]},
+	{"id": "bookworm", "run": 24, "desc": "Trigger runes 3,300 times.", "cond": {"stat": "rune_triggers", "min": 3300},
+		"unlocks": [["pets", "grimoire"]]},
+	{"id": "brewmaster", "run": 30, "desc": "Drink 95 potions.", "cond": {"stat": "potions", "min": 95},
+		"unlocks": [["pets", "cauldron"]]},
+	# --- class unlock table (docs/design/2026-09-28-classes-enemies-skins.md §2.2)
+	{"id": "oathsworn", "run": 6, "desc": "Win 3 runs with the Knight, or play 8 runs.",
+		"cond": {"any": [{"class_wins": "knight", "min": 3}, {"stat": "runs", "min": 8}]}, "unlocks": [["classes", "paladin"]]},
+	{"id": "pathfinder_trail", "run": 13, "desc": "Reach the final boss with 4 different classes, or play 16 runs.",
+		"cond": {"any": [{"stat": "classes_at_boss", "min": 4}, {"stat": "runs", "min": 16}]}, "unlocks": [["classes", "ranger"]]},
+	{"id": "shadow_pact", "run": 19, "desc": "Win 2 runs with the Rogue, or use 1,700 combat rerolls, or play 22 runs.",
+		"cond": {"any": [{"class_wins": "rogue", "min": 2}, {"stat": "rerolls", "min": 1700}, {"stat": "runs", "min": 22}]},
+		"unlocks": [["classes", "ninja"]]},
+	{"id": "long_road", "run": 23, "desc": "Complete 320 laps in total, or play 26 runs.",
+		"cond": {"any": [{"stat": "laps", "min": 320}, {"stat": "runs", "min": 26}]}, "unlocks": [["classes", "druid"]]},
+	{"id": "tinker_bench", "run": 27, "desc": "Edit 125 die faces (Forge edits and Face Raises), or play 30 runs.",
+		"cond": {"any": [{"stat": "face_edits", "min": 125}, {"stat": "runs", "min": 30}]}, "unlocks": [["classes", "engineer"]]},
+	{"id": "grave_calling", "run": 32, "desc": "Defeat the Bone Warden twice, or defeat 1,000 enemies, or play 36 runs.",
+		"cond": {"any": [{"boss_kills": "boss_bone_warden", "min": 2}, {"stat": "kills", "min": 1000}, {"stat": "runs", "min": 36}]},
+		"unlocks": [["classes", "necromancer"]]},
+	{"id": "trick_or_treat", "run": 23, "hidden": true, "hint": "Something in the Hollow wants to play dress-up.",
+		"desc": "Finish 36 events in The Hollow while owning 6 classes, or play 40 runs.",
+		"cond": {"any": [{"all": [{"stat": "hollow_events", "min": 36}, {"stat": "classes_owned", "min": 6}]}, {"stat": "runs", "min": 40}]},
+		"unlocks": [["classes", "monster_kid"]]},
+	# Minigames 2.0 (minor unlocks, spread between the class/biome majors)
+	{"id": "arcade_newbie", "run": 2, "desc": "Play 6 minigames.", "cond": {"stat": "minigames", "min": 6},
+		"unlocks": [["minigames", "plinko"]]},
+	{"id": "lucky_streak", "run": 6, "desc": "Cash out the Treasury 12 times.", "cond": {"stat": "cashouts", "min": 12},
+		"unlocks": [["minigames", "high_low"]]},
+	{"id": "angler", "run": 8, "desc": "Complete 105 laps in total.", "cond": {"stat": "laps", "min": 105},
+		"unlocks": [["minigames", "fishing"]]},
+	{"id": "sharp_memory", "run": 9, "desc": "Keep 1,350 dice unrerolled.", "cond": {"stat": "kept", "min": 1350},
+		"unlocks": [["minigames", "memory_match"]]},
+	{"id": "arcade_ace", "run": 11, "desc": "Play 30 minigames.", "cond": {"stat": "minigames", "min": 30},
+		"unlocks": [["minigames", "bubble_shooter"]]},
+	{"id": "sleight_of_hand", "run": 16, "desc": "Use 1,500 combat rerolls.", "cond": {"stat": "rerolls", "min": 1500},
+		"unlocks": [["minigames", "shell_game"]]},
+	{"id": "high_roller", "run": 20, "desc": "Play 56 minigames.", "cond": {"stat": "minigames", "min": 56},
+		"unlocks": [["minigames", "lucky_wheel"]]},
 	{"id": "rune_lord", "run": 24, "desc": "In 15 runs, fight with 5 dice that all carry runes.", "cond": {"stat": "full_runes", "min": 15},
 		"unlocks": [["packs", "resonance"]]},
 	# --- 2026-09-29 new biomes (docs/design/2026-09-29-new-biomes.md §7): one biome per milestone,

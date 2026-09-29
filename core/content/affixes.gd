@@ -17,7 +17,7 @@ extends RefCounted
 const DATA := {
 	"armored": {"name": "Armored", "trait": "armor", "desc": "Its Block never expires. Starts with Block equal to 20% of its max HP.",
 		"exclude": ["bone_knight", "mini_bone_champion"]},
-	"thorned": {"name": "Thorned", "trait": "thorns", "desc": "Hitting it with your attack reflects 3 damage (4 late). Never lethal.",
+	"thorned": {"name": "Thorned", "trait": "thorns", "desc": "Hitting it with your attack reflects 2 damage (3 late). Never lethal.",
 		"exclude": ["mini_briar_beast"]},
 	"warded": {"name": "Warded", "trait": "ward_allies", "desc": "Takes half damage while any other non-warded enemy stands.",
 		"exclude": [], "group": true},
@@ -63,8 +63,8 @@ const ELITE_SECOND := [0.0, 0.0, 0.0, 0.15, 0.30]
 const REROLL_TRIES := 3
 
 const ARMORED_BLOCK_PCT := 0.2
-const THORNS_EARLY := 3
-const THORNS_LATE := 4
+const THORNS_EARLY := 2
+const THORNS_LATE := 3
 const REGEN_PCT := 0.06
 const HEX_EVERY := 3
 const GILDED_HP := 1.4

@@ -4,9 +4,13 @@ extends RefCounted
 ## loadout). Bot.next_command() asks next_command() first; an empty result means "no meta
 ## action, carry on". Pure functions of the flow/profile state (no randomness of its own).
 
-## "par": AUTO takes the par result without playing (review §5.4, the default for AUTO);
-## "play": the bot plays the minigame (fossil probability hunt, largest bubble cluster,
-## scratch in a seed-derived order, claw at the best prize centre).
+## "par": take the par result without playing (review §5.4; the sim's stand-in for an average
+## player — the in-game AUTO never plays minigames, Bot.decide pauses there);
+## "play": the bot plays the minigame (fossil: follow bones, else a spread pattern; largest bubble cluster,
+## scratch in a seed-derived order, claw at the best prize centre; the Minigames 2.0 set:
+## bubble shooter's best angle, plinko's best-odds slot, the shell game's tracked cup (a Sharp
+## Eye pick), memory in grid order (no memory of its own), fishing the deep spot with a quick
+## strike, the wheel's richest brake, high-low by expected value).
 static var minigame_mode := "par"
 
 ## HP ratio under which a big incoming hit triggers a Healing Draught in combat.
@@ -100,6 +104,13 @@ static func pick_reward(f: GameFlow) -> int:
 			"new_die": s = 12.0 if f.run.dice.size() < f.run.max_dice() else 5.0
 			"reroll_boost": s = 8.0
 			"passive_common": s = 7.5
+			"sharpshooter": s = 8.0
+			"rare_rune": s = 8.0
+			"heart_gem": s = 6.5
+			"mirror_forge": s = 7.0
+			"potion_pair": s = 9.0 if f.run.potions < f.run.potion_cap else 4.0
+			"passive_uncommon": s = 8.0
+			"high_roller": s = 7.0
 		if s > best_s:
 			best_s = s
 			best = i
@@ -113,25 +124,50 @@ static func minigame_command(f: GameFlow) -> Array:
 		return ["minigame_auto"]
 	if bool(st.get("done", false)) or int(st.get("actions_left", 0)) <= 0:
 		return ["minigame_finish"]
-	match String(f.offer.id):
+	var args := play_args(String(f.offer.id), st, f.run.seed)
+	return ["minigame_finish"] if args.is_empty() else ["minigame_action", args]
+
+## The bot's next input for a minigame from its public state (args for minigame_action), or []
+## when it has nothing worth doing (cash in). Pure: public data plus the run seed.
+static func play_args(id: String, st: Dictionary, run_seed := 0) -> Array:
+	match id:
 		"fossil_hunter":
 			var c := fossil_pick(st)
-			return ["minigame_action", [c % int(st.w), c / int(st.w)]]
+			return [c % int(st.w), c / int(st.w)]
 		"bubble_breaker":
 			var cl := bubble_pick(st)
 			if cl < 0:
-				return ["minigame_finish"]
-			return ["minigame_action", [cl / int(st.h), cl % int(st.h)]]
+				return []
+			return [cl / int(st.h), cl % int(st.h)]
 		"scratch_off":
-			return ["minigame_action", [scratch_pick(st, f.run.seed)]]
+			return [scratch_pick(st, run_seed)]
 		"claw_machine":
+			# aim at the richest-looking capsule (its tier colour is public)
 			var best := -1
-			for i in st.prizes.size():
-				var p: Dictionary = st.prizes[i]
-				if not bool(p.taken) and (best < 0 or int(p.points) > int(st.prizes[best].points)):
+			for i in st.balls.size():
+				var b: Dictionary = st.balls[i]
+				if not bool(b.taken) and (best < 0 or ClawMachine.TIERS.find(String(b.tier)) > ClawMachine.TIERS.find(String(st.balls[best].tier))):
 					best = i
-			return ["minigame_action", [float(st.prizes[best].pos) if best >= 0 else 0.5]]
-	return ["minigame_finish"]
+			return [float(st.balls[best].pos) if best >= 0 else 0.5]
+		"bubble_shooter":
+			return [BubbleShooter.best_angle(st.grid, int(st.current))]
+		"plinko":
+			return [Plinko.best_slot(st.buckets, st.golden)]
+		"shell_game":
+			return [ShellGame.follow(int(st.start), st.swaps), 0.5]
+		"memory_match":
+			return [memory_pick(st)]
+		"fishing":
+			if String(st.phase) == "cast":
+				return ["cast", 2]
+			return ["hook", float(st.bite_at) + 0.2]
+		"lucky_wheel":
+			if String(st.phase) == "spin":
+				return ["spin"]
+			return ["stop", LuckyWheel.best_stop_for(st.segments, st.spin)]
+		"high_low":
+			return [high_low_pick(st)]
+	return []
 
 static func _untouched(st: Dictionary) -> bool:
 	match String(st.get("id", "")):
@@ -139,82 +175,73 @@ static func _untouched(st: Dictionary) -> bool:
 		"bubble_breaker": return int(st.actions_left) == BubbleBreaker.TAPS
 		"scratch_off": return int(st.actions_left) == ScratchOff.SCRATCHES
 		"claw_machine": return int(st.actions_left) == ClawMachine.GRABS
+		"bubble_shooter": return int(st.actions_left) == BubbleShooter.SHOTS
+		"plinko": return int(st.actions_left) == Plinko.DROPS
+		"shell_game": return int(st.actions_left) == ShellGame.ROUNDS
+		"memory_match": return int(st.open) < 0 and int(st.pairs) == 0 and int(st.actions_left) == MemoryMatch.MISSES
+		"fishing": return int(st.actions_left) == Fishing.CASTS and String(st.phase) == "cast"
+		"lucky_wheel": return int(st.actions_left) == LuckyWheel.SPINS and String(st.phase) == "spin"
+		"high_low": return (st.history as Array).is_empty()
 	return true
 
-## Probability hunt: the undug cell covered by the most fossil layouts consistent with the
-## public state (hits, misses, distance hints, completed fossils).
+## Memory Match without a memory: the first face-down card (grid order) that isn't the open one.
+static func memory_pick(st: Dictionary) -> int:
+	var cards: Array = st.cards
+	for i in cards.size():
+		if int(cards[i]) == 0 and i != int(st.open):
+			return i
+	return 0
+
+## High-Low: climb while the expected prize of a guess beats cashing the current rung.
+static func high_low_pick(st: Dictionary) -> String:
+	var die := int(st.die)
+	var rung := int(st.rung)
+	var g := HighLow.best_guess(die)
+	var p := HighLow.win_odds(die, g)
+	var up := float(HighLow.PRIZES[mini(rung + 1, HighLow.PRIZES.size() - 1)])
+	var ev := p * up + (1.0 - p) * float(HighLow.PRIZES[HighLow.safety(rung)])
+	return g if ev > float(HighLow.PRIZES[rung]) else "cash"
+
+## Luck dig (no hints): follow an unfinished fossil first (extend a line of two hits, else try
+## a hit's neighbours), otherwise dig the next cell of a fixed spread-out pattern.
 static func fossil_pick(st: Dictionary) -> int:
 	var w := int(st.w)
 	var h := int(st.h)
 	var cells: Array = st.cells
-	var hints: Array = st.hints
-	var places: Array = []
-	for size in FossilHunter.SIZES:
-		var ps: Array = []
-		for horiz in [true, false]:
-			for y in range(0, h - (0 if horiz else int(size) - 1)):
-				for x in range(0, w - (int(size) - 1 if horiz else 0)):
-					var p: Array = []
-					for k in int(size):
-						p.append((y + (0 if horiz else k)) * w + x + (k if horiz else 0))
-					ps.append(p)
-		places.append(ps)
-	var counts: Array = []
-	counts.resize(w * h)
-	counts.fill(0)
-	var any := false
-	for a in places[0]:
-		for b in places[1]:
-			var cover := {}
-			var overlap := false
-			for i in a:
-				cover[i] = 0
-			for i in b:
-				if cover.has(i):
-					overlap = true
-				cover[i] = 1
-			if overlap or not _fossil_ok(cells, hints, cover, a, b, w):
-				continue
-			any = true
-			for i in cover:
-				if String(cells[i]) == "?":
-					counts[i] += 1
-	var best := -1
+	var open := func(x: int, y: int) -> bool:
+		return x >= 0 and x < w and y >= 0 and y < h and String(cells[y * w + x]) == "?"
+	var hit := func(x: int, y: int) -> bool:
+		return x >= 0 and x < w and y >= 0 and y < h and String(cells[y * w + x]) == "hit"
+	var dirs := [Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1)]
+	# 1. a line of hits: dig past either end
 	for i in cells.size():
-		if String(cells[i]) != "?":
+		if String(cells[i]) != "hit":
 			continue
-		if best < 0 or int(counts[i]) > int(counts[best]):
-			best = i
-	if not any or best < 0:
-		for i in cells.size():
-			if String(cells[i]) == "?":
+		var x := i % w
+		var y := i / w
+		for d: Vector2i in dirs:
+			if hit.call(x + d.x, y + d.y):
+				var k := 1
+				while hit.call(x + d.x * k, y + d.y * k):
+					k += 1
+				if open.call(x + d.x * k, y + d.y * k):
+					return (y + d.y * k) * w + x + d.x * k
+				if open.call(x - d.x, y - d.y):
+					return (y - d.y) * w + x - d.x
+	# 2. a lone hit: try its neighbours
+	for i in cells.size():
+		if String(cells[i]) != "hit":
+			continue
+		for d: Vector2i in dirs:
+			if open.call(i % w + d.x, i / w + d.y):
+				return (i / w + d.y) * w + i % w + d.x
+	# 3. spread: every other cell of a diagonal lattice first, then the rest
+	for pass_i in 2:
+		for k in cells.size():
+			var i := (k * 17 + 3) % cells.size()
+			if String(cells[i]) == "?" and ((i % w + i / w) % 2 == 0) == (pass_i == 0):
 				return i
-	return best
-
-static func _fossil_ok(cells: Array, hints: Array, cover: Dictionary, a: Array, b: Array, w: int) -> bool:
-	var fossils := [a, b]
-	for i in cells.size():
-		var c := String(cells[i])
-		if c == "?":
-			continue
-		if c == ".":
-			if cover.has(i):
-				return false
-			var d := 99
-			for j in cover:
-				d = mini(d, absi(int(j) % w - i % w) + absi(int(j) / w - i / w))
-			if d != int(hints[i]):
-				return false
-		else:
-			if not cover.has(i):
-				return false
-			var complete := true
-			for j in fossils[cover[i]]:
-				if String(cells[j]) == "?":
-					complete = false
-			if (c == "bone") != complete:
-				return false
-	return true
+	return 0
 
 ## Largest poppable cluster (cell index x * H + y), or -1.
 static func bubble_pick(st: Dictionary) -> int:
@@ -237,27 +264,32 @@ static func scratch_pick(st: Dictionary, run_seed: int) -> int:
 ## Loadout for the next run: the owned minigames (up to the slots, Fossil and Claw first since
 ## their gold signatures help builds), and the highest-level owned pet (ties: content order).
 static func choose_loadout(p: Profile) -> Array:
-	var order := ["fossil_hunter", "claw_machine", "bubble_breaker", "scratch_off"]
+	var order := ["fossil_hunter", "claw_machine", "bubble_breaker", "bubble_shooter", "plinko", "fishing", "memory_match",
+		"shell_game", "high_low", "lucky_wheel", "scratch_off"]
 	var mg: Array = []
 	for id in order:
 		if p.owns("minigames", id) and mg.size() < p.loadout_slots():
 			mg.append(id)
 	var pet := ""
-	var pref := ["skull_buddy", "guard_die", "lantern_ghost", "pumpkin_sprite", "crystal_wisp", "coin_mimic"]
+	var pref := ["skull_buddy", "guard_die", "lantern_ghost", "pumpkin_sprite", "crystal_wisp", "coin_mimic",
+		"wick", "frost_mote", "pebble_golem", "grimoire", "tinker_gear", "cauldron"]
 	for id in pref:
 		if p.owns("pets", id) and (pet == "" or p.pet_level(id) > p.pet_level(pet)):
 			pet = id
 	return [mg, pet]
 
 ## Spends Crowns and Sigils greedily: the cheapest affordable item each step, Sigil unlocks in
-## CLASS -> PACK -> PET -> MINIGAME -> BIOME order, gear traits keep their default. Returns the
-## commands applied.
-static func spend(camp: Camp) -> Array:
+## CLASS -> PACK -> PET -> MINIGAME -> BIOME order, gear traits keep their default. A player who
+## just got a major unlock (class, pet or biome) from a milestone enjoys it before buying another
+## (`got_major`). Returns the commands applied.
+static func spend(camp: Camp, got_major := false) -> Array:
 	var done: Array = []
 	for guard in 200:
 		var best: Dictionary = {}
 		for it in camp.catalog():
 			if not bool(it.affordable):
+				continue
+			if got_major and UnlockDefs.MAJOR_KINDS.has(String(it.kind)):
 				continue
 			if best.is_empty() or _spend_rank(it) < _spend_rank(best):
 				best = it
@@ -282,7 +314,8 @@ static func _spend_rank(it: Dictionary) -> float:
 # ------------------------------------------------------------------ AUTO (Bot.decide)
 
 ## The meta part of Bot.decide(): {} when there is nothing meta to do, else a decide() result
-## {cmd, reason, stop, stop_reason}. Minigames always use AUTO's par result.
+## {cmd, reason, stop, stop_reason}. (Bot.decide stops before this in phase MINIGAME: the
+## player plays minigames; the minigame reward pick stays AUTO's.)
 static func decide(f: GameFlow, rules: AutoRules) -> Dictionary:
 	var cmd := next_command(f)
 	if cmd.is_empty():

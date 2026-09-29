@@ -28,9 +28,13 @@ const CHARGE_TEXT := {
 	"attack_intent": "+1 per enemy attack intent",
 	"board_double": "+1 per board move with doubles",
 }
-const MINIGAME_ICON := {"fossil_hunter": "skull", "bubble_breaker": "star", "scratch_off": "coin", "claw_machine": "trophy"}
+const MINIGAME_ICON := {"fossil_hunter": "skull", "bubble_breaker": "star", "scratch_off": "coin", "claw_machine": "trophy",
+	"bubble_shooter": "bolt", "plinko": "dice", "shell_game": "chest", "memory_match": "mirror", "fishing": "snowflake",
+	"lucky_wheel": "crown", "high_low": "up"}
 const MINIGAME_COLOR := {"fossil_hunter": Color("e0b070"), "bubble_breaker": Color("6fc8ff"),
-	"scratch_off": Color("ffc93d"), "claw_machine": Color("ff6fae")}
+	"scratch_off": Color("ffc93d"), "claw_machine": Color("ff6fae"), "bubble_shooter": Color("7f8cff"), "plinko": Color("5fe0c0"),
+	"shell_game": Color("e08a4a"), "memory_match": Color("b58cff"), "fishing": Color("4ac0e8"), "lucky_wheel": Color("ff7a5a"),
+	"high_low": Color("9ae05a")}
 const GEAR_ICON := {"helm": "shield", "blade": "sword", "boots": "speed", "charm": "coin"}
 const FEATURE_NAME := {"potion_belt": "Third Potion Slot", "loadout_slot": "Third Minigame Slot"}
 
@@ -102,12 +106,12 @@ static func milestone_for(kind: String, id: String) -> Dictionary:
 
 
 ## How a locked thing unlocks: the milestone text, plus the Sigil price when it can be bought.
-static func lock_text(kind: String, id: String) -> String:
+static func lock_text(kind: String, id: String, p: Profile = null) -> String:
 	var m := milestone_for(kind, id)
 	var parts := PackedStringArray()
 	if not m.is_empty():
 		parts.append(String(m.desc))
-	var cost := UnlockDefs.sigil_cost(kind, id)
+	var cost := UnlockDefs.sigil_cost(kind, id, p.unlocks.get("classes", []) if p != null else null)
 	if not cost.is_empty():
 		parts.append("or %d Sigils" % int(cost.sigils))
 	return "  ".join(parts) if not parts.is_empty() else "Locked"
@@ -115,17 +119,7 @@ static func lock_text(kind: String, id: String) -> String:
 
 ## [current, needed] toward a milestone condition ({stat, min} or {any: [...]}: best branch).
 static func progress(p: Profile, cond: Dictionary) -> Array:
-	if cond.has("any"):
-		var best := [0, 1]
-		var best_r := -1.0
-		for sub in cond.any:
-			var pr := progress(p, sub)
-			var r := float(pr[0]) / maxf(1.0, float(pr[1]))
-			if r > best_r:
-				best_r = r
-				best = pr
-		return best
-	return [mini(p.counter(String(cond.stat)), int(cond.min)), int(cond.min)]
+	return p.cond_progress(cond)
 
 
 ## Station lock state: {locked, text}. The Armory opens with the first gear piece, the Pet Den

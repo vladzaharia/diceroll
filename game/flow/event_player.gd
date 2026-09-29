@@ -200,6 +200,11 @@ func _one(ev: Dictionary) -> void:
 		# --- combat --------------------------------------------------------------------
 		"combat_started":
 			await c.begin_combat(ev)
+			await EncounterCards.after_combat_started(c, ev)
+		"affix_triggered":
+			await AffixBeats.affix_triggered(c, ev)
+		"enemy_transformed":
+			await AffixBeats.transformed(c, ev)
 		"combat_turn_started":
 			_swung = false
 			c.tray.clear_highlight()
@@ -247,6 +252,9 @@ func _one(ev: Dictionary) -> void:
 			await _wait(1.1)
 		"combat_won":
 			await c.end_combat(ev)
+		# --- minigames (game/minigames/minigame_beats.gd) ---------------------------------
+		"minigame_started", "minigame_update", "minigame_result", "crowns_pending":
+			await MinigameBeats.play(c, ev)
 		_:
 			pass
 
@@ -658,6 +666,12 @@ func _status(ev: Dictionary) -> void:
 	if i >= c.stage.enemy_count():
 		return
 	var pos := c.stage.enemy_position(i) + Vector3.UP
+	if st == "frenzy":
+		await AffixBeats.frenzy(c, ev)
+		return
+	if bool(ev.get("rally", false)):
+		await AffixBeats.rally(c, ev)
+		return
 	match st:
 		"poison":
 			c.stage.set_enemy(i, {"poison": v})
