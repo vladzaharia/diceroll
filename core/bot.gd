@@ -989,7 +989,7 @@ class CombatModel:
 			var d0 := _hit(t, float(total))
 			dealt += d0
 			if pierce_carry and h[t] <= 0.0:
-				var over := (ceilf(total / 2.0) if e_ward[t] == 1 else float(total)) - e_block[t] - e_hp[t]
+				var over := floorf(((ceilf(total / 2.0) if e_ward[t] == 1 else float(total)) - e_block[t] - e_hp[t]) * ClassLogic.RANGER_PIERCE_PCT)
 				if over > 0.0:
 					for k in ne:
 						if k != t and h[k] > 0.0:

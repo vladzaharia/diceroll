@@ -202,7 +202,7 @@ func test_ranger_piercing_shot_carries_overkill_once() -> void:
 	var ev := c.attack(run)
 	var ps := _all(ev, "class_triggered", "piercing_shot")
 	assert_eq(ps.size(), 1)
-	assert_eq(int(ps[0].value), int(floor(18 * ClassLogic.aim_mult(2))) - 3)
+	assert_eq(int(ps[0].value), int(floor((int(floor(18 * ClassLogic.aim_mult(2))) - 3) * ClassLogic.RANGER_PIERCE_PCT)))
 	assert_eq(int(ps[0].enemy_idx), 1)
 	assert_true(not c.alive(1))
 	assert_eq(int(c.enemies[2].hp), 100, "only one carry")

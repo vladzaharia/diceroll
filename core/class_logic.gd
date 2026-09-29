@@ -17,7 +17,7 @@ extends RefCounted
 ##                         Oath (face_changed {source: "sanctify"}). Shops weight Twin/Even x2.
 ##   aim (Ranger)          no combat reroll this turn: the main attack deals x aim_mult(pool size)
 ##                         (RANGER_AIM_SMALL with 3 dice or fewer, else RANGER_AIM_MULT);
-##                         overkill on the target carries once to the next living enemy
+##                         RANGER_PIERCE_PCT of the overkill on the target carries once to the next living enemy
 ##                         (Piercing Shot, event id "piercing_shot")
 ##   shadow_step (Ninja)   a reroll after which a rerolled die matches another die's non-blank
 ##                         value is refunded (max NINJA_REFUNDS_PER_TURN per turn; never twice
@@ -63,6 +63,8 @@ static var RANGER_AIM_MULT := 1.15
 static var RANGER_AIM_SMALL := 1.3
 static var RANGER_AIM_SMALL_DICE := 3
 static var RANGER_PIERCE_CARRIES := 1
+## Share of the overkill that Piercing Shot carries on.
+static var RANGER_PIERCE_PCT := 0.5
 static var NINJA_REFUNDS_PER_TURN := 2
 static var NINJA_BOARD_REFUNDS := 1
 static var DRUID_GROWTH := 1
@@ -89,6 +91,7 @@ static func tune_knob(knob: String, v: float) -> bool:
 		"RANGER_AIM_SMALL": RANGER_AIM_SMALL = v
 		"RANGER_AIM_SMALL_DICE": RANGER_AIM_SMALL_DICE = int(v)
 		"RANGER_PIERCE_CARRIES": RANGER_PIERCE_CARRIES = int(v)
+		"RANGER_PIERCE_PCT": RANGER_PIERCE_PCT = v
 		"NINJA_REFUNDS_PER_TURN": NINJA_REFUNDS_PER_TURN = int(v)
 		"NINJA_BOARD_REFUNDS": NINJA_BOARD_REFUNDS = int(v)
 		"DRUID_GROWTH": DRUID_GROWTH = int(v)
@@ -261,7 +264,7 @@ static func after_main_hit(run: RunState, c: CombatState, tgt: int, overkill: in
 	var out: Array[Dictionary] = []
 	match mech(run):
 		"aim":
-			var carry := overkill
+			var carry := int(floor(overkill * RANGER_PIERCE_PCT))
 			var from := tgt
 			for k in RANGER_PIERCE_CARRIES:
 				if carry <= 0:
@@ -275,7 +278,7 @@ static func after_main_hit(run: RunState, c: CombatState, tgt: int, overkill: in
 					break
 				out.append(ev(run, "piercing_shot", carry, {"from": from, "enemy_idx": nxt}))
 				out.append_array(c.damage_enemy(nxt, carry, "pierce_shot", run))
-				carry = c.last_overkill
+				carry = int(floor(c.last_overkill * RANGER_PIERCE_PCT))
 				from = nxt
 	return out
 
@@ -394,11 +397,16 @@ static func on_lap(run: RunState) -> Array[Dictionary]:
 	match mech(run):
 		"overgrowth":
 			var grew := 0
+			# the Short Road's 10 laps grow as much as a standard run's 15 (x1.5, alternating 1 and 2)
+			var steps := DRUID_GROWTH
+			if run.mode == "short":
+				var k := int(run.stats.get("laps_completed", 1))
+				steps = DRUID_GROWTH * (int(floor(k * 1.5)) - int(floor((k - 1) * 1.5)))
 			for i in run.dice.size():
 				var d := run.dice[i]
 				if not d.has_tag("seed"):
 					continue
-				for g in DRUID_GROWTH:
+				for g in steps:
 					var f := d.lowest_face()
 					if d.raise_face(f):
 						grew += 1
@@ -451,15 +459,19 @@ static func on_biome(run: RunState) -> Array[Dictionary]:
 			for d in run.dice:
 				if d.has_tag("seed"):
 					seeds += 1
-			if seeds >= DRUID_MAX_SEEDS:
-				return out
-			var best := -1
-			for i in run.dice.size():
-				if run.dice[i].has_tag("seed"):
-					continue
-				if best < 0 or run.dice[i].face_sum() < run.dice[best].face_sum():
-					best = i
-			if best >= 0:
+			# the Short Road has one biome change instead of two: it plants two seeds
+			for n in (2 if run.mode == "short" else 1):
+				if seeds >= DRUID_MAX_SEEDS:
+					break
+				var best := -1
+				for i in run.dice.size():
+					if run.dice[i].has_tag("seed"):
+						continue
+					if best < 0 or run.dice[i].face_sum() < run.dice[best].face_sum():
+						best = i
+				if best < 0:
+					break
+				seeds += 1
 				run.dice[best].add_tag("seed")
 				out.append(ev(run, "seed", best, {"die_idx": best}))
 				out.append({"type": "die_tagged", "die_idx": best, "tag": "seed", "tags": Array(run.dice[best].tags)})
