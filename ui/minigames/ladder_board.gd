@@ -231,6 +231,9 @@ func scripted_input(args: Array, drv: Node) -> bool:
 
 func play_update(ev: Dictionary) -> void:
 	_pending = -1.0
+	if not is_inside_tree():
+		set_state(ev.get("state", {}), true)
+		return
 	_busy = true
 	locked = true
 	_layout()
@@ -412,29 +415,10 @@ func _play_cash(r: int, top: bool) -> void:
 	await wait(0.6)
 
 
-## Plays an sfx at a chosen pitch (a chime climbing with the rung): the bus has no pitch
-## parameter, so this loads the same stream into a one-shot player here.
+## The climb chime: a bell and a glass plink, pitched up with every rung.
 func _chime(pitch: float) -> void:
-	var loop := Engine.get_main_loop() as SceneTree
-	var a: Node = loop.root.get_node_or_null("Audio") if loop else null
-	if a == null or a.get_script() == null:
-		return
-	var defs: Dictionary = (a.get_script() as Script).get_script_constant_map().get("SFX", {})
-	for id in ["bell", "plink"]:
-		if not defs.has(id):
-			continue
-		var files: Array = defs[id][0]
-		var path := String(files[randi() % files.size()])
-		if not ResourceLoader.exists(path):
-			continue
-		var p := AudioStreamPlayer.new()
-		p.stream = load(path)
-		p.bus = "SFX"
-		p.volume_db = float(defs[id][1]) + (-2.0 if id == "bell" else 2.0)
-		p.pitch_scale = pitch * (1.0 if id == "bell" else 1.5)
-		add_child(p)
-		p.finished.connect(p.queue_free)
-		p.play()
+	MgBoard.sfx("bell", 0.0, -2.0, pitch)
+	MgBoard.sfx("plink", 0.0, 2.0, pitch * 1.5)
 
 
 func _tick(dt: float) -> void:
