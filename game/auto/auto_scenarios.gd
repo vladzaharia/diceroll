@@ -104,6 +104,11 @@ static func run_ui_auto(d: Node, c: GameController, f: GameFlow, args: Dictionar
 				await d.get_tree().create_timer(0.5, true, false, true).timeout
 				await _save("%s_handback_%02d.png" % [shot_base, handback_shots])
 			# the player plays this step (the manual path), then turns AUTO back on
+			if f.phase == GameFlow.Phase.MINIGAME:
+				await play_minigame(c, f)
+				if not f.is_over():
+					toggle_on(c)
+				continue
 			var step := Bot.decide(f, AutoRules.all_on())
 			if not bool(step.stop):
 				var cmd: Array = step.cmd
@@ -115,6 +120,23 @@ static func run_ui_auto(d: Node, c: GameController, f: GameFlow, args: Dictionar
 	print("AUTO_END %s act=%d lap=%d lvl=%d commands=%d auto_steps=%d handbacks=%d t=%.0fs" % ["VICTORY" if won else "GAME_OVER",
 		f.run.act, f.run.lap, f.run.level, f.commands.size(), c.auto.steps, handbacks, _el(t0)])
 	return 0
+
+
+## AUTO pauses at every minigame (the player plays them): a simulated player plays it through
+## the screen's commands (BotMeta's play policy on the public state), then the screen cashes
+## it in by itself.
+static func play_minigame(c: GameController, f: GameFlow) -> void:
+	var guard := 0
+	while f.phase == GameFlow.Phase.MINIGAME and guard < 120:
+		guard += 1
+		if not bool(f.offer.get("done", false)) and int(f.offer.get("actions_left", 0)) > 0 and not c.busy:
+			var args := BotMeta.play_args(String(f.offer.id), f.offer.state, f.run.seed)
+			if args.is_empty():
+				c.run_command("minigame_finish", [])
+			else:
+				c.run_command("minigame_action", [args])
+		await _idle(c)
+		await c.get_tree().create_timer(0.1, true, false, true).timeout
 
 
 static func _el(t0: int) -> float:

@@ -4,9 +4,10 @@ extends Control
 ## (FossilBoard / BubbleBoard / ScratchBoard / ClawBoard and the Minigames 2.0 boards: ShooterBoard,
 ## PlinkoBoard, ShellBoard, MemoryBoard, FishingBoard, WheelBoard, LadderBoard) plus the frame
 ## every game shares:
-## title ribbon, a one-line hint, the actions-left and score pills, a live par meter, the
-## AUTO button (takes the par result) and the results beat (medal stamp, score, par meter,
-## Crowns). Portrait: everything stacked; landscape: the board left, the panel right.
+## title ribbon, a one-line hint, the actions-left and score pills, a live tier meter, the
+## claw's DROP button and the results beat (medal stamp, score, tier meter, Crowns). Portrait:
+## everything stacked; landscape: the board left, the panel right. There is no AUTO here: the
+## player plays every minigame (user decision 2026-09-29; AUTO pauses at minigames).
 ##
 ## It renders the core's public state only (flow.offer.state and event states) and never
 ## calls GameFlow: taps become signals that UiRoot turns into commands.
@@ -20,13 +21,10 @@ extends Control
 signal action(args: Array)
 ## The game is over on the board (no actions left / nothing left to find): cash it in.
 signal finish_requested
-## AUTO: skip with the par result (GameFlow.minigame_auto).
-signal auto_requested
 
 var speed := 1.0
 var game_id := ""
 var board: MgBoard
-var auto_btn: GameButton
 var drop_btn: GameButton
 var ribbon: Ribbon
 
@@ -90,13 +88,6 @@ func _init() -> void:
 	_buttons = UiTheme.hbox(16)
 	_buttons.alignment = BoxContainer.ALIGNMENT_CENTER
 	_content.add_child(_buttons)
-	auto_btn = GameButton.make("AUTO", "auto", GameButton.Kind.SECONDARY, 30)
-	auto_btn.sub_text = "take par"
-	auto_btn.custom_minimum_size = Vector2(190, 84)
-	auto_btn.pressed.connect(func() -> void:
-		if _open and not _in_result:
-			auto_requested.emit())
-	_buttons.add_child(auto_btn)
 	drop_btn = GameButton.make("DROP!", "", GameButton.Kind.PRIMARY, 40)
 	drop_btn.custom_minimum_size = Vector2(250, 84)
 	drop_btn.pressed.connect(func() -> void:
@@ -205,7 +196,6 @@ func _show() -> void:
 	_result.visible = false
 	_finish_at = -1.0
 	_content.modulate.a = 1.0
-	auto_btn.set_enabled(true)
 	_layout()
 
 
@@ -280,7 +270,6 @@ func _process(dt: float) -> void:
 	if over and board.is_settled():
 		if _finish_at < 0.0:
 			_finish_at = _t + 0.8 / speed
-			auto_btn.set_enabled(false)
 		elif _t >= _finish_at and _t - _last_emit > 0.4:
 			_last_emit = _t
 			finish_requested.emit()
@@ -309,7 +298,6 @@ func play_result(ev: Dictionary) -> void:
 		_ensure(String(ev.get("id", "")), MinigameDefs.name_of(String(ev.get("id", ""))))
 	_show_if_hidden()
 	_in_result = true
-	auto_btn.set_enabled(false)
 	var tier := String(ev.get("tier", "silver"))
 	var col: Color = MgLogic.TIER_COLORS.get(tier, UiPalette.GOLD)
 	var auto := bool(ev.get("auto", false))
@@ -418,6 +406,8 @@ func _layout() -> void:
 	ribbon.size = rs
 	var board_r: Rect2
 	var side_ctl: Array[Control] = [ribbon, _hint, _stats, _meter_box, _buttons]
+	# the button row only holds the claw's DROP button; other boards take the space
+	var btn_h := 88.0 if drop_btn.visible else 0.0
 	if land:
 		# board square on the left, the info column beside it (scaled up a notch: the
 		# landscape canvas is wider); the pair is centred
@@ -433,7 +423,7 @@ func _layout() -> void:
 		_hint.custom_minimum_size = Vector2(cw, 0)
 		_hint.size = Vector2(cw, 0)
 		var hint_h := _hint.get_combined_minimum_size().y
-		var total := (rs.y + 10.0 + hint_h + 24.0 + 88.0 + 100.0 + 88.0) * k
+		var total := (rs.y + 10.0 + hint_h + 24.0 + 88.0 + 100.0 + btn_h) * k
 		var y := maxf(top, (vs.y - total) * 0.5)
 		ribbon.position = Vector2(cx + (col_w - rs.x * k) * 0.5, y)
 		y += (rs.y + 10.0) * k
@@ -466,7 +456,7 @@ func _layout() -> void:
 		_meter_box.size = Vector2(mw, 60)
 		_meter.custom_minimum_size = Vector2(mw, 60)
 		y += 70.0
-		var by := vs.y - safe.bottom - 100.0
+		var by := vs.y - safe.bottom - (btn_h + 12.0 if btn_h > 0.0 else 0.0)
 		_buttons.position = Vector2(0, by)
 		_buttons.size = Vector2(vs.x, 88)
 		board_r = Rect2(Vector2(safe.left + 8.0, y), Vector2(vs.x - safe.left - safe.right - 16.0, by - y - 12.0))

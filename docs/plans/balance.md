@@ -154,8 +154,12 @@ Upgrades are the whole growth curve now: the old level-up drafts gave about 17 p
 - **Minigames:** one tile per equipped minigame (2 slots, 3 with the Arcade upgrade), and each
   tile respawns on lap mutation. The score is compared with `MinigameDefs.MEDIAN`: below 0.8 is
   bronze, 0.8 to 1.2 is silver, and 1.2+ is gold. Gold rewards scale by ±15% (the skill band).
-  AUTO takes the par result of 0.85 (silver) without playing. The run is saved when a minigame
-  starts (`minigame_started.save_point`).
+  **Players play every minigame (user decision 2026-09-29):** the in-game AUTO pauses on a
+  minigame tile ("Your turn: play the minigame") and resumes when switched back on; the screen
+  has no AUTO button. The sim and headless bots still take the par result of 0.85 (silver,
+  `minigame_auto`) as a stand-in for an average player, which is why the minigame reward rows
+  in the tables above count as "par". The run is saved when a minigame starts
+  (`minigame_started.save_point`).
 - **Fossil Hunter is a luck dig (user decision, no Minesweeper hints):** 7x7 site, three fossils
   (4, 3, 2 long) plus a gem (3 pts) and two coin pouches (2 pts), 10 digs; a dig reveals only its
   own cell. Score = fossil cells dug + each complete fossil's size again + treasure points.
@@ -173,7 +177,7 @@ Upgrades are the whole growth curve now: the old level-up drafts gave about 17 p
 ### Minigames 2.0 (WP-E5, spec §16 "More minigames")
 
 Seven more Arcade games, all in `core/minigames/<id>.gd` (deterministic from the minigame Rng +
-inputs, public state only, save/load mid-game). Every MEDIAN below is calibrated with
+inputs, public state only, save/load mid-game; played by the player, never by AUTO). Every MEDIAN below is calibrated with
 `tools/mg_calibrate.gd` (a human-like player with its own noise Rng, 2,000 games each; `--policy=
 expert|random` for the bounds), so median play = ratio 1.0 = silver at 1.0x, like the first four.
 E[value] = expected prize in gold equivalents (bronze 12, silver 25, gold 45 x skill band); the

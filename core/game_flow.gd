@@ -1485,7 +1485,8 @@ func minigame_finish() -> Array[Dictionary]:
 	_record(["minigame_finish"])
 	return _minigame_result(float(minigame.score()) / float(MinigameDefs.MEDIAN[minigame.id]), false)
 
-## AUTO: skips the game and takes the par result (MinigameDefs.PAR of median).
+## Skips the game with the par result (MinigameDefs.PAR of median). Sims / headless bots only:
+## players play every minigame and the in-game AUTO pauses at minigames (Bot.decide).
 func minigame_auto() -> Array[Dictionary]:
 	if phase != Phase.MINIGAME or minigame == null:
 		return _err("minigame_auto")

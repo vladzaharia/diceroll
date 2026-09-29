@@ -4,7 +4,8 @@ extends RefCounted
 ## loadout). Bot.next_command() asks next_command() first; an empty result means "no meta
 ## action, carry on". Pure functions of the flow/profile state (no randomness of its own).
 
-## "par": AUTO takes the par result without playing (review §5.4, the default for AUTO);
+## "par": take the par result without playing (review §5.4; the sim's stand-in for an average
+## player — the in-game AUTO never plays minigames, Bot.decide pauses there);
 ## "play": the bot plays the minigame (fossil: follow bones, else a spread pattern; largest bubble cluster,
 ## scratch in a seed-derived order, claw at the best prize centre; the Minigames 2.0 set:
 ## bubble shooter's best angle, plinko's best-odds slot, the shell game's tracked cup (a Sharp
@@ -309,7 +310,8 @@ static func _spend_rank(it: Dictionary) -> float:
 # ------------------------------------------------------------------ AUTO (Bot.decide)
 
 ## The meta part of Bot.decide(): {} when there is nothing meta to do, else a decide() result
-## {cmd, reason, stop, stop_reason}. Minigames always use AUTO's par result.
+## {cmd, reason, stop, stop_reason}. (Bot.decide stops before this in phase MINIGAME: the
+## player plays minigames; the minigame reward pick stays AUTO's.)
 static func decide(f: GameFlow, rules: AutoRules) -> Dictionary:
 	var cmd := next_command(f)
 	if cmd.is_empty():

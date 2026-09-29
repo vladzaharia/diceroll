@@ -4,7 +4,8 @@ extends RefCounted
 ## `score`. Performance ratio r = score / MEDIAN[id] (MEDIAN = median play, calibrated with the
 ## sim bot, see balance.md). r picks the reward TIER (bronze < TIER_SILVER <= silver <
 ## TIER_GOLD <= gold) and scales gold rewards by clamp(r, 1 - SKILL_BAND, 1 + SKILL_BAND).
-## AUTO (minigame_auto) skips the game and takes r = PAR.
+## minigame_auto skips the game and takes r = PAR: sims / headless bots only (the player plays
+## every minigame; the in-game AUTO pauses at minigames, Bot.decide).
 ## After a game the player picks ONE reward from the tier's options (offer kind "reward").
 ## Crowns: Economy.CROWNS_MINIGAME[tier] per game, banked at run end.
 ## Mastery (1..5) comes from playing a minigame (MASTERY_PLAYS) and adds MASTERY_BONUS per level

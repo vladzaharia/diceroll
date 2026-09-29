@@ -18,16 +18,18 @@ extends RefCounted
 ##                      (Continue mid-minigame); prints MG_RESUME
 ##      --aim=cluster   (claw) drop where the most capsules are in reach (multi-scoop shots)
 ##      --rig=three     (scratch) scratch three alike (harness peek, for the jackpot shots)
-##      --auto=1        (fresh) press the screen's AUTO button (par result)
 ##      --state=anim    --actions=N actions after --delay=S seconds (frame sequences: pair it
 ##                      with --wait and --frames)
 ##  tile_minigames  a board with all four minigame tiles next to the hero (--close=1: close-up;
 ##                  --set=new: the seven Minigames 2.0 tiles; --game=<id>: that one tile)
-##  mg_play_auto    a run with all four minigames equipped (opts.meta from the max profile,
+##  mg_play_auto    a run with every minigame equipped (opts.meta from the max profile,
 ##                  loadout = every minigame), played by AUTO through the real toggle
-##                  (AutoPilot + Bot.decide); shots whenever a minigame starts / ends
-##                  (<shot>_mg_NN.png), quits after --games=N minigames (default 4) or the run
-##                  end. Prints MG_AUTO_PLAYED lines and MG_AUTO_DONE.
+##                  (AutoPilot + Bot.decide). AUTO never plays a minigame: it pauses on the
+##                  tile ("Your turn: play the minigame"), the scenario plays it like a player
+##                  (real input via the boards' scripted_input), then turns AUTO back on. Shots
+##                  whenever a minigame starts / ends (<shot>_mg_NN.png); quits after --games=N
+##                  minigames (default 4) or the run end. Prints MG_AUTO_HANDBACK /
+##                  MG_AUTO_PLAYED / MG_AUTO_RESUMED lines and MG_AUTO_DONE.
 ## Common: --seed=N --speed=N --class=<id>
 
 const NAMES := ["mg_fossil", "mg_bubble", "mg_scratch", "mg_claw", "tile_minigames", "mg_play_auto", "mg_icons",
@@ -101,9 +103,6 @@ class _Driver extends Node:
 		var ev := f.debug_open("minigame", id)
 		await c.play_events(ev)
 		if st == "fresh":
-			if args.get("auto", "0") == "1":
-				await _pause(0.6)
-				_click_control(c.ui.minigame.auto_btn)
 			return
 		var scr := c.ui.minigame
 		if st == "result":
@@ -351,7 +350,25 @@ class _Driver extends Node:
 				print("MG_AUTO_STUCK phase=%s enabled=%s busy=%s" % [GameFlow.phase_name(f.phase), c.auto.enabled, c.busy])
 				break
 			if not c.auto.enabled and not c.busy and c.auto.can_act() and not f.is_over():
+				if f.phase == GameFlow.Phase.MINIGAME:
+					# AUTO handed the minigame to the player: play it by hand, then AUTO on again
+					var gid := String(f.offer.id)
+					print("MG_AUTO_HANDBACK %s reason=\"%s\"" % [gid, String(c.auto.last_decision.get("stop_reason", ""))])
+					var guard := 0
+					while f.phase == GameFlow.Phase.MINIGAME and not bool(f.offer.done) and guard < 80:
+						guard += 1
+						await _idle()
+						if not await _input_action(gid, f):
+							break
+						await _idle()
+					var wait_guard := 0
+					while f.phase == GameFlow.Phase.MINIGAME and wait_guard < 200:
+						wait_guard += 1
+						await _pause(0.05)
+					await _idle()
 				AutoScenarios.toggle_on(c)
+				if f.phase != GameFlow.Phase.MINIGAME:
+					print("MG_AUTO_RESUMED phase=%s auto_on=%s" % [GameFlow.phase_name(f.phase), c.auto.enabled])
 		await _pause(2.0)
 		await _save("%s_final.png" % _shot_base)
 		print("MG_AUTO_DONE played=%d phase=%s lap=%d commands=%d t=%.0fs" % [played[0], GameFlow.phase_name(f.phase), f.run.lap,

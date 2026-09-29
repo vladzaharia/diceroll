@@ -12,15 +12,46 @@ func _first(ev: Array, type: String) -> Dictionary:
 	return {}
 
 
-## AUTO (Bot.decide / BotMeta par mode) must skip every untouched minigame with the par
-## result (review §5.4: "AUTO plays at a par result of 85% of median"), the claw included.
-func test_auto_takes_par_for_every_minigame() -> void:
+## Players play every minigame (user decision 2026-09-29): AUTO (Bot.decide) pauses on every
+## minigame and hands it to the player; the sim/headless bot (BotMeta par mode, through
+## Bot.next_command) still takes the par result as an average player's stand-in.
+func test_auto_pauses_at_every_minigame_sim_takes_par() -> void:
 	for game in MinigameDefs.IDS:
 		var f := GameFlow.new_run("knight", 11, 28, {"profile": Profile.fresh().to_dict()})
 		f.debug_open("minigame", game)
-		assert_eq(BotMeta.minigame_command(f), ["minigame_auto"], game)
 		var d := Bot.decide(f, AutoRules.all_on())
-		assert_eq(d.cmd, ["minigame_auto"], game + " via Bot.decide")
+		assert_true(bool(d.stop), game + ": AUTO stops")
+		assert_eq(String(d.stop_reason), "Your turn: play the minigame", game)
+		assert_eq(d.cmd, [], game)
+		assert_eq(BotMeta.minigame_command(f), ["minigame_auto"], game + " (sim)")
+		assert_eq(Bot.next_command(f), ["minigame_auto"], game + " via Bot.next_command (sim)")
+		# half-played: AUTO still leaves it to the player
+		BotMeta.minigame_mode = "play"
+		f.apply(BotMeta.minigame_command(f))
+		BotMeta.minigame_mode = "par"
+		if f.phase == P.MINIGAME:
+			assert_true(bool(Bot.decide(f, AutoRules.all_on()).stop), game + " mid-game")
+
+
+## After the minigame, AUTO picks the reward again (turning it back on resumes the run).
+func test_auto_resumes_after_the_minigame() -> void:
+	var f := GameFlow.new_run("knight", 12, 28, {"profile": Profile.fresh().to_dict()})
+	f.debug_open("minigame", "plinko")
+	for k in 3:
+		f.minigame_action([4])
+	f.minigame_finish()
+	assert_eq(String(f.offer.kind), "reward")
+	var d := Bot.decide(f, AutoRules.all_on())
+	assert_true(not bool(d.stop))
+	assert_eq(String(d.cmd[0]), "pick_draft")
+
+
+## The screen has no AUTO button.
+func test_screen_has_no_auto_button() -> void:
+	var scr := MinigameScreen.new()
+	assert_true(scr.get("auto_btn") == null, "no auto_btn")
+	assert_true(not scr.has_signal("auto_requested"))
+	scr.free()
 
 
 ## The public state handed to the presentation is a snapshot: a later action must not change
