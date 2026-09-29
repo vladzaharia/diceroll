@@ -14,7 +14,9 @@ extends RefCounted
 ##                   rattles, BOO!, the hero appears): use --frames
 ##  ui_mk_mystery    the run setup on a mid profile (the "???" card)
 
-const CAMP := preload("res://game/camp/scenarios.gd")
+## Loaded at runtime: game/camp/scenarios.gd reaches autoloads (Audio) that the headless
+## ui/check_scripts.gd compile check does not have.
+const CAMP_PATH := "res://game/camp/scenarios.gd"
 const NAMES := ["ui_class_select", "ui_wardrobe", "camp_wardrobe", "ui_results_skins", "ui_mk_reveal", "ui_mk_mystery"]
 
 
@@ -35,7 +37,7 @@ static func build(name: String) -> Node:
 static func profile(name: String) -> Profile:
 	match name:
 		"demo":
-			var p := CAMP.preset("mid")
+			var p: Profile = load(CAMP_PATH).preset("mid")
 			p.loadout["class"] = "knight"
 			p.cosmetics["owned"] = {"knight": ["victor", "ascendant", "prestige"], "paladin": ["victor"]}
 			p.cosmetics["equipped"] = {"knight": "victor", "paladin": "victor"}
@@ -45,7 +47,7 @@ static func profile(name: String) -> Profile:
 			p.records["bosses_by_class"] = {"knight": ["boss_lich", "boss_cinder_king"], "barbarian": ["boss_lich"]}
 			return p
 		"capped":
-			var p := CAMP.preset("max")
+			var p: Profile = load(CAMP_PATH).preset("max")
 			p.crowns = 1260
 			for slot in GearDefs.SLOTS:
 				p.gear[slot] = GearDefs.MAX_LEVEL
@@ -61,7 +63,7 @@ static func profile(name: String) -> Profile:
 			return p
 		"kid":
 			# every other class owned, 39 runs banked: the next run finds the Monster Kid
-			var p := CAMP.preset("max")
+			var p: Profile = load(CAMP_PATH).preset("max")
 			(p.unlocks.classes as Array).erase("monster_kid")
 			p.milestones = p.milestones.filter(func(m: Variant) -> bool: return String(m) != "trick_or_treat")
 			p.records.runs = 39
@@ -75,12 +77,12 @@ static func profile(name: String) -> Profile:
 			return null
 	if name == "fresh":
 		return Profile.fresh()
-	return CAMP.preset(name)
+	return load(CAMP_PATH).preset(name)
 
 
 class _Driver extends Node:
 	var scenario := ""
-	var c: GameController
+	var c: Node # GameController, loaded at runtime (see CAMP_PATH)
 	var args: Dictionary = {}
 
 	func _ready() -> void:
@@ -109,7 +111,7 @@ class _Driver extends Node:
 		return load("res://ui/camp/wardrobe_scenarios.gd").profile(n)
 
 	func _controller() -> void:
-		c = GameController.new()
+		c = load("res://game/game_controller.gd").new()
 		c.autosave = false
 		c.persist_profile = false
 		add_child(c)
@@ -145,7 +147,7 @@ class _Driver extends Node:
 	func _results(cls: String, asc: int, prof: String) -> void:
 		_controller()
 		c.profile = _prof(prof)
-		var p := c.profile
+		var p: Profile = c.profile
 		p.loadout["class"] = cls
 		if not p.unlocks.classes.has(cls):
 			(p.unlocks.classes as Array).append(cls)

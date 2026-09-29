@@ -5,7 +5,7 @@ extends RefCounted
 ##   default    owned with the class
 ##   victor     first win with the class (any mode)            cond {class_win: 1}
 ##   ascendant  a win with the class at A3+                     cond {class_asc: 3}
-##   bossbane   each of the 4 final bosses beaten with the class, or a win at A6+
+##   bossbane   4 different final bosses beaten with the class, or a win at A6+
 ##                                                              cond {class_bosses: 4, or_class_asc: 6}
 ##   prestige   a win at A10: an overlay on any equipped skin, never buyable
 ##                                                              cond {class_asc: 10, prestige: true}
@@ -91,7 +91,7 @@ static func cond_text(class_id: String, skin: String) -> String:
 		"ascendant":
 			return "Win with the %s at Ascension 3+." % cname
 		"bossbane":
-			return "Beat each of the 4 final bosses with the %s (or win at Ascension 6+)." % cname
+			return "Beat 4 different final bosses with the %s (or win at Ascension 6+)." % cname
 		"prestige":
 			return "Win with the %s at Ascension 10." % cname
 	return "Owned with the class."
