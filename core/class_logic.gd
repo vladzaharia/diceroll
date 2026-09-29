@@ -27,20 +27,37 @@ extends RefCounted
 ##                         untagged die with the lowest face sum as a seed (max DRUID_MAX_SEEDS);
 ##                         Wild Bond: the pet starts every fight with +1 charge ("wild_bond")
 
-const PALADIN_OATH_MULT := 0.5
-const PALADIN_OATH_PIP := 1
+static var PALADIN_OATH_MULT := 0.5
+static var PALADIN_OATH_PIP := 1
 ## Sanctify uses per run (one per biome change; 2 in a standard run).
-const PALADIN_SANCTIFY := 2
+static var PALADIN_SANCTIFY := 2
 ## Shop die-kind weight multipliers for the Paladin (only kinds in the unlocked pool).
 const PALADIN_SHOP_KINDS := {"twin": 2.0, "even": 2.0}
 const SET_COMBOS := ["pair", "two_pair", "three_kind", "full_house", "four_kind", "five_kind", "six_kind"]
-const RANGER_AIM_MULT := 1.3
-const RANGER_PIERCE_CARRIES := 1
-const NINJA_REFUNDS_PER_TURN := 2
-const NINJA_BOARD_REFUNDS := 1
-const DRUID_GROWTH := 1
-const DRUID_MAX_SEEDS := 3
-const DRUID_PET_CHARGE := 1
+static var RANGER_AIM_MULT := 1.3
+static var RANGER_PIERCE_CARRIES := 1
+static var NINJA_REFUNDS_PER_TURN := 2
+static var NINJA_BOARD_REFUNDS := 1
+static var DRUID_GROWTH := 1
+static var DRUID_MAX_SEEDS := 3
+static var DRUID_PET_CHARGE := 1
+
+## Sim-only analysis dial (tools/sim.gd --cl=<KNOB>=<value>): sets one of the knobs above.
+## Returns false for an unknown knob. The defaults above ARE the shipped numbers.
+static func tune_knob(knob: String, v: float) -> bool:
+	match knob:
+		"PALADIN_OATH_MULT": PALADIN_OATH_MULT = v
+		"PALADIN_OATH_PIP": PALADIN_OATH_PIP = int(v)
+		"PALADIN_SANCTIFY": PALADIN_SANCTIFY = int(v)
+		"RANGER_AIM_MULT": RANGER_AIM_MULT = v
+		"RANGER_PIERCE_CARRIES": RANGER_PIERCE_CARRIES = int(v)
+		"NINJA_REFUNDS_PER_TURN": NINJA_REFUNDS_PER_TURN = int(v)
+		"NINJA_BOARD_REFUNDS": NINJA_BOARD_REFUNDS = int(v)
+		"DRUID_GROWTH": DRUID_GROWTH = int(v)
+		"DRUID_MAX_SEEDS": DRUID_MAX_SEEDS = int(v)
+		"DRUID_PET_CHARGE": DRUID_PET_CHARGE = int(v)
+		_: return false
+	return true
 
 static func mech(run: RunState) -> String:
 	return HeroDefs.mechanic(run.class_id)

@@ -64,7 +64,7 @@ var cursed_faces: Array[Dictionary] = []
 ## the rest of the random stream. Invalid overrides are ignored.
 static func create(p_class_id: String, p_seed: int, p_board_size: int = Balance.BOARD_SIZE, opts: Dictionary = {}) -> RunState:
 	var r := RunState.new()
-	var def: Dictionary = HeroDefs.DATA[p_class_id]
+	var def: Dictionary = HeroDefs.def(p_class_id)
 	r.class_id = p_class_id
 	r.seed = p_seed
 	r.rng = Rng.new(p_seed)

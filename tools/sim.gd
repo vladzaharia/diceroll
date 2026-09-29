@@ -152,6 +152,24 @@ func _init() -> void:
 			track_items = true
 		elif arg == "--force":
 			force_classes = true
+		elif arg.begins_with("--hero="):
+			# --hero=<class>.<field>=<value>: hp/atk/board_rerolls/combat_rerolls ints, runes/kinds/tags
+			# as a|b lists (empty entries allowed: "guard|")
+			var spec := arg.substr(7)
+			var cid := spec.get_slice(".", 0)
+			var kv := spec.substr(cid.length() + 1)
+			var key := kv.get_slice("=", 0)
+			var val := kv.substr(key.length() + 1)
+			var t: Dictionary = HeroDefs.tune.get(cid, {})
+			t[key] = Array(val.split("|")) if key in ["runes", "kinds", "tags"] else (val.to_int() if val.is_valid_int() else val)
+			HeroDefs.tune[cid] = t
+		elif arg.begins_with("--cl="):
+			# --cl=<ClassLogic knob>=<value>, e.g. --cl=RANGER_AIM_MULT=1.25
+			var spec2 := arg.substr(5)
+			var knob := spec2.get_slice("=", 0)
+			var v2 := spec2.substr(knob.length() + 1)
+			if not ClassLogic.tune_knob(knob, v2.to_float()):
+				print("unknown --cl knob ", knob)
 		elif arg == "--verbose":
 			verbose = true
 	rules = AutoRules.all_on(focus, "realistic" if policy == "realistic" else "expert")

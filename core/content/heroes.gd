@@ -33,9 +33,23 @@ const IDS := ["knight", "barbarian", "paladin", "mage", "ranger", "rogue", "ninj
 ## Mechanic names for the class badge (presentation).
 const MECHANIC_NAMES := {"oath": "Oath", "aim": "Aim", "shadow_step": "Shadow Step", "overgrowth": "Overgrowth"}
 
+## Sim-only analysis dial (tools/sim.gd --hero=<id>.<field>=<value>): per-class field overrides.
+## The game never sets it; the DATA values ARE the shipped numbers.
+static var tune := {}
+
+## DATA[id] with any sim overrides applied.
+static func def(id: String) -> Dictionary:
+	var d: Dictionary = DATA.get(id, DATA.knight)
+	if not tune.has(id):
+		return d
+	var out := d.duplicate(true)
+	for k in tune[id]:
+		out[k] = tune[id][k]
+	return out
+
 ## Field with its default for classes that leave it out.
 static func field(id: String, key: String) -> Variant:
-	var d: Dictionary = DATA.get(id, DATA.knight)
+	var d: Dictionary = def(id)
 	match key:
 		"kinds":
 			var k: Array = d.get("kinds", [])
