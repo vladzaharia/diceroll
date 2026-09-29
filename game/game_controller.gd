@@ -167,6 +167,7 @@ func start(f: GameFlow) -> void:
 	board.hero_class = f.run.class_id
 
 	board.hero_idx = f.run.pos
+	EnemyLooks.run_seed = f.run.seed  # per-run enemy variants
 	board.build(f.run.biome(), f.run.board.to_dict().tiles)
 	if f.phase == GameFlow.Phase.BOARD_READY:
 		rig.home(board.hero, true)

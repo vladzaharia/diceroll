@@ -73,6 +73,49 @@ for c in yellow red blue; do
 done
 lic "$PLAT" "$KK/platformer"
 
+echo "== Enemy roster (EXTRA + Mystery Monthly packs -> assets/kaykit/foes; see game/world/enemy_looks.gd)"
+FOES="$KK/foes"
+SKX="KayKit_Skeletons_1.1_EXTRA"
+sync "$SRC/$SKX/characters/gltf" "$FOES/skeletons" --include='*.glb' --exclude='*'
+sync "$SRC/$SKX/assets/gltf" "$FOES/skeletons/weapons" --exclude='Skeleton_Arrow*'
+sync "$SRC/$SKX/textures" "$FOES/skeletons/textures" --include='skeleton_texture_B.png' --exclude='*'
+lic "$SKX" "$FOES/skeletons"
+ADX="KayKit_Adventurers_2.0_EXTRA"
+sync "$SRC/$ADX/Characters/gltf" "$FOES/adventurers" --include='Barbarian_Large.glb' --include='Druid.glb' --exclude='*'
+sync "$SRC/$ADX/Textures" "$FOES/adventurers/textures" --include='*_alt_*.png' --exclude='*'
+adx_keep=""
+for w in axe_1handed_Large axe_2handed_Large shield_round_barbarian_Large druid_staff; do
+	adx_keep="$adx_keep --include=$w.gltf --include=$w.bin"
+done
+# shellcheck disable=SC2086
+sync "$SRC/$ADX/Assets/gltf" "$FOES/adventurers/weapons" $adx_keep --include='barbarian_texture.png' --include='druid_texture.png' --exclude='*'
+lic "$ADX" "$FOES/adventurers"
+MMS="$SRC/KayKit_Mystery_Monthly_Series_4"
+sync "$MMS/1 - July 2023 - Orc Raider/character" "$FOES/monthly/orc" --include='OrcRaider.glb' --exclude='*'
+sync "$MMS/1 - July 2023 - Orc Raider/textures" "$FOES/monthly/orc/textures"
+sync "$MMS/1 - July 2023 - Orc Raider/assets/gltf" "$FOES/monthly/orc/weapons" --include='Orc_Axe.gltf.glb' --include='Orc_Club.gltf.glb' --exclude='*'
+sync "$MMS/4 - October 2023 - Werewolf/characters/gltf" "$FOES/monthly/werewolf" --include='Werewolf_Wolf.glb' --exclude='*'
+sync "$MMS/4 - October 2023 - Werewolf/textures" "$FOES/monthly/werewolf/textures"
+sync "$MMS/4 - October 2023 - Werewolf/assets/gltf" "$FOES/monthly/werewolf/weapons" --include='axe.*' --include='werewolf_A.png' --exclude='*'
+sync "$MMS/10 - April 2024 - Paladin/characters/gltf" "$FOES/monthly/paladin" --include='*.glb' --exclude='*'
+sync "$MMS/10 - April 2024 - Paladin/textures" "$FOES/monthly/paladin/textures"
+sync "$MMS/10 - April 2024 - Paladin/assets/gltf" "$FOES/monthly/paladin/weapons" \
+	--include='paladin_hammer.*' --include='paladin_shield.*' --include='paladin_texture_A.png' --exclude='*'
+sync "$MMS/8 - February 2024 - Ninja/character" "$FOES/monthly/ninja" --include='Ninja.glb' --exclude='*'
+sync "$MMS/8 - February 2024 - Ninja/texture" "$FOES/monthly/ninja/textures"
+sync "$MMS/8 - February 2024 - Ninja/assets/gltf" "$FOES/monthly/ninja/weapons" --include='Ninja_Katana.*' --include='ninja_texture_A.png' --exclude='*'
+sync "$MMS/3 - September 2023 - Monster Costume/character/gltf" "$FOES/monthly/monster" --include='Monster.glb' --exclude='*'
+sync "$MMS/3 - September 2023 - Monster Costume/textures" "$FOES/monthly/monster/textures" --include='monstercostume_texture_*.png' --exclude='*'
+cp -f "$MMS/License.txt" "$FOES/monthly/License.txt"
+FWX="KayKit_FantasyWeaponsBits_1.0_EXTRA"
+fwx_keep=""
+for w in axe_D dagger_C hammer_D scythe shield_D spear_B staff_C staff_D sword_F sword_G wand_B; do
+	fwx_keep="$fwx_keep --include=$w.gltf --include=$w.bin"
+done
+# shellcheck disable=SC2086
+sync "$SRC/$FWX/Assets/gltf" "$FOES/weapons" $fwx_keep --include='*.png' --exclude='*'
+lic "$FWX" "$FOES/weapons"
+
 echo "== Music beds (mixkit, re-encoded to 96 kbps mp3 to keep the repo lean)"
 MUS="$DST/audio/music"
 mkdir -p "$MUS"
