@@ -247,3 +247,10 @@ Principles: no premium currency, no paid or random rolls for power. Every upgrad
   - Every unlocked class appears as an NPC with an activity, in its equipped skin. Every owned pet roams the camp.
   - Milestone trophies, banners and souvenirs appear; the campfire, paths and lanterns grow.
   - A short reveal (camera pan + transition + banner) plays when returning with a new unlock.
+- **More minigames (Vlad):** keep Bubble Breaker, and **add Bubble Shooter** (aim and launch from the bottom-centre, match 3+). Also add Plinko, Shell Game, Memory Match, Fishing, Lucky Wheel and High-Low Ladder, for 11 in total. Every minigame follows the same rules:
+  - one-thumb/mouse, 15–35 s;
+  - outcomes decided by core (deterministic, public state only);
+  - skill capped at ±15%;
+  - AUTO plays at par;
+  - rewards on par with each other;
+  - Arcade unlocks.
