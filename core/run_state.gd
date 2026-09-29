@@ -85,7 +85,7 @@ static func create(p_class_id: String, p_seed: int, p_board_size: int = Balance.
 		die.add_tag(String(tags[k]))
 		r.dice.append(die)
 	if HeroDefs.mechanic(p_class_id) == "turret":
-		r.turret = Die.make("", "standard")
+		r.turret = Die.make(String(HeroDefs.def(p_class_id).get("turret_rune", "")), "standard")
 		r.turret.add_tag("turret")
 	r.board_size = p_board_size
 	r.mode = "short" if String(opts.get("mode", "standard")) == "short" else "standard"

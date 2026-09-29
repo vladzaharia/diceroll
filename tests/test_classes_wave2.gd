@@ -110,7 +110,7 @@ func test_engineer_turret_fires_after_the_attack() -> void:
 	var tf := _all(ev, "turret_fired")
 	assert_eq(tf.size(), 1)
 	assert_eq(int(tf[0].value), 4)
-	assert_eq(int(tf[0].damage), 4, "tier 1: pips x1")
+	assert_eq(int(tf[0].damage), int(round(4 * ClassLogic.TURRET_T[0])), "tier 1")
 	run.turret.rune = "heavy"
 	run.act = 3
 	run.route = ["glade", "hollow", "magma"]
@@ -152,8 +152,10 @@ func test_engineer_offers_target_the_turret() -> void:
 
 func test_engineer_greedy_bot_fills_the_turret() -> void:
 	var f := GameFlow.new_run("engineer", 3)
+	f.run.turret.rune = ""
 	f.debug_open("rune_assign", "frost")
 	assert_eq(Bot.next_command(f), ["rune_assign", GameFlow.TURRET])
+	assert_eq(GameFlow.new_run("engineer", 3).run.turret.rune, "gilded", "the Turret starts with Gilded")
 
 # ================================================================ Monster Kid
 

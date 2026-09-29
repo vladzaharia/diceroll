@@ -50,21 +50,21 @@ extends RefCounted
 ##                         untagged die with the lowest face sum as a seed (max DRUID_MAX_SEEDS);
 ##                         Wild Bond: the pet starts every fight with +1 charge ("wild_bond")
 
-static var PALADIN_OATH_MULT := 0.5
-static var PALADIN_OATH_PIP := 1
+static var PALADIN_OATH_MULT := 0.4
+static var PALADIN_OATH_PIP := 0
 ## Sanctify uses per run (one per biome change; 2 in a standard run).
 static var PALADIN_SANCTIFY := 2
 ## Shop die-kind weight multipliers for the Paladin (only kinds in the unlocked pool).
 const PALADIN_SHOP_KINDS := {"twin": 2.0, "even": 2.0}
 const SET_COMBOS := ["pair", "two_pair", "three_kind", "full_house", "four_kind", "five_kind", "six_kind"]
-static var RANGER_AIM_MULT := 1.3
+static var RANGER_AIM_MULT := 1.15
 static var RANGER_PIERCE_CARRIES := 1
 static var NINJA_REFUNDS_PER_TURN := 2
 static var NINJA_BOARD_REFUNDS := 1
 static var DRUID_GROWTH := 1
 static var DRUID_MAX_SEEDS := 3
 static var DRUID_PET_CHARGE := 1
-static var TURRET_T := [1.0, 2.0, 3.0]
+static var TURRET_T := [0.5, 0.75, 1.0]
 static var FLEE_PCT := 0.25
 static var BOO_WEAKEN := 0.3
 const FLEE_GOLD := 0.5
@@ -148,7 +148,7 @@ static func combo_bonus(run: RunState, c: CombatState, combo: Dictionary, out: A
 	match mech(run):
 		"oath":
 			var b := oath_bonus(c.oath, String(combo.id), combo.group, combo.values)
-			if int(b[1]) > 0:
+			if float(b[0]) > 0.0 or int(b[1]) > 0:
 				out.append(ev(run, "oath_kept", int(b[1]), {"oath": c.oath, "mult": float(b[0])}))
 			return b
 	return [0.0, 0]
