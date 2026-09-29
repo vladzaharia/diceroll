@@ -232,7 +232,7 @@ func _dress_tile(i: int, animate: bool) -> void:
 	var figs: Array[Character] = []
 	var ids: Array = t.enemies
 	if type == "miniboss" and not ids.is_empty():
-		figs.append(_dress_miniboss(holder, String(ids[0])))
+		figs.append(_dress_miniboss(holder, String(ids[0]), i))
 	if (type == "enemy" or type == "elite") and ids.is_empty():
 		ids = ["skeleton_minion"]
 	if type == "enemy" or type == "elite":
@@ -242,10 +242,12 @@ func _dress_tile(i: int, animate: bool) -> void:
 		var elite := bool(t.elite) or type == "elite"
 		for k in n:
 			var id := String(ids[k])
-			var ch := EnemyLooks.create(id, false)
+			# same variant / tier / elite skin as the fight on this tile (EnemyLooks.spawn_context)
+			var ctx := EnemyLooks.spawn_context(id, i, ids.slice(0, k), biome_id, elite)
+			var ch := EnemyLooks.create(id, false, ctx)
 			var s := PREVIEW_SCALE * (1.0 if n == 1 else 0.85) * (1.15 if elite else 1.0)
 			s *= clampf(EnemyLooks.scale_of(id), 1.0, 1.25)
-			if String(EnemyLooks.def(id).model) == "mannequin_large":
+			if EnemyLooks.is_large(id, ctx):
 				s *= 0.72
 			ch.scale = Vector3.ONE * s
 			ch.position = spots[k]
@@ -268,8 +270,8 @@ func _dress_tile(i: int, animate: bool) -> void:
 
 ## Mini-boss tile: a larger preview figure between two skull posts with red flames, a
 ## hovering skull emblem and a slow red ground glow. Returns the figure.
-func _dress_miniboss(holder: Node3D, id: String) -> Character:
-	var ch := EnemyLooks.create(id, false)
+func _dress_miniboss(holder: Node3D, id: String, idx := -1) -> Character:
+	var ch := EnemyLooks.create(id, false, EnemyLooks.spawn_context(id, idx, [], biome_id))
 	ch.scale = Vector3.ONE * PREVIEW_SCALE * 1.35 * EnemyLooks.scale_of(id) / 1.3
 	ch.position = Vector3(0, 0, 0.02)
 	ch.rotation.y = deg_to_rad(12.0)

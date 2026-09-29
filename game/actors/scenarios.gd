@@ -3,6 +3,7 @@ extends RefCounted
 ##  actors        all 8 models idling + a bone-tinted skeleton mannequin (skel_idle)
 ##  actors_anims  same line-up, each model looping a different alias (attack, cast, hit...)
 ## Optional `--anim=<alias>` plays that alias on everyone (e.g. --anim=attack).
+## Enemy looks (enemy_gallery, combat_<biome>, <boss id>, <mini-boss id>): game/enemies/foe_scenarios.gd.
 
 const LINEUP := [
 	# [model id, label, alias, tint, grid col, grid row (0 = back)]
@@ -22,10 +23,12 @@ const SPACING := Vector2(2.5, 3.3)
 
 
 static func names() -> PackedStringArray:
-	return PackedStringArray(["actors", "actors_anims"])
+	return PackedStringArray(["actors", "actors_anims"]) + FoeScenarios.names()
 
 
 static func build(name: String) -> Node:
+	if FoeScenarios.names().has(name):
+		return FoeScenarios.build(name)
 	if not names().has(name):
 		return null
 	var root := Node3D.new()

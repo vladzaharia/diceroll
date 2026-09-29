@@ -186,7 +186,7 @@ func _floor_offset() -> float:
 
 func _add(d: Dictionary, i: int, n: int, rise_delay := -1.0) -> void:
 	var id := String(d.get("id", "skeleton_minion"))
-	var ch := EnemyLooks.create(id)
+	var ch := EnemyLooks.create(id, true, EnemyLooks.spawn_context(d, _board_idx, data, _board.biome_id if _board else ""))
 	ch.anim_player.speed_scale = speed
 	var s := UNIT_SCALE * EnemyLooks.scale_of(id)
 	ch.scale = Vector3.ONE * s
@@ -261,6 +261,8 @@ func set_enemy(i: int, d: Dictionary) -> void:
 	for k in d:
 		data[i][k] = d[k]
 	huds[i].set_data(data[i], true)
+	if d.has("traits") and i < enemies.size():
+		EnemyLooks.set_traits(enemies[i], d.traits)
 	if d.has("traits") or d.has("hp"):
 		refresh_wards()
 
@@ -370,7 +372,7 @@ func enemy_attack(i: int) -> void:
 	var ch := enemies[i]
 	var id := String(data[i].get("id", ""))
 	var home := ch.global_position
-	var ranged := id in ["skeleton_archer", "cultist", "boss_lich", "mini_grave_mage"]
+	var ranged := EnemyLooks.ranged_kind(ch) != ""
 	var lunge := home + (hero_home - home).normalized() * (0.2 if ranged else 0.9)
 	var t := ch.create_tween().set_speed_scale(speed)
 	t.tween_property(ch, "global_position", lunge, 0.18).set_trans(Tween.TRANS_SINE)
@@ -379,7 +381,7 @@ func enemy_attack(i: int) -> void:
 	Audio.play_sfx("swing")
 	await get_tree().create_timer((0.32) / speed, false).timeout
 	if ranged:
-		var col := Color(0.7, 0.4, 1.0) if id != "skeleton_archer" else Color(1.0, 0.9, 0.7)
+		var col := EnemyLooks.shot_color(ch)
 		await Fx.projectile(self, ch.global_position + Vector3.UP * 1.1, hero_home + Vector3.UP * 0.8, col, 0.28 / speed)
 	var back := ch.create_tween().set_speed_scale(speed)
 	back.tween_property(ch, "global_position", home, 0.3).set_trans(Tween.TRANS_SINE).set_delay(0.1)
