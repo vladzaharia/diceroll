@@ -8,9 +8,12 @@ extends UiModal
 signal reward_picked(index: int)
 
 const ICONS := {"gold": "coin", "crown": "crown", "potion": "potion", "potion_gold": "potion", "face_raise": "anvil",
-	"rune_choice": "star", "reroll_boost": "reroll", "passive_common": "trophy"}
+	"rune_choice": "star", "reroll_boost": "reroll", "passive_common": "trophy", "sharpshooter": "sword", "rare_rune": "star",
+	"heart_gem": "heart", "mirror_forge": "mirror", "potion_pair": "potion", "passive_uncommon": "trophy", "high_roller": "up"}
 const TAGS := {"gold": "GOLD", "crown": "META", "potion": "POTION", "potion_gold": "POTION", "face_raise": "FORGE",
-	"rune_choice": "RUNE", "new_die": "DIE", "reroll_boost": "BOOST", "passive_common": "PASSIVE"}
+	"rune_choice": "RUNE", "new_die": "DIE", "reroll_boost": "BOOST", "passive_common": "PASSIVE", "sharpshooter": "ATK",
+	"rare_rune": "RUNE", "heart_gem": "MAX HP", "mirror_forge": "FORGE", "potion_pair": "POTIONS", "passive_uncommon": "PASSIVE",
+	"high_roller": "DICE"}
 
 var _medal: MgWidgets.Medal
 var _sub: Label

@@ -28,9 +28,13 @@ const CHARGE_TEXT := {
 	"attack_intent": "+1 per enemy attack intent",
 	"board_double": "+1 per board move with doubles",
 }
-const MINIGAME_ICON := {"fossil_hunter": "skull", "bubble_breaker": "star", "scratch_off": "coin", "claw_machine": "trophy"}
+const MINIGAME_ICON := {"fossil_hunter": "skull", "bubble_breaker": "star", "scratch_off": "coin", "claw_machine": "trophy",
+	"bubble_shooter": "bolt", "plinko": "dice", "shell_game": "chest", "memory_match": "mirror", "fishing": "snowflake",
+	"lucky_wheel": "crown", "high_low": "up"}
 const MINIGAME_COLOR := {"fossil_hunter": Color("e0b070"), "bubble_breaker": Color("6fc8ff"),
-	"scratch_off": Color("ffc93d"), "claw_machine": Color("ff6fae")}
+	"scratch_off": Color("ffc93d"), "claw_machine": Color("ff6fae"), "bubble_shooter": Color("7f8cff"), "plinko": Color("5fe0c0"),
+	"shell_game": Color("e08a4a"), "memory_match": Color("b58cff"), "fishing": Color("4ac0e8"), "lucky_wheel": Color("ff7a5a"),
+	"high_low": Color("9ae05a")}
 const GEAR_ICON := {"helm": "shield", "blade": "sword", "boots": "speed", "charm": "coin"}
 const FEATURE_NAME := {"potion_belt": "Third Potion Slot", "loadout_slot": "Third Minigame Slot"}
 

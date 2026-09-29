@@ -403,35 +403,30 @@ func test_minigame_save_at_entry_resumes_identically() -> void:
 			assert_eq(JSON.stringify(a), JSON.stringify(b), "%s step %d" % [game, k])
 
 func test_minigame_medians_are_calibrated() -> void:
-	# luck/deduction games: the bot's played median sits near MinigameDefs.MEDIAN; dexterity
-	# games (claw, bubbles): the bot's perfect aim scores at least the human median
+	# luck/deduction games: the bot's played median sits near MinigameDefs.MEDIAN; dexterity and
+	# tracking games (claw, bubbles, shooter, shell, fishing): the bot's perfect play scores at
+	# least the human median. Memory Match is skipped: the bot has no memory (tools/mg_calibrate
+	# models the human one; test_minigames2 checks a perfect memory clears the board).
+	var skill := ["claw_machine", "bubble_breaker", "bubble_shooter", "shell_game", "fishing"]
 	for game in MinigameDefs.IDS:
+		if game == "memory_match":
+			continue
 		var scores: Array = []
-		for s in 60:
+		for s in (60 if game != "bubble_shooter" else 12):
 			var m := Minigames.create(game, 1000 + s * 7, 1)
 			var guard := 0
-			while not m.done and m.actions_left > 0 and guard < 20:
+			while not m.done and m.actions_left > 0 and guard < 40:
 				guard += 1
-				var st := m.public_state()
-				var cmd: Array
-				match game:
-					"fossil_hunter":
-						var c := BotMeta.fossil_pick(st)
-						cmd = [c % int(st.w), c / int(st.w)]
-					"bubble_breaker":
-						var cl := BotMeta.bubble_pick(st)
-						if cl < 0:
-							break
-						cmd = [cl / int(st.h), cl % int(st.h)]
-					"scratch_off":
-						cmd = [BotMeta.scratch_pick(st, s)]
-					"claw_machine":
-						cmd = [(m as ClawMachine).best_target()]
+				var cmd := BotMeta.play_args(game, m.public_state(), s)
+				if game == "claw_machine":
+					cmd = [(m as ClawMachine).best_target()]
+				if cmd.is_empty():
+					break
 				m.action(cmd)
 			scores.append(m.score())
 		scores.sort()
 		var med := float(scores[scores.size() / 2]) / float(MinigameDefs.MEDIAN[game])
-		if game == "claw_machine" or game == "bubble_breaker":
+		if skill.has(game):
 			assert_true(med >= 0.9, "%s perfect-aim median ratio %.2f" % [game, med])
 		else:
 			assert_true(med > 0.7 and med < 1.35, "%s played median ratio %.2f" % [game, med])

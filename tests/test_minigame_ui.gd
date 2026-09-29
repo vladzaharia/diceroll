@@ -26,7 +26,8 @@ func test_auto_takes_par_for_every_minigame() -> void:
 ## The public state handed to the presentation is a snapshot: a later action must not change
 ## a state the screen already holds (Array(typed) aliases the live array in Godot 4).
 func test_public_state_is_a_snapshot() -> void:
-	var args := {"fossil_hunter": [2, 2], "scratch_off": [4], "claw_machine": [0.5]}
+	var args := {"fossil_hunter": [2, 2], "scratch_off": [4], "claw_machine": [0.5], "bubble_shooter": [60], "plinko": [4],
+		"shell_game": [1, 0.5], "memory_match": [3], "fishing": ["cast", 1], "lucky_wheel": ["spin"], "high_low": ["higher"]}
 	for game in MinigameDefs.IDS:
 		var m := Minigames.create(game, 321, 1)
 		var st := m.public_state()
@@ -169,7 +170,7 @@ func test_scripted_play_reaches_reward_then_board() -> void:
 		var f := GameFlow.new_run("knight", 21, 28, {"profile": Profile.fresh().to_dict()})
 		f.debug_open("minigame", game)
 		var guard := 0
-		while f.phase == P.MINIGAME and not bool(f.offer.done) and guard < 12:
+		while f.phase == P.MINIGAME and not bool(f.offer.done) and guard < 80:
 			guard += 1
 			BotMeta.minigame_mode = "play"
 			var cmd := BotMeta.minigame_command(f)
