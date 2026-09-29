@@ -133,7 +133,7 @@ static func _leap(n: Node3D) -> void:
 	# the splash where it jumped: a ring of droplets
 	var splash := Node3D.new()
 	splash.name = "Splash"
-	splash.position = Vector3(0.22, 0.075, -0.2)
+	splash.position = Vector3(0.4, 0.075, -0.08)
 	n.add_child(splash)
 	var drop := MinigameProps._mat(Color("e6fbff"), 0.1, 0.0, 0.6)
 	for k in 8:
@@ -141,25 +141,27 @@ static func _leap(n: Node3D) -> void:
 		var d := MinigameProps._mesh(splash, MinigameProps._sphere(0.022 + 0.01 * (k % 2)), drop, Vector3(cos(a) * 0.1, 0.02 + 0.04 * (k % 3), sin(a) * 0.08))
 		d.scale = Vector3(1.0, 1.4, 1.0)
 	_ring(n, splash.position, 0.12)
-	# the golden fish arcing out of it
+	# the golden koi arcing out of it, side-on to the camera
 	var fish := Node3D.new()
 	fish.name = "Fish"
-	fish.position = Vector3(0.22, 0.42, -0.2)
-	fish.rotation = Vector3(deg_to_rad(-35.0), deg_to_rad(-15.0), deg_to_rad(38.0))
-	fish.scale = Vector3.ONE * 1.3
+	fish.position = Vector3(0.42, 0.4, -0.08)
+	fish.rotation = Vector3(deg_to_rad(-10.0), deg_to_rad(-12.0), deg_to_rad(38.0))
+	fish.scale = Vector3.ONE * 1.05
 	n.add_child(fish)
-	var gold := MinigameProps._mat(Color("ffc83a"), 0.3, 0.3, 0.35)
+	var gold := MinigameProps._mat(Color("ffc83a"), 0.25, 0.35, 0.35)
+	var orange := MinigameProps._mat(Color("ff5a24"), 0.4, 0.0, 0.25)
 	var body := MinigameProps._mesh(fish, MinigameProps._sphere(0.11), gold, Vector3.ZERO, Vector3.ZERO, "Body")
-	body.scale = Vector3(1.6, 0.8, 0.5)
-	MinigameProps._mesh(fish, MinigameProps._sphere(0.045), MinigameProps._mat(Color("ff5a24"), 0.4, 0.0, 0.2), Vector3(0.0, 0.05, 0.03)).scale = Vector3(1.4, 0.7, 1.0)
-	var fin_m := MinigameProps._mat(Color("ffe08a"), 0.4, 0.0, 0.3)
+	body.scale = Vector3(1.7, 0.75, 0.45)
+	for pt: Array in [[Vector3(0.02, 0.035, 0.03), 0.045], [Vector3(-0.09, -0.01, 0.025), 0.035]]:
+		MinigameProps._mesh(fish, MinigameProps._sphere(pt[1]), orange, pt[0]).scale = Vector3(1.4, 0.8, 0.8)
 	for sg in [-1.0, 1.0]:
-		var tail := MinigameProps._mesh(fish, MinigameProps._box(Vector3(0.13, 0.05, 0.02)), fin_m, Vector3(-0.2, sg * 0.04, 0.0))
-		tail.rotation.z = sg * 0.6
-	var fin := MinigameProps._mesh(fish, MinigameProps._box(Vector3(0.08, 0.06, 0.012)), MinigameProps._mat(Color("fff0c0"), 0.4), Vector3(0.0, 0.1, 0.0))
-	fin.rotation.z = -0.3
+		var tail := MinigameProps._mesh(fish, MinigameProps._box(Vector3(0.15, 0.06, 0.02)), orange, Vector3(-0.22, sg * 0.045, 0.0))
+		tail.rotation.z = sg * 0.65
+	var fin := MinigameProps._mesh(fish, MinigameProps._box(Vector3(0.1, 0.06, 0.014)), orange, Vector3(-0.01, 0.085, 0.0))
+	fin.rotation.z = -0.35
 	for sz in [-1.0, 1.0]:
-		MinigameProps._mesh(fish, MinigameProps._sphere(0.018), MinigameProps._mat(Color("1b1530"), 0.3), Vector3(0.12, 0.025, sz * 0.05))
+		MinigameProps._mesh(fish, MinigameProps._sphere(0.024), MinigameProps._mat(Color("ffffff"), 0.3), Vector3(0.12, 0.02, sz * 0.04))
+		MinigameProps._mesh(fish, MinigameProps._sphere(0.013), MinigameProps._mat(Color("1b1530"), 0.3), Vector3(0.13, 0.02, sz * 0.055))
 	# a slow hop: up and a little tilt, down again
 	var y := fish.position.y
 	var t := fish.create_tween().set_loops()
