@@ -118,9 +118,13 @@ Remaining / to verify:
   - App icon "doubles" (with a single die below 114 px).
 - **Magma margin change:** made, then reverted at Vlad's request. He prefers the original Magma.
 - **In progress (worktrees):**
-  - WP-E1: Camp hub, profile persistence and meta flow, results screen.
-  - WP-E2: the 4 minigame UIs and minigame tiles.
+  - WP-E1: Camp hub, profile persistence and meta flow, results screen. It uses the new packs: Armory weapons (FantasyWeapons EXTRA), a built-up camp (Forest Nature, ResourceBits, RPGTools EXTRA, Dungeon EXTRA), NPC keepers (Adventurers EXTRA).
+  - WP-E2: the 4 minigame UIs and minigame tiles. Fossil Hunter is changed to luck-based: no number hints, bigger grid (Vlad).
   - WP-E3: potion belt, pet familiars, auto level-ups, remaining new events.
+  - WP-F1: level scene variety. Seed-driven dressing kits per biome using the new packs; Magma keeps its tight framing.
+  - WP-F2: enemy variety. Real KayKit Skeletons, Adventurers EXTRA, Mystery Monthly characters; 2–4 variants per enemy id.
+  - WP-F3: UI and board polish with the new assets, plus responsive layout. Fixes the matrix bugs (iPhone empty band, narrow tray at 1080p, HUD overlap at 150% zoom) and adds a UI-size setting.
+- **Assets:** everything third-party lives in git-ignored `third_party/` (docs/ASSETS.md). A fresh worktree needs `THIRD_PARTY=/Users/vlad/Repos/diceroll/third_party tools/import_assets.sh`.
 - **Next:**
   1. Merge E1 → E2 → E3.
   2. UX/UI designer review of the whole game, then fixes.
