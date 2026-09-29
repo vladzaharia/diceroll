@@ -3,11 +3,16 @@ extends RefCounted
 ## (GameController + GameFlow) in a given state. They never touch the player's save.
 ##
 ##  game_title    title screen over the orbiting act 1 board
-##  game_board    fresh run, BOARD_READY (--passives=N shows N passives in the HUD bar)
+##  game_board    fresh run, BOARD_READY (--passives=N shows N passives in the HUD bar;
+##                --affixes=a,b,... deals affixes to the fight tiles: preview overlays + chips)
 ##  game_rolled   after ROLL: the two moving dice lifted, the rest dimmed, the move pill,
 ##                the target marker and GO. 4 dice by default (--dice=N, 2..5); --double=1
 ##                searches seeds for a doubles roll (celebration + treasury)
-##  game_combat   mid-fight, dice marked for a reroll (--tile=N, --enemies=a,b,c)
+##  game_combat   mid-fight, dice marked for a reroll (--tile=N, --enemies=a,b,c). Enemy affixes:
+##                --affixes=thorned,warded,-,gilded+hexing (one per enemy in order; "-" none, "+"
+##                two), --elite=1. --cards=0 skips the first-encounter cards (on by default: a
+##                fresh profile meets everything), --tip=I[:K] opens enemy I's affix badge K
+##                tooltip, --turns=N plays N ATTACK turns (procs, rally, transform)
 ##  game_combo    mid-fight right after ATTACK (combo banner held on screen)
 ##  game_shop     shop with a die kind and a passive card (+ the regular stock)
 ##  game_draft / game_forge / game_event / game_portal   modals and picks
@@ -71,6 +76,8 @@ class _Driver extends Node:
 		c.autosave = false
 		c.persist_profile = false
 		c.minigame_fallback = false
+		EncounterCards.reset()
+		EncounterCards.cards_off = String(args.get("cards", "1")) == "0"
 		add_child(c)
 		c.set_speed(float(args.get("speed", "3" if scenario == "play_auto" else "1")))
 		match scenario:
@@ -156,6 +163,17 @@ class _Driver extends Node:
 				f.run.dice[2].raise_face(0)
 			"game_shop":
 				_pool(f, 3)
+		if scenario == "game_board" and args.has("affixes"):
+			# --affixes=a,b,...: dealt round-robin to the fight tiles' leaders (board preview chips)
+			var al: Array = Array(String(args.affixes).split(",", false))
+			var n := 0
+			for t: Dictionary in f.run.board.tiles:
+				if String(t.type) in ["enemy", "elite", "miniboss"] and not (t.enemies as Array).is_empty():
+					var ea: Array = []
+					for k in (t.enemies as Array).size():
+						ea.append([String(al[n % al.size()])] if k == 0 else [])
+					t["enemy_affixes"] = ea
+					n += 1
 		c.start(f)
 		await get_tree().create_timer(0.3).timeout
 		match scenario:
@@ -174,13 +192,28 @@ class _Driver extends Node:
 				var ids := String(args.get("enemies", "skeleton_warrior,skeleton_minion,skeleton_archer"))
 				f.run.pos = int(args.get("tile", "3"))
 				c.board.place_hero(f.run.pos)
-				await c.play_events(f.debug_open("combat", ids))
+				if args.has("affixes") or args.has("elite"):
+					var affs: Array = []
+					for part in String(args.get("affixes", "")).split(",", true):
+						affs.append(Array(part.split("+", false)).filter(func(x: String) -> bool: return AffixDefs.DATA.has(x)))
+					var ev: Array[Dictionary] = []
+					f._start_combat(Array(ids.split(",", false)), args.has("elite"), false, f.run.pos, ev, false, affs)
+					await c.play_events(ev)
+				else:
+					await c.play_events(f.debug_open("combat", ids))
+				for t in int(args.get("turns", "0")):
+					if f.combat == null or f.phase != GameFlow.Phase.COMBAT:
+						break
+					await c.run_command("combat_attack")
 				# mark dice for a reroll like a player would (bot choice), stop before ATTACK
 				for k in 8:
 					var cmd := Bot.next_command(f)
 					if cmd[0] != "combat_toggle" and cmd[0] != "combat_set_target":
 						break
 					await c.run_command(cmd[0], cmd.slice(1))
+				if args.has("tip") and AffixTips.of(c):
+					var tp := String(args.tip).split(":")
+					AffixTips.of(c).show_tip(int(tp[0]), int(tp[1]) if tp.size() > 1 else 0, 60.0)
 				if scenario == "game_combo":
 					c.ui.banner.hold = true
 					if f.combat.rerolls_left > 0 and f.combat.marked.has(true):

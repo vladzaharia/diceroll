@@ -49,6 +49,7 @@ const MODELS := {
 	"druid": [FOE + "adventurers/Druid.glb", "medium", "magic", {}],
 	"orc": [FOE + "monthly/orc/OrcRaider.glb", "medium", "melee_1h", {}, FOE + "monthly/orc/textures/orc_texture_A.png"],
 	"werewolf": [FOE + "monthly/werewolf/Werewolf_Wolf.glb", "medium", "melee_1h", {}],
+	"werewolf_man": [FOE + "monthly/werewolf/Werewolf_Man.glb", "medium", "melee_1h", {}],
 	"paladin": [FOE + "monthly/paladin/Paladin.glb", "medium", "melee_1h", {}],
 	"paladin_helm": [FOE + "monthly/paladin/Paladin_with_Helmet.glb", "medium", "melee_1h", {}],
 	"ninja": [FOE + "monthly/ninja/Ninja.glb", "medium", "dual", {}],
