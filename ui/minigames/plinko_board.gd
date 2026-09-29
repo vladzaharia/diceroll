@@ -194,8 +194,6 @@ func drop(slot: int) -> void:
 
 ## Harness: slide the dropper from where it is to the slot and let go (a player's drag).
 func scripted_input(args: Array, drv: Node) -> bool:
-	# only suspends when a ball is still falling (the harness normally waits for that): a
-	# coroutine resume here upsets the harness's command check (see the WP-E5 report)
 	var guard := 0
 	while (_animating or locked) and guard < 400:
 		guard += 1
@@ -203,11 +201,12 @@ func scripted_input(args: Array, drv: Node) -> bool:
 	_layout()
 	var o := get_global_rect().position
 	var slot := clampi(int(args[0]) if not args.is_empty() else 4, 0, BUCKETS - 1)
-	# press on the dropper, slide it over the slot, let go (a quick drag, same frame)
-	drv.press(o + Vector2(slot_x(_drop_x), _drop_y))
-	for k in range(1, 7):
-		drv.move(o + Vector2(slot_x(lerpf(_drop_x, float(slot), k / 6.0)), _drop_y + k))
-	drv.release(o + Vector2(slot_x(slot), _drop_y + 6.0))
+	# press on the dropper, slide it over the slot, let go
+	var pts: Array = []
+	var from := _drop_x
+	for k in 8:
+		pts.append(o + Vector2(slot_x(lerpf(from, float(slot), k / 7.0)), _drop_y + k))
+	await drv.drag(pts)
 	return true
 
 
