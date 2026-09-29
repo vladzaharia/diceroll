@@ -16,7 +16,6 @@ extends MgBoard
 ## angle A is under the pointer and the wheel turns clockwise as A grows.
 
 const SEG_COLS := [Color("ff4b5c"), Color("3aa0ff"), Color("ffc83a"), Color("a468ff"), Color("ff8a3d"), Color("34c77b")]
-const JACKPOT := 12
 const JACKPOT_COL := Color("2a1145")
 const ICONS := {2: ["resources/Money_Coins_Stack_Small.gltf", 30.0], 3: ["resources/Money_Coins_Stack_Medium.gltf", 30.0],
 	4: ["resources/Money_Coins_Stack_Large.gltf", 30.0], 5: ["resources/Gold_Bar.gltf", 35.0], 6: ["resources/Gold_Nugget_Large.gltf", 25.0],
@@ -46,12 +45,12 @@ var _fly: Dictionary = {}     # {value, from, to, t0, d, slot}
 var _press := 0.0
 var _hover := false
 var _early_t := -9.0
-var _slot_pop := [0.0, 0.0]
+var _slot_pop: Array[float] = []
 
 var _c := Vector2.ZERO        # wheel centre
 var _R := 100.0               # wheel face radius
 var _btn := Rect2()
-var _slots: Array[Rect2] = [Rect2(), Rect2()]
+var _slots: Array[Rect2] = []
 var _off := Vector2.ZERO
 
 
@@ -75,17 +74,38 @@ static func tap_kind(t: float, sp: Dictionary) -> String:
 	return "brake" if t <= d else "late"
 
 
-## The KayKit model for a prize value (coins for small, gold mid, a gem, the gem chest).
-static func icon_path(value: int) -> String:
+## The ICONS key for a prize value: the wheel's top prize (`top`) is the gem chest; below it
+## coins for small, gold mid, a gem for the big ones.
+static func icon_key(value: int, top: int) -> int:
+	if value >= top and top > 0:
+		return 12
 	var best := 2
 	for v: int in ICONS.keys():
-		if v <= value and v > best:
+		if v <= value and v > best and v < 12:
 			best = v
-	return ModelIcons.K + String(ICONS[best][0])
+	return best
 
 
-static func seg_color(i: int, value: int) -> Color:
-	return JACKPOT_COL if value >= JACKPOT else SEG_COLS[i % SEG_COLS.size()]
+static func icon_path(value: int, top: int) -> String:
+	return ModelIcons.K + String(ICONS[icon_key(value, top)][0])
+
+
+static func seg_color(i: int, value: int, top: int) -> Color:
+	return JACKPOT_COL if value >= top and top > 0 else SEG_COLS[i % SEG_COLS.size()]
+
+
+## The wheel's top prize (the jackpot wedge).
+func _top() -> int:
+	var t := 0
+	for v in state.get("segments", []):
+		t = maxi(t, int(v))
+	return t
+
+
+## Spin slots shown: spins done + spins left (the core's count, never a constant here).
+func spins_total() -> int:
+	var done: int = (state.get("results", []) as Array).size()
+	return maxi(1, maxi(done + int(state.get("actions_left", 0)), _won.size()))
 
 
 ## Brake settle overshoot (degrees) that stays inside the caught segment.
@@ -136,10 +156,10 @@ func is_settled() -> bool:
 
 
 func status_text() -> String:
-	var n := mini(_won.size() + (1 if _mode in ["spinning", "braking", "wait"] else 0), LuckyWheel.SPINS)
+	var n := mini(_won.size() + (1 if _mode in ["spinning", "braking", "wait"] else 0), spins_total())
 	if _mode == "spinning" and _window_on:
 		return "BRAKE NOW!"
-	return "Spin %d of %d" % [maxi(n, 1), LuckyWheel.SPINS]
+	return "Spin %d of %d" % [maxi(n, 1), spins_total()]
 
 
 ## Seconds since the spin's curve started (real time; negative during the wind-up).
@@ -206,10 +226,10 @@ func _reveal(seg: int, value: int, nudged: bool, natural: int) -> void:
 	_win_seg = seg
 	_win_t0 = time
 	var top := _c + Vector2(0, -_R * 0.6)
-	var col := seg_color(seg, value)
-	var big := value >= 9
+	var col := seg_color(seg, value, _top())
+	var big := icon_key(value, _top()) >= 9
 	MgBoard.sfx("reveal" if big else "coin")
-	if value >= JACKPOT:
+	if value >= _top():
 		MgBoard.sfx("fanfare")
 		kick.emit(0.9, Color(1.0, 0.85, 0.3, 0.45))
 		shake(9.0)
@@ -226,12 +246,13 @@ func _reveal(seg: int, value: int, nudged: bool, natural: int) -> void:
 		burst(top, Color("ffe8a0"), 12, "star", 240.0, 60.0, 8.0)
 	burst(top, col.lightened(0.3), 10, "chunk", 260.0, 180.0, 7.0)
 	ring(top, Color(1, 1, 1, 0.9), _R * 0.5, 0.5, 7.0)
-	float_text(top + Vector2(0, -_R * 0.15), "+%d" % value, Color("ffe07a") if value < 9 else Color("aef4ff"), int(_R * 0.3) + 10, 1.1)
+	float_text(top + Vector2(0, -_R * 0.15), "+%d" % value, Color("ffe07a") if not big else Color("aef4ff"), int(_R * 0.3) + 10, 1.1)
 	var segs: Array = state.get("segments", [])
 	if nudged and natural >= 0 and natural < segs.size() and int(segs[natural]) < value:
 		float_text(_c + Vector2(0, _R * 0.35), "NICE BRAKE!", Color("9dffb0"), int(_R * 0.14) + 10, 1.2)
 	await wait(0.75)
-	var slot := mini(_won.size(), 1)
+	_layout()
+	var slot := mini(_won.size(), _slots.size() - 1)
 	_fly = {"value": value, "from": top, "to": _slots[slot].get_center(), "t0": time, "d": dur(0.42), "slot": slot}
 	MgBoard.sfx("swoosh", 0.05, -6.0)
 	await wait(0.42)
@@ -307,7 +328,7 @@ func _do_brake(t: float) -> void:
 
 func _tick(dt: float) -> void:
 	_press = maxf(0.0, _press - dt * 5.0)
-	for k in 2:
+	for k in _slot_pop.size():
 		_slot_pop[k] = maxf(0.0, _slot_pop[k] - dt * 3.0)
 	_tick_cd -= dt
 	match _mode:
@@ -392,19 +413,37 @@ func _scripted(args: Array, drv: Node) -> void:
 func _layout() -> void:
 	var w := size.x
 	var h := size.y
+	var n := spins_total()
+	if _slots.size() != n:
+		_slots.resize(n)
+		_slot_pop.resize(n)
 	var bw := clampf(w * 0.42, 130.0, 250.0)
 	var bh := clampf(h * 0.13, 64.0, 92.0)
-	var sw := clampf((w - bw) * 0.5 - 22.0, 60.0, 150.0)
-	var sh := clampf(minf(sw, bh * 1.35), 60.0, 120.0)
-	var strip := maxf(bh, sh) + 16.0
+	var strip: float
+	var sy: float
+	if n <= 2:
+		# one slot either side of the button
+		var sw := clampf((w - bw) * 0.5 - 22.0, 60.0, 150.0)
+		var sh := clampf(minf(sw, bh * 1.35), 60.0, 120.0)
+		strip = maxf(bh, sh) + 16.0
+		sy = h - strip * 0.5
+		var gap := (w * 0.5 - bw * 0.5 - sw) * 0.5
+		_slots[0] = Rect2(Vector2(gap, sy - sh * 0.5), Vector2(sw, sh))
+		if n > 1:
+			_slots[1] = Rect2(Vector2(w - gap - sw, sy - sh * 0.5), Vector2(sw, sh))
+	else:
+		# a shelf of slots over the button
+		var sw := clampf((w - 24.0 - (n - 1) * 10.0) / n, 56.0, 130.0)
+		var sh := clampf(minf(sw * 0.8, h * 0.12), 52.0, 88.0)
+		strip = bh + sh + 30.0
+		sy = h - bh * 0.5 - 8.0
+		var x0 := (w - (sw * n + 10.0 * (n - 1))) * 0.5
+		for k in n:
+			_slots[k] = Rect2(Vector2(x0 + k * (sw + 10.0), h - strip + 6.0), Vector2(sw, sh))
 	var area := Vector2(w, h - strip)
 	_R = maxf(40.0, minf(area.x / 2.34, area.y / 2.42))
 	_c = Vector2(w * 0.5, area.y * 0.5 + _R * 0.06)
-	var sy := h - strip * 0.5
 	_btn = Rect2(Vector2(w * 0.5 - bw * 0.5, sy - bh * 0.5), Vector2(bw, bh))
-	var gap := (w * 0.5 - bw * 0.5 - sw) * 0.5
-	_slots[0] = Rect2(Vector2(gap, sy - sh * 0.5), Vector2(sw, sh))
-	_slots[1] = Rect2(Vector2(w - gap - sw, sy - sh * 0.5), Vector2(sw, sh))
 
 
 func _pointer_tip() -> Vector2:
@@ -430,7 +469,7 @@ func _draw_board() -> void:
 			c + Vector2(cos(a0 + TAU / rays * 0.5), sin(a0 + TAU / rays * 0.5)) * rl])
 		draw_colored_polygon(pts, Color(game_col.r, game_col.g, game_col.b, 0.08))
 	# the stand: a post and a foot behind the wheel
-	var foot_y := minf(_btn.position.y - 4.0, c.y + R * 1.5)
+	var foot_y := minf(_btn.position.y - 8.0 - R * 0.07, c.y + R * 1.5)
 	if foot_y > c.y + R * 1.3:
 		var post := PackedVector2Array([c + Vector2(-R * 0.1, 0), c + Vector2(R * 0.1, 0), Vector2(c.x + R * 0.2, foot_y), Vector2(c.x - R * 0.2, foot_y)])
 		draw_colored_polygon(post, UiPalette.OUTLINE)
@@ -495,6 +534,7 @@ func _draw_wheel(c: Vector2, R: float) -> void:
 	if segs.is_empty():
 		return
 	var n := segs.size()
+	var top := _top()
 	var sd := 360.0 / n
 	var rot := deg_to_rad(_angle - 90.0)
 	var xf := Transform2D(rot, c)
@@ -502,13 +542,13 @@ func _draw_wheel(c: Vector2, R: float) -> void:
 	# wedges (drawing angle psi = -phi)
 	for i in n:
 		var v := int(segs[i])
-		var col := seg_color(i, v)
+		var col := seg_color(i, v, top)
 		var a0 := deg_to_rad(-(i + 1) * sd)
 		var a1 := deg_to_rad(-i * sd)
 		draw_colored_polygon(_wedge(Vector2.ZERO, 0.0, R, a0, a1), col)
 		draw_colored_polygon(_wedge(Vector2.ZERO, R * 0.84, R, a0, a1), col.lightened(0.18))
 		draw_colored_polygon(_wedge(Vector2.ZERO, 0.0, R * 0.36, a0, a1, 4), col.darkened(0.22))
-		if v >= JACKPOT:
+		if v >= top:
 			# the jackpot wedge: gold trims and a shimmer sweeping across
 			draw_arc(Vector2.ZERO, R * 0.84, a0, a1, 12, Color("ffd24a"), R * 0.03, true)
 			draw_arc(Vector2.ZERO, R * 0.96, a0, a1, 12, Color("ffd24a"), R * 0.02, true)
@@ -517,19 +557,19 @@ func _draw_wheel(c: Vector2, R: float) -> void:
 				var sa := lerpf(a0, a1, sh)
 				draw_colored_polygon(_wedge(Vector2.ZERO, R * 0.4, R * 0.98, sa - 0.04, sa + 0.04, 2), Color(1, 0.95, 0.7, 0.35))
 	# the brake window: the arc of wheel the pointer will cover in the last `window` seconds
+	var zone := []
 	if _mode in ["spinning", "braking"] and not _spin.is_empty():
 		var d := float(_spin.dur)
 		var w0 := LuckyWheel.angle_at(_spin, d - float(_spin.window))
 		var w1 := LuckyWheel.angle_at(_spin, d)
 		var t := spin_clock()
-		var near := clampf(1.0 - (d - float(_spin.window) - t) / 2.0, 0.25, 1.0) if _mode == "spinning" else 0.5
+		var near := clampf(1.0 - (d - float(_spin.window) - t) / 2.5, 0.35, 1.0) if _mode == "spinning" else 0.5
 		var pulse := 0.5 + 0.5 * sin(time * (14.0 if _window_on else 6.0))
 		var b0 := deg_to_rad(-w1)
 		var b1 := deg_to_rad(-w0)
 		var steps := maxi(6, int((w1 - w0) / 4.0))
-		draw_colored_polygon(_wedge(Vector2.ZERO, R * 0.38, R * 0.98, b0, b1, steps), Color(1.0, 0.95, 0.75, (0.1 + 0.12 * pulse) * near))
-		draw_arc(Vector2.ZERO, R * 0.995, b0, b1, steps * 2, Color(UiPalette.OUTLINE, near), R * 0.075, true)
-		draw_arc(Vector2.ZERO, R * 0.995, b0, b1, steps * 2, Color(1.0, 0.35 + 0.4 * pulse, 0.3, near), R * 0.05, true)
+		zone = [b0, b1, steps, near, pulse]
+		draw_colored_polygon(_wedge(Vector2.ZERO, R * 0.24, R * 0.98, b0, b1, steps), Color(1.0, 0.95, 0.7, (0.14 + 0.16 * pulse) * near))
 	# dividers and pegs
 	for i in n:
 		var a := deg_to_rad(-i * sd)
@@ -537,6 +577,11 @@ func _draw_wheel(c: Vector2, R: float) -> void:
 		draw_line(dv * R * 0.3, dv * R, UiPalette.OUTLINE, maxf(2.0, R * 0.022), true)
 		draw_line(dv * R * 0.3, dv * R * 0.99, Color("ffe7a0"), maxf(1.0, R * 0.008), true)
 	draw_arc(Vector2.ZERO, R, 0.0, TAU, 72, UiPalette.OUTLINE, maxf(3.0, R * 0.025), true)
+	if not zone.is_empty():
+		var zc := Color(1.0, 0.3 + 0.5 * float(zone[4]), 0.25, float(zone[3]))
+		draw_arc(Vector2.ZERO, R * 0.985, zone[0], zone[1], int(zone[2]) * 2, Color(UiPalette.OUTLINE, float(zone[3])), R * 0.11, true)
+		draw_arc(Vector2.ZERO, R * 0.985, zone[0], zone[1], int(zone[2]) * 2, zc, R * 0.075, true)
+		draw_arc(Vector2.ZERO, R * 0.97, zone[0], zone[1], int(zone[2]) * 2, Color(1, 1, 0.8, 0.5 * float(zone[3])), R * 0.018, true)
 	for i in n:
 		var a := deg_to_rad(-i * sd)
 		var pp := Vector2(cos(a), sin(a)) * R * 0.955
@@ -558,12 +603,14 @@ func _draw_wheel(c: Vector2, R: float) -> void:
 			var mid := deg_to_rad(-(i + 0.5) * sd) + ga
 			var dvec := Vector2(cos(mid), sin(mid))
 			var lrot := mid + PI * 0.5
+			if sin(rot + mid) > 0.12:
+				lrot += PI  # lower half: keep the numbers upright (a 6 never reads as a 9)
 			draw_set_transform_matrix(xf * Transform2D(lrot, dvec * R * 0.76))
 			var fs := int(R * 0.2)
-			var tc := Color("ffd24a") if v >= JACKPOT else Color.WHITE
+			var tc := Color("ffd24a") if v >= top else Color.WHITE
 			text_c(Vector2.ZERO, str(v), fs, Color(tc, alpha), maxi(4, int(fs * 0.22)), true, Color(UiPalette.OUTLINE, alpha))
 			draw_set_transform_matrix(xf * Transform2D(lrot, dvec * R * 0.5))
-			_icon(v, Vector2.ZERO, R * (0.34 if v >= 9 else 0.3), alpha)
+			_icon(v, Vector2.ZERO, R * (0.34 if icon_key(v, top) >= 9 else 0.3), alpha)
 	draw_set_transform_matrix(xf)
 	# the winning wedge pops out
 	if _win_seg >= 0 and _win_seg < n:
@@ -575,7 +622,7 @@ func _draw_wheel(c: Vector2, R: float) -> void:
 		var a0 := deg_to_rad(-(_win_seg + 1) * sd)
 		var a1 := deg_to_rad(-_win_seg * sd)
 		var v := int(segs[_win_seg])
-		var col := seg_color(_win_seg, v)
+		var col := seg_color(_win_seg, v, top)
 		var wpts := _wedge(out, 0.0, R * s, a0, a1)
 		draw_colored_polygon(_wedge(out, 0.0, R * s + 6.0, a0 - 0.02, a1 + 0.02), Color(1, 1, 1, 0.6 + 0.3 * sin(time * 12.0)))
 		draw_colored_polygon(wpts, col.lightened(0.12))
@@ -583,7 +630,7 @@ func _draw_wheel(c: Vector2, R: float) -> void:
 		var dvec := Vector2(cos(mid), sin(mid))
 		draw_set_transform_matrix(xf * Transform2D(mid + PI * 0.5, out + dvec * R * 0.76 * s))
 		var fs := int(R * 0.24)
-		text_c(Vector2.ZERO, str(v), fs, Color("ffd24a") if v >= JACKPOT else Color.WHITE, maxi(5, int(fs * 0.22)))
+		text_c(Vector2.ZERO, str(v), fs, Color("ffd24a") if v >= top else Color.WHITE, maxi(5, int(fs * 0.22)))
 		draw_set_transform_matrix(xf * Transform2D(mid + PI * 0.5, out + dvec * R * 0.5 * s))
 		_icon(v, Vector2.ZERO, R * 0.42, 1.0)
 		draw_set_transform_matrix(xf)
@@ -689,20 +736,21 @@ func _draw_controls() -> void:
 	if sub != "":
 		text_c(face.get_center() + Vector2(0, fs * 0.55), sub, int(fs * 0.42), Color(1, 1, 1, 0.85), 4)
 	# the two spin slots
-	for k in 2:
+	for k in _slots.size():
 		var s := _slots[k].grow(_slot_pop[k] * 6.0)
 		var has := k < _won.size()
 		var cur := k == _won.size() and _mode != "over"
 		rrect(Rect2(s.position + Vector2(0, 5), s.size), Color(0, 0, 0, 0.35), 16)
 		rrect(s, Color("2a1745") if not has else Color("3a1c55"), 16, 3, Color("ffc93d") if cur and _mode != "idle" else UiPalette.OUTLINE)
 		var hs := int(clampf(s.size.y * 0.15, 12.0, 18.0))
-		text_c(Vector2(s.get_center().x, s.position.y + hs * 0.9), "SPIN %d" % (k + 1), hs, Color(1, 1, 1, 0.6), 0, false)
+		if s.size.y >= 64.0:
+			text_c(Vector2(s.get_center().x, s.position.y + hs * 0.9), "SPIN %d" % (k + 1), hs, Color(1, 1, 1, 0.6), 0, false)
 		if has:
 			var wv := int(_won[k].value)
 			_icon(wv, s.get_center() + Vector2(-s.size.x * 0.17, s.size.y * 0.08), s.size.y * 0.52, 1.0)
 			var vs := int(clampf(s.size.y * 0.3, 18.0, 36.0))
-			text_c(s.get_center() + Vector2(s.size.x * 0.2, s.size.y * 0.08), "+%d" % wv, vs, Color("ffe07a") if wv < 9 else Color("aef4ff"), 5)
-			if bool(_won[k].nudged):
+			text_c(s.get_center() + Vector2(s.size.x * 0.2, s.size.y * 0.08), "+%d" % wv, vs, Color("ffe07a") if icon_key(wv, _top()) < 9 else Color("aef4ff"), 5)
+			if bool(_won[k].nudged) and s.size.y >= 64.0:
 				var tag := Rect2(Vector2(s.get_center().x - s.size.x * 0.3, s.end.y - hs * 0.9), Vector2(s.size.x * 0.6, hs * 1.3))
 				rrect(tag, Color("ff3b4f"), hs * 0.6, 2, UiPalette.OUTLINE)
 				text_c(tag.get_center(), "BRAKE", int(hs * 0.8), Color.WHITE, 0)
@@ -712,24 +760,22 @@ func _draw_controls() -> void:
 
 ## A prize icon centred at c, size s (the 3D KayKit model, else a vector stand-in).
 func _icon(value: int, c: Vector2, s: float, a: float) -> void:
-	var best := 2
-	for v: int in ICONS.keys():
-		if v <= value and v > best:
-			best = v
-	var tex: Texture2D = ModelIcons.get_icon(icon_path(value), float(ICONS[best][1]))
+	var top := _top()
+	var key := icon_key(value, top)
+	var tex: Texture2D = ModelIcons.get_icon(icon_path(value, top), float(ICONS[key][1]))
 	if tex:
 		draw_texture_rect(tex, Rect2(c - Vector2(s, s) * 0.5, Vector2(s, s)), false, Color(1, 1, 1, a))
 		return
 	var o := Color(UiPalette.OUTLINE, a)
-	if value >= JACKPOT:
+	if key == 12:
 		rrect(Rect2(c - Vector2(s * 0.34, s * 0.2), Vector2(s * 0.68, s * 0.44)), Color(Color("8a4a1c"), a), s * 0.06, 2, o)
 		draw_rect(Rect2(c - Vector2(s * 0.34, s * 0.04), Vector2(s * 0.68, s * 0.06)), Color(Color("ffc93d"), a))
 		draw_circle(c + Vector2(0, -s * 0.24), s * 0.1, Color(Color("6ff0ff"), a))
-	elif value >= 9:
+	elif key == 9:
 		var pts := PackedVector2Array([c + Vector2(0, -s * 0.34), c + Vector2(s * 0.3, -s * 0.06), c + Vector2(0, s * 0.34), c + Vector2(-s * 0.3, -s * 0.06)])
 		draw_colored_polygon(pts, Color(Color("5fe3ff"), a))
 		draw_polyline(pts + PackedVector2Array([pts[0]]), o, 2.0, true)
-	elif value >= 5:
+	elif key >= 5:
 		rrect(Rect2(c - Vector2(s * 0.32, s * 0.14), Vector2(s * 0.64, s * 0.28)), Color(Color("ffc93d"), a), s * 0.05, 2, o)
 	else:
 		draw_circle(c, s * 0.28 + 2.0, o)
