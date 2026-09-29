@@ -29,8 +29,13 @@ static func display_font() -> Font:
 		if not FileAccess.file_exists(DISPLAY_PATH) and not ResourceLoader.exists(DISPLAY_PATH):
 			_display = ThemeDB.fallback_font
 			return _display
-		var f := FontFile.new()
-		f.load_dynamic_font(DISPLAY_PATH)
+		var f: FontFile
+		if ResourceLoader.exists(DISPLAY_PATH):
+			# Exported builds only contain the imported font (.fontdata), not the raw .ttf.
+			f = (load(DISPLAY_PATH) as FontFile).duplicate()
+		else:
+			f = FontFile.new()
+			f.load_dynamic_font(DISPLAY_PATH)
 		f.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
 		f.hinting = TextServer.HINTING_LIGHT
 		f.generate_mipmaps = true
