@@ -172,10 +172,10 @@ func _rest_len() -> float:
 func _prize_h(kind: String) -> float:
 	var u := _unit()
 	match kind:
-		"small": return 58.0 * u
-		"medium": return 62.0 * u
-		"big": return 70.0 * u
-	return 44.0 * u
+		"small": return 64.0 * u
+		"medium": return 86.0 * u
+		"big": return 94.0 * u
+	return 58.0 * u
 
 
 # --- drawing -------------------------------------------------------------------------
@@ -282,7 +282,7 @@ func _draw_board() -> void:
 	if _won.is_empty():
 		text_c(shelf.get_center(), "WON: -", int(16 * u + 4), Color(1, 1, 1, 0.35))
 	for k in _won.size():
-		_prize(String(_won[k]), Vector2(shelf.position.x + 40 * u + k * 70 * u, shelf.end.y - 8), u * 0.72, 1.0)
+		_prize(String(_won[k]), Vector2(shelf.position.x + 44 * u + k * 80 * u, shelf.end.y - 6), u * 0.62, 1.0)
 	var bc := Vector2(fp.end.x - fp.size.x * 0.13, fp.get_center().y)
 	var br := minf(fp.size.y * 0.36, 34.0 * u + 10)
 	var pressed := _mode == "drop"
@@ -329,9 +329,23 @@ func _draw_claw(top: Vector2, u: float) -> void:
 	draw_line(head, head + Vector2(0, 30 * u), Color("d6dcea"), 4 * u, true)
 
 
-## A prize standing on point `b` (bottom centre).
+const PRIZE_ICONS := {"small": [ModelIcons.BALLOON_DOG, 80.0, 74.0], "medium": [ModelIcons.ROBOT, 20.0, 96.0],
+	"big": [ModelIcons.ACTION_FIGURE, 25.0, 104.0], "legendary": [ModelIcons.GEM, 30.0, 66.0]}
+
+
+## A prize standing on point `b` (bottom centre): the KayKit toy / gem, or a vector stand-in.
 func _prize(kind: String, b: Vector2, s: float, a: float) -> void:
 	var col: Color = MgLogic.PRIZE_COLORS.get(kind, Color.WHITE)
+	var spec: Array = PRIZE_ICONS.get(kind, [])
+	var tex := ModelIcons.get_icon(String(spec[0]), float(spec[1])) if not spec.is_empty() else null
+	if tex:
+		var px := float(spec[2]) * s
+		if kind == "legendary":
+			glow(b + Vector2(0, -px * 0.45), px * 0.9, Color(0.5, 0.9, 1.0, 0.8 * a))
+		draw_texture_rect(tex, Rect2(b - Vector2(px * 0.5, px * 0.96), Vector2(px, px)), false, Color(1, 1, 1, a))
+		if kind == "legendary":
+			_star4(b + Vector2(px * 0.3, -px * 0.8), (8.0 + 3.0 * sin(_bulbs * 6.0)) * s, Color(1, 1, 1, a))
+		return
 	var o := Color(UiPalette.OUTLINE, a)
 	match kind:
 		"small":

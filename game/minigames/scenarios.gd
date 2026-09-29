@@ -14,6 +14,7 @@ extends RefCounted
 ##                      and quits (exit 0 / 1).
 ##      --state=resume  two actions, then the run is JSON round-tripped and presented again
 ##                      (Continue mid-minigame); prints MG_RESUME
+##      --rig=three     (scratch) scratch three alike (harness peek, for the jackpot shots)
 ##      --auto=1        (fresh) press the screen's AUTO button (par result)
 ##      --state=anim    --actions=N actions after --delay=S seconds (frame sequences: pair it
 ##                      with --wait and --frames)
@@ -25,7 +26,7 @@ extends RefCounted
 ##                  end. Prints MG_AUTO_PLAYED lines and MG_AUTO_DONE.
 ## Common: --seed=N --speed=N --class=<id>
 
-const NAMES := ["mg_fossil", "mg_bubble", "mg_scratch", "mg_claw", "tile_minigames", "mg_play_auto"]
+const NAMES := ["mg_fossil", "mg_bubble", "mg_scratch", "mg_claw", "tile_minigames", "mg_play_auto", "mg_icons"]
 const IDS := {"mg_fossil": "fossil_hunter", "mg_bubble": "bubble_breaker", "mg_scratch": "scratch_off", "mg_claw": "claw_machine"}
 
 
@@ -69,6 +70,8 @@ class _Driver extends Node:
 		add_child(c)
 		c.set_speed(float(args.get("speed", "1")))
 		match scenario:
+			"mg_icons":
+				_icons()
 			"tile_minigames":
 				await _tiles()
 			"mg_play_auto":
@@ -96,7 +99,7 @@ class _Driver extends Node:
 		var scr := c.ui.minigame
 		if st == "result":
 			scr.set_meta("hold", 999.0)
-		var n := {"mid": 2, "resume": 2, "anim": int(args.get("actions", "1")), "result": 99, "reward": 99, "play": 99}.get(st, 2) as int
+		var n := {"mid": int(args.get("actions", "2")), "resume": 2, "anim": int(args.get("actions", "1")), "result": 99, "reward": 99, "play": 99}.get(st, 2) as int
 		if args.has("delay"):
 			await _pause(float(args.delay))
 		if st == "play":
@@ -177,7 +180,7 @@ class _Driver extends Node:
 		match id:
 			"fossil_hunter":
 				var fb := b as FossilBoard
-				var p := o + fb.cell_rect(int(a[1]) * 5 + int(a[0])).get_center()
+				var p := o + fb.cell_rect(int(a[1]) * int(st.w) + int(a[0])).get_center()
 				if args.has("debug"):
 					print("CLICK ", p, " board ", b.get_global_rect(), " locked ", b.locked, " hovered ", get_viewport().gui_get_hovered_control())
 				_click(p)
@@ -186,6 +189,17 @@ class _Driver extends Node:
 				_click(o + bb.to_screen(Vector2(int(a[0]), int(a[1]))))
 			"scratch_off":
 				var sb := b as ScratchBoard
+				if args.get("rig", "") == "three":
+					# screenshot aid only (the harness peeks, the screen never does): scratch the
+					# highest face's three copies -> three alike, the jackpot when it is a 6
+					var sm := f.minigame as ScratchOff
+					var top := 0
+					for v in sm.faces:
+						top = maxi(top, int(v))
+					for i in sm.faces.size():
+						if int(sm.faces[i]) == top and sm.revealed[i] == 0:
+							a = [i]
+							break
 				var r := sb.cell_rect(int(a[0]))
 				# a zig-zag scratch across the cell
 				var pts: Array = []
@@ -209,6 +223,32 @@ class _Driver extends Node:
 			await _pause(0.05)
 		print("MG_INPUT_MISSED %s %s" % [id, str(a)])
 		return false
+
+	# --- model icons ---------------------------------------------------------------------
+
+	## Every ModelIcons texture on a grid (checks the 3D -> 2D icon renders).
+	func _icons() -> void:
+		var paths := [ModelIcons.GEM, ModelIcons.GEM_SMALL, ModelIcons.COINS, ModelIcons.COIN_STACK, ModelIcons.GEM_CHEST,
+			ModelIcons.NUGGET, ModelIcons.BALLOON_DOG, ModelIcons.ROBOT, ModelIcons.ACTION_FIGURE, ModelIcons.SHOVEL,
+			ModelIcons.PICKAXE, ModelIcons.MAGNIFIER]
+		var bg := ColorRect.new()
+		bg.color = Color("2a1745")
+		bg.size = Vector2(4000, 4000)
+		add_child(bg)
+		var grid := GridContainer.new()
+		grid.columns = 3
+		grid.position = Vector2(20, 20)
+		add_child(grid)
+		for pth in paths:
+			var tr := TextureRect.new()
+			tr.custom_minimum_size = Vector2(220, 220)
+			tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			tr.texture = ModelIcons.get_icon(pth, float(args.get("yaw", "30")))
+			grid.add_child(tr)
+		if args.get("keep", "0") != "1":
+			c.queue_free()
+		else:
+			c.start(_flow())
 
 	# --- tiles ---------------------------------------------------------------------------
 

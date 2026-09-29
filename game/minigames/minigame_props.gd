@@ -86,6 +86,11 @@ static func _fossil(n: Node3D) -> void:
 	shovel.name = "Shovel"
 	shovel.rotation.x = deg_to_rad(-12.0)
 	shovel.rotation.z = deg_to_rad(16.0)
+	# a glinting gem half out of the dirt (the dig's treasures), when the pack is installed
+	if ResourceLoader.exists(Props.K + "resources/Gem_Medium.gltf"):
+		var gem := Props.put(n, Props.K + "resources/Gem_Medium.gltf", Vector3(-0.38, 0.05, 0.3), 20.0, 0.9)
+		gem.name = "Gem"
+		gem.rotation.z = deg_to_rad(25.0)
 
 
 static func _bubbles(n: Node3D) -> void:

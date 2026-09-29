@@ -12,14 +12,14 @@ const CLAW_SWEEP := 1.45
 
 ## Bubble colours (4) and the claw prize looks by kind.
 const BUBBLE_COLORS := [Color("ff5a6e"), Color("3fa9ff"), Color("5fdc6a"), Color("ffc93d")]
-const PRIZE_COLORS := {"small": Color("56d6c8"), "medium": Color("ff8ac2"), "big": Color("ffa53d"), "legendary": Color("ffe36b")}
-const PRIZE_NAMES := {"small": "Plush", "medium": "Gift Box", "big": "Treasure", "legendary": "Crown"}
+const PRIZE_COLORS := {"small": Color("ff6b6b"), "medium": Color("b8c4d8"), "big": Color("ffa53d"), "legendary": Color("7fe8ff")}
+const PRIZE_NAMES := {"small": "Balloon Dog", "medium": "Robot", "big": "Action Figure", "legendary": "Giant Gem"}
 
 const TIER_COLORS := {"bronze": Color("d98b4f"), "silver": Color("cfd9ea"), "gold": Color("ffcf4a")}
 const GAME_COLORS := {"fossil_hunter": Color("e0a15a"), "bubble_breaker": Color("5ab8ff"),
 	"scratch_off": Color("c98cff"), "claw_machine": Color("ff6f9a")}
 const HINTS := {
-	"fossil_hunter": "Dig for 2 fossils. Numbers show the distance to the nearest bone.",
+	"fossil_hunter": "Dig for 3 fossils and hidden treasure. Hit a bone? Dig beside it!",
 	"bubble_breaker": "Tap a group of 3+ to pop it. Big pops and chains score more.",
 	"scratch_off": "Scratch 3 faces. A pair pays, three alike pays big, three 6s: JACKPOT!",
 	"claw_machine": "Tap to drop the claw. Narrow prizes are worth more.",

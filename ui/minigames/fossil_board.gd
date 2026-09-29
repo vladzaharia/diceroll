@@ -1,14 +1,15 @@
 class_name FossilBoard
 extends MgBoard
-## Fossil Hunter: a 5x5 dig site of dirt mounds. Tap a mound to dig ([x, y]). The core
-## answers with the dug cell: an empty hole shows the distance to the nearest bone (hot red
-## 1 ... cool blue 4+), a hit shows a bone piece, and a finished fossil turns its bones gold
-## and links them into a skeleton. Hidden fossils are never drawn: only public cells.
+## Fossil Hunter (a luck dig): a 7x7 site of dirt mounds. Tap a mound to dig ([x, y]). The
+## core answers with that cell only: plain dirt, a bone piece (a fossil to follow), or a
+## treasure (a gem or a coin pouch, drawn from KayKit models). A finished fossil turns gold
+## and its bones join into one skeleton. No numbers, no hints: only public cells are drawn.
 
 const DIRT := Color("8a5a36")
 const DIRT_TOP := Color("b07a4a")
 const SOIL := Color("3a2618")
-const HINT_COLORS := [Color("ff4d4d"), Color("ff4d4d"), Color("ff9a3a"), Color("ffd24a"), Color("7fd0ff"), Color("8fa4ff")]
+const EMPTY_LINES := ["Just dirt", "Nothing", "Pebbles", "Only worms", "Empty"]
+const TREASURE_TEXT := {"gem": "GEM!", "coin": "COINS!"}
 
 var _grid := Rect2()
 var _cell := 60.0
@@ -46,14 +47,18 @@ func _layout() -> void:
 	var header := 86.0
 	var avail := Vector2(size.x, size.y - header)
 	var s := minf(avail.x, avail.y)
-	_cell = (s - 56.0) / 5.0
-	var gs := _cell * 5.0
+	_cell = (s - 56.0) / float(_w())
+	var gs := _cell * _w()
 	_grid = Rect2(Vector2((size.x - gs) * 0.5, header + (avail.y - gs) * 0.5), Vector2(gs, gs))
 
 
+func _w() -> int:
+	return int(state.get("w", 7))
+
+
 func cell_rect(i: int) -> Rect2:
-	var x := i % 5
-	var y := i / 5
+	var x := i % _w()
+	var y := i / _w()
 	return Rect2(_grid.position + Vector2(x, y) * _cell, Vector2(_cell, _cell)).grow(-4.0)
 
 
@@ -61,7 +66,7 @@ func cell_at(p: Vector2) -> int:
 	if not _grid.has_point(p):
 		return -1
 	var q := ((p - _grid.position) / _cell).floor()
-	return int(q.y) * 5 + int(q.x)
+	return int(q.y) * _w() + int(q.x)
 
 
 func _gui_input(e: InputEvent) -> void:
@@ -83,7 +88,7 @@ func _gui_input(e: InputEvent) -> void:
 		return
 	_dig[i] = time
 	MgBoard.sfx("dig")
-	send([i % 5, i / 5])
+	send([i % _w(), i / _w()])
 
 
 func play_update(ev: Dictionary) -> void:
@@ -92,7 +97,7 @@ func play_update(ev: Dictionary) -> void:
 	var info: Dictionary = ev.get("info", {})
 	var x := int(info.get("x", 0))
 	var y := int(info.get("y", 0))
-	var i := y * 5 + x
+	var i := y * _w() + x
 	var r := cell_rect(i)
 	var c := r.get_center()
 	# the shovel strikes (if the tap didn't start it, e.g. AUTO / a scripted action)
@@ -108,7 +113,20 @@ func play_update(ev: Dictionary) -> void:
 	var prev: Array = state.get("cells", []).duplicate()
 	state = (ev.get("state", {}) as Dictionary).duplicate(true)
 	_reveal[i] = time
-	if bool(info.get("hit", false)):
+	var treasure := String(info.get("treasure", ""))
+	if treasure != "":
+		MgBoard.sfx("coin" if treasure == "coin" else "reveal")
+		MgBoard.sfx("clink")
+		var tc: Color = Color("7fe0ff") if treasure == "gem" else Color("ffd34a")
+		burst(c, tc, 22, "star", 320.0, 90.0, 11.0)
+		burst(c, tc.lightened(0.3), 10, "spark", 260.0, 60.0, 8.0)
+		ring(c, tc, _cell * 0.8, 0.5, 7.0)
+		shake(6.0)
+		kick.emit(0.55, Color(tc.r, tc.g, tc.b, 0.35))
+		float_text(c + Vector2(0, -_cell * 0.35), "%s +%d" % [TREASURE_TEXT.get(treasure, "TREASURE!"),
+			int(FossilHunter.TREASURE_POINTS.get(treasure, 2))], tc.lightened(0.35), 40, 1.2)
+		await wait(0.55)
+	elif bool(info.get("hit", false)):
 		MgBoard.sfx("clink")
 		burst(c, Color("fff2c8"), 14, "star", 240.0, 60.0, 9.0)
 		ring(c, Color("ffe08a"), _cell * 0.7)
@@ -125,36 +143,34 @@ func play_update(ev: Dictionary) -> void:
 			MgBoard.sfx("win")
 			shake(9.0)
 			kick.emit(0.8, Color(1.0, 0.85, 0.4, 0.45))
-			float_text(c + Vector2(0, -_cell * 0.3), "FOSSIL! +%d" % (done + 2), Color("ffe07a"), 44, 1.3)
+			float_text(c + Vector2(0, -_cell * 0.3), "FOSSIL! +%d" % (done + 1), Color("ffe07a"), 44, 1.3)
 			await wait(0.7)
 		else:
 			float_text(c + Vector2(0, -_cell * 0.3), "BONE! +1", Color("fff0c0"), 36)
 			await wait(0.45)
 	else:
-		var hint := int(info.get("hint", -1))
 		MgBoard.sfx("tick")
-		float_text(c + Vector2(0, -_cell * 0.25), ["", "HOT!", "Warm", "Cool", "Cold"][clampi(hint, 0, 4)] if hint <= 4 else "Cold",
-			HINT_COLORS[clampi(hint, 0, 5)], 26, 0.8)
-		await wait(0.35)
+		float_text(c + Vector2(0, -_cell * 0.25), String(EMPTY_LINES[hash(i * 31 + 7) % EMPTY_LINES.size()]),
+			Color(0.85, 0.78, 0.7, 0.9), 24, 0.7)
+		await wait(0.3)
 	unlock()
 
 
 func _draw_board() -> void:
 	_layout()
 	var cells: Array = state.get("cells", [])
-	var hints: Array = state.get("hints", [])
 	_draw_header()
 	# dig site: wooden frame and soil bed
 	var frame := _grid.grow(18.0)
 	rrect(frame.grow(4.0), UiPalette.OUTLINE, 30)
 	rrect(frame, Color("6b4526"), 28)
 	rrect(Rect2(frame.position, Vector2(frame.size.x, frame.size.y - 8)), Color("8d5d34"), 28)
-	for k in 5:
-		var yy := frame.position.y + 6 + k * (frame.size.y - 12) / 5.0
+	for k in _w():
+		var yy := frame.position.y + 6 + k * (frame.size.y - 12) / float(_w())
 		draw_line(Vector2(frame.position.x + 16, yy), Vector2(frame.end.x - 16, yy), Color(0, 0, 0, 0.12), 2.0)
 	rrect(_grid.grow(6.0), SOIL, 18)
 	for i in cells.size():
-		_draw_cell(i, String(cells[i]), int(hints[i]) if i < hints.size() else -1)
+		_draw_cell(i, String(cells[i]))
 	_draw_skeleton(cells)
 	# shovel strikes
 	for i in _dig:
@@ -162,27 +178,56 @@ func _draw_board() -> void:
 		_draw_shovel(cell_rect(int(i)).get_center() + Vector2(_cell * 0.28, -_cell * (0.75 - 0.45 * k)), -0.6 + 0.5 * k)
 
 
+## A treasure icon (the KayKit gem / coin pouch, or a vector stand-in) centred at c.
+func _treasure(kind: String, c: Vector2, s: float, tint := Color.WHITE) -> void:
+	var tex := ModelIcons.get_icon(ModelIcons.GEM_SMALL if kind == "gem" else ModelIcons.COINS, 25.0, -22.0)
+	if tex:
+		draw_texture_rect(tex, Rect2(c - Vector2(s, s) * 0.5, Vector2(s, s)), false, tint)
+		return
+	if kind == "gem":
+		var pts := PackedVector2Array([c + Vector2(0, -s * 0.4), c + Vector2(s * 0.35, -s * 0.1), c + Vector2(0, s * 0.4), c + Vector2(-s * 0.35, -s * 0.1)])
+		draw_colored_polygon(pts, Color("5fd0ff"))
+		draw_polyline(pts + PackedVector2Array([pts[0]]), UiPalette.OUTLINE, 3.0, true)
+	else:
+		draw_circle(c + Vector2(0, s * 0.08), s * 0.3, UiPalette.OUTLINE)
+		draw_circle(c + Vector2(0, s * 0.08), s * 0.26, Color("c8963e"))
+		draw_circle(c + Vector2(-s * 0.1, s * 0.12), s * 0.12, Color("ffd34a"))
+
+
 func _draw_header() -> void:
 	var fs: Array = state.get("fossils", [])
+	var ts: Array = state.get("treasures", [])
 	var total := 0.0
 	for f: Dictionary in fs:
-		total += int(f.size) * 34.0 + 50.0
+		total += int(f.size) * 26.0 + 24.0 + 16.0
+	total += ts.size() * 60.0 + 10.0
 	var x := (size.x - total) * 0.5
 	for f: Dictionary in fs:
 		var n := int(f.size)
-		var w := n * 34.0 + 24.0
+		var w := n * 26.0 + 24.0
 		var r := Rect2(x, 14, w, 56)
 		var found := bool(f.found)
 		rrect(r, Color("2a1d14") if not found else Color("5a3d12"), 24, 3, UiPalette.GOLD_FAINT if not found else UiPalette.GOLD_BRIGHT)
 		if found:
 			glow(r.get_center(), w * 0.7, Color(1.0, 0.8, 0.3, 0.6 + 0.2 * sin(time * 4.0)))
 		var y := r.get_center().y
-		_bone(Vector2(r.position.x + 22, y), Vector2(r.end.x - 22, y), 11.0,
+		_bone(Vector2(r.position.x + 20, y), Vector2(r.end.x - 20, y), 10.0,
 			Color("fff1d0") if found else Color(1, 1, 1, 0.16), found)
-		x += w + 26.0
+		x += w + 16.0
+	x += 10.0
+	for t: Dictionary in ts:
+		var tr := Rect2(x, 14, 52, 56)
+		var got := bool(t.found)
+		rrect(tr, Color("2a1d14") if not got else Color("1d3a4a"), 20, 3, UiPalette.GOLD_FAINT if not got else Color("9fe8ff"))
+		if got:
+			_treasure(String(t.kind), tr.get_center(), 50.0)
+		else:
+			# still buried: a dark silhouette of what to look for
+			_treasure(String(t.kind), tr.get_center(), 44.0, Color(0.0, 0.0, 0.0, 0.55))
+		x += 60.0
 
 
-func _draw_cell(i: int, kind: String, hint: int) -> void:
+func _draw_cell(i: int, kind: String) -> void:
 	var r := cell_rect(i)
 	var c := r.get_center()
 	var rev := float(_reveal.get(i, -10.0))
@@ -225,10 +270,21 @@ func _draw_cell(i: int, kind: String, hint: int) -> void:
 	rrect(Rect2(hr.position + Vector2(_cell * 0.07, hr.size.y * 0.62), Vector2(hr.size.x - _cell * 0.14, hr.size.y * 0.3)), Color("3b2415"), _cell * 0.14)
 	match kind:
 		".":
-			var col: Color = HINT_COLORS[clampi(hint, 0, 5)]
-			var gk := 0.5 + 0.2 * sin(time * 3.0 + i)
-			glow(c, _cell * 0.5, Color(col.r, col.g, col.b, gk if hint <= 1 else gk * 0.6))
-			text_c(c, str(hint), int(_cell * 0.5 * pop), col, 8)
+			# plain dirt: a few clods and a worm now and then
+			for d in 3:
+				var dh := hash(h + d * 13)
+				var dp := hr.position + hr.size * Vector2(0.25 + 0.5 * float(dh % 89) / 89.0, 0.62 + 0.18 * float((dh / 89) % 7) / 7.0)
+				draw_circle(dp, _cell * (0.05 + 0.02 * (dh % 2)), Color("5a3a24"))
+			if (h / 7) % 6 == 0:
+				var wp := hr.position + hr.size * Vector2(0.35, 0.5)
+				draw_polyline(PackedVector2Array([wp, wp + Vector2(_cell * 0.1, -_cell * 0.05), wp + Vector2(_cell * 0.2, 0),
+					wp + Vector2(_cell * 0.3, -_cell * 0.04)]), Color("d98a8a"), _cell * 0.05, true)
+		"gem", "coin":
+			var gem := kind == "gem"
+			var tc: Color = Color("7fe0ff") if gem else Color("ffd34a")
+			glow(c, _cell * 0.62, Color(tc.r, tc.g, tc.b, 0.55 + 0.2 * sin(time * 4.0 + i)))
+			_treasure(kind, c, _cell * 0.95 * pop)
+			_star4(c + Vector2(_cell * 0.24, -_cell * 0.24), _cell * (0.07 + 0.03 * sin(time * 5.0 + i)), Color.WHITE)
 		"hit":
 			# a bone piece still half in the dirt, glinting: more of this fossil is nearby
 			glow(c, _cell * 0.55, Color(1.0, 0.85, 0.5, 0.45 + 0.15 * sin(time * 4.0 + i)))
@@ -257,7 +313,7 @@ func _draw_skeleton(cells: Array) -> void:
 		var rev := float(_reveal.get(i, -10.0))
 		var k := clampf((time - rev) / dur(0.35), 0.0, 1.0)
 		var pop := 1.0 + 0.25 * sin(k * PI) if k < 1.0 else 1.0
-		var links := MgLogic.bone_links(cells, i, 5)
+		var links := MgLogic.bone_links(cells, i, _w())
 		var dirs: Array = []
 		for d in 4:
 			if links[d]:

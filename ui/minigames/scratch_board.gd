@@ -27,6 +27,8 @@ var _last_sfx := 0.0
 var _last_pt := Vector2.INF
 var _match_t := -10.0
 var _match_n := 0
+## Jackpot: gem icons thrown over the card {p, v, t, rot}.
+var _gems: Array = []
 static var _base: Image
 
 
@@ -231,7 +233,13 @@ func play_update(ev: Dictionary) -> void:
 	unlock()
 
 
-func _tick(_dt: float) -> void:
+func _tick(dt: float) -> void:
+	for g: Dictionary in _gems:
+		g.t += dt
+		g.v.y += 1100.0 * dt
+		g.p += g.v * dt
+		g.rot += dt * 4.0
+	_gems = _gems.filter(func(g: Dictionary) -> bool: return float(g.t) < 1.6)
 	var cells: Array = state.get("cells", [])
 	for i in CELLS:
 		var face := int(cells[i]) if i < cells.size() else 0
@@ -269,9 +277,13 @@ func _eval_match(instant: bool) -> void:
 		mid /= float(best.cells.size())
 		if n >= 3:
 			var jack := int(best.face) == 6
-			float_text(mid, "JACKPOT!!" if jack else "THREE ALIKE!", Color("ffe07a"), 54 if jack else 46, 1.6)
+			_texts.clear()
+			float_text(mid + Vector2(0, 40), "JACKPOT!!" if jack else "THREE ALIKE!", Color("ffe07a"), 54 if jack else 46, 1.6)
 			MgBoard.sfx("win")
 			burst(mid, Color("ffd24a"), 40, "flake", 520.0, 260.0, 10.0)
+			for g in 10:
+				_gems.append({"p": mid + Vector2(randf_range(-60, 60), randf_range(-30, 30)),
+					"v": Vector2(randf_range(-320, 320), randf_range(-620, -300)), "t": 0.0, "rot": randf() * TAU})
 			burst(mid, Color.WHITE, 20, "star", 380.0, 100.0, 12.0)
 			shake(10.0)
 			kick.emit(1.0, Color(1.0, 0.85, 0.35, 0.5))
@@ -337,6 +349,9 @@ func _draw_board() -> void:
 	for k in 3:
 		die_face(Rect2(Vector2(lx + 58 + k * 30, ly - 13), Vector2(26, 26)), 6)
 	text_c(Vector2(lx + 190, ly), "JACKPOT", fs, Color("ff9ae0"), 5)
+	var chest := ModelIcons.get_icon(ModelIcons.GEM_CHEST, 25.0)
+	if chest:
+		draw_texture_rect(chest, Rect2(Vector2(lx + 240, ly - 30), Vector2(56, 56)), false)
 	# jackpot shimmer band sweeping across the card
 	if jackpot:
 		var k := fposmod((time - _match_t) * 0.8, 1.6) - 0.3
@@ -344,6 +359,15 @@ func _draw_board() -> void:
 		var band := PackedVector2Array([Vector2(x0, c.position.y - 40), Vector2(x0 + 90, c.position.y - 40),
 			Vector2(x0 - 110, c.end.y + 40), Vector2(x0 - 200, c.end.y + 40)])
 		clipped(band, rect_poly(c), Color(1.0, 0.95, 0.7, 0.28))
+	var gem := ModelIcons.get_icon(ModelIcons.GEM, 30.0) if not _gems.is_empty() else null
+	for g: Dictionary in _gems:
+		var a := clampf(2.0 - float(g.t) * 1.3, 0.0, 1.0)
+		if gem:
+			draw_set_transform(g.p, g.rot, Vector2.ONE)
+			draw_texture_rect(gem, Rect2(-32, -32, 64, 64), false, Color(1, 1, 1, a))
+			draw_set_transform(Vector2.ZERO)
+		else:
+			_star4(g.p, 16.0, Color(0.5, 0.9, 1.0, a))
 
 
 func _draw_cell(i: int, face: int, best: Dictionary) -> void:
