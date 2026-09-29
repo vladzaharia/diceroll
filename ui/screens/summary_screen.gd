@@ -1,22 +1,43 @@
 class_name SummaryScreen
 extends UiModal
-## Victory / Defeat run summary: headline, class + act reached, stat tiles from
-## flow.run.stats, New Run / Title. Emits new_run_pressed, title_pressed.
+## End-of-run RESULTS (review §5.6), shown for a victory and a defeat alike: the headline,
+## class and route, then the Crowns lines counted up one by one (laps -> biomes -> mini-boss ->
+## final boss -> minigames -> leftover gold (capped) -> ascension / catch-up bonus -> total),
+## Sigils from firsts, pet XP, unlock cards for milestones and firsts (Camp.bank_run events),
+## and a "nearest goals" section with 3 progress bars. CAMP returns to the hub.
+##
+## The GameController banks the run before the screen opens and sets `results`:
+##   {events: Camp.bank_run() events, before: Profile.to_dict() before banking, after: Profile}
+## Without `results` (legacy scenarios) only the run half is shown.
+## Emits new_run_pressed (= go to Camp) and title_pressed.
 
 signal new_run_pressed
 signal title_pressed
 
 const ACT_NAMES := ["The Crypt", "The Hollow", "The Bone Throne"]
+const LINES := {
+	"laps": ["flag", "Laps"], "biomes": ["portal", "Biomes reached"], "mini-boss": ["skull", "Mini-boss slain"],
+	"victory": ["trophy", "Final boss"], "minigames": ["star", "Minigames"], "gold": ["coin", "Leftover gold"],
+	"bonus": ["up", "Bonus"],
+}
 
+var results: Dictionary = {}
 var _hero: HBoxContainer
-var _grid: GridContainer
-var _passive_title: Label
-var _passives: HFlowContainer
 var _headline: Label
 var _route: VBoxContainer
+var _crowns_box: VBoxContainer
+var _total_row: HBoxContainer
+var _total_l: Label
+var _extra: VBoxContainer
+var _goals: VBoxContainer
+var _camp_btn: GameButton
+var _anim_gen := 0
+var _lines: Array = []
+var _cards: Array = []
 
 
 func _build() -> void:
+	max_width = 700.0
 	_headline = UiTheme.label("", 28, UiPalette.TEXT, true, 0, true)
 	_headline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_headline.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -26,30 +47,26 @@ func _build() -> void:
 	body.add_child(_hero)
 	_route = UiTheme.vbox(0)
 	body.add_child(_route)
-	_grid = GridContainer.new()
-	_grid.columns = 2
-	_grid.add_theme_constant_override("h_separation", 12)
-	_grid.add_theme_constant_override("v_separation", 12)
-	body.add_child(_grid)
-	_passive_title = UiModal.section_label("Passives")
-	body.add_child(_passive_title)
-	_passives = HFlowContainer.new()
-	_passives.alignment = FlowContainer.ALIGNMENT_CENTER
-	_passives.add_theme_constant_override("h_separation", 8)
-	_passives.add_theme_constant_override("v_separation", 8)
-	_passives.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	body.add_child(_passives)
+	_crowns_box = UiTheme.vbox(6)
+	body.add_child(_crowns_box)
+	_extra = UiTheme.vbox(12)
+	body.add_child(_extra)
+	_goals = UiTheme.vbox(10)
+	body.add_child(_goals)
 	body.add_child(UiTheme.spacer(4))
 	var row := UiTheme.hbox(14)
 	body.add_child(row)
-	var title := GameButton.make("TITLE", "home", GameButton.Kind.SECONDARY, 30)
+	var title := GameButton.make("", "home", GameButton.Kind.SECONDARY, 30)
 	title.icon_tint = UiPalette.GOLD
+	title.min_height = 100
 	title.pressed.connect(func() -> void: title_pressed.emit())
 	row.add_child(title)
-	var again := GameButton.make("NEW RUN", "dice", GameButton.Kind.PRIMARY, 36)
-	again.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	again.pressed.connect(func() -> void: new_run_pressed.emit())
-	row.add_child(again)
+	_camp_btn = GameButton.make("TO CAMP", "campfire", GameButton.Kind.PRIMARY, 38)
+	_camp_btn.icon_tint = UiPalette.TEXT_DARK
+	_camp_btn.min_height = 100
+	_camp_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_camp_btn.pressed.connect(func() -> void: new_run_pressed.emit())
+	row.add_child(_camp_btn)
 
 
 func refresh(flow: GameFlow) -> void:
@@ -59,67 +76,337 @@ func refresh(flow: GameFlow) -> void:
 	set_title("VICTORY!" if won else "DEFEATED", UiPalette.GOLD if won else UiPalette.DANGER)
 	var info := flow.route_info()
 	var boss_name := String(info.boss.name)
-	var last := BiomeDefs.name_of(String(r.route[2])) if r.route.size() >= 3 else String(ACT_NAMES[2])
+	var last := BiomeDefs.name_of(String(r.route.back())) if not r.route.is_empty() else String(ACT_NAMES[2])
 	_headline.text = ("%s has fallen. %s is yours." % [boss_name, last]) if won \
-		else "Fallen on lap %d of %d, in %s." % [r.lap, Balance.TOTAL_LAPS, BiomeDefs.name_of(r.biome())]
+		else "Fallen on lap %d of %d, in %s." % [r.lap, r.total_laps(), BiomeDefs.name_of(r.biome())]
 	_headline.label_settings = UiTheme.label_settings(28, UiPalette.GOLD_BRIGHT if won else UiPalette.TEXT, true, 0, UiPalette.OUTLINE, true)
 	UiTheme.clear(_hero)
 	var cls: Dictionary = HeroDefs.DATA.get(r.class_id, HeroDefs.DATA.knight)
-	_hero.add_child(OptionCard.Medallion.make(UiIcons.class_icon(r.class_id), 88, null, UiPalette.GOLD if won else UiPalette.DANGER))
+	_hero.add_child(OptionCard.Medallion.make(UiIcons.class_icon(r.class_id), 80, null, UiPalette.GOLD if won else UiPalette.DANGER))
 	var col := UiTheme.vbox(0)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	_hero.add_child(col)
-	col.add_child(UiTheme.label(String(cls.name), 40, UiPalette.TEXT, true, 6))
-	col.add_child(UiTheme.label("Level %d  ·  Lap %d/%d  ·  %d dice" % [r.level, r.lap, Balance.TOTAL_LAPS, r.dice.size()], 22, UiPalette.TEXT_DIM, false, 0, false, 600))
+	col.add_child(UiTheme.label(String(cls.name), 38, UiPalette.TEXT, true, 6))
+	var sub := "Level %d  ·  Lap %d/%d  ·  %d fights won" % [r.level, r.lap, r.total_laps(), int(st.get("fights_won", 0))]
+	var asc := int(r.meta.get("asc", 0))
+	if asc > 0:
+		sub += "  ·  A%d" % asc
+	col.add_child(UiTheme.label(sub, 20, UiPalette.TEXT_DIM, false, 0, false, 600))
 	UiTheme.clear(_route)
 	var strip := RouteStrip.make(info, 0 if won else r.act, 0, true)
 	strip.beaten.boss = won
+	strip.beaten.miniboss = int(st.get("minibosses_won", 0)) > 0
 	strip._rebuild()
 	_route.add_child(strip)
-	UiTheme.clear(_grid)
-	var best := String(st.get("best_combo", ""))
-	var bm := float(st.get("best_mult", 0.0))
-	var tiles := [
-		["sword", "Fights won", str(int(st.get("fights_won", 0)))],
-		["flame", "Damage dealt", _num(int(st.get("damage_dealt", 0)))],
-		["heart", "Damage taken", _num(int(st.get("damage_taken", 0)))],
-		["coin", "Gold earned", _num(int(st.get("gold_earned", 0)))],
-		["star", "Best combo", ("%s ×%s" % [best, CombatHud._fmt(bm)]) if best != "" else "None"],
-		["dice", "Board turns", str(int(st.get("board_turns", 0)))],
-	]
-	for t in tiles:
-		_grid.add_child(_tile(t[0], t[1], t[2]))
-	UiTheme.clear(_passives)
-	for id in r.passives:
-		_passives.add_child(PassiveIcon.make(String(id), 56, true))
-	_passive_title.text = "PASSIVES (%d)" % r.passives.size()
-	_passive_title.visible = not r.passives.is_empty()
-	_passives.visible = not r.passives.is_empty()
+	_build_crowns(st)
+	_build_extra()
+	_build_goals()
 	relayout()
 
 
-
-static func _num(n: int) -> String:
-	var s := str(n)
-	if n >= 1000:
-		s = "%d,%03d" % [n / 1000, n % 1000]
-	return s
+func open() -> void:
+	await super.open()
+	_animate()
 
 
-func _tile(icon: String, label: String, value: String) -> Control:
+func show_now() -> void:
+	super.show_now()
+	_animate()
+
+
+func close(free_after := false) -> void:
+	_anim_gen += 1
+	await super.close(free_after)
+
+
+# ---------------------------------------------------------------- crowns
+
+func _build_crowns(st: Dictionary) -> void:
+	UiTheme.clear(_crowns_box)
+	_lines.clear()
+	var rw: Dictionary = st.get("rewards", {})
+	var parts: Array = rw.get("breakdown", [])
+	if parts.is_empty():
+		_crowns_box.visible = false
+		return
+	_crowns_box.visible = true
+	_crowns_box.add_child(UiModal.section_label("Crowns earned"))
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", UiTheme.panel_box("inset"))
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_crowns_box.add_child(panel)
+	var list := UiTheme.vbox(4)
+	panel.add_child(list)
+	for p in parts:
+		var key := String(p[0])
+		var amt := int(p[1])
+		if key == "bonus" and amt == 0:
+			continue
+		if key in ["mini-boss", "victory"] and amt == 0:
+			continue
+		var row := UiTheme.hbox(12)
+		list.add_child(row)
+		var def: Array = LINES.get(key, ["star", key.capitalize()])
+		row.add_child(UiIcons.rect(String(def[0]), 32))
+		var lab := UiTheme.label(String(def[1]), 23, UiPalette.TEXT, false, 0, false, 600)
+		row.add_child(lab)
+		var det := UiTheme.label(_detail(key, amt, st), 18, UiPalette.TEXT_MUTED, false, 0, false, 600)
+		det.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(det)
+		var val := UiTheme.label("+0", 28, UiPalette.GOLD_BRIGHT, true, 5)
+		val.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		val.custom_minimum_size.x = 70
+		row.add_child(val)
+		row.modulate.a = 0.0
+		_lines.append([row, val, amt])
+	var sep := ColorRect.new()
+	sep.color = UiPalette.GOLD_FAINT
+	sep.custom_minimum_size = Vector2(0, 2)
+	sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	list.add_child(sep)
+	_total_row = UiTheme.hbox(12)
+	list.add_child(_total_row)
+	_total_row.add_child(UiIcons.rect("crown", 44, CampUi.CROWN_COLOR))
+	var tl := UiTheme.label("TOTAL", 30, UiPalette.TEXT, true, 6)
+	tl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_total_row.add_child(tl)
+	_total_l = UiTheme.label("0", 44, UiPalette.GOLD_BRIGHT, true, 8, true)
+	_total_row.add_child(_total_l)
+	_total_row.set_meta("total", int(rw.get("crowns", 0)))
+
+
+func _detail(key: String, amt: int, st: Dictionary) -> String:
+	match key:
+		"laps":
+			return "%d laps" % int(st.get("laps_completed", amt / maxi(1, Economy.CROWNS_PER_LAP)))
+		"biomes":
+			return "%d new" % (amt / maxi(1, Economy.CROWNS_PER_BIOME)) if amt > 0 else ""
+		"minigames":
+			return "%d played" % int(st.get("minigames_played", 0))
+		"gold":
+			return "%d gold  ·  max %d" % [int(st.get("gold", 0)), Economy.GOLD_CROWN_CAP]
+		"bonus":
+			var bits := PackedStringArray()
+			var a := int(st.get("asc", 0))
+			if a > 0:
+				bits.append("Ascension +%d%%" % int(round(Economy.ASC_CROWN_BONUS * 100.0 * a)))
+			if String(st.get("mode", "standard")) == "short":
+				bits.append("Short Road")
+			if bits.is_empty():
+				bits.append("Comeback")
+			return "  ·  ".join(bits)
+	return ""
+
+
+# ---------------------------------------------------------------- sigils, pet, unlocks
+
+func _build_extra() -> void:
+	UiTheme.clear(_extra)
+	_cards.clear()
+	if results.is_empty():
+		return
+	var evs: Array = results.get("events", [])
+	var before := Profile.from_dict(results.get("before", {}))
+	var after: Profile = results.get("after")
+	# Sigils from firsts
+	var firsts: Array = []
+	for e in evs:
+		if String(e.type) == "first":
+			firsts.append(e)
+	if not firsts.is_empty():
+		_extra.add_child(UiModal.section_label("Firsts"))
+		var flow := HFlowContainer.new()
+		flow.alignment = FlowContainer.ALIGNMENT_CENTER
+		flow.add_theme_constant_override("h_separation", 8)
+		flow.add_theme_constant_override("v_separation", 8)
+		flow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_extra.add_child(flow)
+		for e in firsts:
+			var chip := _first_chip(e)
+			chip.modulate.a = 0.0
+			flow.add_child(chip)
+			_cards.append(chip)
+	# pet XP
+	var pet := String(before.loadout.get("pet", ""))
+	if pet != "" and after != null and after.owns("pets", pet):
+		var gained := int(after.pet_xp.get(pet, 0)) - int(before.pet_xp.get(pet, 0))
+		var l0 := before.pet_level(pet)
+		var l1 := after.pet_level(pet)
+		var row := CampUi.card(l1 > l0, CampInfo.PET_COLOR.get(pet, UiPalette.GOLD))
+		var h := UiTheme.hbox(12)
+		row.add_child(h)
+		h.add_child(OptionCard.Medallion.make(String(CampInfo.PET_ICON.get(pet, "heart")), 56, CampInfo.PET_COLOR.get(pet, UiPalette.GOLD), CampInfo.PET_COLOR.get(pet, UiPalette.GOLD)))
+		var c := UiTheme.vbox(4)
+		c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		h.add_child(c)
+		c.add_child(UiTheme.label("%s  +%d XP" % [PetDefs.name_of(pet), gained] + ("   LEVEL %d!" % l1 if l1 > l0 else ""), 24,
+			UiPalette.GOLD_BRIGHT if l1 > l0 else UiPalette.TEXT, true, 5))
+		var xb := CampInfo.pet_xp_bar(after, pet)
+		if int(xb[1]) > 0:
+			var br := UiTheme.hbox(8)
+			c.add_child(br)
+			br.add_child(CampUi.bar(float(xb[0]), float(xb[1]), UiPalette.XP, 16))
+			br.add_child(UiTheme.label("%d / %d to L%d" % [int(xb[0]), int(xb[1]), l1 + 1], 17, UiPalette.TEXT_DIM, false, 0, false, 700))
+		else:
+			c.add_child(UiTheme.label("Level %d  ·  more levels at the Pet Den" % l1, 17, UiPalette.TEXT_DIM, false, 0, false, 700))
+		row.modulate.a = 0.0
+		_extra.add_child(row)
+		_cards.append(row)
+	# unlock cards: milestones (with their rewards) and the ascension ladder
+	var ms: Array = []
+	var asc_up := -1
+	for e in evs:
+		match String(e.type):
+			"milestone":
+				ms.append(e)
+			"run_banked":
+				asc_up = int(e.get("ascension_unlocked", -1))
+	if not ms.is_empty() or asc_up > 0:
+		_extra.add_child(UiModal.section_label("Unlocked!"))
+		for e in ms:
+			for u in e.unlocks:
+				var card := _unlock_card(String(u[0]), String(u[1]), String(e.desc))
+				card.modulate.a = 0.0
+				_extra.add_child(card)
+				_cards.append(card)
+		if asc_up > 0:
+			var card := _asc_card(asc_up)
+			card.modulate.a = 0.0
+			_extra.add_child(card)
+			_cards.append(card)
+
+
+func _first_chip(e: Dictionary) -> Control:
+	var kind := String(e.kind)
+	var id := String(e.id)
+	var label := ""
+	match kind:
+		"biome": label = "Discovered %s" % BiomeDefs.name_of(id)
+		"miniboss": label = "Slew %s" % String(EnemyDefs.def(id).get("name", id))
+		"boss": label = "Defeated %s" % String(EnemyDefs.def(id).get("name", id))
+		"class_win": label = "First %s win" % CampInfo.name_of("classes", id)
+		"route_win": label = "New route conquered"
+		"asc_clear": label = "Cleared Ascension %s" % id
+		"short_win": label = "Short Road win"
+		_: label = kind
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(UiPalette.NAVY_2, 20, 2, Color(1, 1, 1, 0.06)), 16, 12))
+	p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(0.12, 0.08, 0.22, 0.9), 18, 2, Color(CampUi.SIGIL_COLOR, 0.6)), 12, 6))
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var row := UiTheme.hbox(12)
+	var row := UiTheme.hbox(8)
 	p.add_child(row)
-	row.add_child(UiIcons.rect(icon, 44))
-	var col := UiTheme.vbox(-2)
-	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(col)
-	var v := UiTheme.label(value, 30 if value.length() < 12 else 24, UiPalette.TEXT, true, 0)
-	v.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	v.custom_minimum_size.x = 60
-	col.add_child(v)
-	col.add_child(UiTheme.label(label.to_upper(), 16, UiPalette.TEXT_MUTED, false, 0, false, 700))
+	row.add_child(UiTheme.label(label, 19, UiPalette.TEXT, false, 0, false, 600))
+	row.add_child(CampUi.sigils(int(e.get("sigils", 0)), 20))
 	return p
+
+
+func _unlock_card(kind: String, id: String, why: String) -> Control:
+	var col := CampInfo.color_of(kind, id)
+	var c := CampUi.card(true)
+	var row := UiTheme.hbox(14)
+	c.add_child(row)
+	row.add_child(OptionCard.Medallion.make(CampInfo.icon_of(kind, id), 64, null if kind == "biomes" else col, col))
+	var v := UiTheme.vbox(0)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(v)
+	v.add_child(UiTheme.label("NEW " + String(CampInfo.KIND_LABEL.get(kind, kind)).to_upper(), 16, UiPalette.GOLD, false, 0, false, 800))
+	v.add_child(UiTheme.label(CampInfo.name_of(kind, id), 30, UiPalette.TEXT, true, 6))
+	v.add_child(UiTheme.para(why, 18, UiPalette.TEXT_DIM, 500))
+	return c
+
+
+func _asc_card(level: int) -> Control:
+	var c := CampUi.card(true)
+	var row := UiTheme.hbox(14)
+	c.add_child(row)
+	row.add_child(OptionCard.Medallion.make("skull", 64, UiPalette.HP_BRIGHT, UiPalette.DANGER))
+	var v := UiTheme.vbox(0)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(v)
+	v.add_child(UiTheme.label("NEW CHALLENGE", 16, UiPalette.HP_BRIGHT, false, 0, false, 800))
+	v.add_child(UiTheme.label("Ascension %d" % level, 30, UiPalette.TEXT, true, 6))
+	v.add_child(UiTheme.para(String(UnlockDefs.ASCENSION[level - 1].desc), 18, UiPalette.TEXT_DIM, 500))
+	return c
+
+
+# ---------------------------------------------------------------- goals
+
+func _build_goals() -> void:
+	UiTheme.clear(_goals)
+	var after: Profile = results.get("after")
+	if after == null:
+		return
+	var goals := CampInfo.nearest_goals(after, 3)
+	if goals.is_empty():
+		return
+	_goals.add_child(UiModal.section_label("Nearest goals"))
+	for g in goals:
+		var c := CampUi.card(false, g.color)
+		var v := UiTheme.vbox(6)
+		c.add_child(v)
+		var head := UiTheme.hbox(10)
+		v.add_child(head)
+		head.add_child(UiIcons.rect(String(g.icon), 30, g.color))
+		var t := UiTheme.label(String(g.title), 22, UiPalette.TEXT, true, 4)
+		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		t.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		t.custom_minimum_size.x = 60
+		head.add_child(t)
+		head.add_child(UiTheme.label("%s / %s" % [CampUi._num(int(g.cur)), CampUi._num(int(g.need))], 18, UiPalette.TEXT_DIM, false, 0, false, 700))
+		v.add_child(CampUi.bar(float(g.cur), float(g.need), g.color, 16))
+		v.add_child(UiTheme.label(String(g.detail), 17, UiPalette.TEXT_MUTED, false, 0, false, 600))
+		_goals.add_child(c)
+
+
+# ---------------------------------------------------------------- animation
+
+## Counts the Crowns lines up one after another, then the total, then pops the cards in.
+func _animate() -> void:
+	_anim_gen += 1
+	var gen := _anim_gen
+	if not is_inside_tree():
+		return
+	await get_tree().create_timer(0.25).timeout
+	var total := 0
+	for l in _lines:
+		if gen != _anim_gen:
+			return
+		var row: Control = l[0]
+		var val: Label = l[1]
+		var amt: int = l[2]
+		row.modulate.a = 1.0
+		UiTheme.pop(row, 1.04, 0.2)
+		var tw := val.create_tween()
+		tw.tween_method(func(v: float) -> void: val.text = "+%d" % int(round(v)), 0.0, float(amt), 0.3)
+		if amt > 0:
+			UiTheme.sfx("coin")
+		total += amt
+		if _total_l:
+			var from := total - amt
+			var tt := _total_l.create_tween()
+			tt.tween_method(func(v: float) -> void: _total_l.text = str(int(round(v))), float(from), float(total), 0.3)
+		await get_tree().create_timer(0.34).timeout
+	if gen != _anim_gen:
+		return
+	if _total_row:
+		_total_l.text = str(int(_total_row.get_meta("total", total)))
+		UiTheme.pop(_total_row, 1.12, 0.35)
+		UiTheme.sfx("fanfare")
+	for card in _cards:
+		await get_tree().create_timer(0.22).timeout
+		if gen != _anim_gen:
+			return
+		(card as Control).modulate.a = 1.0
+		UiTheme.pop(card, 1.08, 0.3)
+		UiTheme.sfx("buff")
+
+
+## Skips the count-up (screenshots, tests): everything at its final value.
+func finish_now() -> void:
+	_anim_gen += 1
+	for l in _lines:
+		(l[0] as Control).modulate.a = 1.0
+		(l[1] as Label).text = "+%d" % int(l[2])
+	if _total_row:
+		_total_l.text = str(int(_total_row.get_meta("total", 0)))
+	for card in _cards:
+		(card as Control).modulate.a = 1.0

@@ -1,6 +1,7 @@
 extends Node
 ## Entry point: boots the GameController on the title screen.
-## Title -> Class Select -> run (GameController) -> Victory/Defeat summary -> Title.
+## Title -> Camp (profile hub) -> run setup -> run (GameController) -> results (banked into
+## user://profile.json) -> Camp.
 ## "Continue" on the title loads user://save.json (auto-saved by the controller at every
 ## idle point outside combat).
 

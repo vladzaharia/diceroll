@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
-# Copies the KayKit subsets, music beds and licenses Diceroll needs from ~/Downloads
-# into assets/. Idempotent: rsync only copies what changed; music is transcoded once.
-# Fonts and Kenney SFX are downloaded (see assets/CREDITS.md) with --fetch.
+# Populates the game's runtime asset folders (assets/kaykit, assets/audio, assets/fonts)
+# from the central, git-ignored third-party store in third_party/ (see docs/ASSETS.md).
+# Nothing third-party is committed; a fresh clone needs third_party/ filled in first.
+# Idempotent: rsync only copies what changed; music is transcoded once.
+# --fetch downloads fonts / Kenney SFX into third_party/ if they're missing there.
 #
 # Usage: tools/import_assets.sh [--fetch]   (run from anywhere)
 set -euo pipefail
 
-SRC="${DOWNLOADS:-$HOME/Downloads}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+TP="${THIRD_PARTY:-$ROOT/third_party}"
+SRC="$TP/kaykit"
 DST="$ROOT/assets"
 KK="$DST/kaykit"
 
@@ -70,11 +73,30 @@ for c in yellow red blue; do
 done
 lic "$PLAT" "$KK/platformer"
 
+echo "== KayKit Forest Nature EXTRA (Camp: trees, bushes, rocks, grass; greens, teal and autumn)"
+FOR="KayKit_Forest_Nature_Pack_1.0_EXTRA"
+for c in 1 2 4 6; do
+	sync "$SRC/$FOR/Assets/gltf/Color$c" "$KK/forest/color$c" \
+		--include='Tree_*' --include='Bush_*' --include='Rock_*' --include='Grass_*' --include='forest_texture.png' --exclude='*'
+done
+lic "$FOR" "$KK/forest"
+
+echo "== KayKit ResourceBits FREE (Camp: logs, planks, pallets, textiles, bars)"
+RES="KayKit_ResourceBits_1.0_FREE"
+res_keep=""
+for r in Wood_Log_A Wood_Log_B Wood_Log_Stack Wood_Planks_Stack_Small Wood_Planks_Stack_Medium Pallet_Wood \
+	Pallet_Wood_Covered_A Textiles_Stack_Large_Colored Textiles_A Iron_Bars_Stack_Small Gold_Bars_Stack_Small Parts_Pile_Small; do
+	res_keep="$res_keep --include=$r.gltf --include=$r.bin"
+done
+# shellcheck disable=SC2086
+sync "$SRC/$RES/Assets/gltf" "$KK/resources" $res_keep --include='*.png' --exclude='*'
+lic "$RES" "$KK/resources"
+
 echo "== Music beds (mixkit, re-encoded to 96 kbps mp3 to keep the repo lean)"
 MUS="$DST/audio/music"
 mkdir -p "$MUS"
 for name in zanarkand-forest-169 spirit-in-the-woods-2-147 ambient-251 vastness-184 nature-meditation-345; do
-	in="$SRC/mixkit-$name.mp3"
+	in="$TP/music/mixkit/mixkit-$name.mp3"
 	out="$MUS/mixkit-$name.mp3"
 	[ -f "$in" ] || { echo "missing $in" >&2; exit 1; }
 	if [ ! -f "$out" ] || [ "$in" -nt "$out" ]; then
@@ -87,8 +109,8 @@ for name in zanarkand-forest-169 spirit-in-the-woods-2-147 ambient-251 vastness-
 done
 
 if [ "${1:-}" = "--fetch" ]; then
-	echo "== Fonts (Google Fonts GitHub, OFL)"
-	FON="$DST/fonts"
+	echo "== Fonts (Google Fonts GitHub, OFL) -> third_party/fonts"
+	FON="$TP/fonts"
 	mkdir -p "$FON"
 	GF="https://raw.githubusercontent.com/google/fonts/main/ofl"
 	[ -f "$FON/Fredoka-Variable.ttf" ] || curl -fsSL -o "$FON/Fredoka-Variable.ttf" "$GF/fredoka/Fredoka%5Bwdth,wght%5D.ttf"
@@ -96,7 +118,7 @@ if [ "${1:-}" = "--fetch" ]; then
 	[ -f "$FON/OFL-Fredoka.txt" ] || curl -fsSL -o "$FON/OFL-Fredoka.txt" "$GF/fredoka/OFL.txt"
 	[ -f "$FON/OFL-LilitaOne.txt" ] || curl -fsSL -o "$FON/OFL-LilitaOne.txt" "$GF/lilitaone/OFL.txt"
 
-	echo "== Kenney SFX packs (CC0) -> assets/audio/sfx/<pack>/"
+	echo "== Kenney SFX packs (CC0) -> third_party/kenney/<pack>/"
 	TMP="$(mktemp -d)"
 	# pack name, then an optional egrep filter of the .ogg basenames to keep (default: all).
 	for spec in "casino-audio" "rpg-audio" "impact-sounds" "interface-sounds" \
@@ -104,7 +126,7 @@ if [ "${1:-}" = "--fetch" ]; then
 		"digital-audio:(powerUp2|powerUp7|phaseJump1|zapThreeToneUp)"; do
 		pack="${spec%%:*}"
 		filter="."; [ "$spec" != "$pack" ] && filter="${spec#*:}"
-		out="$DST/audio/sfx/$pack"
+		out="$TP/kenney/$pack"
 		[ -d "$out" ] && continue
 		url="$(curl -fsSL "https://kenney.nl/assets/$pack" | grep -oE 'https://kenney.nl/media/pages/assets/[^"]+\.zip' | head -1)"
 		[ -n "$url" ] || { echo "no zip url for $pack" >&2; continue; }
@@ -116,5 +138,9 @@ if [ "${1:-}" = "--fetch" ]; then
 	done
 	rm -rf "$TMP" 2>/dev/null || true
 fi
+
+echo "== Fonts and Kenney SFX (third_party -> assets)"
+sync "$TP/fonts" "$DST/fonts"
+sync "$TP/kenney" "$DST/audio/sfx"
 
 du -sh "$DST"
