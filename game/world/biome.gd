@@ -26,8 +26,6 @@ const BASE_EXTENT := 7.35
 
 ## Layout scale for the biome being built (see build()).
 static var _s := 1.0
-## Island top half-size for the biome being built (see island_half()).
-static var _half := ISLAND_HALF
 
 ## Per-biome look. Colours are sRGB.
 const LOOKS := {
@@ -100,20 +98,15 @@ static func build(b: Variant, extent := BASE_EXTENT) -> Node3D:
 	var root := Node3D.new()
 	root.name = "Biome_" + id
 	var lk := look(id)
-	_half = ISLAND_HALF * _s
-	var moat := int(lk.get("moat", 0))
-	if moat > 0:
-		# floor band of `moat` cells past the ring, the lava moat, one shelf row, a lip
-		_half = maxf(_half, BASE_EXTENT * _s + (moat + 2) * BiomeBlocks.CELL + 0.6)
 	root.add_child(make_environment(id))
 	_add_lights(root, lk)
 	var island := MeshInstance3D.new()
 	island.name = "Island"
 	var sd := seed_of(id)
-	island.mesh = island_mesh(_half, 13.0 * sqrt(_s), lk.island_top, lk.island_side, lk.island_bottom, sd * 17)
+	island.mesh = island_mesh(ISLAND_HALF * _s, 13.0 * sqrt(_s), lk.island_top, lk.island_side, lk.island_bottom, sd * 17)
 	root.add_child(island)
 	_add_floating_rocks(root, lk, sd)
-	root.add_child(_lava_sea(_half / (ISLAND_HALF * _s)) if String(lk.get("sea", "clouds")) == "lava" else _cloud_sea(lk))
+	root.add_child(_lava_sea() if String(lk.get("sea", "clouds")) == "lava" else _cloud_sea(lk))
 	var dressing := Node3D.new()
 	dressing.name = "Dressing"
 	root.add_child(dressing)
@@ -134,7 +127,7 @@ static func build(b: Variant, extent := BASE_EXTENT) -> Node3D:
 	if _s > 1.05:
 		_inner_corners(root, id, centre.scale.x)
 	var amb := ambient_particles(String(lk.particles))
-	amb.scale = Vector3(_half / ISLAND_HALF, 1.0, _half / ISLAND_HALF)
+	amb.scale = Vector3(_s, 1.0, _s)
 	root.add_child(amb)
 	return root
 
@@ -142,12 +135,6 @@ static func build(b: Variant, extent := BASE_EXTENT) -> Node3D:
 ## Current layout scale (dressing spreads by it; see build()).
 static func layout_scale() -> float:
 	return _s
-
-
-## Half-size of the current island's top (ISLAND_HALF * layout scale, larger for a biome
-## with a lava moat around its floor: see BiomeBlocks).
-static func island_half() -> float:
-	return _half
 
 
 ## Spreads authored dressing out to the real ring size: positions scale by _s in x/z and
@@ -331,7 +318,7 @@ static func _cloud_sea(lk: Dictionary) -> MeshInstance3D:
 
 
 ## The glowing lava ocean under the Magma island (replaces the cloud sea).
-static func _lava_sea(k := 1.0) -> MeshInstance3D:
+static func _lava_sea() -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
 	mi.name = "LavaSea"
 	var pm := PlaneMesh.new()
@@ -350,12 +337,12 @@ static func _lava_sea(k := 1.0) -> MeshInstance3D:
 	m.set_shader_parameter("plate_heat", 0.06)
 	m.set_shader_parameter("crust_color", Color(0.05, 0.035, 0.045))
 	m.set_shader_parameter("warm_crust", Color(0.09, 0.035, 0.035))
-	m.set_shader_parameter("fade_near", 13.0 * k)
-	m.set_shader_parameter("fade_far", 30.0 * k)
+	m.set_shader_parameter("fade_near", 13.0)
+	m.set_shader_parameter("fade_far", 30.0)
 	m.set_shader_parameter("far_glow", 0.12)
 	m.set_shader_parameter("haze_color", Color(0.06, 0.02, 0.045))
-	m.set_shader_parameter("haze_near", 12.0 * k)
-	m.set_shader_parameter("haze_far", 40.0 * k)
+	m.set_shader_parameter("haze_near", 12.0)
+	m.set_shader_parameter("haze_far", 40.0)
 	m.set_shader_parameter("haze_max", 0.85)
 	mi.material_override = m
 	mi.position.y = -12.0
@@ -363,7 +350,7 @@ static func _lava_sea(k := 1.0) -> MeshInstance3D:
 	var l := OmniLight3D.new()
 	l.light_color = Color(1.0, 0.4, 0.12)
 	l.light_energy = 1.0
-	l.omni_range = 16.0 * k
+	l.omni_range = 16.0
 	l.omni_attenuation = 1.2
 	l.position = Vector3(0, 2.5, 0)
 	mi.add_child(l)
@@ -374,8 +361,7 @@ static func _add_floating_rocks(root: Node3D, lk: Dictionary, sd: int) -> void:
 	var spots := [Vector3(-15.5, -3.5, -9.0), Vector3(15.0, -5.0, -12.0), Vector3(-13.0, -7.0, 9.0),
 		Vector3(16.5, -2.0, 4.0), Vector3(-6.0, -4.0, -17.0), Vector3(8.0, -6.5, -18.0)]
 	for i in spots.size():
-		var k := _half / ISLAND_HALF
-		spots[i] = Vector3(spots[i].x * k, spots[i].y, spots[i].z * k)
+		spots[i] = Vector3(spots[i].x * _s, spots[i].y, spots[i].z * _s)
 		var mi := MeshInstance3D.new()
 		var h := 0.9 + 0.35 * float(i % 3)
 		mi.mesh = island_mesh(h, h * 2.2, lk.island_top, lk.island_side, lk.island_bottom, sd * 31 + i)
@@ -394,7 +380,6 @@ static func _floor(p_parent: Node3D, paths: Array, y: float, half := 10.0, step 
 	rng.seed = seed
 	var parent := Node3D.new()
 	parent.name = "Floor"
-	parent.set_meta("walkable", true)
 	p_parent.add_child(parent)
 	half *= _s
 	var n := int(ceil(half * 2.0 / step - 0.2))
