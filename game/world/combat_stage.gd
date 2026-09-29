@@ -207,6 +207,7 @@ func _add(d: Dictionary, i: int, n: int, rise_delay := -1.0) -> void:
 	huds.append(hud)
 	# shadow disc under the unit (grounds it on the moat floor)
 	var blob := _blob(0.55 * s / UNIT_SCALE)
+	blob.set_meta("stage_child", true)
 	ch.add_child(blob)
 	if rise_delay >= 0.0:
 		_rise(ch, id, hud, rise_delay)
@@ -282,6 +283,7 @@ func refresh_wards() -> void:
 		var on := summons and "ward" in (data[k].get("traits", []) as Array) and int(data[k].get("hp", 0)) > 0
 		if on and not _wards.has(k) and k < enemies.size():
 			_wards[k] = _ward_dome(enemies[k], String(data[k].get("id", "")))
+			_wards[k].set_meta("stage_child", true)
 		elif not on and _wards.has(k):
 			var dome: MeshInstance3D = _wards[k]
 			_wards.erase(k)
@@ -290,6 +292,17 @@ func refresh_wards() -> void:
 				t.tween_property(dome, "scale", Vector3.ONE * 1.3, 0.25)
 				t.parallel().tween_property(dome, "transparency", 1.0, 0.25)
 				t.tween_callback(dome.queue_free)
+	AffixBeats.refresh_warded(self)
+
+
+## Transform (enemy_transformed): enemy i's model swaps in place (Werewolf_Man -> Werewolf_Wolf).
+func transform_enemy(i: int, form: String) -> void:
+	if i >= enemies.size():
+		return
+	data[i]["form"] = form
+	var old := enemies[i]
+	enemies[i] = EnemyLooks.swap_form(old, form)
+	AffixBeats.transform_fx(self, enemies[i], old.global_position)
 
 
 func flash_ward(i: int) -> void:

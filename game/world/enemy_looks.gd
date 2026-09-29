@@ -10,8 +10,11 @@ extends RefCounted
 ##   EnemyLooks.retint(ch, id, flash_emission)                     # hit flash, keeps part tints
 ##   EnemyLooks.set_traits(ch, ["ward"])                           # boss phase changes
 ##   EnemyLooks.shatter(ch)                                        # Magma Golem phase 2
+##   var wolf := EnemyLooks.swap_form(ch, "wolf")                  # transform: in-place model swap
 ##
-## ctx keys (all optional): variant (cosmetic index; default 0), tier (1..3), elite, traits.
+## ctx keys (all optional): variant (cosmetic index; default 0), tier (1..3), elite, traits,
+## affixes (AffixDefs ids: the overlay layer, AffixLooks), biome (affix colour clash), form
+## (a transforming enemy's current form, e.g. "wolf": the look's `forms` entry merges on top).
 ## Variants are picked per spawn from a hash of the run seed, the tile and the enemy's
 ## occurrence on it, so the board preview and the fight on that tile match.
 
@@ -25,15 +28,24 @@ static var run_seed := 0
 static var _hud_cache: Dictionary = {}
 
 
-## Family look merged with a cosmetic variant (no tier / elite / trait layers).
-static func def(id: String, variant := 0) -> Dictionary:
+## Family look merged with a cosmetic variant (no tier / elite / trait layers), then the
+## form override of a transforming enemy (`forms[form]`, e.g. the Werewolf's wolf body).
+static func def(id: String, variant := 0, form := "") -> Dictionary:
 	var base: Dictionary = DEFS.get(id, DEFS["skeleton_minion"])
 	var out := base.duplicate(true)
 	out.erase("variants")
+	out.erase("forms")
 	var vs: Array = base.get("variants", [])
-	if vs.is_empty():
-		return out
-	var v: Dictionary = vs[posmod(variant, vs.size())]
+	if not vs.is_empty():
+		_merge(out, vs[posmod(variant, vs.size())])
+	var forms: Dictionary = base.get("forms", {})
+	if form != "" and forms.has(form):
+		_merge(out, forms[form])
+		out["form"] = form
+	return out
+
+
+static func _merge(out: Dictionary, v: Dictionary) -> void:
 	for k in v:
 		if v[k] == null:
 			out.erase(k)
@@ -43,7 +55,11 @@ static func def(id: String, variant := 0) -> Dictionary:
 			out["clips"] = c
 		else:
 			out[k] = v[k]
-	return out
+
+
+## Forms a look can switch to (transforming enemies), e.g. ["wolf"].
+static func forms_of(id: String) -> Array:
+	return (DEFS.get(id, {}).get("forms", {}) as Dictionary).keys()
 
 
 static func variant_count(id: String) -> int:
@@ -70,8 +86,11 @@ static func spawn_context(d: Variant, tile: int, prior: Array = [], biome := "",
 	var id := String(d.get("id", "")) if d is Dictionary else String(d)
 	var traits: Array = (d.get("traits", EnemyDefs.traits(id)) if d is Dictionary else EnemyDefs.traits(id)) \
 		if _core_has(id) else []
+	var affixes: Array = (d.get("affixes", []) as Array).duplicate() if d is Dictionary else []
+	var form := String(d.get("form", "")) if d is Dictionary else ""
 	return {"variant": variant_for(id, tile, prior), "tier": SkinRules.tier_for(biome),
-		"elite": elite or (bool(d.get("elite", false)) if d is Dictionary else false), "traits": traits.duplicate()}
+		"elite": elite or (bool(d.get("elite", false)) if d is Dictionary else false), "traits": traits.duplicate(),
+		"affixes": affixes, "biome": biome, "form": form if forms_of(id).has(form) else ""}
 
 
 static func _core_has(id: String) -> bool:
@@ -80,13 +99,16 @@ static func _core_has(id: String) -> bool:
 
 ## The final look for a spawn: variant + tier colourway + elite (regular enemies only).
 static func look(id: String, ctx: Dictionary = {}) -> Dictionary:
-	var L := def(id, int(ctx.get("variant", 0)))
+	var L := def(id, int(ctx.get("variant", 0)), String(ctx.get("form", "")))
 	L["id"] = id
 	var unique := bool(L.get("boss", false)) or bool(L.get("miniboss", false))
 	var tier := clampi(int(ctx.get("tier", 1)), 1, 3)
 	L["tier"] = tier
 	if not unique:
-		var tex: Variant = SkinRules.tier_texture(String(L.model), tier)
+		var key := String(L.get("tier_key", L.model))
+		var tex: Variant = SkinRules.tier_texture(key, tier)
+		if bool(ctx.get("elite", false)) and SkinRules.ELITE_TEXTURES.has(key):
+			tex = SkinRules.ELITE_TEXTURES[key]
 		if tex != null:
 			L["texture"] = tex
 		L["eye_glow"] = SkinRules.TIER_EYES[tier]
@@ -102,7 +124,14 @@ static func look(id: String, ctx: Dictionary = {}) -> Dictionary:
 			L["eye_glow"] = SkinRules.ELITE.eyes
 			if L.has("eyes"):
 				L["eyes"] = SkinRules.ELITE.eyes
-	L["traits"] = (ctx.get("traits", []) as Array).duplicate()
+	var traits: Array = (ctx.get("traits", []) as Array).duplicate()
+	var affixes: Array = (ctx.get("affixes", []) as Array).filter(func(a: Variant) -> bool: return SkinRules.AFFIXES.has(String(a)))
+	for t in SkinRules.affix_traits(affixes):
+		if not traits.has(t):
+			traits.append(t)
+	L["traits"] = traits
+	L["affixes"] = affixes
+	L["biome"] = String(ctx.get("biome", ""))
 	return L
 
 
@@ -137,8 +166,11 @@ static func hud_height(id: String) -> float:
 	if _hud_cache.has(id):
 		return _hud_cache[id]
 	var h := 0.0
+	var looks := []
 	for v in variant_count(id):
-		var d := def(id, v)
+		for f in [""] + forms_of(id):
+			looks.append(def(id, v, f))
+	for d: Dictionary in looks:
 		var x := 2.2 * scale_of(id)
 		if String(Character.MODELS[String(d.model)][1]) == "large":
 			x *= 1.42
@@ -170,6 +202,7 @@ static func create(id: String, full := true, ctx: Dictionary = {}) -> Character:
 	ch.set_meta("enemy_id", id)
 	ch.set_meta("look", L)
 	ch.set_meta("full", full)
+	ch.set_meta("ctx", ctx.duplicate(true))
 	if String(L.get("texture", "")) != "":
 		ch.set_texture(load(String(L.texture)))
 	_set_clips(ch, L)
@@ -203,6 +236,7 @@ static func create(id: String, full := true, ctx: Dictionary = {}) -> Character:
 		if full:
 			_elite_ring(ch)
 	set_traits(ch, L.get("traits", []))
+	AffixLooks.apply(ch, L, full)
 	retint(ch, id)
 	if full:
 		if L.has("aura"):
@@ -225,6 +259,31 @@ static func create(id: String, full := true, ctx: Dictionary = {}) -> Character:
 	ch.play("idle", 0.0)
 	ch.anim_player.seek(randf() * 0.8, true)
 	return ch
+
+
+## Transform (enemy_transformed): builds the figure for `form` with the same spawn context
+## (variant, tier, elite, traits, affixes) and puts it in `ch`'s place (same parent, transform
+## and animation speed); frees `ch`. Returns the new figure.
+static func swap_form(ch: Character, form: String) -> Character:
+	var id := String(ch.get_meta("enemy_id", ""))
+	var ctx: Dictionary = (ch.get_meta("ctx", {}) as Dictionary).duplicate(true)
+	ctx["form"] = form
+	var L: Dictionary = ch.get_meta("look", {})
+	ctx["traits"] = (L.get("traits", []) as Array).duplicate()
+	var nc := create(id, bool(ch.get_meta("full", true)), ctx)
+	nc.transform = ch.transform
+	nc.visible = ch.visible
+	nc.anim_player.speed_scale = ch.anim_player.speed_scale
+	var parent := ch.get_parent()
+	if parent:
+		parent.add_child(nc)
+		parent.move_child(nc, ch.get_index())
+		# stage extras parented to the figure (shadow blob, ward dome) move over
+		for c in ch.get_children():
+			if c.has_meta("stage_child"):
+				c.reparent(nc, false)
+	ch.queue_free()
+	return nc
 
 
 ## Per-figure role -> clip table: the rig defaults, the undead set, then the look's clips.
@@ -256,7 +315,8 @@ static func retint(ch: Character, id: String, flash := Color.BLACK) -> void:
 	var eye: Color = L.get("eye_glow", Color.BLACK)
 	var elite := bool(L.get("elite", false))
 	var traits: Array = L.get("traits", [])
-	var shader_needed := not parts.is_empty() or eye != Color.BLACK or elite or "pierce" in traits
+	var affixes: Array = L.get("affixes", [])
+	var shader_needed := not parts.is_empty() or eye != Color.BLACK or elite or "pierce" in traits or not affixes.is_empty()
 	# a tiny strength keeps every surface on the tint shader so part / gear tints can apply
 	ch.set_tint(L.get("tint", Color.WHITE), maxf(st, 0.001) if shader_needed else st, em)
 	for key in parts:
@@ -273,6 +333,8 @@ static func retint(ch: Character, id: String, flash := Color.BLACK) -> void:
 	if "pierce" in traits:
 		ch.tint_where(func(m: MeshInstance3D) -> bool: return _in_attachment(m, "handslot_r"),
 			Color(0.55, 0.08, 0.05), 0.6, Color(0.9, 0.12, 0.04) + flash)
+	if not affixes.is_empty():
+		AffixLooks.retint(ch, L, flash)
 
 
 static func _in_attachment(m: Node, slot: String) -> bool:
@@ -377,6 +439,10 @@ static func _trait_overlay(ch: Character, root: Node3D, kind: String, full: bool
 			if full:
 				var p := Fx.elite_sparkle(root, Vector3(0, 0.2, 0), 0.7, 1.8)
 				(p.process_material as ParticleProcessMaterial).color = col.lightened(0.3)
+		"frenzy":
+			AffixLooks.steam(ch, root, col, full)
+		"ward_allies":
+			AffixLooks.shimmer_dome(ch, root, col)
 		"pierce":
 			var s := _trait_socket(ch, "lowerarm.r")
 			if s:
@@ -656,6 +722,28 @@ static func _extra(ch: Character, L: Dictionary, kind: String, full: bool) -> vo
 					var cd := Props.put(ch, Props.HAL + "candle_triple.gltf", Vector3(cos(a) * 0.9, 0, sin(a) * 0.9), 0.0, 0.5)
 					cd.name = "Candle%d" % j
 					Biome.flame(cd, Vector3(0, 0.5, 0), Color(0.45, 1.0, 0.55), 0.12, 4)
+		"moon_motes":
+			if full:
+				var p := Fx.elite_sparkle(ch, Vector3(0, 0.3, 0), 0.7, 2.2)
+				(p.process_material as ParticleProcessMaterial).color = Color(0.85, 0.92, 1.0)
+		"war_banner":
+			var c := _socket(ch, "chest")
+			if c:
+				var pole := _mat(Color(0.3, 0.2, 0.12))
+				var cloth := _mat(Color(0.62, 0.12, 0.08), Color(0.08, 0.0, 0.0))
+				cloth.cull_mode = BaseMaterial3D.CULL_DISABLED
+				var st := _cone(c, Vector3(0.3, 1.1, -0.45) * k, 0.03 * k, 2.3 * k, pole)
+				(st.mesh as CylinderMesh).top_radius = 0.03 * k
+				var fl := MeshInstance3D.new()
+				var q := QuadMesh.new()
+				q.size = Vector2(0.62, 0.5) * k
+				fl.mesh = q
+				fl.material_override = cloth
+				fl.position = Vector3(0.62, 1.95, -0.45) * k
+				c.add_child(fl)
+				for j in 3:
+					_cone(c, Vector3(0.4 + 0.2 * j, 1.62, -0.45) * k, 0.07 * k, 0.16 * k, cloth, Vector3(PI, 0, 0))
+				_dome(c, Vector3(0.3, 2.28, -0.45) * k, 0.07 * k, _mat(Color(0.9, 0.85, 0.7)))
 		"crown":
 			_crown(ch)
 		"rock_shell":

@@ -32,6 +32,7 @@ const SFX := {
 	"block": [[IMPACT + "impactMetal_heavy_000.ogg", IMPACT + "impactMetal_heavy_001.ogg", IMPACT + "impactMetal_heavy_002.ogg"], -3.0],
 	"swing": [[RPG + "knifeSlice.ogg", RPG + "knifeSlice2.ogg", RPG + "drawKnife1.ogg"], -3.0],
 	"death": [[IMPACT + "impactSoft_heavy_000.ogg", IMPACT + "impactSoft_heavy_001.ogg"], 0.0],
+	"drum": [[IMPACT + "impactSoft_heavy_000.ogg", IMPACT + "impactSoft_heavy_001.ogg", IMPACT + "impactWood_heavy_000.ogg"], 1.0],
 	"heal": [[DIGI + "powerUp2.ogg"], -6.0],
 	"buff": [[DIGI + "powerUp7.ogg"], -6.0],
 	"levelup": [[JINGLE + "jingles_PIZZI10.ogg"], -2.0],

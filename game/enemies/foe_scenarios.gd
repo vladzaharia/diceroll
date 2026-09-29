@@ -5,11 +5,17 @@ extends RefCounted
 ##                  --only=old|new|mini|boss|all|<id,id,...> (default old), --tier=1..3 (default:
 ##                  the id's home biome tier), --elite=1, --traits=a,b, --hud=1 (HP / intent HUDs),
 ##                  --anim=<role> (loops idle|attack|hit|death|spawn|cast on everyone), --pitch=deg
+##                  --affixes=a,b (the affix overlay layer), --form=wolf (transforming enemies),
+##                  --biome=<id> (affix colour clash); --only=new2: the 2026-09-28 roster
 ##  enemy_gallery --legend   meaning sheet: each family x (early, mid, late, elite, armor, thorns,
 ##                  ward, pierce), from SkinRules. --only picks the families (default: the 7
 ##                  shared regulars; also crypt|frost|magma|glade|hollow|throne|<ids>)
+##  enemy_gallery --legend --affixes   the affix sheet: family rows x the 10 affix overlays, each
+##                  column headed by its HUD badge (--hud=1 adds the HUDs; --biome=glade|frost
+##                  shows the clash-brightened rims)
 ##  combat_<biome>  a fight on that biome's board with a varied roster from its pool
-##                  (--enemies=a,b,c, --elite=1, --seed=N, --tile=N, --beat=attack|hit|die|cast)
+##                  (--enemies=a,b,c, --elite=1, --seed=N, --tile=N, --beat=attack|hit|die|cast|transform,
+##                  --affixes=a,b,... one per enemy in order: "-" = none, "a+b" = two)
 ##  <boss id> / <mini-boss id>   e.g. boss_lich, mini_grave_mage: that fight on its home biome
 ##                  (--phase=2: phase-2 traits; the Bone Warden brings two summoned warriors)
 
@@ -18,9 +24,12 @@ const GROUPS := {
 	"new": ["thorn_sprite", "wolf_bandit", "hollow_wisp", "frost_skeleton", "ice_archer", "bone_knight",
 		"ember_imp", "magma_brute"],
 	"mini": ["mini_bone_champion", "mini_pumpkin_knight", "mini_grave_mage", "mini_frost_warden",
-		"mini_briar_beast", "mini_cinder_brute"],
+		"mini_briar_beast", "mini_cinder_brute", "mini_moonfang", "mini_orc_warchief"],
+	"new2": ["bone_cutthroat", "bone_golem", "orc_raider", "orc_drummer", "werewolf", "fallen_paladin", "mini_moonfang",
+		"mini_orc_warchief", "mini_grave_mage"],
 	"boss": ["boss_bone_warden", "boss_lich", "boss_cinder_king", "boss_magma_golem", "boss_hollow_king"],
 	"legend": ["skeleton_minion", "skeleton_warrior", "skeleton_archer", "cultist", "bandit", "brute", "wolf_bandit"],
+	"affix_legend": ["skeleton_warrior", "orc_raider", "werewolf", "cultist"],
 	"size": ["skeleton_minion", "brute", "mini_bone_champion", "mini_cinder_brute", "boss_lich", "boss_magma_golem"],
 }
 const LEGEND_COLS := [["early", 1, false, []], ["mid", 2, false, []], ["late", 3, false, []], ["elite", 1, true, []],
@@ -97,7 +106,9 @@ class _Gallery extends Node3D:
 			# the ortho camera sits far back; distance fog would wash the sheet out
 			(we as WorldEnvironment).environment.fog_enabled = false
 		_floor()
-		if args.has("legend"):
+		if args.has("legend") and args.has("affixes"):
+			_affix_legend(args)
+		elif args.has("legend"):
 			_legend(args)
 		else:
 			_variants(args)
@@ -144,7 +155,9 @@ class _Gallery extends Node3D:
 			var n := EnemyLooks.variant_count(id)
 			var g := gap * maxf(1.0, big * 0.8)
 			for v in n:
-				var ctx := {"variant": v, "tier": tier, "elite": args.has("elite"), "traits": traits}
+				var ctx := {"variant": v, "tier": tier, "elite": args.has("elite"), "traits": traits,
+					"affixes": Array(String(args.get("affixes", "")).split(",", false)), "form": String(args.get("form", "")),
+					"biome": String(args.get("biome", ""))}
 				var p := Vector3((float(v) - (cols - 1) * 0.5) * g, 0.0, z)
 				var L := EnemyLooks.look(id, ctx)
 				_figure(id, ctx, p, args)
@@ -189,6 +202,37 @@ class _Gallery extends Node3D:
 				var p := Vector3((float(c) - (cols - 1) * 0.5) * gap, 0.0, z)
 				_figure(id, ctx, p, args)
 
+	## The affix sheet: family rows x one column per affix (its badge + name above).
+	func _affix_legend(args: Dictionary) -> void:
+		var ids := _ids(String(args.get("only", "")), "affix_legend")
+		var affs: Array = AffixDefs.IDS
+		var gap := 2.0
+		var row_gap := 0.0
+		for id in ids:
+			row_gap = maxf(row_gap, _row_step(_tall(String(id))))
+		var cols := affs.size()
+		var biome := String(args.get("biome", ""))
+		var z0 := (-0.5 - (ids.size() - 1) * 0.5) * row_gap - 0.3
+		for c in cols:
+			var a := String(affs[c])
+			var x := (float(c) - (cols - 1) * 0.5) * gap
+			var col: Color = SkinRules.affix_color(a, biome)
+			_label(Vector3(x, 0.02, z0), AffixDefs.name_of(a).to_upper(), 48, col.lightened(0.35))
+			var b := UnitHud.affix_badge(String(SkinRules.AFFIXES[a].icon), col, 0.9)
+			b.rotation_degrees.x = -90.0
+			b.position = Vector3(x, 0.03, z0 - 0.85)
+			add_child(b)
+			_pts.append(b.position + Vector3(0, 0, -0.5))
+		for r in ids.size():
+			var id := String(ids[r])
+			var z := (float(r) - (ids.size() - 1) * 0.5) * row_gap
+			var nm := String(EnemyDefs.def(id).name) if FoeScenarios._core(id) else id
+			_label(Vector3(-(cols - 1) * 0.5 * gap - gap * 0.95, 0.02, z + 0.1), nm.replace(" ", "\n"), 44, Color(0.85, 0.92, 1.0))
+			for c in cols:
+				var ctx := {"variant": 0, "tier": 1, "elite": false, "traits": EnemyDefs.traits(id),
+					"affixes": [String(affs[c])], "biome": biome}
+				_figure(id, ctx, Vector3((float(c) - (cols - 1) * 0.5) * gap, 0.0, z), args)
+
 	func _figure(id: String, ctx: Dictionary, p: Vector3, args: Dictionary) -> void:
 		var ch := EnemyLooks.create(id, true, ctx)
 		ch.scale = Vector3.ONE * CombatStage.UNIT_SCALE * EnemyLooks.scale_of(id)
@@ -207,6 +251,9 @@ class _Gallery extends Node3D:
 			hud.position = p + Vector3.UP * (h + 0.35)
 			var d := FoeScenarios.enemy_dict(id, bool(ctx.get("elite", false))) if FoeScenarios._core(id) else {"hp": 10, "max_hp": 12}
 			d.traits = ctx.get("traits", [])
+			d.affixes = ctx.get("affixes", [])
+			if (d.affixes as Array).has("frenzied") or id == "orc_raider":
+				d.frenzy = 4
 			hud.set_data(d, false)
 			_pts.append(hud.position + Vector3.UP * 0.6)
 		if args.has("yaw"):
@@ -323,6 +370,12 @@ class _Fight extends Node3D:
 				ids = [pool[0], pool[0], pool[1]] if not elite else [BiomeDefs.DEFS[biome].elite, pool[0]]
 			for id in ids:
 				list.append(FoeScenarios.enemy_dict(String(id), elite))
+		# --affixes=thorned,warded,-,gilded+hexing: one entry per enemy in order
+		var affs: Array = Array(String(args.get("affixes", "")).split(",", true)) if args.has("affixes") else []
+		for k in mini(affs.size(), list.size()):
+			var aa: Array = Array(String(affs[k]).split("+", false)).filter(func(x: String) -> bool: return AffixDefs.DATA.has(x))
+			if not aa.is_empty():
+				AffixDefs.apply(list[k], aa, EnemyDefs.band(8))
 		stage = CombatStage.new()
 		add_child(stage)
 		rig.overview(board.ring_bounds(), true)
@@ -351,3 +404,8 @@ class _Fight extends Node3D:
 				stage.enemies[i].play_once("cast", "idle")
 			"hero":
 				stage.hero_attack(i)
+			"transform":
+				# --beat=transform: the Werewolf / Moonfang hits half HP and turns (enemy_transformed)
+				var d: Dictionary = stage.data[i]
+				stage.set_enemy(i, {"hp": int(d.get("max_hp", 10)) / 2 - 1, "phase": 2})
+				stage.transform_enemy(i, "wolf")

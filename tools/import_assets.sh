@@ -162,8 +162,9 @@ lic "$ADX" "$FOES/adventurers"
 MMS="$SRC/KayKit_Mystery_Monthly_Series_4"
 sync "$MMS/1 - July 2023 - Orc Raider/character" "$FOES/monthly/orc" --include='OrcRaider.glb' --exclude='*'
 sync "$MMS/1 - July 2023 - Orc Raider/textures" "$FOES/monthly/orc/textures"
-sync "$MMS/1 - July 2023 - Orc Raider/assets/gltf" "$FOES/monthly/orc/weapons" --include='Orc_Axe.gltf.glb' --include='Orc_Club.gltf.glb' --exclude='*'
-sync "$MMS/4 - October 2023 - Werewolf/characters/gltf" "$FOES/monthly/werewolf" --include='Werewolf_Wolf.glb' --exclude='*'
+sync "$MMS/1 - July 2023 - Orc Raider/assets/gltf" "$FOES/monthly/orc/weapons" --include='Orc_Axe.gltf.glb' --include='Orc_Club.gltf.glb' \
+	--include='Orc_Wardrum.gltf.glb' --include='Orc_WardrumStick.gltf.glb' --include='Orc_Backpack.gltf.glb' --include='Orc_DrinkingHorn.gltf.glb' --exclude='*'
+sync "$MMS/4 - October 2023 - Werewolf/characters/gltf" "$FOES/monthly/werewolf" --include='Werewolf_Wolf.glb' --include='Werewolf_Man.glb' --exclude='*'
 sync "$MMS/4 - October 2023 - Werewolf/textures" "$FOES/monthly/werewolf/textures"
 sync "$MMS/4 - October 2023 - Werewolf/assets/gltf" "$FOES/monthly/werewolf/weapons" --include='axe.*' --include='werewolf_A.png' --exclude='*'
 sync "$MMS/10 - April 2024 - Paladin/characters/gltf" "$FOES/monthly/paladin" --include='*.glb' --exclude='*'

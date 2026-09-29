@@ -15,6 +15,9 @@ uniform vec4 crack_color : source_color = vec4(0.0);
 uniform float crack_scale = 7.0;
 uniform float crack_energy = 2.5;
 uniform float crack_sparsity = 0.45;
+// Rim accent (enemy affixes): a fresnel glow at the silhouette; alpha = strength, 0 = off.
+uniform vec4 rim_color : source_color = vec4(0.0);
+uniform float rim_power = 3.2;
 
 varying vec3 obj_pos;
 
@@ -53,6 +56,10 @@ void fragment() {
 	ROUGHNESS = roughness;
 	METALLIC = metallic;
 	EMISSION = emission.rgb;
+	if (rim_color.a > 0.0) {
+		float fr = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), rim_power);
+		EMISSION += rim_color.rgb * fr * rim_color.a;
+	}
 	if (crack_color.a > 0.0) {
 		vec2 ce = crack_edge(obj_pos * crack_scale);
 		// thin seams, and only around some plates: reads as a few deliberate cracks
