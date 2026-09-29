@@ -1,7 +1,214 @@
 # Diceroll balance
 
 Numbers live in `core/content/` (`balance.gd`, `heroes.gd`, `enemies.gd`, `biomes.gd`,
-`dice_kinds.gd`, `passives.gd`, `shop.gd`, `events.gd`) and `core/runes.gd`.
+`dice_kinds.gd`, `passives.gd`, `shop.gd`, `events.gd`, and the meta tables `economy.gd`,
+`gear.gd`, `pets.gd`, `potions.gd`, `minigames.gd`, `unlocks.gd`), `core/runes.gd`,
+`core/combo.gd` and the profile presets in `core/meta/presets.gd`.
+
+## Current balance (2026-09-28 meta rules + rebalance)
+
+This section is authoritative. Later sections are kept as history; where they disagree with
+this one (shop laps, XP, drafts, enemy scaling, combo multipliers, greedy win rates) this one
+wins.
+
+### How to measure
+
+```
+godot --headless --path . -s tools/sim.gd -- --runs=100 --class=all --seed=1 \
+    --policy=greedy|realistic|expert --profile=fresh|mid|max [--asc=N] [--mode=standard|short]
+godot --headless --path . -s tools/sim.gd -- --campaign=40 --campaigns=5 --policy=realistic [--snapshot=10]
+```
+
+- **Policies.** `greedy` is `Bot.next_command` (the naive floor). `realistic` is `Bot.decide`
+  with `AutoRules.skill = "realistic"`: the smart policy with bounded rationality. Per decision it
+  lapses with probability `Bot.real_heur` = **0.62** (combat, board, build) into a rule of
+  thumb, otherwise it thinks with fewer samples and noisy near-best picks. It is AUTO's default
+  and **the balance reference**. `expert` is the full smart policy.
+- **Profiles.** `fresh` is a new profile: Knight only, starter pack, the Glade → Hollow → Throne
+  route, no pet, no gear, a belt of 2 with 1 Healing Draught. `mid` is the realistic campaign
+  at run 10 (`--campaign --snapshot=10`): 3 classes, all biomes, 5 packs, gear L4 with the L4
+  traits, Starter Kit, Pumpkin Sprite L4, 3 minigames owned. `max` is everything unlocked and
+  maxed, with the Pumpkin Sprite L10, 3 minigame slots and a belt of 3.
+- The sim prints each class row machine-readably (`#row`, `#up`), so seed shards can be summed.
+  Analysis flags: `--strip=` removes parts of a profile, `--tune-*` dials rescale enemies,
+  bosses, gold and shop laps without code edits, `--real-heur=` sets the lapse rate, and
+  `--items` prints win rates by held item. Per-class tables, route/boss tables and upgrades
+  per run by source are printed as before.
+
+### Targets and results (A0 unless noted, 28-tile board, random routes, all unlocked classes)
+
+Targets (Vlad): realistic fresh 30–40%, mid 45–50%, max 55–65%, max A10 20–30%; greedy fresh
+about 15–30%; expert fresh at or below about 75–80%.
+
+Standard mode (15 laps, 3 biomes):
+
+| profile | greedy | realistic | expert |
+|---|---|---|---|
+| fresh | 15.0% (1000 runs) | **35.8%** (500) | 79.7% (300) |
+| mid | 23.3% (900) | **49.2%** (600) | 92.3% (300) |
+| max | 32.6% (1200) | **60.8%** (800) | 96.2% (400) |
+| max, A10 | 5.3% (1200) | **21.0%** (480) | 71.8% (400) |
+
+Short Road (10 laps, 2 biomes, final boss at 75% HP):
+
+| profile | greedy | realistic | expert |
+|---|---|---|---|
+| fresh | 20.7% (300) | **37.9%** (240) | 71.0% (100) |
+| mid | 31.8% (900) | **52.1%** (720) | 82.0% (300) |
+| max | 39.1% (1200) | **58.8%** (960) | 85.5% (400) |
+| max, A10 | 5.8% (1200) | **17.3%** (480) | 56.2% (400) |
+
+Short Road A10 sits a little under the standard ladder (fewer shops to absorb A3/A5). It pays
+60% of the Crowns (`Economy.SHORT_CROWN_MULT`), with laps and biomes counted at their
+standard-run equivalent.
+
+Realistic deaths (fresh, 500 runs): act 1 45, act 2 4, act 3 141, final boss 131. Levels: a
+winning run ends around level 6.8, so about 5–7 automatic level-ups.
+
+### Upgrades per run by source (fresh profile, standard mode)
+
+Kills give gold, XP and pet charge only. An "upgrade" is a die, a rune, a face edit, a passive,
++1 combat reroll or a stat blessing; potions and gold are not counted (`run.stats.upgrades`).
+
+| source | greedy | realistic | expert |
+|---|---|---|---|
+| shop | 9.19 | 11.70 | 12.43 |
+| chest (rune choice) | 3.52 | 3.80 | 4.15 |
+| elite (passive choice) | 3.01 | 3.73 | 5.30 |
+| event | 3.55 | 3.44 | 3.25 |
+| Forge tile | 2.22 | 2.23 | 2.07 |
+| mini-boss (boss passive) | 0.44 | 0.56 | 0.62 |
+| minigame | 0.0 | 0.0 | 0.0 |
+| **total** | **21.93** | **25.46** | **27.82** |
+
+Minigame rewards are real but show as 0 here: AUTO's par result is silver, and the bots take the
+potion or the gold. A played gold tier offers a rune, a die, a passive or +1 reroll (all counted).
+Upgrades are the whole growth curve now: the old level-up drafts gave about 17 per run on top.
+
+### Rule changes in this pass
+
+- **No drafts from kills (Vlad).** Levels are automatic: XP thresholds 25/55/90/130/175/225,
+  then +60. Each level gives +`LEVEL_MAX_HP` (4) max HP and heals 4 + 10% of max HP. The
+  `level_up` event has `auto: true`, `max_hp_gained` and `healed`, and is followed by
+  `hp_changed {source: "level"}`. There is no DRAFT phase after a fight. Elites still give a
+  passive choice and the mini-boss a boss-passive choice.
+- **Shops are the main source:** they open after laps 1, 3, 5, 6, 8, 10, 12 and 14
+  (`Balance.SHOP_LAPS`), or 1, 3, 5, 7 and 9 on the Short Road.
+- **Corrected board movement (Vlad).** The move uses one die of each of the two pip values shown
+  by the most dice. Ties at any rank are broken with the run Rng. Blanks are ignored unless
+  fewer than 2 dice show a value, and a single value moves two of its dice. **Doubles** = the
+  most common value shows on 2+ dice. `pair_value` is the higher such value among the moving
+  dice. It feeds the Treasury (pair value × 2), Fast Feet's hop, Double Trouble and Coin Mimic.
+  The Boots L8 trait now breaks ties toward the higher value.
+- **Enemy curve.** HP × (1.0 + 0.35·(lap−1)) and attack × (1.0 + 0.125·(lap−1)), which was
+  1.2 + 0.105·(lap−1) for both. The start is gentle (2 dice, no drafts), and late fights are
+  long rather than one-shots.
+
+### Mechanic nerfs (degenerate combos)
+
+| change | before | after | why |
+|---|---|---|---|
+| Four / Five / Six of a Kind | ×5 / ×10 / ×15 | **×4 / ×6 / ×8** | Wild + rerolls turned sets into one-shots (13.5% of expert attacks were Four of a Kind) |
+| Resonance, Rune Echo | double every combo rune | **never double Heavy or Echo** | Heavy ×3 pips, Echo +1.0 per die stacking |
+| Glass Cannon | ×1.5 damage | **×1.3** | top of the held-item win table |
+| Starter Kit | any common kind | **sidegrades only** (Standard, Low, Odd) | Loaded as a starting die was about +5 pp |
+| (kept) | | Wild caps at 1 die, Heavy only in the scoring group, each rune acts on at most 2 dice, Vampire heals only on a kill | earlier pass |
+
+### Meta numbers (all deterministic; `core/content/*.gd`)
+
+- **Crowns per run:** 2 per lap (cap 30), 5 per biome after the first, 12 for the mini-boss,
+  30 for a win, 2/3/4 per minigame (bronze/silver/gold, plus a bronze "+1 Crown" pick), and
+  leftover gold at 1 per 25 (**cap 5**). Then ×(1 + 8% per ascension) × (1 + catch-up). Catch-up
+  is +25% from the 3rd loss in a row, capped at +50%, and a win resets it. Short Road pays 60%.
+  Measured with the realistic campaign: about **78 Crowns per run**.
+- **Crowns sink ≈ 5,930:** gear 15/25/40/70/100/130/160/190 per level (730 per piece), pet
+  levels 6–10 at 40/60/80/100/120 each, Whetstone 220, Starter Kit 40, 3rd potion slot 150,
+  3rd minigame slot 200. At 78 per run, gear and upgrades are maxed around run 45 and everything
+  around run 76.
+- **Sigils** come from firsts only (biome 1, mini-boss 1, final boss 2, class win 2, route win 1,
+  ascension clear 2, Short Road win 1). Unlock prices: class 8, pet/minigame/pack 6, biome 5,
+  boss/mini-boss/gear/potion 4.
+- **Gear (caps):** Helm +0.5 HP per level (max +4). Blade +1 ATK at L8. Boots: traps and lava
+  −5% per level, and at L6 +1 board reroll per biome (worth about 6 pp on its own). Charm +1.5%
+  gold per level (max +12%). Trait pairs at L4 and L8, free to switch: Hearty lap heal +0.5% or
+  Camper campfires +10% · Last Stand or Bulwark (Block 4 on turn 1) · Twin Edge +1 on Pair or Long
+  Edge +3 on High Roller · Opener ×1.3 or Cleave 50% · Long Stride portal +2 or Sure Foot 3+ ·
+  Pathfinder's Eye or Tithe · Haggle (restock 7) or Regular (1 free restock) · Apothecary or
+  Interest.
+- **Pets** (charge meters persist across fights, fire automatically, and most power comes from
+  levels; XP levels at 15/45/90/150 fights won with the pet):
+
+| pet | charges on | size | fires (level L) | acts/run at L10 | max-profile win% at L10 (none: 48.9%) |
+|---|---|---|---|---|---|
+| Pumpkin Sprite | Pair or better | 6 | heal 2% + 0.4%·(L−1) of max HP | 8.3 | 61.1 |
+| Skull Buddy | each die ≤ 2 | 4 | bite 30% + 4%·(L−1) of the hand's combo damage (L5: all enemies at half) | 7.3 | 58.6 |
+| Lantern Ghost | each 6 | 5 | poison L on every enemy | 13.1 | 63.3 |
+| Crystal Wisp | each kept die | 8 | turn start: +1 reroll and combo ×+(0.1 + 0.03·(L−1)) | 15.7 | 65.8 |
+| Guard Die | each attack intent | 6 | Block d6 + (L−1)/2 (L5: half again next turn) | 8.2 | 58.6 |
+| Coin Mimic | each board double | 3 | +8 + 3·(L−1) gold and a small bite | 7.6 | 62.2 |
+
+- **Potions:** 30% heal, a belt of 2 (3 with the Armory upgrade, never 4), 1 at run start, and
+  at most one per combat turn. Four types: Healing Draught, Stoneskin (Block 15 now and next
+  turn), Reroll Tonic (+2 rerolls), and Cleanse (clears Burn, Curse and Chill, heals 10%). A shop
+  potion goes on the belt, or is drunk at once when the belt is full.
+- **Minigames:** one tile per equipped minigame (2 slots, 3 with the Arcade upgrade), and each
+  tile respawns on lap mutation. The score is compared with `MinigameDefs.MEDIAN`: below 0.8 is
+  bronze, 0.8 to 1.2 is silver, and 1.2+ is gold. Gold rewards scale by ±15% (the skill band).
+  AUTO takes the par result of 0.85 (silver) without playing. The run is saved when a minigame
+  starts (`minigame_started.save_point`).
+
+### Ascension (global, 10 levels, max profile, realistic bot, standard mode)
+
+| A | rule | win% |
+|---|---|---|
+| 0 | none | 60.8 |
+| 1 | lap mutations spawn +1 Elite, and elites have +15% HP | 58.5 |
+| 2 | lap heal 10% → 8% | 56.4 |
+| 3 | shops +10%, restock 12 | 52.2 |
+| 4 | the mini-boss gains a trait, and skipping it gives the boss +10% HP | 49.7 |
+| 5 | start with 0 potions | 44.4 |
+| 6 | enemies (not bosses) +4% HP and attack | 37.3 |
+| 7 | each new biome curses a face to 1 until you use a Forge | 32.8 |
+| 8 | traps, ice and lava ×1.5, and +1 hazard tile | 29.4 |
+| 9 | the final boss starts with its phase-2 traits and +5% HP | 27.2 |
+| 10 | double final: the route's other boss at 40% HP | 21.0 |
+
+A win at the highest unlocked level unlocks the next one. The game is very sensitive to enemy
+stats: +12% HP and attack at A6 once cost 15 pp.
+
+### Unlock pacing (fresh profiles, realistic bot, `--campaign=40`, 40 profiles × 40 runs)
+
+The campaign bot plays the least-played class, equips owned minigames and the highest-level pet,
+and after each run spends greedily. It buys the cheapest item first, with one-off Camp upgrades
+at half weight, and spends Sigils in class → pack → pet → minigame → biome order. The table
+gives the median run at which each unlock arrived, whether by milestone or by Sigils, whichever
+came first.
+
+| run | unlocks |
+|---|---|
+| 1 | Helm, Pumpkin Sprite, Barbarian (Sigils), and on a first win Colossus pack, Magma, Cinder King, Magma Golem |
+| 2 | Blade gear, Crypt |
+| 3–5 | Gambler's Kit, Boots, Stoneskin, Cold Steel, Fossil Hunter |
+| 6–7 | Frostpeak, 3rd potion slot (purchasable), Charm, Skull Buddy, Numerology |
+| 9–12 | Reroll Tonic, Mage (11.5), Storm, Grave Mage |
+| 14–15 | Crystal Wisp, Bubble Breaker, 3rd minigame slot (purchasable), Cleanse, Rogue (15), Resonance |
+| 15.5–19.5 | Lantern Ghost, Coin Mimic, Pyromancy, Guard Die, Bone Champion, Bone Warden |
+| 20–24 | Frost Warden, Briar Beast, Cinder Brute |
+
+The campaign's win rate by run is about 45–55% over runs 1–5, 55–70% over runs 8–25, and
+60–70% after run 30. Crowns run about 70–87 per run, and Sigils go from 6.2 on run 1 to under
+1 per run after run 10.
+
+### Tools and sweep notes
+
+- The pp values measured by `--strip` at max: all packs beyond the starter about −12, belt 3 about −6,
+  Whetstone about −6, a L10 pet +10–17, and gear L5–8 about −4. The mid profile (run 10) moved
+  from 72% to 49% after these fixes: the Boots reroll moved to L6, Hearty went to +0.5%,
+  Whetstone to 220 Crowns, Haggle to restock 7, and pet power was backloaded to levels 6–10.
+- `Bot.danger_lo/hi` (0.8 / 1.2): the greedy bot rerolls away from fights that would cost about
+  that share of its HP in two enemy turns.
+
+## History (earlier passes)
 
 Re-run the sim with:
 
@@ -26,7 +233,8 @@ class table, then win% per route, per final boss, per route + boss (with "reache
   lap 6 or lap 11 starts, the board is **regenerated** in the route's next biome around the hero.
   The hero keeps their position, their landing tile is never a fight, and they heal 30%.
   `act_started` fires at that point.
-- **Shop** after completing laps 3, 6, 9 and 12, and at each biome change (after laps 5 and 10).
+- **Shop** after completing laps 1, 3, 5, 6, 8, 10, 12 and 14 (2026-09-28 rebalance; it was laps
+  3, 6, 9 and 12 plus the biome changes).
 - **Mini-boss.** When lap 7 starts, one `miniboss` tile appears with the run's mini-boss
   (`run.miniboss_id`, drawn at run start from the tier-2 biome's candidates). It lasts until it
   is beaten, or until lap 11 regenerates the board.
@@ -36,7 +244,7 @@ class table, then win% per route, per final boss, per route + boss (with "reache
 - **Movement is automatic.** `roll_board()` rolls the whole pool and picks two dice. The move is
   their sum (0..18). The only choice is to reroll or go (`board_reroll()` / `confirm_move()`).
 
-## Final sim (greedy Bot, 500 runs per class, board 28, seed 1, random routes)
+## Final sim of the pre-meta pass (greedy Bot, 500 runs per class, board 28, seed 1, random routes; superseded)
 
 | class | win% | avg act | avg lap | avg board turns | avg combat turns | avg commands | avg level | avg fights won | deaths |
 |---|---|---|---|---|---|---|---|---|---|
@@ -370,7 +578,8 @@ and XP, base enemy stats and patterns.
   below).
 - The random kind is rolled by rarity weight: common 60, rare 30, epic 10.
 - Sources: the shop, drafts and the Dicesmith event. While the pool is below its cap, every
-  shop's first item is a die and every level-up draft includes a New Die option.
+  shop's first item is a die and every level-up draft includes a New Die option. *(Level-up
+  drafts were removed 2026-09-28; minigame gold rewards and events can still add dice.)*
 
 ## Passives (`core/content/passives.gd`)
 
@@ -487,6 +696,7 @@ Damage with passives:
     +1.0, Guard gives Block twice, Ember and Thunder hit twice, Venom poisons twice, Vampire heals
     twice, Gilded pays twice and Lucky banks twice (up to the cap).
 16. **Rewards.** The order is level-up drafts first, then any passive choice (elite or mini-boss).
+    *(Superseded 2026-09-28: level-ups are automatic, so only the passive choice remains.)*
     Elites no longer offer a rune choice. Chests still do.
 17. All earlier rules not replaced here still apply: block and poison timing, curse, chaos,
     summons, Lucky, and the event text and choices. The Blessing Shrine now offers 2 regular

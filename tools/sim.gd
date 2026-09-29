@@ -1,13 +1,20 @@
 extends SceneTree
-## Balance simulator: plays N runs per class with the greedy Bot (the balance reference) or the
-## player-facing AUTO policy (Bot.decide with every scope on and no stop conditions).
+## Balance simulator: plays N runs per class with the greedy Bot (the naive floor) or the
+## player-facing AUTO policy (Bot.decide with every scope on and no stop conditions); the
+## realistic AUTO skill is the balance reference (docs/plans/balance.md).
 ## Usage: godot --headless --path . -s tools/sim.gd -- --runs=300 --class=all --seed=1
 ##        [--board=24|28|32] [--route=glade,frost,magma] [--boss=boss_lich] [--verbose]
 ##        [--profile=none|fresh|mid|max] [--asc=N] [--mode=standard|short] [--mg=par|play]
 ##        [--pet=<id>|none] [--policy=greedy|realistic|expert] [--focus=balanced|damage|defense|economy]
 ## --policy: greedy = the naive Bot.next_command floor; realistic = Bot.decide with
 ## AutoRules.skill "realistic" (the balance reference); expert (alias smart) = full smart AUTO.
-##        [--campaign=N [--campaigns=M]]
+##        [--campaign=N [--campaigns=M] [--snapshot=R]] [--seed-step=N]
+## Analysis: [--strip=gear|hp|atk|boots|charm|traits|gear4|pet|pet4|belt|whetstone|starter|slot|
+##           mastery|packs|midpacks|-<pack>|t:<slot>:<tier>:<trait>|lv:<slot>:<level>,...]
+##           [--tune-hp= --tune-atk= --tune-boss= --tune-base= --tune-step= --tune-atk-step=
+##            --tune-gold= --tune-shop=1,3,5] [--danger=lo,hi] [--real-heur=p|scope:p,...] [--items]
+## Each class row is also printed machine-readable ("#row class wins runs level_sum fights act_sum
+## win_level_sum", "#up source count runs") so shards can be summed.
 ## Without --route each run draws its own route (one biome per tier) and bosses from its seed.
 ## --profile runs with a canonical meta profile (core/meta/presets.gd; default none = legacy
 ## rules, no meta layer); --asc sets its ascension level; classes the profile has locked are

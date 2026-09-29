@@ -160,7 +160,8 @@ static func is_shop_lap(completed_lap: int) -> bool:
 		return Array(tune_shop.split(",")).has(str(completed_lap))
 	return SHOP_LAPS.has(completed_lap)
 
-## TEMP tuning dials (sim sweeps)
+## Sim-only analysis dials (tools/sim.gd --tune-*): the defaults ARE the shipped numbers. The
+## game never changes them; they exist so balance sweeps need no code edits.
 static var tune_hp := 1.0
 static var tune_atk := 1.0
 static var tune_boss := 1.0
@@ -204,7 +205,12 @@ const SHORT_EFF_LAPS := [1, 2, 3, 4, 5, 7, 8, 9, 10, 11]
 ## Short Road final boss HP multiplier (less time to build than a 15-lap run).
 const SHORT_BOSS_HP := 0.75
 
-## Balance targets for the greedy sim bot (A0, standard mode), used by tools/sim.gd reports.
-const TARGET_FRESH := [0.22, 0.30]
-const TARGET_MID := 0.33
-const TARGET_MAX := [0.45, 0.50]
+## Balance targets (Vlad, 2026-09-28) for the REALISTIC sim bot (AutoRules.skill "realistic"),
+## standard mode; profiles are core/meta/presets.gd. See docs/plans/balance.md for the tables.
+const TARGET_FRESH := [0.30, 0.40]
+const TARGET_MID := [0.45, 0.50]
+const TARGET_MAX := [0.55, 0.65]
+const TARGET_MAX_A10 := [0.20, 0.30]
+## Greedy (naive floor) on a fresh profile, and the expert ceiling on a fresh profile.
+const TARGET_GREEDY_FRESH := [0.15, 0.30]
+const TARGET_EXPERT_FRESH_MAX := 0.80
