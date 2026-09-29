@@ -8,8 +8,10 @@
 # (-allowProvisioningUpdates), then exports <out>/Diceroll-<v>-ios.ipa (method app-store-connect,
 # ready for TestFlight). The key needs the "Admin" or "App Manager" role for profile creation.
 #
-# Unsigned path (otherwise): <out>/Diceroll-<v>-ios-unsigned.ipa (device build, CODE_SIGNING_ALLOWED=NO;
-# re-sign it with your own tools) and <out>/Diceroll-<v>-ios-simulator.zip (Simulator .app).
+# Always: <out>/Diceroll-<v>-ios-sideload.ipa, an unsigned device build (CODE_SIGNING_ALLOWED=NO)
+# with the standard Payload/Diceroll.app layout: SideStore / AltStore re-sign it with the user's
+# Apple ID (published with the AltStore source, tools/ci/altstore_source.py).
+# Unsigned path only: <out>/Diceroll-<v>-ios-simulator.zip (Simulator .app).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
@@ -52,14 +54,18 @@ EOF
 		-exportPath "$tmp/export" "${auth[@]}" >"$tmp/export.log" 2>&1 \
 		|| { grep -E "error" "$tmp/export.log" | head -30 >&2; exit 1; }
 	mv "$tmp/export/"*.ipa "$out/Diceroll-$version-ios.ipa"
-else
-	echo "==> no Apple signing secrets: unsigned device build + Simulator build"
-	xcodebuild -project "$proj" -scheme Diceroll -configuration Release -destination generic/platform=iOS \
-		-derivedDataPath "$tmp/dd" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build >"$tmp/device.log" 2>&1 \
-		|| { grep -E "error:" "$tmp/device.log" | head -30 >&2; exit 1; }
-	mkdir -p "$tmp/Payload"
-	cp -R "$tmp/dd/Build/Products/Release-iphoneos/Diceroll.app" "$tmp/Payload/"
-	(cd "$tmp" && zip -qr "$out/Diceroll-$version-ios-unsigned.ipa" Payload)
+fi
+
+echo "==> unsigned device build (sideload IPA)"
+xcodebuild -project "$proj" -scheme Diceroll -configuration Release -destination generic/platform=iOS \
+	-derivedDataPath "$tmp/dd" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build >"$tmp/device.log" 2>&1 \
+	|| { grep -E "error:" "$tmp/device.log" | head -30 >&2; exit 1; }
+mkdir -p "$tmp/Payload"
+cp -R "$tmp/dd/Build/Products/Release-iphoneos/Diceroll.app" "$tmp/Payload/"
+(cd "$tmp" && zip -qry "$out/Diceroll-$version-ios-sideload.ipa" Payload)
+
+if [ $signed = 0 ]; then
+	echo "==> no Apple signing secrets: Simulator build"
 	# Simulator build (tools/export.sh adds the arm64 simulator slice to libgodot).
 	tools/export.sh ios
 	(cd "$ROOT/build/ios_dd/Build/Products/Release-iphonesimulator" && zip -qr "$out/Diceroll-$version-ios-simulator.zip" Diceroll.app)

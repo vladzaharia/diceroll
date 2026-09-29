@@ -272,14 +272,22 @@ jobs:
         with:
           name: release-notes
           path: notes
-      - name: Checksums, build manifest, updater manifests
+      - name: Checksums, build manifest, updater manifests, AltStore/SideStore source
         env:
           UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
           CHANNEL: ${{ needs.prepare.outputs.channel }}
+          BUILD: ${{ needs.prepare.outputs.build }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           python3 tools/ci/update_manifest.py --version "$V" --dist dist --channel "$CHANNEL" \
             --release-url "$REPO_URL/releases/download/v$V" --notes notes/store/android_whats_new.txt --out channels
+          src=altstore-source.json
+          [ "$CHANNEL" = stable ] || src=altstore-source-beta.json
+          gh release download channels -R "$GITHUB_REPOSITORY" -p "$src" -O "$RUNNER_TEMP/$src" 2>/dev/null || true
+          python3 tools/ci/altstore_source.py --version "$V" --build "$BUILD" --ipa "dist/Diceroll-$V-ios-sideload.ipa" \
+            --download-url "$REPO_URL/releases/download/v$V/Diceroll-$V-ios-sideload.ipa" \
+            --notes notes/store/ios_whats_new.txt --existing "$RUNNER_TEMP/$src" --out "channels/$src"
           python3 - <<'EOF'
           import hashlib, json, os, pathlib, subprocess
           dist = pathlib.Path("dist")
@@ -301,7 +309,7 @@ jobs:
           cp notes/store/android_whats_new.txt "dist/Diceroll-$V-whats-new-android.txt"
           cat notes/RELEASE_NOTES.md >release_body.md
           # shellcheck disable=SC2016
-          printf '\n---\n**Downloads**: macOS (.dmg/.zip, universal), Windows x86_64, Linux x86_64 and arm64, Web (itch.io-ready zip), Android APK (sideload) and AAB, iOS/iPadOS.\nVerify with `sha256sum -c SHA256SUMS.txt`. Built from %s with Godot %s.\n' "${GITHUB_SHA::7}" "$GODOT_VERSION" >>release_body.md
+          printf '\n---\n**Downloads**: macOS (.dmg/.zip, universal), Windows x86_64, Linux x86_64 and arm64, Web (itch.io-ready zip), Android APK (sideload / Obtainium) and AAB, iOS/iPadOS (sideload IPA for SideStore/AltStore; add the source %s/releases/download/channels/altstore-source.json).\nVerify with `sha256sum -c SHA256SUMS.txt`. Built from %s with Godot %s.\n' "$REPO_URL" "${GITHUB_SHA::7}" "$GODOT_VERSION" >>release_body.md
       - name: Create GitHub Release
         if: github.event_name == 'push' || inputs.publish
         uses: softprops/action-gh-release@v3

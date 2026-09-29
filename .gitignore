@@ -11,7 +11,7 @@
 !tools/icon/
 !tools/icon/**
 
-# Third-party assets are never committed (EXTRA KayKit packs are not redistributable).
+# Third-party assets are never committed (paid KayKit EXTRA packs, non-redistributable Mixkit music).
 # Canonical store: third_party/ ; runtime copies populated by tools/import_assets.sh.
 /third_party/
 /assets/kaykit/
