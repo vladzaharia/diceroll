@@ -62,6 +62,8 @@ const LOOKS := {
 		"particles": "embers", "light": Color(1.0, 0.45, 0.15),
 		"cloud_deep": Color(0.2, 0.05, 0.03), "cloud_light": Color(0.5, 0.14, 0.05), "cloud_rim": Color(1.0, 0.5, 0.2),
 		"sea": "lava", "tile_base": Color(0.6, 0.57, 0.56), "tile_glow": Color(1.0, 0.4, 0.1),
+		# cells of basalt floor between the ring and the lava moat (same margin on all sides)
+		"moat": 2,
 	},
 }
 
@@ -142,7 +144,7 @@ static func inner_corner(id: String, holder: Node3D, p: Vector3, yaw: float, sx:
 ## Height in blocks of the terrain column at cell (i, j) (0 = flat paving).
 static func _height(cx: float, cz: float) -> int:
 	var e := _extent + 0.2
-	var half := Biome.ISLAND_HALF * _s
+	var half := Biome.island_half()
 	if absf(cx) < e and absf(cz) < e:
 		return 0
 	var edge := maxf(absf(cx), absf(cz)) > half - CELL * 0.75
@@ -161,10 +163,14 @@ static func _height(cx: float, cz: float) -> int:
 			elif not front:
 				up = (2 if edge else 1) if cz < -_extent * 0.3 else (1 if edge else 0)
 		"magma":
-			if back:
-				up = 2 if edge else 1
+			# flat floor and moat, then one shelf row: a cliff at the back (the lava falls),
+			# low ledges along the back half of the sides, open toward the camera
+			if maxf(absf(cx), absf(cz)) < _moat_outer():
+				return 0
+			if cz < -_moat_outer():
+				up = 2
 			elif not front:
-				up = (2 if edge else 0) if cz < 0.0 else (1 if edge and cz < _extent * 0.5 else 0)
+				up = 1 if cz < _extent * 0.5 else 0
 	# break up the rows
 	if up > 0 and _rng.randf() < 0.22:
 		up = maxi(up - 1, 0) if _rng.randf() < 0.6 else up + 1
@@ -196,14 +202,21 @@ static func _path_cell(cx: float, cz: float) -> bool:
 	return cz > 2.6 * _s and not (cz > inner and cz < _extent + 0.2)
 
 
-## True for a cell of the Magma lava channel: the column just outside the ring on both
-## sides (running off the island's front edge) and the row behind the ring.
+## Distance from the centre to the inner edge of the Magma lava moat: the ring's outer edge
+## plus the floor band ("moat" cells, the same on all four sides).
+static func _moat_inner() -> float:
+	return _extent + int(LOOKS.get(_id, {}).get("moat", 0)) * CELL
+
+
+static func _moat_outer() -> float:
+	return _moat_inner() + CELL
+
+
+## True for a cell of the Magma lava moat: a one-cell square band around the basalt floor,
+## `moat` cells out from the ring on every side (cell centres sit half a cell inside it).
 static func _is_channel(cx: float, cz: float) -> bool:
-	var e := _extent + 0.2
-	var ax := absf(cx)
-	if ax > e and ax < e + CELL:
-		return true
-	return cz < -e and cz > -e - CELL and ax < e + CELL
+	var m := maxf(absf(cx), absf(cz))
+	return m > _moat_inner() and m < _moat_outer()
 
 
 static func _pick(list: Array) -> String:
@@ -224,11 +237,12 @@ static func _terrain(d: Node3D) -> void:
 	var pal: Dictionary = TERRAIN[_id]
 	var shader_mat: Material = basalt_material() if String(pal.get("shader", "")) == "basalt" else null
 	var chan_node: Node3D = null
-	var half := Biome.ISLAND_HALF * _s
+	var half := Biome.island_half()
 	var n := int(ceil(half / CELL)) + 1
 	var flat: Dictionary = {}     # block name -> Array[Transform3D]
 	var floor_node := Node3D.new()
 	floor_node.name = "Floor"
+	floor_node.set_meta("walkable", true)
 	d.add_child(floor_node)
 	var basis := Basis().scaled(Vector3.ONE * (CELL * 0.5))
 	# low-frequency meadow / snowfield patches: per-cell tint and patch blocks
@@ -237,6 +251,7 @@ static func _terrain(d: Node3D) -> void:
 	nz.frequency = 0.09
 	var patch_cols: Array = pal.get("patch_tints", [])
 	var cols: Dictionary = {}     # block name -> Array[Color]
+	var cells := PackedVector2Array()   # paving cell centres at ground level (BiomeExtents)
 	for i in range(-n, n + 1):
 		for j in range(-n, n + 1):
 			var cx := (float(i) + _off) * CELL
@@ -254,6 +269,7 @@ static func _terrain(d: Node3D) -> void:
 					chan_node = Node3D.new()
 					chan_node.name = "LavaChannel"
 					chan_node.set_meta("prescaled", true)
+					chan_node.set_meta("hazard", true)
 					d.add_child(chan_node)
 				var lp := MeshInstance3D.new()
 				var pm := PlaneMesh.new()
@@ -280,10 +296,13 @@ static func _terrain(d: Node3D) -> void:
 			cols[name].append(tint)
 			flat[name].append(Transform3D(basis.rotated(Vector3.UP, PI * 0.5 * _rng.randi_range(0, 3)),
 				Vector3(cx, -CELL * 0.5 - (0.55 if chan else 0.0), cz)))
+			if not chan:
+				cells.append(Vector2(cx, cz))
 			if up > 0:
 				var col := Node3D.new()
 				col.name = "Block"
 				col.set_meta("prescaled", true)
+				col.set_meta("walkable", true)
 				col.position = Vector3(cx, 0, cz)
 				d.add_child(col)
 				for k in up:
@@ -325,6 +344,9 @@ static func _terrain(d: Node3D) -> void:
 		mmi.material_override = fmat if fmat else _floor_material(bm[1], pal.tint, mm.use_colors)
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		floor_node.add_child(mmi)
+	# MultiMesh transforms do not read back under the headless dummy renderer
+	floor_node.set_meta("cells", cells)
+	floor_node.set_meta("cell_size", CELL)
 
 
 static var _basalt: ShaderMaterial
@@ -859,7 +881,7 @@ static func _flower_multimesh(parent: Node3D, xs: Array, colors: Array) -> void:
 ## Random flat-ground points: the border and the moat, off the ring tiles and the centre.
 static func _scatter_points(count: int, centre_r: float, ring_gap: bool) -> Array:
 	var out: Array = []
-	var half := Biome.ISLAND_HALF * _s - 0.6
+	var half := Biome.island_half() - 0.6
 	var tries := 0
 	while out.size() < count and tries < count * 12:
 		tries += 1
@@ -1271,8 +1293,12 @@ static func _magma(root: Node3D, d: Node3D, c: Node3D) -> void:
 	up.light_specular = 0.2
 	up.rotation_degrees = Vector3(35.0, 20.0, 0.0)
 	root.add_child(up)
-	var side_x := (_extent + CELL * 1.5) / _s      # authored x of the raised side columns
-	var back_z := -(_extent + CELL * 1.5) / _s     # authored z of the raised back row
+	# authored (pre-spread) coordinates: side_x = middle of the floor band beside the ring,
+	# shelf = the raised row just past the lava moat, front_z = floor band before the ring
+	var side_x := (_extent + CELL) / _s
+	var front_z := (_extent + CELL) / _s
+	var shelf := (_moat_outer() + CELL * 0.5) / _s
+	var back_z := -shelf
 	# back cliffs: lava falls pouring into the channel, smoke columns and obsidian spires
 	for x in [-6.3, 0.0, 6.3]:
 		var p := spot(Vector3(x, 0, back_z))
@@ -1309,13 +1335,18 @@ static func _magma(root: Node3D, d: Node3D, c: Node3D) -> void:
 		_tag(rock(d, spot(Vector3(side * side_x, 0, 6.6)), 0.55, basalt, int(side * 7 + 33)))
 	put(d, T + "grindstone.gltf", Vector3(-side_x, 0, 5.2), 80.0, 1.2)
 	put(d, D + "sword_shield_broken.gltf", Vector3(side_x, 0, 5.4), -80.0, 0.85)
-	# front: low basalt boulders and a few thin glowing cracks (the camera side stays open)
-	for p in [Vector3(-5.6, 0, 9.9), Vector3(5.4, 0, 9.8)]:
+	# side shelves past the moat: more columns and the smoke vents
+	for side in [-1.0, 1.0]:
+		_tag(basalt_columns(d, spot(Vector3(side * shelf, 0, -2.6)), 1.3, 7, int(side * 11 + 61)))
+		_tag(spire(d, spot(Vector3(side * shelf, 0, 1.6)), 0.6, int(side * 11 + 67)))
+	_tag(smoke(d, spot(Vector3(-shelf, 0, -8.0)) + Vector3(0, 0.5, 0), 0.9, smoke_col))
+	_tag(smoke(d, spot(Vector3(shelf, 0, -7.0)) + Vector3(0, 0.5, 0), 0.9, smoke_col))
+	# front: low basalt boulders and a few thin glowing cracks on the floor band (the camera
+	# side stays open)
+	for p in [Vector3(-5.6, 0, front_z), Vector3(5.4, 0, front_z - 0.1)]:
 		_tag(basalt_columns(d, spot(p), 1.1, 10, int(p.x * 7 + 99), 0.6))
-	for p in [Vector3(-2.2, 0, 9.6), Vector3(2.6, 0, 9.8)]:
+	for p in [Vector3(-2.2, 0, front_z - 0.2), Vector3(2.6, 0, front_z)]:
 		_tag(crack_decal(d, spot(p) + Vector3(0, 0.02, 0), 1.5, _rng.randf() * 180.0))
-	_tag(smoke(d, spot(Vector3(-side_x, 0, -8.0)) + Vector3(0, 0.5, 0), 0.9, smoke_col))
-	_tag(smoke(d, spot(Vector3(side_x, 0, -7.0)) + Vector3(0, 0.5, 0), 0.9, smoke_col))
 	# set piece: the Cinder Forge. A stepped basalt dais over a ring of lava, a great anvil on
 	# top with a glowing greatsword driven into it, flanked by two obsidian spires.
 	var moat := lava_pool(c, Vector3(0, 0.01, -0.1), 2.05)
