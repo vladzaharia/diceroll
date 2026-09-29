@@ -117,6 +117,12 @@ class _Driver extends Node:
 			o["boss"] = String(args.boss)
 		if args.has("miniboss"):
 			o["miniboss"] = String(args.miniboss)
+		if args.has("profile"):
+			# meta layer on: --profile=fresh|mid|max [--pet=<id>] [--asc=N]
+			var prof := MetaPresets.get_preset(String(args.profile), int(args.get("asc", "0")))
+			if args.has("pet"):
+				(prof.loadout as Dictionary)["pet"] = String(args.pet)
+			o["profile"] = prof
 		return o
 
 	## A die pool of `n` (2..5) with a spread of kinds (and one rune) for dice-heavy shots.
