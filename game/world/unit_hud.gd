@@ -4,11 +4,17 @@ extends Node3D
 ## HP numbers, a block badge, the intent badge + value, and status pips. The node turns to
 ## face the active camera every frame, so the layout stays screen-aligned and crisp.
 
-const INTENT_KINDS := {"attack": 0, "block": 1, "buff": 2, "curse": 3, "summon": 4, "aim": 6, "chaos": 7}
+const INTENT_KINDS := {"attack": 0, "block": 1, "buff": 2, "curse": 3, "summon": 4, "aim": 6, "chaos": 7,
+	"heal": 8, "drain": 9, "burn": 10, "chill": 11, "scorch": 12}
+## Trait chips under the HP bar (intent_icon.gdshader kinds).
+const TRAIT_KINDS := {"armor": 13, "thorns": 14, "ward": 15, "pierce": 16}
 const INTENT_COLORS := {
 	"attack": Color(0.9, 0.24, 0.22), "block": Color(0.28, 0.55, 0.95), "buff": Color(0.98, 0.55, 0.18),
 	"curse": Color(0.6, 0.3, 0.9), "summon": Color(0.35, 0.7, 0.45), "aim": Color(0.42, 0.46, 0.6),
-	"chaos": Color(0.85, 0.28, 0.72),
+	"chaos": Color(0.85, 0.28, 0.72), "heal": Color(0.3, 0.72, 0.36), "drain": Color(0.66, 0.12, 0.24),
+	"burn": Color(0.95, 0.42, 0.12), "chill": Color(0.36, 0.68, 0.92), "scorch": Color(0.78, 0.28, 0.08),
+	"armor": Color(0.5, 0.5, 0.56), "thorns": Color(0.42, 0.62, 0.26), "ward": Color(0.56, 0.36, 0.86),
+	"pierce": Color(0.9, 0.4, 0.22),
 }
 const BAR_SIZE := Vector2(1.3, 0.2)
 
@@ -20,6 +26,8 @@ var intent_label: Label3D
 var block_badge: MeshInstance3D
 var block_label: Label3D
 var status_label: Label3D
+var trait_chips: Array[MeshInstance3D] = []
+var _traits: Array = []
 
 var _bar_mat: ShaderMaterial
 var _intent_mat: ShaderMaterial
@@ -116,6 +124,8 @@ func set_data(data: Dictionary, animate := true) -> void:
 		st.append("FROZEN")
 	status_label.text = "  ".join(st)
 	status_label.modulate = Fx.STATUS_COLORS["poison"] if int(data.get("poison", 0)) > 0 else Fx.STATUS_COLORS["frost"]
+	if data.has("traits"):
+		set_traits(data.traits)
 	var nm := String(data.get("name", ""))
 	var mini := bool(data.get("miniboss", false))
 	name_label.visible = (boss or mini) and nm != ""
@@ -126,7 +136,7 @@ func set_data(data: Dictionary, animate := true) -> void:
 func set_intent(kind: String, value: int, animate := true) -> void:
 	var key := "%s:%d" % [kind, value]
 	intent_badge.visible = kind != ""
-	intent_label.visible = kind != "" and value > 0 and not kind in ["curse", "summon", "aim", "chaos"]
+	intent_label.visible = kind != "" and value > 0 and not kind in ["curse", "summon", "aim", "chaos", "scorch"]
 	if kind == "":
 		_intent_key = key
 		return
@@ -140,7 +150,31 @@ func set_intent(kind: String, value: int, animate := true) -> void:
 	_intent_key = key
 
 
+## Trait chips (armor, thorns, ward, pierce) to the right of the HP bar.
+func set_traits(traits: Array) -> void:
+	var list: Array = traits.filter(func(t: Variant) -> bool: return TRAIT_KINDS.has(String(t)))
+	if list == _traits:
+		return
+	_traits = list.duplicate()
+	for c in trait_chips:
+		c.queue_free()
+	trait_chips.clear()
+	for k in list.size():
+		var t := String(list[k])
+		var chip := _badge(0.3)
+		var m: ShaderMaterial = chip.material_override
+		m.set_shader_parameter("kind", int(TRAIT_KINDS[t]))
+		m.set_shader_parameter("bg_color", INTENT_COLORS.get(t, Color(0.5, 0.5, 0.5)))
+		chip.name = "Trait_" + t
+		chip.position = Vector3(BAR_SIZE.x * 0.5 + 0.2 + 0.32 * k, 0.0, 0.005)
+		add_child(chip)
+		trait_chips.append(chip)
+		_punch(chip, 1.3)
+
+
 func set_opacity(a: float) -> void:
+	for c in trait_chips:
+		(c.material_override as ShaderMaterial).set_shader_parameter("opacity", a)
 	for m in [_bar_mat, _intent_mat, _block_mat]:
 		(m as ShaderMaterial).set_shader_parameter("opacity", a)
 	for l in [hp_label, intent_label, block_label, status_label, name_label]:

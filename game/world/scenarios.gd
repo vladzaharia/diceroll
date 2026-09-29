@@ -8,12 +8,21 @@ extends RefCounted
 ##  combat_act1     hero vs 3 enemies, intents/HP visible, mid-attack
 ##  boss_act1..3    boss fights (Bone Warden, Hollow King, Lich + minions)
 ##  fx_gallery      every FX firing in a loop on the act 1 board
-##  enemy_gallery   every enemy look with its HUD, on the act 1 island
+##  board_<biome>   overview of a biome by id (glade, crypt, hollow, frost, throne, magma)
+##  enemy_gallery   enemy looks with their HUDs on the cleared act 1 island; --only=new|old|mini|
+##                  boss|size|all|<id,id,...> (default new), --pitch=deg, --shatter=1 (every
+##                  second Magma Golem in phase 2), --intents=1 (cycle intent kinds)
 ##  combat_sequence full beat loop (attack, hit, death, enemy attack, hero hit, summon, end)
+##  tiles_ice_lava  close-up of the Frostpeak ice and Magma lava tiles (--biome=frost|magma)
+##  combat_hero_check  position check (headless ok): the hero fights from the fight's tile even
+##                  when its model was left elsewhere, and returns there after every lunge;
+##                  prints HERO_TILE_OK / HERO_TILE_FAIL and quits (exit 0 / 1)
 ## Optional args: --hero=<class>, --tile=<idx>.
 
-const NAMES := ["board_act1", "board_act2", "board_act3", "board_follow", "board_mutate", "board_portal", "combat_act1",
-	"combat_act2", "combat_act3", "boss_act1", "boss_act2", "boss_act3", "fx_gallery", "enemy_gallery", "combat_sequence"]
+const NAMES := ["board_glade", "board_crypt", "board_hollow", "board_frost", "board_throne", "board_magma",
+	"board_act1", "board_act2", "board_act3", "board_follow", "board_mutate", "board_portal", "combat_act1",
+	"combat_act2", "combat_act3", "boss_act1", "boss_act2", "boss_act3", "fx_gallery", "enemy_gallery", "combat_sequence",
+	"combat_hero_check", "tiles_ice_lava"]
 
 
 static func names() -> PackedStringArray:
@@ -27,6 +36,24 @@ static func build(name: String) -> Node:
 	root.name = "WorldScenario"
 	root.scenario = name
 	return root
+
+
+## Tier (1..3) of a biome id.
+static func tier_of(id: String) -> int:
+	return int(BiomeDefs.DEFS[id].tier) if BiomeDefs.DEFS.has(id) else 1
+
+
+## A real generated board for a biome (deterministic): the tier's third lap, with the
+## route's mini-boss standing on tile 11 for tier-2 biomes.
+static func biome_tiles(id: String, seed := 5) -> Array:
+	var tier := tier_of(id)
+	var lap := int(Balance.BIOME_LAPS[tier - 1]) + 2
+	var b := Board.generate(Rng.new(seed), tier, Balance.BOARD_SIZE, lap, id)
+	var tiles: Array = b.to_dict().tiles
+	if tier == 2:
+		var mb: Array = BiomeDefs.miniboss_candidates(["crypt", id, "throne"])
+		tiles[11] = {"type": "miniboss", "enemies": [mb[0]], "elite": false}
+	return tiles
 
 
 ## 28 tiles (8x8 ring, corners 0/7/14/21) in the contract shape for an act (deterministic).
@@ -120,15 +147,26 @@ class _Driver extends Node3D:
 			act = 2
 		elif scenario.ends_with("3"):
 			act = 3
+		var biome_id := String(Biome.NAMES[act])
+		for id in Biome.IDS:
+			if scenario.ends_with("_" + id):
+				biome_id = id
+				act = BoardScenarios.tier_of(id)
+		if scenario == "tiles_ice_lava":
+			biome_id = "magma"
+			act = 3
+		biome_id = String(args.get("biome", biome_id))
 		board = BoardView.new()
 		add_child(board)
 		board.hero_class = String(args.get("hero", ["knight", "barbarian", "mage"][act - 1]))
 		board.hero_idx = int(args.get("tile", "0"))
-		board.build(act, BoardScenarios.mock_tiles(act))
+		var tiles: Array = BoardScenarios.mock_tiles(act) if scenario.ends_with(str(act)) and not args.has("biome") \
+			else BoardScenarios.biome_tiles(biome_id)
+		board.build(biome_id, tiles)
 		rig = CameraRig.new()
 		add_child(rig)
 		match scenario:
-			"board_act1", "board_act2", "board_act3":
+			"board_act1", "board_act2", "board_act3", "board_glade", "board_crypt", "board_hollow", "board_frost", "board_throne", "board_magma":
 				board.place_hero(int(args.get("tile", "0")))
 				rig.overview(board.ring_bounds(), true)
 				var from := board.hero_idx
@@ -160,37 +198,86 @@ class _Driver extends Node3D:
 				await _combat(act, wait)
 			"combat_sequence":
 				await _sequence()
-			"enemy_gallery":
-				var ids := EnemyLooks.DEFS.keys()
-				if String(args.get("only", "")) == "mini":
-					# size ladder: elite brute < mini-bosses < the Lich
-					ids = ["brute", "mini_bone_champion", "mini_pumpkin_knight", "mini_grave_mage", "boss_lich"]
+			"combat_hero_check":
+				await _hero_check()
+			"tiles_ice_lava":
+				for k in [1, 3, 5]:
+					board.set_tile(k, {"type": "ice"})
+				for k in [2, 4, 6]:
+					board.set_tile(k, {"type": "lava"})
+				board.place_hero(0)
+				await get_tree().create_timer(0.1).timeout
 				var pts := PackedVector3Array()
-				for i in ids.size():
-					var id: String = ids[i]
-					var ch := EnemyLooks.create(id)
-					ch.scale = Vector3.ONE * CombatStage.UNIT_SCALE * EnemyLooks.scale_of(id)
-					var p := Vector3(-5.6 + (i % 5) * 2.8, 0.05, -1.5 + (i / 5) * 4.2)
-					if ids.size() <= 5:
-						p = Vector3(-5.2 + i * 2.6, 0.05, 0.6)
-
-					ch.position = p
-					add_child(ch)
-					var hud := UnitHud.new()
-					add_child(hud)
-					hud.position = p + Vector3.UP * (2.2 * EnemyLooks.scale_of(id) + 0.2)
-					hud.set_data({"hp": 10, "max_hp": 12, "block": 3 if i % 3 == 0 else 0, "boss": EnemyLooks.is_boss(id),
-						"name": id, "intent": {"kind": ["attack", "block", "buff", "curse", "summon"][i % 5], "value": 5}}, false)
-					pts.append(p)
-					pts.append(p + Vector3.UP * 3.0)
-				for c in board.biome.get_node("SetPiece").get_children():
-					c.visible = false
-				rig.frame_points(pts, 0.0, 28.0, true)
+				for k in 7:
+					pts.append(board.tile_global_position(k))
+				pts.append(board.tile_global_position(3) + Vector3.UP * 2.0)
+				rig.frame_points(pts, 0.0, 42.0, true)
+			"enemy_gallery":
+				_gallery(String(args.get("only", "new")))
 			"fx_gallery":
 				board.place_hero(3)
 				rig.follow(board.hero, true)
 				await get_tree().create_timer(maxf(wait - 0.5, 0.2)).timeout
 				_fx_all()
+
+	## Enemy looks in rows with their HUDs, on the cleared island. only: new | old | mini |
+	## boss | all | size (elite < mini < boss ladder) | comma-separated ids.
+	func _gallery(only: String) -> void:
+		var groups := {
+			"old": ["skeleton_minion", "skeleton_warrior", "skeleton_archer", "cultist", "bandit", "brute"],
+			"new": ["thorn_sprite", "wolf_bandit", "hollow_wisp", "frost_skeleton", "ice_archer", "bone_knight",
+				"ember_imp", "magma_brute"],
+			"mini": ["mini_bone_champion", "mini_pumpkin_knight", "mini_grave_mage", "mini_frost_warden",
+				"mini_briar_beast", "mini_cinder_brute"],
+			"boss": ["boss_bone_warden", "boss_lich", "boss_cinder_king", "boss_magma_golem", "boss_hollow_king"],
+			"size": ["brute", "mini_bone_champion", "mini_cinder_brute", "boss_lich", "boss_magma_golem"],
+		}
+		var ids: Array = EnemyLooks.DEFS.keys() if only == "all" else groups.get(only, Array(only.split(",")))
+		var kinds := ["attack", "heal", "drain", "burn", "chill", "scorch", "block", "buff", "curse", "summon"]
+		var per_row := 4 if only in ["new", "old"] else 3
+		if ids.size() <= 5 and only != "new":
+			per_row = ids.size()
+		var big := 1.0
+		for id in ids:
+			big = maxf(big, EnemyLooks.scale_of(String(id)))
+		var gap := 1.9 + 1.25 * big
+		var rows := int(ceil(float(ids.size()) / per_row))
+		var pts := PackedVector3Array()
+		for i in ids.size():
+			var id := String(ids[i])
+			var ch := EnemyLooks.create(id)
+			ch.scale = Vector3.ONE * CombatStage.UNIT_SCALE * EnemyLooks.scale_of(id)
+			var row := i / per_row
+			var in_row := mini(per_row, ids.size() - row * per_row)
+			var p := Vector3((float(i % per_row) - (in_row - 1) * 0.5) * gap, 0.05, (float(row) - (rows - 1) * 0.5) * gap * 1.5 + 1.5)
+			ch.position = p
+			add_child(ch)
+			var hud := UnitHud.new()
+			add_child(hud)
+			hud.position = p + Vector3.UP * (EnemyLooks.hud_height(id) * CombatStage.UNIT_SCALE + 0.35)
+			var ed := EnemyDefs.def(id)
+			var intent := {"kind": kinds[i % kinds.size()], "value": 5}
+			var pat: Array = ed.get("pattern", ed.get("phases", [[]])[0] if ed.has("phases") else [])
+			if not pat.is_empty() and not Shot.args.has("intents"):
+				# show the enemy's signature move (its first non-plain intent)
+				intent = (pat[0] as Dictionary).duplicate()
+				for q: Dictionary in pat:
+					if not String(q.kind) in ["attack", "block", "aim"]:
+						intent = q.duplicate()
+						break
+			hud.set_data({"hp": 10, "max_hp": 12, "block": 3 if i % 3 == 0 else 0, "boss": EnemyLooks.is_boss(id),
+				"miniboss": EnemyLooks.is_miniboss(id), "name": String(ed.get("name", id)), "intent": intent,
+				"traits": EnemyDefs.traits(id, 2 if id == "boss_magma_golem" and Shot.args.has("shatter") and i % 2 == 1 else 1)}, false)
+			if id == "boss_magma_golem" and Shot.args.has("shatter") and i % 2 == 1:
+				EnemyLooks.shatter(ch)
+			pts.append(p)
+			pts.append(p + Vector3.UP * (2.9 * EnemyLooks.scale_of(id)) + Vector3.BACK * -1.2)
+		for n in ["SetPiece", "InnerCorners"]:
+			if board.biome.has_node(n):
+				board.biome.get_node(n).visible = false
+		board.get_node("Tiles").visible = false
+		board.hero.visible = false
+		rig.frame_points(pts, 0.0, float(Shot.args.get("pitch", "30")), true)
 
 	func _process(_dt: float) -> void:
 		if Shot and Shot.args.has("perf") and Engine.get_process_frames() % 60 == 0:
@@ -224,6 +311,50 @@ class _Driver extends Node3D:
 		rig.shake(0.5, 0.3)
 		if scenario == "combat_act1":
 			Fx.flash(self, Color(1.0, 0.85, 0.5, 0.25))
+
+	## Asserts the hero stands on `idx` (its combat anchor); prints and returns the result.
+	func _hero_on(idx: int, what: String) -> bool:
+		var want: Vector3 = board.combat_anchor(idx).hero
+		var d := board.hero.global_position.distance_to(want)
+		var ok := d < 0.05 and board.hero_idx == board.wrap_idx(idx)
+		if ok:
+			print("HERO_TILE_OK %s (tile %d)" % [what, idx])
+		else:
+			push_error("HERO_TILE_FAIL %s: hero_idx %d, %.2f from tile %d" % [what, board.hero_idx, d, idx])
+		return ok
+
+	func _hero_check() -> void:
+		var ok := true
+		# the hero model is left on tile 9 but the fight is on tile 12 (stale hop / restore)
+		board.place_hero(9)
+		stage = CombatStage.new()
+		add_child(stage)
+		rig.overview(board.ring_bounds(), true)
+		await get_tree().process_frame
+		await stage.begin_on_board(board, 12, BoardScenarios.mock_enemies("act1"), rig)
+		ok = _hero_on(12, "begin") and ok
+		ok = stage.hero_home.distance_to(board.tile_global_position(12)) < 0.05 and ok
+		for style in ["melee", "magic"]:
+			await stage.hero_attack(1, style)
+			await get_tree().create_timer(0.6).timeout
+			ok = _hero_on(12, "after %s attack" % style) and ok
+		await stage.enemy_attack(0)
+		await stage.hero_hit(4)
+		await get_tree().create_timer(0.5).timeout
+		ok = _hero_on(12, "after enemy attack") and ok
+		stage.end_on_board()
+		await get_tree().create_timer(0.3).timeout
+		ok = _hero_on(12, "after the fight") and ok
+		# a second fight on a corner, hero already there
+		board.place_hero(14)
+		await stage.begin_on_board(board, 14, BoardScenarios.mock_enemies("act2"), rig)
+		await stage.hero_attack(0)
+		await get_tree().create_timer(0.6).timeout
+		ok = _hero_on(14, "corner fight") and ok
+		stage.end_on_board()
+		print("HERO_TILE_CHECK ", "PASS" if ok else "FAIL")
+		if not Shot.args.has("shot"):
+			get_tree().quit(0 if ok else 1)
 
 	func _sequence() -> void:
 		var idx := 9

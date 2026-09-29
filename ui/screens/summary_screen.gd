@@ -13,6 +13,7 @@ var _grid: GridContainer
 var _passive_title: Label
 var _passives: HFlowContainer
 var _headline: Label
+var _route: VBoxContainer
 
 
 func _build() -> void:
@@ -23,6 +24,8 @@ func _build() -> void:
 	_hero = UiTheme.hbox(16)
 	_hero.alignment = BoxContainer.ALIGNMENT_CENTER
 	body.add_child(_hero)
+	_route = UiTheme.vbox(0)
+	body.add_child(_route)
 	_grid = GridContainer.new()
 	_grid.columns = 2
 	_grid.add_theme_constant_override("h_separation", 12)
@@ -54,8 +57,11 @@ func refresh(flow: GameFlow) -> void:
 	var st := r.stats
 	var won := flow.phase == GameFlow.Phase.VICTORY or bool(st.get("victory", false))
 	set_title("VICTORY!" if won else "DEFEATED", UiPalette.GOLD if won else UiPalette.DANGER)
-	var act := clampi(int(st.get("max_act", r.act)), 1, 3)
-	_headline.text = "The Lich has fallen. The Bone Throne is yours." if won else "Fallen on lap %d of %d, in %s." % [r.lap, Balance.TOTAL_LAPS, ACT_NAMES[act - 1]]
+	var info := flow.route_info()
+	var boss_name := String(info.boss.name)
+	var last := BiomeDefs.name_of(String(r.route[2])) if r.route.size() >= 3 else String(ACT_NAMES[2])
+	_headline.text = ("%s has fallen. %s is yours." % [boss_name, last]) if won \
+		else "Fallen on lap %d of %d, in %s." % [r.lap, Balance.TOTAL_LAPS, BiomeDefs.name_of(r.biome())]
 	_headline.label_settings = UiTheme.label_settings(28, UiPalette.GOLD_BRIGHT if won else UiPalette.TEXT, true, 0, UiPalette.OUTLINE, true)
 	UiTheme.clear(_hero)
 	var cls: Dictionary = HeroDefs.DATA.get(r.class_id, HeroDefs.DATA.knight)
@@ -65,6 +71,11 @@ func refresh(flow: GameFlow) -> void:
 	_hero.add_child(col)
 	col.add_child(UiTheme.label(String(cls.name), 40, UiPalette.TEXT, true, 6))
 	col.add_child(UiTheme.label("Level %d  ·  Lap %d/%d  ·  %d dice" % [r.level, r.lap, Balance.TOTAL_LAPS, r.dice.size()], 22, UiPalette.TEXT_DIM, false, 0, false, 600))
+	UiTheme.clear(_route)
+	var strip := RouteStrip.make(info, 0 if won else r.act, 0, true)
+	strip.beaten.boss = won
+	strip._rebuild()
+	_route.add_child(strip)
 	UiTheme.clear(_grid)
 	var best := String(st.get("best_combo", ""))
 	var bm := float(st.get("best_mult", 0.0))

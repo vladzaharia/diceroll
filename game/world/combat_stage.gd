@@ -55,7 +55,9 @@ func begin(p_hero: Character, anchor: Dictionary, enemy_list: Array) -> void:
 	_ground_y = float(anchor.get("ground_y", hero_home.y - 0.45))
 	_distance = float(anchor.get("distance", DISTANCE))
 	_lateral = float(anchor.get("lateral", 0.0))
-	_face(hero, hero.global_position + facing, 0.3)
+	# the fight is staged on the anchor tile: the hero always starts (and returns) there
+	hero.global_position = hero_home
+	_face(hero, hero_home + facing, 0.3)
 	_arena()
 	var n := enemy_list.size()
 	for i in n:
@@ -72,6 +74,9 @@ func begin_on_board(board: BoardView, idx: int, enemy_list: Array, rig: CameraRi
 	_board = board
 	_board_idx = idx
 	_rig = rig
+	if board.hero_idx != board.wrap_idx(idx):
+		push_warning("CombatStage: hero on tile %d, fight on tile %d; moving the hero" % [board.hero_idx, idx])
+		board.place_hero(idx)
 	board.set_tile_dressing_visible(idx, false)
 	var anchor := board.combat_anchor(idx)
 	if rig:
@@ -85,13 +90,13 @@ func begin_on_board(board: BoardView, idx: int, enemy_list: Array, rig: CameraRi
 	begin(board.hero, anchor, enemy_list)
 
 	var focus: Array = enemy_positions()
-	focus.append(board.hero.global_position)
+	focus.append(hero_home)
 	var centre := Vector3.ZERO
 	for f: Vector3 in focus:
 		centre += f
 	board.clear_area(centre / focus.size(), 5.5)
 	if rig:
-		rig.combat(board.hero.global_position, enemy_positions(), false, enemy_heights())
+		rig.combat(hero_home, enemy_positions(), false, enemy_heights())
 		var vs := get_viewport().get_visible_rect().size
 		board.hide_occluders(rig.desired_transform(), rig.camera.fov, vs.x / maxf(vs.y, 1.0), focus)
 	await began
@@ -139,6 +144,7 @@ func add_enemy(d: Dictionary) -> int:
 	var i := enemies.size()
 	_add(d, i, i + 1, 0.0)
 	_relayout()
+	refresh_wards()
 	return i
 
 
@@ -207,10 +213,7 @@ func _add(d: Dictionary, i: int, n: int, rise_delay := -1.0) -> void:
 
 
 func _hud_height(id: String) -> float:
-	var h := 2.2 * UNIT_SCALE * EnemyLooks.scale_of(id)
-	if id == "brute":
-		h *= 1.2
-	return h + 0.35
+	return EnemyLooks.hud_height(id) * UNIT_SCALE + 0.35
 
 
 func _rise(ch: Character, id: String, hud: UnitHud, delay: float) -> void:
@@ -258,6 +261,79 @@ func set_enemy(i: int, d: Dictionary) -> void:
 	for k in d:
 		data[i][k] = d[k]
 	huds[i].set_data(data[i], true)
+	if d.has("traits") or d.has("hp"):
+		refresh_wards()
+
+
+# --- ward (Bone Warden phase 2): a shimmering dome while any summoned ally stands -----------
+
+var _wards: Dictionary = {}  # enemy index -> MeshInstance3D
+
+
+## Shows or hides each warded enemy's dome from the current data (traits + living summons).
+func refresh_wards() -> void:
+	var summons := false
+	for k in data.size():
+		if bool(data[k].get("summoned", false)) and int(data[k].get("hp", 0)) > 0:
+			summons = true
+	for k in data.size():
+		var on := summons and "ward" in (data[k].get("traits", []) as Array) and int(data[k].get("hp", 0)) > 0
+		if on and not _wards.has(k) and k < enemies.size():
+			_wards[k] = _ward_dome(enemies[k], String(data[k].get("id", "")))
+		elif not on and _wards.has(k):
+			var dome: MeshInstance3D = _wards[k]
+			_wards.erase(k)
+			if is_instance_valid(dome):
+				var t := dome.create_tween()
+				t.tween_property(dome, "scale", Vector3.ONE * 1.3, 0.25)
+				t.parallel().tween_property(dome, "transparency", 1.0, 0.25)
+				t.tween_callback(dome.queue_free)
+
+
+func flash_ward(i: int) -> void:
+	if not _wards.has(i):
+		return
+	var dome: MeshInstance3D = _wards[i]
+	if is_instance_valid(dome):
+		var m := dome.material_override as StandardMaterial3D
+		var t := dome.create_tween()
+		t.tween_property(m, "emission_energy_multiplier", 3.0, 0.06)
+		t.tween_property(m, "emission_energy_multiplier", 0.9, 0.3)
+
+
+func _ward_dome(ch: Character, _id: String) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.name = "WardDome"
+	var sm := SphereMesh.new()
+	# child of the figure (local units, so it follows relayouts)
+	var r := 1.25
+	sm.radius = r
+	sm.height = r * 2.0
+	sm.radial_segments = 24
+	sm.rings = 12
+	mi.mesh = sm
+	var m := StandardMaterial3D.new()
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.albedo_color = Color(0.7, 0.5, 1.0, 0.12)
+	m.emission_enabled = true
+	m.emission = Color(0.6, 0.35, 1.0)
+	m.emission_energy_multiplier = 0.9
+	m.rim_enabled = true
+	m.rim = 1.0
+	m.rim_tint = 0.2
+	m.cull_mode = BaseMaterial3D.CULL_BACK
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+	mi.material_override = m
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	ch.add_child(mi)
+	mi.position = Vector3.UP * r * 0.75
+	mi.scale = Vector3.ONE * 0.01
+	var t := mi.create_tween()
+	t.tween_property(mi, "scale", Vector3.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	var p := mi.create_tween().set_loops()
+	p.tween_property(m, "albedo_color:a", 0.2, 0.9).set_trans(Tween.TRANS_SINE)
+	p.tween_property(m, "albedo_color:a", 0.1, 0.9).set_trans(Tween.TRANS_SINE)
+	return mi
 
 
 ## Moves the target marker under enemy i.
@@ -295,7 +371,7 @@ func enemy_attack(i: int) -> void:
 	var id := String(data[i].get("id", ""))
 	var home := ch.global_position
 	var ranged := id in ["skeleton_archer", "cultist", "boss_lich", "mini_grave_mage"]
-	var lunge := home + (hero.global_position - home).normalized() * (0.2 if ranged else 0.9)
+	var lunge := home + (hero_home - home).normalized() * (0.2 if ranged else 0.9)
 	var t := ch.create_tween().set_speed_scale(speed)
 	t.tween_property(ch, "global_position", lunge, 0.18).set_trans(Tween.TRANS_SINE)
 	var clip := EnemyLooks.clip(id, "attack")
@@ -304,7 +380,7 @@ func enemy_attack(i: int) -> void:
 	await get_tree().create_timer((0.32) / speed, false).timeout
 	if ranged:
 		var col := Color(0.7, 0.4, 1.0) if id != "skeleton_archer" else Color(1.0, 0.9, 0.7)
-		await Fx.projectile(self, ch.global_position + Vector3.UP * 1.1, hero.global_position + Vector3.UP * 0.8, col, 0.28 / speed)
+		await Fx.projectile(self, ch.global_position + Vector3.UP * 1.1, hero_home + Vector3.UP * 0.8, col, 0.28 / speed)
 	var back := ch.create_tween().set_speed_scale(speed)
 	back.tween_property(ch, "global_position", home, 0.3).set_trans(Tween.TRANS_SINE).set_delay(0.1)
 
@@ -325,7 +401,7 @@ func enemy_hit(i: int, amount: int, crit := false, blocked := 0) -> void:
 		Fx.damage_number(self, num_pos, amount, crit)
 		Audio.play_sfx("crit" if crit else "hit")
 		_flash_white(ch, id)
-		var dir := (ch.global_position - hero.global_position)
+		var dir := (ch.global_position - hero_home)
 		dir.y = 0.0
 		dir = dir.normalized()
 		var home := _slot(i, enemies.size())
@@ -350,6 +426,8 @@ func enemy_die(i: int) -> void:
 		return
 	var ch := enemies[i]
 	var id := String(data[i].get("id", ""))
+	data[i]["hp"] = 0
+	refresh_wards()
 	var hud := huds[i]
 	var ht := hud.create_tween().set_speed_scale(speed)
 	ht.tween_method(hud.set_opacity, 1.0, 0.0, 0.3)
@@ -403,7 +481,7 @@ func hero_attack(target_i: int, style := "") -> void:
 			hero.play_once("attack" if style == "ranged" else "Ranged_Magic_Shoot", "idle", 0.05, 1.2)
 			await get_tree().create_timer((0.25) / speed, false).timeout
 			var col := Color(0.5, 0.75, 1.0) if style == "magic" else Color(1.0, 0.9, 0.7)
-			await Fx.projectile(self, hero.global_position + Vector3.UP * 1.0 + facing * 0.4,
+			await Fx.projectile(self, hero_home + Vector3.UP * 1.0 + facing * 0.4,
 				ch.global_position + Vector3.UP * 0.9, col, 0.3 / speed)
 
 
@@ -431,9 +509,9 @@ func _return_hero(delay: float) -> void:
 func hero_hit(amount: int, blocked := 0) -> void:
 	if hero == null:
 		return
-	var top := hero.global_position + Vector3.UP * 1.4
+	var top := hero_home + Vector3.UP * 1.4
 	if blocked > 0:
-		Fx.block_flash(self, hero.global_position + Vector3.UP * 0.8, 0.85)
+		Fx.block_flash(self, hero_home + Vector3.UP * 0.8, 0.85)
 		Audio.play_sfx("block")
 		if amount <= 0:
 			Fx.popup_text(self, top + Vector3.UP * 0.5, "BLOCK", Fx.BLOCK_COLOR, 0.8)
@@ -458,6 +536,10 @@ func clear() -> void:
 	enemies.clear()
 	huds.clear()
 	data.clear()
+	for k in _wards:
+		if is_instance_valid(_wards[k]):
+			_wards[k].queue_free()
+	_wards.clear()
 	if _target_ring:
 		_target_ring.queue_free()
 		_target_ring = null
@@ -483,13 +565,12 @@ func _face(ch: Node3D, at: Vector3, time: float) -> void:
 
 
 func _flash_white(ch: Character, id: String) -> void:
-	var d := EnemyLooks.def(id)
-	ch.set_tint(d.tint, float(d.strength), Color(0.9, 0.85, 0.8))
+	EnemyLooks.retint(ch, id, Color(0.9, 0.85, 0.8))
 	var t := ch.create_tween().set_speed_scale(speed)
 	t.tween_interval(0.08)
 	t.tween_callback(func() -> void:
 		if is_instance_valid(ch):
-			ch.set_tint(d.tint, float(d.strength), d.get("emission", Color.BLACK)))
+			EnemyLooks.retint(ch, id))
 
 
 var _arena_mi: MeshInstance3D

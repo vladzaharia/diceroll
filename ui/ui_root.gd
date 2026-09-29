@@ -35,6 +35,7 @@ var portal: PortalBanner
 var pause: PauseMenu
 var settings: SettingsPanel
 var summary: SummaryScreen
+var route_card: RouteCard
 
 var _flow: GameFlow
 var _modals: Array[UiModal] = []
@@ -60,7 +61,8 @@ func _init() -> void:
 	class_select = ClassSelect.new()
 	pause = PauseMenu.new()
 	settings = SettingsPanel.new()
-	for c in [board_hud, combat_hud, portal, banner, draft, passive, rune_assign, shop, forge, event, summary, inspector, title, class_select, pause, settings]:
+	route_card = RouteCard.new()
+	for c in [board_hud, combat_hud, portal, banner, draft, passive, rune_assign, shop, forge, event, summary, inspector, title, class_select, route_card, pause, settings]:
 		add_child(c)
 	_modals = [draft, passive, rune_assign, shop, forge, event, summary]
 	board_hud.visible = false
@@ -133,6 +135,14 @@ func open_pause() -> void:
 		pause.refresh(_flow)
 	pause.open()
 	menu.emit("pause", null)
+
+
+## Run-start route card; returns when BEGIN is pressed (or after `auto_close` seconds).
+func show_route(flow: GameFlow, auto_close := 0.0) -> void:
+	route_card.auto_close = auto_close
+	route_card.refresh(flow)
+	route_card.open()
+	await route_card.begin_pressed
 
 
 func open_settings() -> void:
