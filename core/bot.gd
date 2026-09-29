@@ -551,8 +551,14 @@ static func _combo(vals: PackedInt32Array, wild_mask: int) -> Array:
 	_combo_cache[key] = out
 	return out
 
-const _KIND_MULT := [0.0, 0.0, 1.5, 2.5, 5.0, 10.0, 15.0]
+## Multiplier by set size (from Combo.TABLE, so the model always matches the rules).
+static var _KIND_MULT := [0.0, 0.0, float(Combo.TABLE.pair.mult), float(Combo.TABLE.three_kind.mult),
+	float(Combo.TABLE.four_kind.mult), float(Combo.TABLE.five_kind.mult), float(Combo.TABLE.six_kind.mult)]
 const _KIND_ID := ["", "", "pair", "three_kind", "four_kind", "five_kind", "six_kind"]
+const FH_MULT: float = Combo.TABLE.full_house.mult
+const TP_MULT: float = Combo.TABLE.two_pair.mult
+const ST_MULT: float = Combo.TABLE.straight.mult
+const SST_MULT: float = Combo.TABLE.small_straight.mult
 
 ## Mask of the first k dice showing value v.
 static func _first(vals: PackedInt32Array, n: int, v: int, k: int) -> int:
@@ -595,15 +601,15 @@ static func _eval_fixed(vals: PackedInt32Array, n: int) -> Array:
 				continue
 			if cnt[a] >= 3:
 				var s := 3 * a + 2 * b
-				if 3.5 > bm or (3.5 == bm and s > bs):
-					bm = 3.5
+				if FH_MULT > bm or (FH_MULT == bm and s > bs):
+					bm = FH_MULT
 					bs = s
 					bg = _first(vals, n, a, 3) | _first(vals, n, b, 2)
 					bid = "full_house"
 			if a > b:
 				var s2 := 2 * a + 2 * b
-				if 2.0 > bm or (2.0 == bm and s2 > bs):
-					bm = 2.0
+				if TP_MULT > bm or (TP_MULT == bm and s2 > bs):
+					bm = TP_MULT
 					bs = s2
 					bg = _first(vals, n, a, 2) | _first(vals, n, b, 2)
 					bid = "two_pair"
@@ -622,7 +628,7 @@ static func _eval_fixed(vals: PackedInt32Array, n: int) -> Array:
 				s3 += v
 			if not ok:
 				continue
-			var m3 := 3.0 if length == 5 else 2.5
+			var m3 := ST_MULT if length == 5 else SST_MULT
 			if m3 > bm or (m3 == bm and s3 > bs):
 				bm = m3
 				bs = s3
@@ -1850,8 +1856,9 @@ static func _fight_loss(f: GameFlow, rules: AutoRules, ids: Array, elite: bool) 
 		var sid := String(id)
 		var boss := EnemyDefs.is_boss(sid)
 		var scale := 1.0 if boss else Balance.enemy_scale(run.eff_lap())
+		var ascale := 1.0 if boss else Balance.enemy_atk_scale(run.eff_lap())
 		var hm := scale * (Balance.ELITE_HP_MULT if elite else 1.0)
-		var am := scale * (Balance.ELITE_ATK_MULT if elite else 1.0)
+		var am := ascale * (Balance.ELITE_ATK_MULT if elite else 1.0)
 		hps.append(float(EnemyDefs.def(sid).hp) * hm)
 		atks.append(_avg_attack(sid, am, 0))
 	var order := range(hps.size())

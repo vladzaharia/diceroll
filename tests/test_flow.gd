@@ -188,37 +188,48 @@ func test_enemy_fight_win_clears_tile() -> void:
 	f.choose_move(0)
 	assert_eq(f.phase, P.BOARD_READY)
 
-func test_level_up_drafts_queue() -> void:
+func test_level_up_is_automatic() -> void:
 	var f := _flow()
 	_blank(f)
 	_put(f, 3, Board.make_tile("enemy", ["brute"]))
-	# brute gives 9 XP: start just below the level-2 threshold so it crosses levels 2 and 3
-	f.run.xp = Balance.xp_for_level(2) - 9
+	# brute gives 9 XP: start just below the level-2 threshold
+	f.run.xp = Balance.xp_for_level(1) - 5
+	f.run.hp = 30
+	var hp0 := f.run.max_hp
 	_force_roll(f, 3)
 	f.choose_move(0)
 	var ev := _win_fight(f)
-	var lv := []
+	var lv: Array = []
 	for e in ev:
 		if e.type == "level_up":
 			lv.append(e.level)
-	assert_eq(lv, [2, 3])
-	assert_eq(f.phase, P.DRAFT)
-	assert_eq(f.offer.kind, "draft")
-	assert_eq(f.offer.options.size(), 3)
-	# pick until both drafts resolved (handle follow-up modals)
-	var guard := 0
-	var drafts := 0
-	while f.phase != P.BOARD_READY and guard < 10:
-		guard += 1
-		if f.offer.kind == "draft":
-			drafts += 1
-			f.pick_draft(0)
-		elif f.offer.kind == "rune_assign":
-			f.rune_assign(1)
-		elif f.offer.kind == "forge":
-			f.forge_apply(0, 0, "raise")
-	assert_eq(drafts, 2)
-	assert_eq(f.phase, P.BOARD_READY)
+			assert_eq(e.auto, true)
+			assert_eq(e.max_hp_gained, Balance.LEVEL_MAX_HP)
+	assert_eq(lv, [2])
+	assert_eq(f.run.max_hp, hp0 + Balance.LEVEL_MAX_HP)
+	assert_true(f.run.hp > 30 + Balance.LEVEL_MAX_HP, "the level heals")
+	assert_eq(f.phase, P.BOARD_READY, "no draft: fights pay gold and XP only")
+
+func test_levels_are_slow() -> void:
+	# about 5-7 levels per full run: the XP curve is steep
+	assert_true(Balance.xp_for_level(1) >= 30)
+	assert_true(Balance.xp_for_level(6) - Balance.xp_for_level(5) >= 60)
+
+func test_upgrades_counted_by_source() -> void:
+	var f := _flow()
+	f.run.gold = 999
+	var ev: Array[Dictionary] = []
+	f._open_rune_choice("chest", ev)
+	f.pick_draft(0)
+	assert_eq(f.offer.source, "chest")
+	f.rune_assign(0)
+	assert_eq(f.run.stats.upgrades, {"chest": 1})
+	f.debug_open("shop")
+	for k in f.offer.items.size():
+		if f.offer.items[k].id != "potion" and not f.offer.items[k].needs_die:
+			f.shop_buy(k)
+			break
+	assert_eq(int(f.run.stats.upgrades.get("shop", 0)), 1)
 
 func _draft_with(f: GameFlow, option: Dictionary) -> void:
 	f.phase = P.DRAFT
@@ -243,7 +254,7 @@ func test_draft_options() -> void:
 	_draft_with(f, {"id": "rune", "label": "", "desc": "", "rune": "blade"})
 	f.pick_draft(0)
 	assert_eq(f.phase, P.DRAFT)
-	assert_eq(f.offer, {"kind": "rune_assign", "rune": "blade"})
+	assert_eq(f.offer, {"kind": "rune_assign", "rune": "blade", "source": "level"})
 	assert_eq(f.pick_draft(0)[0].type, "error", "not a draft offer")
 	assert_eq(f.rune_assign(9)[0].type, "error")
 	f.rune_assign(2)

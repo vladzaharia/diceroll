@@ -79,10 +79,15 @@ const GOLD_LAP_STEP := 0.05
 ## Chance an elite's passive reward is a boss-tier choice instead of a regular one.
 const ELITE_BOSS_PASSIVE_CHANCE := 0.15
 
-# Progression
+# Progression. Levels are automatic and slow (about 5-7 per full run): each gives
+# LEVEL_MAX_HP max HP and heals LEVEL_MAX_HP + LEVEL_HEAL_PCT of max HP. No drafts from kills:
+# upgrades come from shops, events, chests, minigames, elites and the mini-boss.
+const LEVEL_MAX_HP := 5
+const LEVEL_HEAL_PCT := 0.10
+## Legacy level-up draft option (debug scenarios only).
 const DRAFT_MAX_HP := 8
-const XP_THRESHOLDS := [6, 14, 24, 36, 50]
-const XP_STEP_AFTER := 18
+const XP_THRESHOLDS := [40, 90, 150, 220, 300, 390]
+const XP_STEP_AFTER := 100
 
 # Shop
 ## Dice prices live in DiceKinds.DEFS[kind].price.
@@ -141,14 +146,28 @@ static func act_for_lap(lap: int) -> int:
 	return a
 
 static func is_shop_lap(completed_lap: int) -> bool:
+	if tune_shop != "":
+		return Array(tune_shop.split(",")).has(str(completed_lap))
 	return completed_lap % SHOP_EVERY == 0 or BIOME_LAPS.has(completed_lap + 1)
 
 ## TEMP tuning dials (sim sweeps)
 static var tune_hp := 1.0
 static var tune_atk := 1.0
+static var tune_boss := 1.0
+static var tune_base := ENEMY_BASE_SCALE
+static var tune_step := ENEMY_LAP_STEP
+static var tune_gold := 1.0
+static var tune_shop := "" # "" = default cadence; else comma list of completed laps
 
+static var tune_atk_step := -1.0
+
+## Enemy HP multiplier at `lap`.
 static func enemy_scale(lap: int) -> float:
-	return ENEMY_BASE_SCALE + ENEMY_LAP_STEP * (lap - 1)
+	return tune_base + tune_step * (lap - 1)
+
+## Enemy attack multiplier at `lap` (grows slower than HP late: long fights, fewer one-shots).
+static func enemy_atk_scale(lap: int) -> float:
+	return tune_base + (tune_step if tune_atk_step < 0.0 else tune_atk_step) * (lap - 1)
 
 static func gold_scale(lap: int) -> float:
 	return 1.0 + GOLD_LAP_STEP * (lap - 1)

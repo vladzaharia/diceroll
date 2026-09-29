@@ -7,9 +7,9 @@ extends RefCounted
 ## Best combo = highest multiplier; ties go to the higher group pip sum.
 
 const TABLE := {
-	"six_kind": {"name": "Six of a Kind", "mult": 15.0},
-	"five_kind": {"name": "Five of a Kind", "mult": 10.0},
-	"four_kind": {"name": "Four of a Kind", "mult": 5.0},
+	"six_kind": {"name": "Six of a Kind", "mult": 8.0},
+	"five_kind": {"name": "Five of a Kind", "mult": 6.0},
+	"four_kind": {"name": "Four of a Kind", "mult": 4.0},
 	"full_house": {"name": "Full House", "mult": 3.5},
 	"straight": {"name": "Straight", "mult": 3.0},
 	"small_straight": {"name": "Small Straight", "mult": 2.5},

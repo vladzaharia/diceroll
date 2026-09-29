@@ -607,12 +607,10 @@ func _on_combat_won(ev: Array[Dictionary]) -> void:
 		return
 	var front: Array[Dictionary] = []
 	run.xp += c.xp_reward
-	while run.xp >= Balance.xp_for_level(run.level):
-		run.level += 1
-		ev.append({"type": "level_up", "level": run.level, "xp": run.xp, "next": Balance.xp_for_level(run.level)})
-		front.append({"kind": "draft"})
-	# After the level-up drafts: the mini-boss gives 1 of 3 boss passives; elites give 1 of 3
-	# regular passives, or (ELITE_BOSS_PASSIVE_CHANCE) 1 of 3 boss passives.
+	_level_ups(ev)
+	# Fights pay gold, XP and pet charge only (Vlad, 2026-09-28: no upgrade drafts from kills).
+	# The upgrade rewards: the mini-boss gives 1 of 3 boss passives; elites give 1 of 3 regular
+	# passives, or (ELITE_BOSS_PASSIVE_CHANCE) 1 of 3 boss passives.
 	if c.miniboss:
 		front.append({"kind": "passive_choice", "source": "miniboss"})
 	elif c.elite:
@@ -621,6 +619,26 @@ func _on_combat_won(ev: Array[Dictionary]) -> void:
 		front.append({"kind": "passive_choice", "source": "elite", "tier": tier})
 	front.append_array(pending)
 	pending = front
+
+## Automatic, slow levels (no choice): each level gives LEVEL_MAX_HP max HP and heals
+## LEVEL_MAX_HP + LEVEL_HEAL_PCT of max HP. Emits level_up {level, xp, next, auto:true,
+## max_hp_gained, healed} + hp_changed {source:"level"} per level.
+func _level_ups(ev: Array[Dictionary]) -> void:
+	while run.xp >= Balance.xp_for_level(run.level):
+		run.level += 1
+		run.max_hp += Balance.LEVEL_MAX_HP
+		var h := run.heal(Balance.LEVEL_MAX_HP + run.pct_of_max(Balance.LEVEL_HEAL_PCT))
+		ev.append({"type": "level_up", "level": run.level, "xp": run.xp, "next": Balance.xp_for_level(run.level),
+			"auto": true, "max_hp_gained": Balance.LEVEL_MAX_HP, "healed": h})
+		ev.append({"type": "hp_changed", "amount": h, "total": run.hp, "source": "level", "max_hp": run.max_hp})
+
+## Counts one in-run upgrade (die, rune, face edit, passive, reroll, stat) by source for the
+## balance report: run.stats.upgrades {source: n}. Sources: shop, event, chest, minigame,
+## elite, miniboss, forge (the Forge tile), whetstone, boss.
+func _upgrade(source: String) -> void:
+	var u: Dictionary = run.stats.get("upgrades", {})
+	u[source] = int(u.get(source, 0)) + 1
+	run.stats["upgrades"] = u
 
 func _finish(victory: bool, ev: Array[Dictionary]) -> void:
 	combat = null
@@ -801,20 +819,25 @@ func pick_draft(i: int) -> Array[Dictionary]:
 	var opt: Dictionary = offer.options[i]
 	var is_passive := String(offer.kind) == "passive"
 	var is_reward := String(offer.kind) == "reward"
+	var source := String(offer.get("source", ""))
 	_close_offer(ev)
 	if is_reward:
 		_pick_reward(opt, ev)
 		_advance(ev)
 		return ev
 	if is_passive:
+		if not run.has_passive(String(opt.id)):
+			_upgrade(source)
 		_gain_passive(String(opt.id), ev)
 		_advance(ev)
 		return ev
+	if not ["rune", "face_raise"].has(String(opt.id)):
+		_upgrade(source)
 	match String(opt.id):
 		"new_die":
 			_add_die(ev, String(opt.get("kind", "standard")))
 		"rune":
-			_set_offer({"kind": "rune_assign", "rune": String(opt.rune)}, Phase.DRAFT, ev)
+			_set_offer({"kind": "rune_assign", "rune": String(opt.rune), "source": source}, Phase.DRAFT, ev)
 		"max_hp":
 			run.max_hp += Balance.DRAFT_MAX_HP
 			var h := run.heal(Balance.DRAFT_MAX_HP)
@@ -823,7 +846,7 @@ func pick_draft(i: int) -> Array[Dictionary]:
 			run.combat_rerolls = mini(Balance.MAX_COMBAT_REROLLS, run.combat_rerolls + 1)
 			ev.append({"type": "stat_changed", "stat": "combat_rerolls", "value": run.combat_rerolls})
 		"face_raise":
-			_set_offer({"kind": "forge", "ops": ["raise"], "source": "draft"}, Phase.FORGE, ev)
+			_set_offer({"kind": "forge", "ops": ["raise"], "source": source if source != "" else "draft"}, Phase.FORGE, ev)
 	_advance(ev)
 	return ev
 
@@ -854,6 +877,7 @@ func rune_assign(die_idx: int) -> Array[Dictionary]:
 	_record(["rune_assign", die_idx])
 	var ev: Array[Dictionary] = []
 	var rune := String(offer.rune)
+	_upgrade(String(offer.get("source", "")))
 	_close_offer(ev)
 	_assign_rune(die_idx, rune, ev)
 	_advance(ev)
@@ -992,6 +1016,8 @@ func shop_buy(i: int, die_idx := -1) -> Array[Dictionary]:
 	run.gold -= int(item.price)
 	ev.append({"type": "gold_changed", "amount": -int(item.price), "total": run.gold, "source": "shop"})
 	item.sold = true
+	if String(item.id) != "potion":
+		_upgrade("shop")
 	match String(item.id):
 		"die":
 			_add_die(ev, String(item.get("kind", "standard")))
@@ -1060,6 +1086,9 @@ func forge_apply(die_idx: int, face_idx: int, op: String, src_face := -1) -> Arr
 			return [_e("bad mirror source")]
 	_record(["forge_apply", die_idx, face_idx, op, src_face])
 	var ev: Array[Dictionary] = []
+	if op != "skip":
+		var fs := String(offer.get("source", "tile"))
+		_upgrade("forge" if fs == "tile" else fs)
 	if op == "raise":
 		run.dice[die_idx].raise_face(face_idx)
 		ev.append(_face_ev(die_idx, face_idx))
@@ -1146,6 +1175,8 @@ func event_choose(i: int) -> Array[Dictionary]:
 	var ev: Array[Dictionary] = []
 	var id := String(offer.id)
 	_close_offer(ev)
+	if (id == "shrine" and String(choice.get("blessing", "")) != "gold") or (id == "dicesmith" and choice.has("kind")) or (id == "idol" and i == 0):
+		_upgrade("event")
 	match id:
 		"shrine":
 			if choice.has("passive"):
@@ -1194,7 +1225,7 @@ func event_choose(i: int) -> Array[Dictionary]:
 				var before := run.hp
 				run.hp = mini(run.hp, run.max_hp)
 				ev.append({"type": "hp_changed", "amount": run.hp - before, "total": run.hp, "source": "merchant", "max_hp": run.max_hp})
-				_set_offer({"kind": "rune_assign", "rune": _rand_rune("rare")}, Phase.DRAFT, ev)
+				_set_offer({"kind": "rune_assign", "rune": _rand_rune("rare"), "source": "event"}, Phase.DRAFT, ev)
 		"dicesmith":
 			if choice.has("kind"):
 				if run.dice.size() < run.max_dice():
@@ -1501,11 +1532,13 @@ func _pick_reward(opt: Dictionary, ev: Array[Dictionary]) -> void:
 		"rune_choice":
 			_open_rune_choice("minigame", ev, 2)
 		"new_die":
+			_upgrade("minigame")
 			if run.dice.size() < run.max_dice():
 				_add_die(ev, String(opt.kind))
 			else:
 				_reforge_die(ev, _weakest_die(), String(opt.kind))
 		"reroll_boost":
+			_upgrade("minigame")
 			run.pet_state["boost"] = int(opt.get("fights", MinigameDefs.REROLL_BOOST_FIGHTS))
 			ev.append({"type": "stat_changed", "stat": "reroll_boost", "value": int(run.pet_state.boost)})
 		"passive_common":

@@ -75,8 +75,9 @@ static func make_enemy(rng: Rng, id: String, p_act: int, p_lap: int, p_elite: bo
 	var is_boss := EnemyDefs.is_boss(id)
 	var def := EnemyDefs.def(id)
 	var scale := 1.0 if is_boss else Balance.enemy_scale(p_lap)
-	var hp_mult := scale * (Balance.ELITE_HP_MULT if p_elite else 1.0) * Balance.tune_hp
-	var atk_mult := scale * (Balance.ELITE_ATK_MULT if p_elite else 1.0) * Balance.tune_atk
+	var hp_mult := scale * (Balance.ELITE_HP_MULT if p_elite else 1.0) * Balance.tune_hp * (Balance.tune_boss if is_boss else 1.0)
+	var atk_scale := 1.0 if is_boss else Balance.enemy_atk_scale(p_lap)
+	var atk_mult := atk_scale * (Balance.ELITE_ATK_MULT if p_elite else 1.0) * Balance.tune_atk
 	var hp := int(round(float(def.hp) * hp_mult))
 	var step := 0
 	if not is_boss and def.mode == "cycle":
@@ -786,7 +787,7 @@ func _win(run: RunState) -> Array[Dictionary]:
 		x += float(def.xp) * m
 	if run.has_passive("scholar"):
 		x *= Balance.PASSIVE_SCHOLAR
-	gold_reward = int(round(g))
+	gold_reward = int(round(g * Balance.tune_gold))
 	xp_reward = int(round(x))
 	var ev: Array[Dictionary] = [{"type": "combat_won", "gold": gold_reward, "xp": xp_reward, "boss": boss, "elite": elite, "miniboss": miniboss}]
 	ev.append_array(restore_chaos(run))

@@ -18,13 +18,13 @@ func _check(values: Array, id: String, mult: float, group: Array, wild: Array = 
 	assert_eq(g, eg, "group for %s" % str(values))
 
 func test_six_of_a_kind() -> void:
-	_check([6, 6, 6, 6, 6, 6], "six_kind", 15.0, [0, 1, 2, 3, 4, 5])
+	_check([6, 6, 6, 6, 6, 6], "six_kind", 8.0, [0, 1, 2, 3, 4, 5])
 
 func test_five_of_a_kind() -> void:
-	_check([3, 3, 1, 3, 3, 3], "five_kind", 10.0, [0, 1, 3, 4, 5])
+	_check([3, 3, 1, 3, 3, 3], "five_kind", 6.0, [0, 1, 3, 4, 5])
 
 func test_four_of_a_kind() -> void:
-	_check([2, 2, 5, 2, 2], "four_kind", 5.0, [0, 1, 3, 4])
+	_check([2, 2, 5, 2, 2], "four_kind", 4.0, [0, 1, 3, 4])
 
 func test_full_house() -> void:
 	_check([4, 2, 4, 2, 4], "full_house", 3.5, [0, 1, 2, 3, 4])
@@ -66,12 +66,12 @@ func test_tie_break_higher_pair() -> void:
 
 func test_six_dice_hands() -> void:
 	_check([1, 2, 3, 4, 5, 6], "straight", 3.0, [1, 2, 3, 4, 5])
-	_check([4, 4, 4, 4, 2, 2], "four_kind", 5.0, [0, 1, 2, 3])
+	_check([4, 4, 4, 4, 2, 2], "four_kind", 4.0, [0, 1, 2, 3])
 	_check([2, 2, 2, 6, 6, 6], "full_house", 3.5, [3, 4, 5, 0, 1])
-	_check([3, 3, 3, 3, 3, 3], "six_kind", 15.0, [0, 1, 2, 3, 4, 5])
+	_check([3, 3, 3, 3, 3, 3], "six_kind", 8.0, [0, 1, 2, 3, 4, 5])
 
 func test_wild_completes_five_of_a_kind() -> void:
-	_check([6, 6, 1, 6, 6], "five_kind", 10.0, [0, 1, 2, 3, 4], [false, false, true, false, false])
+	_check([6, 6, 1, 6, 6], "five_kind", 6.0, [0, 1, 2, 3, 4], [false, false, true, false, false])
 	var c := _ev([6, 6, 1, 6, 6], [false, false, true, false, false])
 	assert_eq(c.values[2], 6, "wild takes value 6")
 
@@ -142,8 +142,8 @@ func test_blank_breaks_straight() -> void:
 func test_high_value_sets() -> void:
 	_check([7, 7, 8, 8, 9], "two_pair", 2.0, [0, 1, 2, 3])
 	_check([7, 7, 8, 8, 8], "full_house", 3.5, [0, 1, 2, 3, 4])
-	_check([9, 9, 9, 9, 2], "four_kind", 5.0, [0, 1, 2, 3])
-	_check([9, 9, 9, 9, 9], "five_kind", 10.0, [0, 1, 2, 3, 4])
+	_check([9, 9, 9, 9, 2], "four_kind", 4.0, [0, 1, 2, 3])
+	_check([9, 9, 9, 9, 9], "five_kind", 6.0, [0, 1, 2, 3, 4])
 
 func test_full_house_prefers_higher_sum() -> void:
 	var c := _ev([7, 7, 9, 9, 9])

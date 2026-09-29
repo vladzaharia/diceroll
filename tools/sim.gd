@@ -37,6 +37,9 @@ var item_runs := [0, 0]
 var track_items := false
 ## --items also tallies the combo of every attack: name -> count.
 var combos := {}
+## In-run upgrades by source (run.stats.upgrades) summed over every run, and gold earned.
+var upgrades := {}
+var gold_sum := 0
 
 func _init() -> void:
 	var runs := 100
@@ -109,6 +112,18 @@ func _init() -> void:
 			Balance.tune_hp = arg.substr(10).to_float()
 		elif arg.begins_with("--tune-atk="):
 			Balance.tune_atk = arg.substr(11).to_float()
+		elif arg.begins_with("--tune-boss="):
+			Balance.tune_boss = arg.substr(12).to_float()
+		elif arg.begins_with("--tune-base="):
+			Balance.tune_base = arg.substr(12).to_float()
+		elif arg.begins_with("--tune-atk-step="):
+			Balance.tune_atk_step = arg.substr(16).to_float()
+		elif arg.begins_with("--tune-step="):
+			Balance.tune_step = arg.substr(12).to_float()
+		elif arg.begins_with("--tune-gold="):
+			Balance.tune_gold = arg.substr(12).to_float()
+		elif arg.begins_with("--tune-shop="):
+			Balance.tune_shop = arg.substr(12)
 		elif arg == "--items":
 			track_items = true
 		elif arg == "--verbose":
@@ -194,6 +209,12 @@ func _init() -> void:
 			potions_sum += int(f.run.stats.get("potions_used", 0))
 			mg_sum += int(f.run.stats.get("minigames_played", 0))
 			pet_sum += int(f.run.stats.get("pet_actions", 0))
+			gold_sum += int(f.run.stats.get("gold_earned", 0))
+			var up: Dictionary = f.run.stats.get("upgrades", {})
+			for k in up:
+				upgrades[k] = int(upgrades.get(k, 0)) + int(up[k])
+		# machine-readable row for shard aggregation (tools: sum wins/runs over shards)
+		print("#row %s %d %d %d %d %d" % [c, wins, runs, level_sum, fights_won_sum, act_sum])
 		all_wins += wins
 		all_runs += runs
 		rows.append([c, 100.0 * wins / runs, float(act_sum) / runs, float(board_turns) / runs,
@@ -217,6 +238,7 @@ func _init() -> void:
 	_table("final boss", by_boss)
 	_table("route / final boss", by_combo)
 	_table("mini-boss", by_mini, false)
+	_upgrades_table(all_runs)
 	if track_items:
 		_items_table()
 	print("")
@@ -417,6 +439,23 @@ func _fmt(d: Dictionary) -> String:
 	for k in keys:
 		parts.append("%s:%d" % [k, d[k]])
 	return " ".join(parts)
+
+## Upgrades per run by source (shop, event, chest, minigame, elite, miniboss, forge, whetstone).
+func _upgrades_table(n: int) -> void:
+	if n <= 0:
+		return
+	print("")
+	print("| upgrade source | per run |")
+	print("|---|---|")
+	var keys := upgrades.keys()
+	keys.sort_custom(func(a, b): return int(upgrades[a]) > int(upgrades[b]))
+	var tot := 0
+	for k in keys:
+		tot += int(upgrades[k])
+		print("| %s | %.2f |" % [k, float(upgrades[k]) / n])
+		print("#up %s %d %d" % [k, int(upgrades[k]), n])
+	print("| total | %.2f |" % (float(tot) / n))
+	print("gold earned per run: %.0f" % (float(gold_sum) / n))
 
 # ------------------------------------------------------------------ build items (--items)
 
