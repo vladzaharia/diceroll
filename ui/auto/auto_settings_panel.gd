@@ -10,7 +10,7 @@ signal rules_changed(rules: AutoRules)
 const SCOPES := [["board", "Board", "dice"], ["combat", "Combat", "sword"], ["drafts", "Drafts", "star"],
 	["shop", "Shop", "coin"], ["forge", "Forge", "anvil"], ["events", "Events", "question"], ["portal", "Portal", "portal"]]
 const STOPS := [["stop_before_miniboss", "Before the mini-boss", "skull"], ["stop_before_boss", "Before the final boss", "crown"],
-	["stop_on_boss_passive", "A boss passive is offered", "star"], ["stop_on_shop", "At shops AUTO skips", "coin"]]
+	["stop_on_boss_passive", "A boss passive is offered", "star"], ["stop_on_shop", "At a shop (Shop is off)", "coin"]]
 const FOCUS_LABELS := {"balanced": "Balanced", "damage": "Damage", "defense": "Defense", "economy": "Economy"}
 const MINIBOSS_LABELS := {"auto": "If winnable", "always": "Always", "never": "Avoid"}
 ## AutoRules.skill (when core has it): how sharp AUTO plays.
@@ -43,7 +43,7 @@ func _build() -> void:
 	_cols = HBoxContainer.new()
 	_cols.add_theme_constant_override("separation", 34)
 	body.add_child(_cols)
-	_left = UiTheme.vbox(14)
+	_left = UiTheme.vbox(10)
 	_left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_right = UiTheme.vbox(10)
 	_right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -61,7 +61,7 @@ func _build() -> void:
 		var b := GameButton.make(s[1], s[2], GameButton.Kind.SECONDARY, 24)
 		b.toggle_mode = true
 		b.toggle_primary = true
-		b.min_height = 70
+		b.min_height = 60
 		b.pad_x = 18
 		b.icon_px = 28
 		b.toggled.connect(_on_scope.bind(String(s[0]), b))
@@ -69,7 +69,6 @@ func _build() -> void:
 		_scope_btns[s[0]] = b
 
 	# --- focus
-	_left.add_child(UiTheme.spacer(2))
 	_left.add_child(section_label("Focus"))
 	_left.add_child(_segmented(AutoRules.FOCUSES, FOCUS_LABELS, _focus_btns, _on_focus))
 	_left.add_child(section_label("Mini-boss fight"))
@@ -97,11 +96,16 @@ func _build() -> void:
 	_hp_slider.min_value = 0.0
 	_hp_slider.max_value = HP_MAX
 	_hp_slider.step = 0.05
-	_hp_slider.custom_minimum_size = Vector2(200, 52)
+	_hp_slider.custom_minimum_size = Vector2(200, 40)
 	_hp_slider.focus_mode = Control.FOCUS_NONE
 	_hp_slider.value_changed.connect(_on_hp)
 	_hp_slider.drag_ended.connect(func(_c: bool) -> void: UiTheme.sfx("click"))
-	hp.add_child(_hp_slider)
+	# inset so the knob isn't clipped at 0 / max
+	var sm := MarginContainer.new()
+	sm.add_theme_constant_override("margin_left", 16)
+	sm.add_theme_constant_override("margin_right", 16)
+	sm.add_child(_hp_slider)
+	hp.add_child(sm)
 	for s in STOPS:
 		var row := _SwitchRow.make(String(s[1]), String(s[2]))
 		row.toggled.connect(_on_stop.bind(String(s[0])))
@@ -134,7 +138,7 @@ func _segmented(ids: Array, labels: Dictionary, store: Dictionary, cb: Callable)
 		var b := GameButton.make(String(labels[id]), "", GameButton.Kind.SECONDARY, 23)
 		b.toggle_mode = true
 		b.toggle_primary = true
-		b.min_height = 66
+		b.min_height = 58
 		b.pad_x = 10
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.pressed.connect(cb.bind(String(id)))
@@ -146,6 +150,8 @@ func _segmented(ids: Array, labels: Dictionary, store: Dictionary, cb: Callable)
 ## Portrait: one column; landscape (wide panel): scope/focus left, stop conditions right.
 func _arrange() -> void:
 	var wide := size.x > size.y * 1.1 and size.x >= 1100.0
+	# wide: the scope chips get the roomier column (4 + 3 chips instead of 3 + 3 + 1)
+	_left.size_flags_stretch_ratio = 1.4 if wide else 1.0
 	if wide == _wide and _cols.get_parent() != null:
 		return
 	_wide = wide
@@ -260,7 +266,7 @@ class _SwitchRow:
 		r.toggle_mode = true
 		r.focus_mode = Control.FOCUS_NONE
 		r.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-		r.custom_minimum_size = Vector2(300, 62)
+		r.custom_minimum_size = Vector2(300, 54)
 		r._icon = UiIcons.rect(icon, 30)
 		r._icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		r.add_child(r._icon)

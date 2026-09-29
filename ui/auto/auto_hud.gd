@@ -264,7 +264,11 @@ func _layout() -> void:
 	var right := (view.x + w) * 0.5
 	var y := (top.content_bottom() if top else safe.top + 110.0) + 14.0
 	cluster.reset_size()
-	cluster.position = Vector2(right - cluster.size.x, y)
+	if view.x - safe.right - right >= cluster.size.x + 56.0:
+		# landscape: the free corner right of the top HUD (clear of enemy intents / HP bars)
+		cluster.position = Vector2(view.x - safe.right - 28.0 - cluster.size.x, safe.top + 14.0)
+	else:
+		cluster.position = Vector2(right - cluster.size.x, y)
 	_place_ticker()
 	if _stop_card.visible:
 		_stop_card.reset_size()
