@@ -19,6 +19,13 @@ signal layout_changed
 const HERO_SCALE := 0.85
 const FOREST := "res://assets/kaykit/forest/color%d/%s_Color%d.gltf"
 const RES := "res://assets/kaykit/resources/"
+## KayKit EXTRA packs (optional: every use checks the file exists).
+const WX := "res://assets/kaykit/weapons_x/"
+const ADX := "res://assets/kaykit/adventurers_x/"
+const RX := "res://assets/kaykit/resources_x/"
+const DX := "res://assets/kaykit/dungeon_x/"
+const TX := "res://assets/kaykit/tools_x/"
+const MM := "res://assets/kaykit/mystery/"
 ## Optional factory for real pet models (WP-E3): func(id: String) -> Node3D. When unset (or it
 ## returns null) a KayKit-prop placeholder stands in.
 static var pet_factory: Callable
@@ -36,17 +43,17 @@ const ISLAND_HALF := 16.0
 ## Station positions per orientation (x, z) and the fire / hero spots.
 const LAYOUT := {
 	"landscape": {
-		"armory": Vector3(-8.4, 0, -0.4), "workshop": Vector3(-3.7, 0, -5.4),
-		"pet_den": Vector3(3.7, 0, -5.4), "arcade": Vector3(8.4, 0, -0.4),
+		"armory": Vector3(-7.2, 0, -0.3), "workshop": Vector3(-3.2, 0, -4.9),
+		"pet_den": Vector3(3.2, 0, -4.9), "arcade": Vector3(7.2, 0, -0.3),
 	},
 	"portrait": {
-		"armory": Vector3(-4.5, 0, -1.3), "workshop": Vector3(-3.2, 0, -7.6),
-		"pet_den": Vector3(3.2, 0, -7.6), "arcade": Vector3(4.5, 0, -1.3),
+		"armory": Vector3(-3.5, 0, -3.0), "workshop": Vector3(-3.0, 0, -8.4),
+		"pet_den": Vector3(3.0, 0, -8.4), "arcade": Vector3(3.5, 0, -3.0),
 	},
 }
 const FIRE_POS := Vector3(0, 0, 1.8)
 ## Yaw each station turns to face the fire / camera.
-const STATION_SCALE := 1.3
+const STATION_SCALE := 1.5
 const STATION_YAW := {"armory": 38.0, "workshop": 14.0, "pet_den": -14.0, "arcade": -38.0}
 
 var rig: CameraRig
@@ -140,6 +147,7 @@ func apply_profile(p: Profile) -> void:
 	set_pet(String(p.loadout.get("pet", "")))
 	for id in CampInfo.STATION_IDS:
 		set_locked(String(id), bool(CampInfo.station_state(p, String(id)).locked))
+	_show_gear(p)
 	_decorate(p)
 
 
@@ -256,7 +264,7 @@ func _on_resize() -> void:
 			s.position = lay[id]
 			var yaw := float(STATION_YAW[id]) * (0.7 if p else 1.0)
 			if p and id in ["armory", "arcade"]:
-				yaw = 55.0 if id == "armory" else -55.0
+				yaw = 32.0 if id == "armory" else -32.0
 			s.rotation.y = deg_to_rad(yaw)
 		_place_deco_spots()
 		_build_paths()
@@ -310,7 +318,7 @@ func _frame(instant := false) -> void:
 		pts.append(base + Vector3.UP * 3.6)
 	pts.append(FIRE_POS + Vector3(0, 0, 2.2))
 	pts.append(_hero_spot() + Vector3(-0.4, 0, 1.4))
-	rig.frame_points(pts, 0.0, 44.0 if portrait else 36.0, instant)
+	rig.frame_points(pts, 0.0, 48.0 if portrait else 36.0, instant)
 
 
 func _hero_spot() -> Vector3:
@@ -544,13 +552,12 @@ func _backdrop() -> void:
 	Props.put(d, RES + "Textiles_Stack_Large_Colored.gltf", Vector3(10.4, 0, -5.4), -30.0, 1.0)
 	Props.put(d, Props.DUN + "crates_stacked.gltf", Vector3(11.2, 0, -3.4), -60.0, 0.8)
 	# lantern posts around the clearing, string lights between them
-	var posts := [Vector3(-5.6, 0, 4.4), Vector3(5.6, 0, 4.4), Vector3(-5.2, 0, -3.2), Vector3(5.2, 0, -3.2)]
+	var posts := [Vector3(-5.0, 0, -2.4), Vector3(5.0, 0, -2.4), Vector3(0.0, 0, -8.6)]
 	for p in posts:
 		Props.put(d, H + "post_lantern.gltf", p, 90.0 if p.x < 0 else -90.0, 0.95)
 		Biome.flicker_light(d, p + Vector3(0, 2.7, 0), Color(1.0, 0.72, 0.42), 1.5, 5.0)
-	_string_lights(d, posts[0] + Vector3(0, 3.0, 0), posts[2] + Vector3(0, 3.0, 0), 8, Color(1.0, 0.8, 0.45))
-	_string_lights(d, posts[1] + Vector3(0, 3.0, 0), posts[3] + Vector3(0, 3.0, 0), 8, Color(1.0, 0.65, 0.4))
-	_string_lights(d, posts[2] + Vector3(0, 3.0, 0), posts[3] + Vector3(0, 3.0, 0), 11, Color(1.0, 0.75, 0.5))
+	_string_lights(d, posts[0] + Vector3(0, 3.0, 0), posts[2] + Vector3(0, 3.2, 0), 10, Color(1.0, 0.8, 0.45))
+	_string_lights(d, posts[1] + Vector3(0, 3.0, 0), posts[2] + Vector3(0, 3.2, 0), 10, Color(1.0, 0.65, 0.4))
 	# flowers near the front edge
 	BiomeBlocks._rng.seed = 77
 	BiomeBlocks.flower_patch(d, Vector3(-8.5, 0, 9.4), 1.8, 22)
@@ -762,76 +769,152 @@ func _covered(id: String) -> Node3D:
 
 func _armory(b: Node3D) -> void:
 	var D := Props.DUN
-	var W := Props.WPN
-	# platform of wooden planks
-	var floor := Props.put(b, D + "floor_wood_small.gltf", Vector3(0, -0.02, 0), 0.0, 1.0)
-	Props.set_shadows(floor, false)
-	# anvil on a stump
+	var W := WX if ResourceLoader.exists(WX + "sword_F.gltf") else Props.WPN
+	_floor_planks(b, Vector2(3.4, 2.6), Color(0.46, 0.32, 0.22))
+	# the forge: a stone brazier with a fire, the anvil on a stump, a grindstone
+	var braz := MeshInstance3D.new()
+	var bc := CylinderMesh.new()
+	bc.top_radius = 0.42
+	bc.bottom_radius = 0.5
+	bc.height = 0.55
+	bc.radial_segments = 8
+	bc.rings = 1
+	braz.mesh = BiomeBlocks.faceted(bc, Color(0.42, 0.4, 0.44), 0.03, 21, Color(0.26, 0.24, 0.28))
+	braz.position = Vector3(1.25, 0.28, -0.55)
+	b.add_child(braz)
+	var coals := MeshInstance3D.new()
+	var cs := SphereMesh.new()
+	cs.radius = 0.36
+	cs.height = 0.2
+	coals.mesh = cs
+	coals.material_override = Props.glow_material(Color(1.0, 0.4, 0.1), false, 2.2)
+	coals.position = Vector3(1.25, 0.56, -0.55)
+	b.add_child(coals)
+	Biome.flame(b, Vector3(1.25, 0.7, -0.55), Color(1.0, 0.5, 0.15), 0.55, 12)
+	Biome.flicker_light(b, Vector3(1.25, 1.3, -0.35), Color(1.0, 0.55, 0.25), 2.0, 4.5)
 	var stump := MeshInstance3D.new()
 	var cm := CylinderMesh.new()
-	cm.top_radius = 0.32
-	cm.bottom_radius = 0.38
-	cm.height = 0.5
+	cm.top_radius = 0.3
+	cm.bottom_radius = 0.36
+	cm.height = 0.45
 	cm.radial_segments = 8
 	cm.rings = 1
 	stump.mesh = BiomeBlocks.faceted(cm, Color(0.46, 0.3, 0.2), 0.02, 4)
-	stump.position = Vector3(0.35, 0.25, 0.45)
+	stump.position = Vector3(0.35, 0.22, 0.55)
 	b.add_child(stump)
-	Props.put(b, Props.TOOLS + "anvil.gltf", Vector3(0.35, 0.5, 0.45), 90.0, 1.6)
-	Props.put(b, Props.TOOLS + "hammer.gltf", Vector3(0.62, 0.02, 0.95), 40.0, 1.5)
-	# weapon rack: two posts, two rails, weapons leaning in
+	Props.put(b, Props.TOOLS + "anvil.gltf", Vector3(0.35, 0.45, 0.55), 90.0, 0.85)
+	_opt(b, TX + "grindstone.gltf", Vector3(-1.35, 0, 0.8), 30.0, 0.5)
+	Props.put(b, Props.TOOLS + "tongs.gltf", Vector3(0.95, 0.02, 0.95), 70.0, 1.0)
+	# weapon rack along the back: two posts, two rails, weapons leaning in
 	var wood := Color(0.44, 0.29, 0.18)
-	for x in [-0.95, 0.35]:
-		var post := MeshInstance3D.new()
-		var bx := BoxMesh.new()
-		bx.size = Vector3(0.12, 1.5, 0.12)
-		post.mesh = BiomeBlocks.faceted(bx, wood, 0.0, 2)
-		post.position = Vector3(x - 0.3, 0.75, -0.45)
-		b.add_child(post)
-	for y in [0.55, 1.3]:
-		var rail := MeshInstance3D.new()
-		var bx2 := BoxMesh.new()
-		bx2.size = Vector3(1.55, 0.09, 0.1)
-		rail.mesh = BiomeBlocks.faceted(bx2, wood.lightened(0.08), 0.0, 3)
-		rail.position = Vector3(-0.6, y, -0.45)
-		b.add_child(rail)
-	var ws := [["sword_A.gltf", -1.0], ["axe_A.gltf", -0.62], ["sword_C.gltf", -0.26], ["hammer_B.gltf", 0.1]]
+	for x in [-1.55, 0.35]:
+		_box(b, Vector3(0.12, 1.7, 0.12), Vector3(x, 0.85, -0.95), wood)
+	for y in [0.6, 1.45]:
+		_box(b, Vector3(2.05, 0.09, 0.1), Vector3(-0.6, y, -0.95), wood.lightened(0.08))
+	var ws := [["sword_F.gltf", -1.35], ["axe_D.gltf", -1.0], ["halberd.gltf", -0.68], ["sword_G.gltf", -0.36],
+		["spear_B.gltf", -0.08], ["hammer_D.gltf", 0.2]]
 	for w in ws:
-		var n := Props.put(b, W + String(w[0]), Vector3(float(w[1]), 0.1, -0.35), 0.0, 1.35)
-		n.rotation_degrees = Vector3(-12.0, 0.0, 0.0)
-	Props.put(b, W + "shield_A.gltf", Vector3(-0.5, 0.05, 0.25), 20.0, 1.3).rotation_degrees.x = -70.0
-	Props.put(b, D + "barrel_small.gltf", Vector3(1.15, 0, -0.2), 30.0, 0.85)
-	Props.put(b, D + "sword_shield.gltf", Vector3(1.1, 0.62, -0.2), 0.0, 0.8)
-	var torch := Props.put(b, D + "torch_lit.gltf", Vector3(-1.3, 0, 0.5), 0.0, 1.1)
-	torch.name = "Torch"
-	Biome.flicker_light(b, Vector3(-1.3, 1.5, 0.5), Color(1.0, 0.6, 0.3), 1.6, 3.8)
-	Props.put(b, D + "banner_patternA_red.gltf", Vector3(-0.6, 1.5, -0.55), 0.0, 0.75)
+		var path := W + String(w[0])
+		if not ResourceLoader.exists(path):
+			path = Props.WPN + "sword_A.gltf"
+		var n := Props.put(b, path, Vector3(float(w[1]), 0.12, -0.85), 0.0, 0.85)
+		n.rotation_degrees = Vector3(-10.0, 90.0, 0.0)
+	# shields hung on the top rail
+	var sh := ["shield_B.gltf", "shield_C.gltf", "shield_D.gltf"]
+	for i in sh.size():
+		_opt(b, W + String(sh[i]), Vector3(-1.25 + 0.62 * i, 1.35, -0.84), 0.0, 0.62)
+	# a barrel of spare blades and a paladin statue guarding the forge
+	Props.put(b, D + "barrel_small.gltf", Vector3(-1.45, 0, -0.1), 30.0, 0.62)
+	for k in 2:
+		var n := Props.put(b, Props.WPN + "sword_A.gltf", Vector3(-1.52 + 0.14 * k, 1.05, -0.12), 0.0, 0.7)
+		n.rotation_degrees = Vector3(8.0 - 16.0 * k, 20.0, 180.0)
+	_opt(b, MM + "paladin/paladin_statue.gltf", Vector3(1.55, 0, 0.55), -35.0, 0.55)
+	# gear display: the profile's gear pieces on a little table (filled by _show_gear())
+	var table := Node3D.new()
+	table.name = "GearTable"
+	table.position = Vector3(-0.45, 0, 0.35)
+	b.add_child(table)
+	_box(table, Vector3(0.9, 0.08, 0.55), Vector3(0, 0.62, 0), Color(0.5, 0.34, 0.22))
+	for x in [-0.38, 0.38]:
+		_box(table, Vector3(0.08, 0.62, 0.08), Vector3(x, 0.31, 0), Color(0.4, 0.26, 0.16))
+	# the smith
+	var smith := _keeper("Barbarian_Large.glb", "large", {}, "idle")
+	if smith:
+		smith.position = Vector3(0.35, 0, -0.25)
+		smith.scale = Vector3.ONE * 0.5
+		smith.name = "Keeper"
+		b.add_child(smith)
+		_hammer_loop(smith)
+
+
+## A table of the owned gear: Helm (shield), Blade (sword), Boots (compass), Charm (gems).
+## Pieces at L8 glow gold.
+func _show_gear(p: Profile) -> void:
+	var s: Node3D = stations.get("armory")
+	if s == null:
+		return
+	var table: Node3D = s.get_node_or_null("Body/GearTable")
+	if table == null:
+		return
+	var old := table.get_node_or_null("Items")
+	if old:
+		old.free()
+	var items := Node3D.new()
+	items.name = "Items"
+	table.add_child(items)
+	var looks := {"helm": [ADX + "assets/shield_badge_color.gltf", Vector3(-0.3, 0.66, 0.0), Vector3(-70, 0, 0), 0.5],
+		"blade": [ADX + "assets/sword_2handed_color.gltf", Vector3(-0.05, 0.68, 0.05), Vector3(90, 0, 70), 0.42],
+		"boots": [Props.TOOLS + "compass_base.gltf", Vector3(0.18, 0.66, -0.1), Vector3.ZERO, 0.7],
+		"charm": [RX + "Gems_Pile_Small.gltf", Vector3(0.32, 0.66, 0.12), Vector3.ZERO, 0.45]}
+	for slot in GearDefs.SLOTS:
+		if not p.owns("gear", slot) or p.gear_level(slot) <= 0:
+			continue
+		var d: Array = looks[slot]
+		if not ResourceLoader.exists(String(d[0])):
+			continue
+		var n := Props.put(items, String(d[0]), d[1], 0.0, float(d[3]))
+		n.rotation_degrees = d[2]
+		if p.gear_level(slot) >= GearDefs.MAX_LEVEL:
+			var l := OmniLight3D.new()
+			l.light_color = Color(1.0, 0.85, 0.4)
+			l.light_energy = 0.8
+			l.omni_range = 0.9
+			l.position = d[1] + Vector3.UP * 0.25
+			items.add_child(l)
 
 
 func _workshop(b: Node3D) -> void:
 	var D := Props.DUN
 	var T := Props.TOOLS
 	var B := Props.BGB
-	var floor := Props.put(b, D + "floor_wood_small.gltf", Vector3(0, -0.02, 0), 0.0, 1.0)
-	Props.set_shadows(floor, false)
-	Props.put(b, D + "table_medium.gltf", Vector3(0, 0, -0.1), 0.0, 1.0)
-	var top := 0.95
-	Props.put(b, T + "saw.gltf", Vector3(-0.55, top, -0.25), 20.0, 1.2)
-	Props.put(b, T + "wrench_A.gltf", Vector3(-0.2, top, 0.15), 60.0, 1.3)
-	Props.put(b, T + "blueprint.gltf", Vector3(0.15, top, -0.2), -10.0, 1.1)
-	Props.put(b, T + "pencil_A_long.gltf", Vector3(0.3, top + 0.02, 0.05), 30.0, 1.3)
-	var lamp := Props.put(b, T + "lantern.gltf", Vector3(0.62, top, -0.35), 0.0, 1.2)
+	_floor_planks(b, Vector2(3.4, 2.6), Color(0.5, 0.36, 0.24))
+	var bench := _opt(b, DX + "table_long_decorated_A.gltf", Vector3(-0.15, 0, -0.35), 0.0, 0.62)
+	if bench == null:
+		Props.put(b, D + "table_medium.gltf", Vector3(-0.15, 0, -0.35), 0.0, 0.62)
+	var top := 0.62
+	Props.put(b, T + "saw.gltf", Vector3(-0.85, top, -0.4), 20.0, 0.7)
+	Props.put(b, T + "blueprint.gltf", Vector3(0.1, top, -0.35), -10.0, 0.6)
+	Props.put(b, T + "hammer.gltf", Vector3(-0.45, top + 0.12, -0.2), 70.0, 0.6)
+	Props.put(b, T + "wrench_A.gltf", Vector3(0.45, top + 0.1, -0.2), 20.0, 0.6)
+	var lamp := Props.put(b, T + "lantern.gltf", Vector3(0.62, top, -0.55), 0.0, 0.65)
 	lamp.name = "Lamp"
-	Biome.flicker_light(b, Vector3(0.62, top + 0.6, -0.2), Color(1.0, 0.8, 0.5), 1.4, 3.4)
-	# big showcase dice
-	var d1 := Props.put(b, B + "D6_A_blue.gltf", Vector3(0.9, 0.0, 0.55), 25.0, 3.4)
-	d1.name = "BigDie"
-	Props.put(b, B + "D6_B_red.gltf", Vector3(-0.95, 0.0, 0.65), -15.0, 2.6)
-	Props.put(b, B + "D20_yellow.gltf", Vector3(-0.2, top, 0.3), 0.0, 1.8)
-	Props.put(b, B + "D6_A_green.gltf", Vector3(1.28, 0.0, 0.05), 50.0, 2.0)
-	Props.put(b, D + "box_small.gltf", Vector3(-1.2, 0, -0.35), 10.0, 0.9)
-	Props.put(b, D + "shelf_small_candles.gltf", Vector3(0.0, 0, -0.85), 0.0, 1.0)
-	Props.put(b, T + "handdrill.gltf", Vector3(-1.2, 0.72, -0.3), 0.0, 1.3)
+	Biome.flicker_light(b, Vector3(0.62, top + 0.7, -0.35), Color(1.0, 0.8, 0.5), 1.6, 3.8)
+	# big showcase dice out front
+	Props.put(b, B + "D6_A_blue.gltf", Vector3(1.05, 0.34, 0.55), 25.0, 0.9)
+	Props.put(b, B + "D6_B_red.gltf", Vector3(-1.2, 0.3, 0.6), -15.0, 0.8)
+	Props.put(b, B + "D20_yellow.gltf", Vector3(-1.5, 0.3, -0.1), 0.0, 0.62)
+	Props.put(b, B + "D6_A_green.gltf", Vector3(-0.8, top + 0.14, -0.55), 50.0, 0.36)
+	Props.put(b, B + "D8_red.gltf", Vector3(-0.2, top + 0.14, -0.55), 10.0, 0.36)
+	_opt(b, RX + "Containers_Crate_Medium_Wood.gltf", Vector3(-1.45, 0, -0.55), 10.0, 0.62)
+	Props.put(b, RES + "Parts_Pile_Small.gltf", Vector3(0.9, 0, 1.0), 30.0, 0.7)
+	_opt(b, TX + "grindstone.gltf", Vector3(1.5, 0, 0.9), -40.0, 0.45)
+	var eng := _keeper("Engineer.glb", "medium", {"handslot.r": ADX + "assets/engineer_Wrench.gltf"}, "Lockpicking")
+	if eng:
+		eng.position = Vector3(1.05, 0, -0.25)
+		eng.rotation.y = deg_to_rad(-60.0)
+		eng.scale = Vector3.ONE * 0.58
+		eng.name = "Keeper"
+		b.add_child(eng)
 
 
 func _pet_den(b: Node3D) -> void:
@@ -839,37 +922,36 @@ func _pet_den(b: Node3D) -> void:
 	var D := Props.DUN
 	# a little lean-to roof over a soft bed
 	var wood := Color(0.46, 0.3, 0.2)
-	for x in [-1.0, 1.0]:
-		var post := MeshInstance3D.new()
-		var bx := BoxMesh.new()
-		bx.size = Vector3(0.12, 1.55, 0.12)
-		post.mesh = BiomeBlocks.faceted(bx, wood, 0.0, 6)
-		post.position = Vector3(x, 0.78, 0.45)
-		b.add_child(post)
+	for x in [-1.25, 1.25]:
+		_box(b, Vector3(0.12, 1.75, 0.12), Vector3(x, 0.88, 0.55), wood)
+		_box(b, Vector3(0.12, 2.1, 0.12), Vector3(x, 1.05, -1.0), wood)
 	var roof := MeshInstance3D.new()
 	var rb := BoxMesh.new()
-	rb.size = Vector3(2.5, 0.1, 1.9)
-	roof.mesh = BiomeBlocks.faceted(rb, Color(0.72, 0.36, 0.26), 0.0, 8, Color(0.5, 0.22, 0.16))
-	roof.position = Vector3(0, 1.45, -0.15)
-	roof.rotation.x = deg_to_rad(-16.0)
+	rb.size = Vector3(2.9, 0.1, 2.0)
+	roof.mesh = BiomeBlocks.faceted(rb, Color(0.74, 0.36, 0.26), 0.0, 8, Color(0.5, 0.22, 0.16))
+	roof.position = Vector3(0, 1.98, -0.2)
+	roof.rotation.x = deg_to_rad(-12.0)
 	b.add_child(roof)
-	var back := MeshInstance3D.new()
-	var bb := BoxMesh.new()
-	bb.size = Vector3(2.3, 1.2, 0.1)
-	back.mesh = BiomeBlocks.faceted(bb, wood.darkened(0.15), 0.0, 9)
-	back.position = Vector3(0, 0.6, -0.95)
-	b.add_child(back)
-	Props.put(b, D + "bed_floor.gltf", Vector3(0, 0, -0.25), 0.0, 0.85)
-	Props.put(b, H + "pumpkin_orange_jackolantern.gltf", Vector3(-1.05, 0, 0.9), 20.0, 1.3)
-	Props.put(b, H + "pumpkin_yellow_small.gltf", Vector3(-0.6, 0, 1.15), -30.0, 1.2)
-	Props.put(b, H + "pumpkin_orange.gltf", Vector3(1.1, 0, 0.95), 10.0, 1.0)
-	Biome.flicker_light(b, Vector3(-1.05, 0.5, 1.0), Color(1.0, 0.55, 0.2), 1.1, 2.4)
-	var lan := Props.put(b, H + "lantern_hanging.gltf", Vector3(0.8, 1.3, 0.55), 0.0, 1.1)
+	_box(b, Vector3(2.6, 1.2, 0.1), Vector3(0, 0.6, -1.05), wood.darkened(0.15))
+	Props.put(b, D + "bed_floor.gltf", Vector3(0.1, 0, -0.35), 90.0, 0.55)
+	Props.put(b, H + "pumpkin_orange_jackolantern.gltf", Vector3(-1.2, 0, 1.0), 20.0, 0.62)
+	Props.put(b, H + "pumpkin_yellow_small.gltf", Vector3(-0.75, 0, 1.2), -30.0, 0.8)
+	Props.put(b, H + "pumpkin_orange.gltf", Vector3(1.25, 0, 1.05), 10.0, 0.62)
+	Biome.flicker_light(b, Vector3(-1.2, 0.5, 1.1), Color(1.0, 0.55, 0.2), 1.2, 2.6)
+	var lan := Props.put(b, H + "lantern_hanging.gltf", Vector3(0.9, 1.75, 0.55), 0.0, 0.7)
 	lan.name = "Lantern"
-	Biome.flicker_light(b, Vector3(0.8, 1.1, 0.7), Color(1.0, 0.72, 0.4), 1.2, 3.2)
-	Props.put(b, H + "candle_triple.gltf", Vector3(1.25, 0, -0.4), 0.0, 1.0)
-	# a food bowl
-	Props.put(b, D + "plate_food_A.gltf", Vector3(0.55, 0, 0.9), 0.0, 1.0)
+	Biome.flicker_light(b, Vector3(0.9, 1.35, 0.7), Color(1.0, 0.72, 0.4), 1.4, 3.4)
+	Props.put(b, H + "candle_triple.gltf", Vector3(1.2, 0, -0.55), 0.0, 0.8)
+	_opt(b, RX + "Food_Basket_A_Berries.gltf", Vector3(0.65, 0, 1.05), 0.0, 0.7)
+	_opt(b, RX + "Food_Crate_Small_Berries.gltf", Vector3(-1.35, 0, -0.35), 20.0, 0.6)
+	_opt(b, DX + "bench.gltf", Vector3(0.0, 0, 1.25), 0.0, 0.5)
+	var druid := _keeper("Druid.glb", "medium", {"handslot.r": ADX + "assets/druid_staff.gltf"}, "idle_b")
+	if druid:
+		druid.position = Vector3(-0.55, 0, 0.2)
+		druid.rotation.y = deg_to_rad(25.0)
+		druid.scale = Vector3.ONE * 0.58
+		druid.name = "Keeper"
+		b.add_child(druid)
 
 
 func _arcade(b: Node3D) -> void:
@@ -877,10 +959,108 @@ func _arcade(b: Node3D) -> void:
 	var P := Props.PLAT
 	# checkered booth floor of coloured game tiles
 	var tiles := ["tile_red.gltf", "tile_blue.gltf", "tile_yellow.gltf", "tile_green.gltf"]
-	for ix in 3:
+	for ix in 4:
 		for iz in 3:
-			var t := Props.put(b, B + tiles[(ix + iz * 2) % 4], Vector3(-0.72 + ix * 0.72, -0.08, -0.5 + iz * 0.72), 0.0, 0.72)
+			var t := Props.put(b, B + tiles[(ix + iz * 2) % 4], Vector3(-1.2 + ix * 0.8, -0.1, -0.8 + iz * 0.8), 0.0, 0.8)
 			Props.set_shadows(t, false)
+	_claw_machine(b, B, P)
+	# circus podium with a balloon dog, hoop, juggling pins and a bunch of balloons
+	var pod := _opt(b, MM + "clown/circus_podium.gltf", Vector3(1.25, 0, 0.35), 0.0, 0.55)
+	if pod:
+		_opt(b, MM + "clown/balloon_dog_blue.gltf", Vector3(1.25, 0.62, 0.35), -40.0, 0.7)
+	_opt(b, MM + "clown/circus_hoop.gltf", Vector3(-1.35, 0, -0.4), 70.0, 0.6)
+	for i in 3:
+		_opt(b, MM + "clown/juggling_pin_%s.gltf" % ["red", "yellow", "green"][i], Vector3(1.0 + 0.16 * i, 0, 1.05), 0.0, 0.6)
+	var bunch := Node3D.new()
+	bunch.name = "Balloons"
+	bunch.position = Vector3(-1.35, 0, 0.75)
+	b.add_child(bunch)
+	var cols := ["red", "yellow", "blue", "green"]
+	for i in cols.size():
+		var bl := _opt(bunch, MM + "clown/balloon_%s.gltf" % cols[i], Vector3(0.18 * cos(i * 1.6), 1.6 + 0.2 * (i % 2), 0.18 * sin(i * 1.6)), 0.0, 0.55)
+		if bl:
+			var bob := bl.create_tween().set_loops()
+			bob.tween_property(bl, "position:y", bl.position.y + 0.12, 1.3 + 0.2 * i).set_trans(Tween.TRANS_SINE)
+			bob.tween_property(bl, "position:y", bl.position.y, 1.3 + 0.2 * i).set_trans(Tween.TRANS_SINE)
+	_opt(b, MM + "orc/Orc_Wardrum.gltf.glb", Vector3(-1.45, 0, 0.0), 30.0, 0.5)
+	Props.put(b, B + "coin_10_gold.gltf", Vector3(0.6, 0.0, 1.1), 30.0, 0.7)
+	Props.put(b, B + "coin_5_silver.gltf", Vector3(0.8, 0.0, 0.95), 0.0, 0.7)
+	var barker := _keeper("Rogue_Hooded.glb", "medium", {}, "Waving")
+	if barker:
+		barker.position = Vector3(-0.75, 0, 0.55)
+		barker.rotation.y = deg_to_rad(20.0)
+		barker.scale = Vector3.ONE * 0.58
+		barker.name = "Keeper"
+		b.add_child(barker)
+
+
+# ------------------------------------------------------------------ station helpers
+
+## Instances a prop if its file exists (EXTRA packs are optional), else returns null.
+func _opt(parent: Node3D, path: String, pos: Vector3, yaw := 0.0, scale := 1.0) -> Node3D:
+	if not ResourceLoader.exists(path):
+		return null
+	return Props.put(parent, path, pos, yaw, scale)
+
+
+func _box(parent: Node3D, size: Vector3, pos: Vector3, color: Color) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var bx := BoxMesh.new()
+	bx.size = size
+	mi.mesh = BiomeBlocks.faceted(bx, color, 0.0, int(pos.x * 10.0 + pos.z * 7.0 + 3.0))
+	mi.position = pos
+	parent.add_child(mi)
+	return mi
+
+
+## A plank deck under a station.
+func _floor_planks(parent: Node3D, size: Vector2, color: Color) -> void:
+	var n := int(ceil(size.x / 0.34))
+	for i in n:
+		var c := color.lightened(0.06 * float(i % 3) - 0.04)
+		var pl := _box(parent, Vector3(0.32, 0.08, size.y), Vector3(-size.x * 0.5 + 0.17 + i * 0.34, 0.04, 0), c)
+		pl.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+
+## A station keeper NPC (KayKit Adventurers EXTRA character on the shared rigs), or null when
+## the EXTRA pack isn't installed.
+func _keeper(glb: String, rig: String, gear: Dictionary, anim: String) -> Character:
+	var path := ADX + "characters/" + glb
+	if not ResourceLoader.exists(path):
+		return null
+	var c := Character.new()
+	c.model_id = glb.get_basename()
+	c._rig = rig
+	c._attack_clip = Character.ATTACKS["large" if rig == "large" else "melee_1h"]
+	c.model = (load(path) as PackedScene).instantiate()
+	c.add_child(c.model)
+	c.skeleton = c.model.find_child("Skeleton3D", true, false)
+	c.anim_player = AnimationPlayer.new()
+	c.anim_player.name = "AnimationPlayer"
+	c.add_child(c.anim_player)
+	c.anim_player.root_node = c.anim_player.get_path_to(c.model)
+	c.anim_player.add_animation_library("", Character._library_for(rig, c.skeleton, c.model.get_path_to(c.skeleton)))
+	c.anim_player.playback_default_blend_time = 0.2
+	for slot in gear:
+		if ResourceLoader.exists(String(gear[slot])):
+			c.attach(String(slot), String(gear[slot]))
+	c.play(anim, 0.0)
+	c.anim_player.seek(randf() * 0.8, true)
+	return c
+
+
+## The smith strikes the anvil every couple of seconds.
+func _hammer_loop(smith: Character) -> void:
+	var t := Timer.new()
+	t.wait_time = 2.4
+	t.autostart = true
+	smith.add_child(t)
+	t.timeout.connect(func() -> void:
+		if is_instance_valid(smith) and smith.is_visible_in_tree():
+			smith.play_once("Melee_2H_Attack_Chop" if smith.has_anim("Melee_2H_Attack_Chop") else "attack", "idle"))
+
+## The claw-machine cabinet: glass case, prize pile, swaying claw, marquee.
+func _claw_machine(b: Node3D, B: String, P: String) -> void:
 	# claw machine: cabinet, glass case, prize pile, claw, marquee
 	var cab := MeshInstance3D.new()
 	var bx := BoxMesh.new()
@@ -976,10 +1156,6 @@ func _arcade(b: Node3D) -> void:
 	glow.omni_range = 3.2
 	glow.position = Vector3(0, 1.5, 0.4)
 	b.add_child(glow)
-	Props.put(b, B + "flag_A_yellow.gltf", Vector3(-0.95, 0, 0.55), 0.0, 1.2)
-	Props.put(b, B + "flag_B_blue.gltf", Vector3(0.95, 0, 0.55), 0.0, 1.2)
-	Props.put(b, B + "coin_10_gold.gltf", Vector3(0.7, 0.0, 0.8), 30.0, 1.4)
-	Props.put(b, B + "coin_5_silver.gltf", Vector3(0.95, 0.0, 0.6), 0.0, 1.4)
 
 
 # ------------------------------------------------------------------ pet + decorations
