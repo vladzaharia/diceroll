@@ -121,6 +121,11 @@ static func _armory(p: Profile) -> Dictionary:
 		for slot in ["body", "trinket", "trinket2", "back"]:
 			if String(lo[slot]) != "":
 				kit.append(String(lo[slot]))
+	# the racks show the first pegs' worth: every base item before any variant (variety), the hero's
+	# worn pieces first so they are always on show
+	weapons = _rack_order(weapons, kit)
+	shields = _rack_order(shields, kit)
+	heads = _rack_order(heads, kit)
 	var st := {"levels": levels, "ranks": ranks, "gear": owned.duplicate(), "pouch": int(p.armory.get("pouch", 0)),
 		"weapons": weapons, "shields": shields, "table": table, "bodies": bodies, "heads": heads, "backs": backs,
 		"kit": kit, "hero": hero, "belt": int(p.upgrades.get("potion_belt", 0))}
@@ -134,6 +139,21 @@ static func _armory(p: Profile) -> Dictionary:
 		st.state = "built"
 		st.tier = 1 if levels < 8 else (2 if levels < 20 else 3)
 	return st
+
+
+## Worn pieces first, then Standards (base items), then crafted variants; content order within.
+static func _rack_order(ids: Array, worn: Array) -> Array:
+	var out: Array = []
+	for id in ids:
+		if worn.has(id):
+			out.append(id)
+	for id in ids:
+		if not out.has(id) and ItemDefs.ITEMS.has(String(id)):
+			out.append(id)
+	for id in ids:
+		if not out.has(id):
+			out.append(id)
+	return out
 
 
 static func _workshop(p: Profile) -> Dictionary:

@@ -352,7 +352,10 @@ func item_pop(at: Vector2, item_id: String, text: String, color: Color, top := 0
 	p.position = pos
 	p.pivot_offset = s * 0.5
 	p.scale = Vector2(0.3, 0.3)
-	var rise := minf(34.0, maxf(0.0, pos.y - top - 6.0))
+	var rise := minf(24.0, maxf(0.0, pos.y - top - 6.0))
+	# the next callout stacks above this one's whole path (it rises a little)
+	if not _live_pops.is_empty():
+		_live_pops[-1].rect = Rect2(pos - Vector2(0, rise), s + Vector2(0, rise))
 	var t := create_tween()
 	t.tween_property(p, "scale", Vector2(1.08, 1.08), _d(0.14)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	t.tween_property(p, "scale", Vector2.ONE, _d(0.1))

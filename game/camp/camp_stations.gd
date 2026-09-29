@@ -149,7 +149,7 @@ static func _armory(b: Node3D, st: Dictionary, tier: int) -> void:
 	for x in [x0, x1]:
 		P.post(rack, Vector3(x, 0, -1.02), 2.05, wood)
 	# a pale board behind the pegs: grey steel reads against it at night
-	P.box(rack, Vector3(x1 - x0, 1.8, 0.04), Vector3((x0 + x1) * 0.5, 1.05, -1.06), Color(0.72, 0.56, 0.38))
+	P.box(rack, Vector3(x1 - x0, 1.8, 0.04), Vector3((x0 + x1) * 0.5, 1.05, -1.06), Color(0.82, 0.66, 0.46))
 	for y in [0.18, 1.2, 1.95]:
 		P.box(rack, Vector3(x1 - x0 + 0.14, 0.08, 0.1), Vector3((x0 + x1) * 0.5, y, -1.02), wood.lightened(0.08))
 	# a lamp over the rack so the pieces read at night
@@ -159,19 +159,27 @@ static func _armory(b: Node3D, st: Dictionary, tier: int) -> void:
 	lamp.omni_range = 2.8
 	lamp.position = Vector3((x0 + x1) * 0.5, 2.0, 0.2)
 	rack.add_child(lamp)
+	var fill := OmniLight3D.new()
+	fill.light_color = Color(1.0, 0.9, 0.75)
+	fill.light_energy = 1.4
+	fill.omni_range = 2.0
+	fill.position = Vector3((x0 + x1) * 0.5, 0.7, 0.35)
+	rack.add_child(fill)
 	var pegs := 12 if tier >= 2 else 6
 	var weapons: Array = (st.get("weapons", []) as Array).slice(0, pegs)
-	var step := (x1 - x0 - 0.3) / float(maxi(pegs - 1, 1))
+	# spread over the whole rack (a young armory's few pieces get room), wide pieces kept narrow
+	var step := minf((x1 - x0 - 0.3) / float(maxi(weapons.size() - 1, 1)), 0.34)
 	for i in weapons.size():
 		var id := String(weapons[i])
 		var w := ItemMounts.upright(id)
 		if w == null:
 			continue
-		var h := ItemMounts.local_bounds(w).size.y
-		var s := clampf(1.0 / maxf(h, 0.01), 0.3, 0.9)
+		var wb := ItemMounts.local_bounds(w).size
+		var s := clampf(minf(1.35 / maxf(wb.y, 0.01), step * 2.6 / maxf(wb.x, 0.01)), 0.5, 1.0)
 		w.scale = Vector3.ONE * s
 		# centred on the rack, so a young armory's few pieces sit in the middle
-		w.position = Vector3((x0 + x1) * 0.5 + step * (float(i) - float(weapons.size() - 1) * 0.5), 0.1, -0.92)
+		# standing a little proud of the board, leaning back onto it (never through it)
+		w.position = Vector3((x0 + x1) * 0.5 + step * (float(i) - float(weapons.size() - 1) * 0.5), 0.1, -0.74)
 		w.rotation_degrees = Vector3(-9.0, 0.0, 0.0)
 		rack.add_child(w)
 		if kit.has(id):
@@ -184,8 +192,8 @@ static func _armory(b: Node3D, st: Dictionary, tier: int) -> void:
 		if sh == null:
 			continue
 		var sz := ItemMounts.local_bounds(sh).size
-		sh.scale = Vector3.ONE * clampf(0.52 / maxf(maxf(sz.x, sz.y), 0.01), 0.25, 0.7)
-		sh.position = Vector3(x0 + 0.3 + (x1 - x0 - 0.6) * (float(i) + 0.5) / float(maxi(shields.size(), 1)), 1.3, -0.95)
+		sh.scale = Vector3.ONE * clampf(0.46 / maxf(maxf(sz.x, sz.y), 0.01), 0.25, 0.7)
+		sh.position = Vector3(x0 + 0.3 + (x1 - x0 - 0.6) * (float(i) + 0.5) / float(maxi(shields.size(), 1)), 1.64, -0.97)
 		rack.add_child(sh)
 		if kit.has(id):
 			_glow(rack, sh.position + Vector3(0, 0.32, 0.3))

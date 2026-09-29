@@ -723,7 +723,7 @@ func _variant_chip(p: Profile, item: String, ch: Dictionary, worn: bool) -> Cont
 		var nw := CampUi.chip("NEW", UiPalette.HP, UiPalette.TEXT, 12)
 		nw.position = Vector2(0, -2)
 		holder.add_child(nw)
-	var nm := UiTheme.label(String(ch.name), 17, UiPalette.GOLD_BRIGHT if worn else (UiPalette.TEXT if st != "locked" else UiPalette.TEXT_DIM), false, 0, false, 800)
+	var nm := UiTheme.label(String(ch.name), 18, UiPalette.GOLD_BRIGHT if worn else (UiPalette.TEXT if st != "locked" else UiPalette.TEXT_DIM), false, 0, false, 800)
 	nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	nm.custom_minimum_size.x = 40
@@ -740,7 +740,7 @@ func _variant_chip(p: Profile, item: String, ch: Dictionary, worn: bool) -> Cont
 		_:
 			var ms: Array = ch.get("mastery", [0, 0])
 			line = "%d / %d fights" % [int(ms[0]), int(ms[1])] if int(ms[1]) > 0 else "FEAT"
-	var ll := UiTheme.label(line, 14, lc, false, 0, false, 800)
+	var ll := UiTheme.label(line, 15, lc, false, 0, false, 800)
 	ll.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(ll)
 	if st == "locked" and int((ch.get("mastery", [0, 0]) as Array)[1]) > 0:
