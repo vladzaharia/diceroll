@@ -89,7 +89,7 @@ func test_tiers_and_routes() -> void:
 
 func test_new_tile_mixes() -> void:
 	var l := Board.layout_for(28, "mines")
-	assert_eq([l.ore, l.chest, l.trap], [3, 3, 2])
+	assert_eq([l.ore, l.chest, l.trap], [3, 4, 2])
 	l = Board.layout_for(28, "warcamp")
 	assert_eq([l.drum, l.enemy, l.event], [2, 7, 4])
 	l = Board.layout_for(28, "ruins")
@@ -236,22 +236,27 @@ func test_drum_smash_and_rebuild() -> void:
 	assert_eq([d.idx, d.gold, d.drums], [10, g, 1])
 	assert_eq(f.run.board.tiles[10].type, "empty")
 	assert_eq(f.run.gold, g0 + g)
-	# the lap mutation rebuilds one drum, more than 3 tiles from the hero
+	# one drum still stands: no rebuild
 	f.run.pos = 25
 	_force_roll(f, [2, 1])
 	ev = f.confirm_move()
-	assert_eq(f.run.board.count("drum"), 2)
+	assert_eq(f.run.board.count("drum"), 1)
+	# all smashed: the lap mutation rebuilds one, more than 3 tiles from the hero
+	f.run.board.tiles[20] = Board.make_tile("empty")
+	f.run.pos = 25
+	_force_roll(f, [2, 1])
+	ev = f.confirm_move()
+	assert_eq(f.run.board.count("drum"), 1)
 	var bm := _first(ev, "board_mutated")
 	var reb: Array = bm.changes.filter(func(x): return x.get("source", "") == "rebuild")
 	assert_eq(reb.size(), 1)
 	var idx := int(reb[0].idx)
 	var dist := mini((idx - f.run.pos + 28) % 28, (f.run.pos - idx + 28) % 28)
 	assert_true(dist > 3 and idx > 2, "rebuilt at %d" % idx)
-	# never more than 2
 	f.run.pos = 25
 	_force_roll(f, [2, 1])
 	f.confirm_move()
-	assert_eq(f.run.board.count("drum"), 2)
+	assert_eq(f.run.board.count("drum"), 1, "one rebuilt drum at a time")
 
 # ---------------------------------------------------------------- Sunscorched Ruins
 
@@ -551,3 +556,12 @@ func test_new_routes_play_and_replay() -> void:
 		assert_true(f.is_over(), "run finishes")
 		var r := GameFlow.replay("knight", 50 + k, f.commands, 28, opts)
 		assert_eq(JSON.stringify(r.to_dict()), JSON.stringify(f.to_dict()), "replay %s" % [routes[k]])
+
+func test_short_road_boss_hp_by_second_biome() -> void:
+	for second in ["hollow", "warcamp", "moonlit"]:
+		var f := GameFlow.new_run("knight", 5, 28, {"mode": "short", "route": ["glade", second]})
+		var boss := f.run.boss_id
+		_fight_in(f, [boss], false, true)
+		var want := int(round(int(EnemyDefs.BOSSES[boss].hp) * BiomeDefs.short_boss_hp(second)))
+		assert_eq(int(c.enemies[0].max_hp), want, "%s finale" % second)
+	assert_eq(BiomeDefs.short_boss_hp("magma"), BiomeDefs.SHORT_T3_BOSS_HP)

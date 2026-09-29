@@ -109,7 +109,7 @@ const BOSSES := {
 	]},
 	# Moonlit Woods: the moon meter (CombatState.moon) rises every enemy phase and your 1s push it
 	# back; a full meter forces phase 2 (Moonrise), then turns its next intent into Moonfall.
-	"boss_moon_king": {"name": "The Moon King", "hp": 950, "gold": 0, "xp": 0, "summon": "wolf_bandit",
+	"boss_moon_king": {"name": "The Moon King", "hp": 900, "gold": 0, "xp": 0, "summon": "wolf_bandit",
 		"forms": ["man", "wolf"], "phases": [
 		[{"kind": "attack", "value": 20}, {"kind": "block", "value": 24}, {"kind": "summon", "value": 1}],
 		[{"kind": "drain", "value": 16}, {"kind": "attack", "value": 22}, {"kind": "attack", "value": 18}],
@@ -154,7 +154,7 @@ const MINIBOSSES := {
 		"phases": [[{"kind": "block", "value": 10}, {"kind": "attack", "value": 9}, {"kind": "curse", "value": 1}],
 			[{"kind": "attack", "value": 8}, {"kind": "drain", "value": 10}, {"kind": "attack", "value": 12}]]},
 	"mini_orc_warchief": {"name": "Orc Warchief", "hp": 100, "gold": 30, "xp": 15, "mode": "cycle", "summon": "orc_raider",
-		"pattern": [{"kind": "summon", "value": 1}, {"kind": "rally", "value": 3}, {"kind": "attack", "value": 11}, {"kind": "block", "value": 8}]},
+		"pattern": [{"kind": "summon", "value": 1}, {"kind": "rally", "value": 2}, {"kind": "attack", "value": 11}, {"kind": "block", "value": 8}]},
 }
 
 ## Legacy per-act defaults (old saves, scenarios). The run uses RunState.miniboss_id.

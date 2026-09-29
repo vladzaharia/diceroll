@@ -1312,14 +1312,14 @@ static func _add_change(changes: Array, c: Dictionary) -> void:
 			changes.remove_at(k)
 	changes.append(c)
 
-## Twist rules of a lap mutation (after the regular spawns): the Warcamp rebuilds one drum while
-## fewer than WARCAMP_DRUMS stand (change source "rebuild"); the mutation into Moonlit's Full lap
+## Twist rules of a lap mutation (after the regular spawns): the Warcamp rebuilds one drum once every
+## drum is smashed (change source "rebuild"); the mutation into Moonlit's Full lap
 ## places the moon rune chest (tile_changed {idx, type:"tile_changed", tile_type:"chest",
 ## moon:true, source:"full_moon"}).
 func _twist_mutation(dest: int, changes: Array, ev: Array[Dictionary]) -> void:
 	match run.twist():
 		"drums":
-			if run.board.count("drum") < BiomeDefs.WARCAMP_DRUMS:
+			if run.board.count("drum") == 0:
 				var c := run.board.rebuild_drum(run.rng, dest, [dest])
 				if not c.is_empty():
 					c["source"] = "rebuild"

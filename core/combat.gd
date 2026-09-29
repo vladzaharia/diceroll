@@ -60,7 +60,7 @@ func begin(run: RunState, ids: Array, p_elite: bool, p_boss: bool, p_tile: int, 
 		# Short Road: fewer laps to build, so the final boss is lighter
 		for e in enemies:
 			if bool(e.boss):
-				e.hp = maxi(1, int(round(int(e.hp) * Balance.SHORT_BOSS_HP)))
+				e.hp = maxi(1, int(round(int(e.hp) * BiomeDefs.short_boss_hp(run.route.back()))))
 				e.max_hp = e.hp
 	if not run.meta.is_empty():
 		for e in enemies:

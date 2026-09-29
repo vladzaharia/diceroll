@@ -44,11 +44,11 @@ const DEFS := {
 		"name": "The Hollow", "tier": 2,
 		"desc": "Restless spirits: events are twice as common, and finishing one heals 8% of your max HP.",
 		"mix": {"event": 2},
-		"pools": [["skeleton_archer", "cultist", "hollow_wisp", "bandit"],
+		"pools": [["werewolf", "cultist", "hollow_wisp", "bandit"],
 			["cultist", "bandit", "hollow_wisp", "werewolf"]],
 		"elite": "fallen_paladin",
 		"minibosses": ["mini_pumpkin_knight", "mini_grave_mage", "mini_moonfang"], "bosses": [],
-		"short_bosses": ["boss_lich", "boss_bone_warden"],
+		"short_bosses": ["boss_lich", "boss_bone_warden"], "short_boss_hp": 0.95,
 	},
 	"frost": {
 		"name": "Frostpeak", "tier": 2,
@@ -58,7 +58,7 @@ const DEFS := {
 			["frost_skeleton", "ice_archer", "skeleton_warrior", "orc_drummer"]],
 		"elite": "brute",
 		"minibosses": ["mini_frost_warden", "mini_bone_champion"], "bosses": [],
-		"short_bosses": ["boss_bone_warden", "boss_lich"],
+		"short_bosses": ["boss_bone_warden", "boss_lich"], "short_boss_hp": 0.85,
 	},
 	"throne": {
 		"name": "Bone Throne", "tier": 3,
@@ -83,7 +83,7 @@ const DEFS := {
 	"mines": {
 		"name": "Deep Mines", "tier": 1, "twist": "ore", "look": "mines",
 		"desc": "Ore veins pay out gold or a Face Raise, but each vein you mine caves in and becomes a trap.",
-		"mix": {"ore": 3, "chest": -1}, "refill": {"ore": 3},
+		"mix": {"ore": 3}, "refill": {"ore": 3},
 		"pools": [["skeleton_minion", "skeleton_minion", "skeleton_archer", "bone_cutthroat"],
 			["skeleton_minion", "bone_cutthroat", "skeleton_warrior", "orc_raider"]],
 		"elite": "rock_golem",
@@ -97,7 +97,7 @@ const DEFS := {
 			["orc_raider", "orc_drummer", "wolf_bandit", "skeleton_warrior"]],
 		"elite": "brute",
 		"minibosses": ["mini_orc_warchief", "mini_cinder_brute"], "bosses": [],
-		"short_bosses": ["boss_cinder_king", "boss_magma_golem"],
+		"short_bosses": ["boss_cinder_king", "boss_magma_golem"], "short_boss_hp": 0.68,
 	},
 	"ruins": {
 		"name": "Sunscorched Ruins", "tier": 3, "twist": "heat", "look": "ruins",
@@ -115,7 +115,7 @@ const DEFS := {
 		"pools": [["werewolf", "wolf_bandit", "hollow_wisp", "orc_raider"],
 			["werewolf", "werewolf", "brute", "wolf_bandit"]],
 		"elite": "werewolf",
-		"minibosses": ["mini_moonfang"], "bosses": ["boss_moon_king", "boss_lich"],
+		"minibosses": ["mini_moonfang"], "bosses": ["boss_moon_king", "boss_lich"], "short_boss_hp": 0.62,
 	},
 }
 
@@ -127,9 +127,9 @@ static var ORE_GOLD := 15
 ## board already holds MINES_TRAP_CAP traps.
 static var MINES_TRAP_CAP := 6
 ## Orc Warcamp: +DRUM_RALLY attack per standing drum for every enemy at fight start; smashing a drum
-## pays DRUM_GOLD x gold scale; the lap mutation rebuilds one drum while fewer than WARCAMP_DRUMS stand.
+## pays DRUM_GOLD x gold scale; the lap mutation rebuilds one drum once every drum is smashed.
 static var DRUM_RALLY := 1
-static var DRUM_GOLD := 10
+static var DRUM_GOLD := 14
 static var WARCAMP_DRUMS := 2
 ## Sunscorched Ruins: heat at each lap end (never lethal) unless you landed on an oasis that lap.
 static var HEAT_PCT := 0.08
@@ -225,6 +225,15 @@ static func valid_short_route(route: Array) -> bool:
 static func final_boss_candidates(biome: String) -> Array:
 	var d: Dictionary = DEFS[biome]
 	return d.bosses if not (d.bosses as Array).is_empty() else d.get("short_bosses", [])
+
+## Short Road final-boss HP multiplier when `biome` ends the run: the biome's short_boss_hp (tier 2:
+## the finale comes after easier tier-2 laps, so the boss keeps more HP), else SHORT_T3_BOSS_HP.
+const SHORT_T3_BOSS_HP := 0.65
+
+static func short_boss_hp(biome: String) -> float:
+	if not DEFS.has(biome):
+		return Balance.SHORT_BOSS_HP
+	return float(DEFS[biome].get("short_boss_hp", SHORT_T3_BOSS_HP))
 
 ## Every Short Road route (21 = 3 tier-1 biomes x 7 second biomes).
 static func all_short_routes() -> Array:
