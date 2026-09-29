@@ -134,6 +134,7 @@ Remaining / to verify:
 - (merged) WP-E2 minigames and Minigames 2.0 (11 games, no AUTO, cross-game balance). TODO for polish: the Camp Arcade booth shows only the original 4 games. Bubble Shooter, Plinko, Shell Game, Memory Match, Fishing, Lucky Wheel and High-Low Ladder (core rules + UIs + Arcade unlocks), reusing E2's framework.
 - **Real-item Armory:** design in docs/design/2026-09-29-armory-items.md. Vlad's decisions: 3 slots, a 2nd trinket slot, +1-tier affinity, the Necromancer keeps its skull staff, and variants carry properties; the design is final. (merged) the armor binder + item mounts (ItemMounts, ArmorBinder, Character loadouts, HEAD_FIT). Core items implementation is queued after the classes/skins core work merges, because both touch the profile schema.
 - **No AUTO in minigames:** being done by the Minigames 2.0 agent.
+- **CI/CD release pipeline (running, worktree wp-ci-release):** GitHub Actions for CI (tests, sim smoke, screenshot matrix + artifacts), release (macOS, iOS/iPadOS, Android, Windows, Linux x64/arm64, Web → GitHub Release), store uploads disabled by default, a private encrypted asset bundle for the paid assets, conventional commits + dev changelog + an LLM user-facing changelog. No remote/push: local validation only.
 - **Assets:** everything third-party lives in git-ignored `third_party/` (docs/ASSETS.md). A fresh worktree needs `THIRD_PARTY=/Users/vlad/Repos/diceroll/third_party tools/import_assets.sh`.
 - **Next:**
   1. Merge E1 → E2 → E3.
