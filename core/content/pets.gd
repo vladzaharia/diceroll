@@ -19,7 +19,7 @@ extends RefCounted
 ##   one            +1 per die showing 1 when you attack
 ##   set3           +1 per attack whose combo is Three of a Kind, Full House or better (L5: Two Pair too)
 ##   reroll         +1 per combat reroll
-##   rune           +1 per rune that triggers in your attack
+##   rune           +1 per attack in which at least one rune triggers
 ##   win            +1 per fight won (fires right after the fight, not at an attack)
 ##
 ## Levels: 1..5 from pet XP (fights won while it is equipped, XP_LEVELS), 6..10 bought with
@@ -35,7 +35,7 @@ const LEVEL_COSTS := [40, 60, 80, 100, 120]
 
 const DEFS := {
 	"pumpkin_sprite": {"name": "Pumpkin Sprite", "role": "heal", "charge_on": "pair_plus", "size": 6, "model": "pumpkin",
-		"fires": "Heal 2% of max HP (+0.6% per level).",
+		"fires": "Heal 2% of max HP (+0.5% per level).",
 		"perk": "Campfires heal +5%.",
 		"l5": "Also removes Burn.", "l10": "Overheal becomes Block."},
 	"skull_buddy": {"name": "Skull Buddy", "role": "attack", "charge_on": "low_die", "size": 4, "model": "skull",
@@ -43,10 +43,10 @@ const DEFS := {
 		"perk": "Traps: +1 to the dodge roll.",
 		"l5": "Bites every enemy at half damage.", "l10": "Blanks count as 1 for its bite and charge x2."},
 	"lantern_ghost": {"name": "Lantern Ghost", "role": "burn", "charge_on": "six", "size": 5, "model": "lantern",
-		"fires": "Poison 1 (+1 per level) on every enemy.",
+		"fires": "Poison 1 (+0.7 per level, rounded down) on every enemy.",
 		"perk": "Lava damage -50%.",
 		"l5": "Poison doesn't decay on bosses.", "l10": "Poisoned enemies take +1 from Thunder and Ember."},
-	"crystal_wisp": {"name": "Crystal Wisp", "role": "tempo", "charge_on": "kept", "size": 8, "model": "crystal",
+	"crystal_wisp": {"name": "Crystal Wisp", "role": "tempo", "charge_on": "kept", "size": 9, "model": "crystal",
 		"fires": "At turn start: +1 combat reroll, and this turn's combo multiplier +0.1 (+0.01 per level).",
 		"perk": "+1 board reroll on the first board turn of each lap.",
 		"l5": "Also +1 banked reroll and frees a cursed die.", "l10": "Its first reroll each fight doesn't count as rerolled."},
@@ -68,17 +68,17 @@ const DEFS := {
 		"perk": "Ice tiles never freeze your dice.",
 		"l5": "Also freezes the enemy with the biggest attack.", "l10": "Frozen enemies lose their Block."},
 	"wick": {"name": "Wick", "role": "burst", "charge_on": "set3", "size": 3, "model": "candle",
-		"fires": "Burn every enemy for 3 (+2 per level) damage.",
+		"fires": "Burn every enemy for 3 (+1.5 per level, rounded down) damage.",
 		"perk": "Burn on you ticks 1 lower.",
 		"l5": "Two Pair charges it too.", "l10": "Its fire ignores Block."},
-	"tinker_gear": {"name": "Tinker", "role": "fixing", "charge_on": "reroll", "size": 7, "model": "gear",
-		"fires": "Before your attack, set your lowest die to its highest face; combo multiplier +0.02 per level this attack.",
+	"tinker_gear": {"name": "Tinker", "role": "fixing", "charge_on": "reroll", "size": 6, "model": "gear",
+		"fires": "Before your attack, set your lowest die to its highest face; combo multiplier +0.01 per level this attack.",
 		"perk": "Shop restocks cost 3 less.",
 		"l5": "Fixes your two lowest dice.", "l10": "Also banks 1 reroll."},
-	"grimoire": {"name": "Grimoire", "role": "runes", "charge_on": "rune", "size": 8, "model": "book",
+	"grimoire": {"name": "Grimoire", "role": "runes", "charge_on": "rune", "size": 5, "model": "book",
 		"fires": "Before your attack, re-fire the last rune that triggered (+5% per level above 1).",
 		"perk": "Chests offer 4 runes instead of 3.",
-		"l5": "Re-fires the last two different runes.", "l10": "Re-fires at +50% more."},
+		"l5": "Re-fires the last two different runes.", "l10": "Re-fires at +25% more."},
 	"cauldron": {"name": "Bubbles", "role": "sustain", "charge_on": "win", "size": 4, "model": "cauldron",
 		"fires": "After a fight, brew a Healing Draught into the belt (heals 15% when the belt is full) and heal 1.5% of max HP per level.",
 		"perk": "Shop potions cost 5 less.",
@@ -119,7 +119,7 @@ static func level_cost(level: int) -> Dictionary:
 ## Pet numbers (2026-09-28 pass: every pet worth about +4-8 pp at L10 in the realistic sim, and
 ## most of that power comes from levels, so a pet grows with the profile).
 static func heal_pct(level: int) -> float:
-	return 0.02 + 0.006 * (clampi(level, 1, MAX_LEVEL) - 1)
+	return 0.02 + 0.005 * (clampi(level, 1, MAX_LEVEL) - 1)
 
 ## Skull Buddy bite: bite_pct(level) x the hand's combo damage (pips x combo multiplier), at
 ## least BITE_MIN.
@@ -138,7 +138,7 @@ static func wisp_mult(level: int) -> float:
 	return WISP_MULT + WISP_MULT_PER_LEVEL * (clampi(level, 1, MAX_LEVEL) - 1)
 
 static func poison(level: int) -> int:
-	return 1 + (clampi(level, 1, MAX_LEVEL) - 1)
+	return 1 + (7 * (clampi(level, 1, MAX_LEVEL) - 1)) / 10
 
 ## Guard Die Block = d6 + block_bonus.
 static func block_bonus(level: int) -> int:
@@ -161,14 +161,14 @@ static func frost_damage(level: int) -> int:
 	return 3 + 2 * (clampi(level, 1, MAX_LEVEL) - 1)
 
 static func wick_damage(level: int) -> int:
-	return 3 + 2 * (clampi(level, 1, MAX_LEVEL) - 1)
+	return 3 + (3 * (clampi(level, 1, MAX_LEVEL) - 1)) / 2
 
 static func tinker_mult(level: int) -> float:
-	return 0.02 * clampi(level, 1, MAX_LEVEL)
+	return 0.01 * clampi(level, 1, MAX_LEVEL)
 
 static func grimoire_mult(level: int) -> float:
 	var m := 1.0 + 0.05 * (clampi(level, 1, MAX_LEVEL) - 1)
-	return m * 1.5 if level >= 10 else m
+	return m * 1.25 if level >= 10 else m
 
 ## Bubbles: heal % of max HP when brewing, and the heal when the belt is full.
 static func cauldron_heal_pct(level: int) -> float:

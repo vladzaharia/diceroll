@@ -341,5 +341,5 @@ static func on_attack_resolved(run: RunState, c: CombatState, combo_id: String, 
 				sets.append("two_pair")
 			n = 1 if sets.has(combo_id) else 0
 		"rune":
-			n = c.last_runes.size()
+			n = 1 if c.last_runes.size() > 0 else 0
 	return _charge(run, n)

@@ -37,7 +37,8 @@ func test_twelve_pets_with_cards() -> void:
 		var c := PetDefs.card(id, 1)
 		for k in ["fires", "perk", "l5", "l10"]:
 			assert_true(String(c[k]) != "", "%s %s" % [id, k])
-		assert_true(PetDefs.size(id) >= 3 and PetDefs.size(id) <= 8, id)
+		var new_pet := PetDefs.IDS.find(id) >= 6
+		assert_true(PetDefs.size(id) >= 3 and PetDefs.size(id) <= (6 if new_pet else 9), id)
 		assert_true(UnlockDefs.all_ids("pets").has(id))
 	var by := {}
 	for m in UnlockDefs.MILESTONES:
