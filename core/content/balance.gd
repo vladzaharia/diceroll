@@ -62,7 +62,7 @@ static func rune_cap(rune: String) -> int:
 # Biome twists (core/content/biomes.gd)
 const GLADE_CAMPFIRE_HEAL_PCT := 0.45
 const CRYPT_DODGE_GOLD := 6
-const HOLLOW_EVENT_HEAL_PCT := 0.08
+const HOLLOW_EVENT_HEAL_PCT := 0.05
 ## Frostpeak ice tile: fail the dodge roll and this many dice lock on turn 1 of the next fight.
 const ICE_CHILL := 1
 const ICE_CHILL_MAX := 2

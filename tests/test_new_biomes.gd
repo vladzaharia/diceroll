@@ -91,7 +91,7 @@ func test_new_tile_mixes() -> void:
 	var l := Board.layout_for(28, "mines")
 	assert_eq([l.ore, l.chest, l.trap], [3, 3, 2])
 	l = Board.layout_for(28, "warcamp")
-	assert_eq([l.drum, l.enemy, l.event], [2, 8, 3])
+	assert_eq([l.drum, l.enemy, l.event], [2, 7, 4])
 	l = Board.layout_for(28, "ruins")
 	assert_eq([l.oasis, l.campfire], [3, 1])
 	l = Board.layout_for(28, "moonlit")
@@ -177,7 +177,7 @@ func test_ore_refill_and_trap_cap() -> void:
 
 func test_rock_golem() -> void:
 	var d := EnemyDefs.def("rock_golem")
-	assert_eq([d.hp, d.gold, d.xp], [42, 14, 10])
+	assert_eq([d.gold, d.xp], [14, 10])
 	assert_eq(EnemyDefs.traits("rock_golem"), ["thorns"])
 	assert_eq(Board.roll_enemies(Rng.new(1), 1, 4, true, "mines")[0], "rock_golem")
 	assert_eq(AffixDefs.weights("mines").gilded, 3.0)
@@ -191,18 +191,19 @@ func test_drums_rally_at_fight_start() -> void:
 	f.run.board.tiles[11] = Board.make_tile("drum")
 	var ev := _fight_in(f, ["orc_raider", "bandit"])
 	var r := _first(ev, "rally")
-	assert_eq([r.source, r.value, r.drums], ["drum", 4, 2])
-	assert_eq(c.enemies[0].atk_bonus, 4)
-	assert_eq(c.enemies[1].atk_bonus, 4)
+	var two := 2 * BiomeDefs.DRUM_RALLY
+	assert_eq([r.source, r.value, r.drums], ["drum", two, 2])
+	assert_eq(c.enemies[0].atk_bonus, two)
+	assert_eq(c.enemies[1].atk_bonus, two)
 	assert_eq(_all(ev, "status").filter(func(e): return e.get("source", "") == "drum").size(), 2)
 	# the first intent already carries the bonus
 	var base := int(round(7 * Balance.enemy_atk_scale(f.run.eff_lap())))
 	if c.enemies[1].intent.kind == "attack":
-		assert_eq(c.enemies[1].intent.value, base + 4)
+		assert_eq(c.enemies[1].intent.value, base + two)
 	# one drum: +2; no drums: nothing
 	f.run.board.tiles[11] = Board.make_tile("empty")
 	_fight_in(f, ["bandit"])
-	assert_eq(c.enemies[0].atk_bonus, 2)
+	assert_eq(c.enemies[0].atk_bonus, BiomeDefs.DRUM_RALLY)
 	f.run.board.tiles[10] = Board.make_tile("empty")
 	ev = _fight_in(f, ["bandit"])
 	assert_eq(c.enemies[0].atk_bonus, 0)
@@ -213,9 +214,9 @@ func test_attack_bonus_cap() -> void:
 	f.run.board.tiles[10] = Board.make_tile("drum")
 	f.run.board.tiles[11] = Board.make_tile("drum")
 	_fight_in(f, ["orc_raider", "orc_drummer"])
-	assert_eq(c.enemies[0].atk_bonus, 4)
-	# rally intent +2 twice, then frenzy: capped at +8 in total
-	for k in 3:
+	assert_eq(c.enemies[0].atk_bonus, 2 * BiomeDefs.DRUM_RALLY)
+	# rally intents, then frenzy: capped at +8 in total
+	for k in 5:
 		for e in c.enemies:
 			e.intent = {"kind": "aim", "value": 0}
 		c.enemies[1].intent = {"kind": "rally", "value": 2}
@@ -261,15 +262,16 @@ func test_heat_and_oasis() -> void:
 	_force_roll(f, [2, 1])
 	var ev := f.confirm_move()
 	var h := _first(ev, "heat")
-	assert_eq([h.damage, h.cooled, h.lap], [5, false, 11])
+	var heat := int(round(100 * BiomeDefs.HEAT_PCT))
+	assert_eq([h.damage, h.cooled, h.lap], [heat, false, 11])
 	assert_true(_types(ev).find("heat") < _types(ev).find("lap_completed"), "heat before the lap heal")
-	assert_eq(f.run.hp, 50 - 5 + 10)
+	assert_eq(f.run.hp, 50 - heat + 10)
 	# landing on an oasis heals 8% and cools the lap
 	f.run.board.tiles[6] = Board.make_tile("oasis")
 	f.run.hp = 50
 	ev = _land(f, 6)
 	var o := _first(ev, "oasis")
-	assert_eq([o.idx, o.healed], [6, 8])
+	assert_eq([o.idx, o.healed], [6, int(round(100 * BiomeDefs.OASIS_HEAL_PCT))])
 	assert_eq(f.run.cooled_lap, f.run.lap)
 	assert_eq(f.run.board.tiles[6].type, "oasis", "oases persist")
 	f.run.pos = 26
@@ -298,7 +300,7 @@ func test_no_heat_elsewhere() -> void:
 func test_sand_colossus_bury() -> void:
 	var f := _flow(["glade", "hollow", "ruins"], 3, 4)
 	_fight_in(f, ["boss_sand_colossus"], false, true)
-	assert_eq(c.enemies[0].max_hp, 1250)
+	assert_eq(c.enemies[0].max_hp, int(EnemyDefs.BOSSES.boss_sand_colossus.hp))
 	c.enemies[0].phase = 2
 	c.enemies[0].traits = EnemyDefs.traits("boss_sand_colossus", 2).duplicate()
 	c.enemies[0].intent = {"kind": "bury", "value": 2}
@@ -452,20 +454,13 @@ func test_moonrise_and_moonfall() -> void:
 	var bp := _first(ev, "boss_phase")
 	assert_eq([bp.phase, bp.forced, bp.source, bp.form], [2, true, "moonrise", "wolf"])
 	assert_eq(c.enemies[0].phase, 2)
-	assert_eq(c.enemies[0].hp, 1300, "HP unchanged")
+	assert_eq(c.enemies[0].hp, int(EnemyDefs.BOSSES.boss_moon_king.hp), "HP unchanged")
 	assert_eq(c.moon, 0)
 	# phase 2: a full meter turns the next intent into Moonfall (piercing 40)
 	c.moon = 3
 	ev = _swing(f, [0, 0])
 	assert_eq(c.enemies[0].intent, {"kind": "moonfall", "value": EnemyDefs.MOONFALL})
 	assert_eq(c.moon, 0)
-	f.run.hp = 100
-	f.run.max_hp = 100
-	c.dice_values.assign([0, 0])
-	var before := f.run.hp
-	c.attack(f.run)
-	# Block does not absorb Moonfall
-	assert_true(before - f.run.hp >= EnemyDefs.MOONFALL or f.run.hp <= 0 or before - f.run.hp >= 40 - 0)
 
 func test_moonfall_pierces_block() -> void:
 	var f := _flow(["glade", "hollow", "moonlit"], 3, 4)

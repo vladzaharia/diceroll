@@ -301,7 +301,7 @@ func test_hollow_event_heals() -> void:
 	for e in ev:
 		if e.type == "hp_changed" and e.source == "hollow":
 			h = e
-	assert_eq(h.get("amount", 0), 8, "8% heal after an event")
+	assert_eq(h.get("amount", 0), int(round(100 * Balance.HOLLOW_EVENT_HEAL_PCT)), "the Hollow heal after an event")
 	var g := _flow(["crypt", "frost", "throne"])
 	g.run.hp = 50
 	var ev2: Array[Dictionary] = []

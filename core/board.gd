@@ -79,6 +79,8 @@ static func layout_for(ring_size: int, p_biome := "") -> Dictionary:
 	var tt := String(BiomeDefs.TWIST_TILES.get(String(def.get("twist", "")), ""))
 	if tt != "" and BiomeDefs.twist_of(p_biome) == "":
 		out.erase(tt)
+	elif tt == "drum":
+		out["drum"] = BiomeDefs.WARCAMP_DRUMS
 	var trap_tile := String(def.get("trap_tile", "trap"))
 	if trap_tile != "trap":
 		out[trap_tile] = int(out.get(trap_tile, 0)) + int(out.get("trap", 0))

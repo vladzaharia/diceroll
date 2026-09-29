@@ -87,6 +87,32 @@ func _init() -> void:
 				print("bad --route (one biome per tier, e.g. glade,frost,magma; Short Road: tier1,second): ", opts.route)
 				quit(2)
 				return
+		elif arg.begins_with("--enemy-hp="):
+			# --enemy-hp=boss_lich:0.9,rock_golem:0.85 (sim-only per-id HP multipliers)
+			for part in arg.substr(11).split(",", false):
+				EnemyDefs.tune_hp_by_id[part.get_slice(":", 0)] = part.get_slice(":", 1).to_float()
+		elif arg.begins_with("--moon="):
+			# --moon=max:4,tide:1,clouds:2,fall:34 (the Moon King's meter numbers)
+			for part in arg.substr(7).split(",", false):
+				var mv := part.get_slice(":", 1).to_int()
+				match part.get_slice(":", 0):
+					"max": EnemyDefs.MOON_MAX = mv
+					"tide": EnemyDefs.MOON_TIDE = mv
+					"clouds": EnemyDefs.MOON_CLOUDS_MAX = mv
+					"fall": EnemyDefs.MOONFALL = mv
+		elif arg.begins_with("--bnum="):
+			# --bnum=DRUM_RALLY:1,HEAT_PCT:0.06 (new-biome twist numbers, BiomeDefs static vars)
+			for part in arg.substr(7).split(",", false):
+				var bv := part.get_slice(":", 1)
+				match part.get_slice(":", 0):
+					"ORE_GOLD": BiomeDefs.ORE_GOLD = bv.to_int()
+					"MINES_TRAP_CAP": BiomeDefs.MINES_TRAP_CAP = bv.to_int()
+					"DRUM_RALLY": BiomeDefs.DRUM_RALLY = bv.to_int()
+					"DRUM_GOLD": BiomeDefs.DRUM_GOLD = bv.to_int()
+					"WARCAMP_DRUMS": BiomeDefs.WARCAMP_DRUMS = bv.to_int()
+					"HEAT_PCT": BiomeDefs.HEAT_PCT = bv.to_float()
+					"OASIS_HEAL_PCT": BiomeDefs.OASIS_HEAL_PCT = bv.to_float()
+					_: print("unknown --bnum ", part)
 		elif arg.begins_with("--twist="):
 			# --twist=off: every new-biome twist off; --twist=off:warcamp,ruins: just those
 			var tw := arg.substr(8)

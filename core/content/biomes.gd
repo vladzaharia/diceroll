@@ -91,20 +91,20 @@ const DEFS := {
 	},
 	"warcamp": {
 		"name": "Orc Warcamp", "tier": 2, "twist": "drums", "look": "warcamp",
-		"desc": "War drums rally every orc in earshot: enemies gain +2 attack per standing drum. Land on a drum to smash it.",
-		"mix": {"drum": 2, "enemy": 1, "event": -1},
-		"pools": [["orc_raider", "orc_raider", "wolf_bandit", "bandit"],
-			["orc_raider", "orc_drummer", "brute", "bandit"]],
+		"desc": "War drums rally every orc in earshot: enemies gain +1 attack per standing drum. Land on a drum to smash it.",
+		"mix": {"drum": 2}, # drum count = WARCAMP_DRUMS (Board.layout_for)
+		"pools": [["orc_raider", "wolf_bandit", "bandit", "skeleton_archer"],
+			["orc_raider", "orc_drummer", "wolf_bandit", "skeleton_warrior"]],
 		"elite": "brute",
 		"minibosses": ["mini_orc_warchief", "mini_cinder_brute"], "bosses": [],
 		"short_bosses": ["boss_cinder_king", "boss_magma_golem"],
 	},
 	"ruins": {
 		"name": "Sunscorched Ruins", "tier": 3, "twist": "heat", "look": "ruins",
-		"desc": "The heat costs 5% of your max HP at the end of every lap unless you landed on an oasis during it. Oases heal 8%.",
+		"desc": "The heat costs 8% of your max HP at the end of every lap unless you landed on an oasis during it. Oases heal 5%.",
 		"mix": {"oasis": 3, "campfire": -1},
-		"pools": [["bone_cutthroat", "skeleton_warrior", "skeleton_archer", "cultist"],
-			["bone_cutthroat", "bone_golem", "bone_knight", "cultist"]],
+		"pools": [["bone_cutthroat", "skeleton_warrior", "bone_knight", "cultist"],
+			["bone_cutthroat", "bone_golem", "bone_knight", "brute"]],
 		"elite": "bone_golem",
 		"minibosses": ["mini_bone_champion"], "bosses": ["boss_sand_colossus", "boss_bone_warden"],
 	},
@@ -122,18 +122,18 @@ const DEFS := {
 # ---------------------------------------------------------------- new-biome twist numbers
 
 ## Deep Mines: an ore vein pays ORE_GOLD x lap gold scale or one Face Raise, then caves in (a trap).
-const ORE_GOLD := 15
+static var ORE_GOLD := 15
 ## Lap mutation: ore tiles are refilled on Empty tiles up to the biome's refill count, unless the
 ## board already holds MINES_TRAP_CAP traps.
-const MINES_TRAP_CAP := 6
+static var MINES_TRAP_CAP := 6
 ## Orc Warcamp: +DRUM_RALLY attack per standing drum for every enemy at fight start; smashing a drum
 ## pays DRUM_GOLD x gold scale; the lap mutation rebuilds one drum while fewer than WARCAMP_DRUMS stand.
-const DRUM_RALLY := 2
-const DRUM_GOLD := 10
-const WARCAMP_DRUMS := 2
+static var DRUM_RALLY := 1
+static var DRUM_GOLD := 10
+static var WARCAMP_DRUMS := 2
 ## Sunscorched Ruins: heat at each lap end (never lethal) unless you landed on an oasis that lap.
-const HEAT_PCT := 0.05
-const OASIS_HEAL_PCT := 0.08
+static var HEAT_PCT := 0.08
+static var OASIS_HEAL_PCT := 0.05
 ## Moonlit Woods: phases by the lap's position in the biome (1..5); the Half moon raises the
 ## transform threshold, the Full moon pre-transforms, adds an elite and a moon rune chest and pays
 ## MOON_FULL_GOLD x fight gold.
@@ -143,6 +143,9 @@ const MOON_FULL_GOLD := 1.5
 ## Moon chest placement: the first Empty tile this many tiles ahead of the hero.
 const MOON_CHEST_AHEAD := [3, 8]
 
+## The twist numbers above are static vars so tools/sim.gd --bnum=<NAME>:<value> can sweep them;
+## the game never changes them.
+##
 ## Sim-only dial (tools/sim.gd --twist=off[:<biome>,...]): biome ids whose new twist is off ("all"
 ## = every new biome). A switched-off twist does nothing and its tiles (ore, drum, oasis) become
 ## Empty. The game never sets it.
