@@ -164,7 +164,7 @@ func _run_round(g: int) -> void:
 	var subs := ["WATCH THE GEM!", "FASTER!", "FASTEST!"]
 	_banner = {"title": "ROUND %d" % (r + 1), "sub": "%s  %d SWAPS" % [subs[clampi(r, 0, 2)], n], "t0": time}
 	MgBoard.sfx("bell", 0.05, -4.0)
-	await wait(1.05)
+	await wait(0.9)
 	if g != _gen:
 		return
 	_banner = {}
@@ -181,7 +181,7 @@ func _run_round(g: int) -> void:
 	await last.finished
 	if g != _gen:
 		return
-	await wait(0.95)
+	await wait(0.8)
 	if g != _gen:
 		return
 	for i in 3:
@@ -447,7 +447,7 @@ func play_update(ev: Dictionary) -> void:
 		_show_gem(gem_s, false)
 		float_text(_gem_pos(gem_s) + Vector2(0, -_ch * 0.9), "HERE!", GEM_TINT.lightened(0.35), int(34 * _u + 8), 1.0)
 	_shown.append(info.duplicate(true))
-	await wait(1.0)
+	await wait(0.85)
 	var last: Tween = null
 	for i in 3:
 		if float(_lift[i]) > 0.01:
@@ -486,8 +486,8 @@ func _layout() -> void:
 	var pw := minf(sw * 0.62, 340.0 * _u + 40.0)
 	_pill = Rect2(Vector2(_stage.get_center().x - pw * 0.5, _apron.position.y + _apron.size.y * 0.3), Vector2(pw, _apron.size.y * 0.5))
 	var fh := _felt.size.y
-	_gy = _felt.position.y + fh * 0.66
-	_dy = fh * 0.13
+	_gy = _felt.position.y + fh * 0.7
+	_dy = fh * 0.12
 	var spacing := _felt.size.x * 0.31
 	_cw = _felt.size.x * 0.225
 	_ch = _cw * 1.08
@@ -768,7 +768,7 @@ func _draw_sharp_eye() -> void:
 
 
 func _draw_banner() -> void:
-	var k := (time - float(_banner.t0)) / dur(1.05)
+	var k := (time - float(_banner.t0)) / dur(0.9)
 	var inn := clampf(k / 0.18, 0.0, 1.0)
 	var out := clampf((k - 0.82) / 0.18, 0.0, 1.0)
 	var sc := (0.4 + 0.6 * ease(inn, 0.3) + 0.12 * sin(inn * PI)) * (1.0 - 0.3 * out)
@@ -808,7 +808,7 @@ func _draw_cup_at(slot_x: float, depth: float, hop: float, lift: float, sq: floa
 	var p := _pose(slot_x, depth, hop)
 	var base: Vector2 = p[0]
 	var s: float = p[1]
-	base.y -= lift * _ch * 0.68
+	base.y -= lift * _ch * 0.64
 	var q := sq * cos((1.0 - sq) * 14.0)
 	var w := _cw * s * (1.0 + 0.1 * q)
 	var h := _ch * s * (1.0 - 0.1 * q)
