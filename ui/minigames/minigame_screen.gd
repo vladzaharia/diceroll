@@ -412,9 +412,9 @@ func _layout() -> void:
 	if land:
 		# board square on the left, the info column beside it (scaled up a notch: the
 		# landscape canvas is wider); the pair is centred
-		var k := 1.3
 		var side := minf(vs.y - top - safe.bottom - 90.0, vs.x * 0.56)
-		var col_w := minf(640.0 * k, vs.x - side - safe.left - safe.right - 80.0)
+		var col_w := minf(900.0, vs.x - side - safe.left - safe.right - 80.0)
+		var k := clampf(col_w / 560.0, 1.0, 1.55)
 		var cw := col_w / k
 		var x0 := (vs.x - side - 60.0 - col_w) * 0.5
 		board_r = Rect2(Vector2(x0, (vs.y - side) * 0.5 + 6.0), Vector2(side, side))
