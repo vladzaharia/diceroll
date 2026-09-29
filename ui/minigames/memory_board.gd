@@ -265,9 +265,9 @@ func play_update(ev: Dictionary) -> void:
 		var pts := int(info.get("points", 2))
 		if bool(nst.get("done", false)):
 			pts -= int(nst.get("actions_left", 0))
-		float_text(mid + Vector2(0, -_ch * 0.1), "+%d" % pts, GOLD, int(_cw * 0.42), 1.0)
+		float_text(mid + Vector2(0, -_ch * 0.1), "+%d" % pts, GOLD, int(_cw * 0.55), 1.0)
 		if streak >= 2:
-			float_text(mid + Vector2(0, _ch * 0.35), "STREAK x%d" % streak, Color("ffb3f0"), int(_cw * 0.3), 1.2)
+			float_text(mid + Vector2(0, _ch * 0.35), "STREAK x%d!" % streak, Color("ffc6f4"), int(_cw * 0.4), 1.2)
 		kick.emit(0.25 + 0.08 * mini(streak, 4), Color(1.0, 0.85, 0.4, 0.3))
 		state = nst
 		await wait(0.4)
@@ -280,7 +280,7 @@ func play_update(ev: Dictionary) -> void:
 		for c in [i, o]:
 			if c >= 0:
 				_shake_t[c] = time
-		float_text(mid, "MISS", Color("ffb0c0"), int(_cw * 0.36), 0.9)
+		float_text(mid, "MISS", Color("ffb0c0"), int(_cw * 0.44), 0.9)
 		_crack_heart()
 		kick.emit(0.2, Color(1.0, 0.3, 0.4, 0.25))
 		await wait(HOLD)
@@ -758,7 +758,7 @@ func _draw_banner() -> void:
 	var c := _grid.get_center() + _so
 	var win := _finale == "win"
 	var txt := "ALL PAIRS!" if win else "OUT OF MISSES"
-	var fs := int(minf(_cw * (0.62 if win else 0.44), size.x * 0.1) * pop)
+	var fs := int(minf(_cw * (0.8 if win else 0.52), size.x * (0.13 if win else 0.1)) * pop)
 	var font := UiTheme.display_font()
 	var tw := font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 	var bh := fs * 1.6
