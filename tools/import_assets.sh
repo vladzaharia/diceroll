@@ -73,6 +73,11 @@ for c in yellow red blue; do
 done
 lic "$PLAT" "$KK/platformer"
 
+echo "== KayKit Skeletons 1.1 (FREE): the minion's head/jaw/eyes make the Skull Buddy pet"
+SK="KayKit_Skeletons_1.1_FREE"
+sync "$SRC/$SK/characters/gltf" "$KK/skeletons" --include='Skeleton_Minion.glb' --include='*.png' --exclude='*'
+lic "$SK" "$KK/skeletons"
+
 echo "== KayKit ResourceBits EXTRA gems (Crystal Wisp pet; EXTRA = never committed, skipped if absent)"
 RB="KayKit_ResourceBits_1.0_EXTRA"
 if [ -d "$SRC/$RB/Assets/gltf" ]; then

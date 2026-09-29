@@ -17,6 +17,7 @@ extends Node3D
 ## Hover height of the body above the anchor (world units, before the level scale).
 const HOVER := 0.95
 const GEM_LARGE := "res://assets/kaykit/resource/Gem_Large.gltf"
+const SKELETON := "res://assets/kaykit/skeletons/Skeleton_Minion.glb"
 const GEM_SMALL := "res://assets/kaykit/resource/Gem_Small.gltf"
 const PIP_RADIUS := 0.36
 ## Per pet: accent (pips, glow, light), light energy.
@@ -61,6 +62,7 @@ var _acting := false
 var _lid: Node3D          # coin mimic lid (chomps)
 var _flame: Node3D        # lantern ghost flame (flickers)
 var _glint: MeshInstance3D  # guard die shield glint
+var _jaw: Node3D          # skull buddy jaw (chatters, bites)
 var _orbiters: Node3D     # crystal wisp: small gems circling it
 var _eyes: Array[Node3D] = []
 var _blink := 2.0
@@ -251,10 +253,38 @@ func _build_pumpkin() -> void:
 
 ## Skull Buddy: a floating skull with glowing green eyes and a wisp trail.
 func _build_skull() -> void:
-	_prop(Props.HAL + "skull.gltf", 0.46, Vector3(0, -0.2, 0))
-	for s in [-1.0, 1.0]:
-		_glow_sphere(model, Vector3(s * 0.085, 0.02, 0.17), 0.04, Color(0.55, 1.0, 0.3), 1.2, false)
-	_halo(model, Vector3(0, 0.0, 0.0), 0.8, Color(0.6, 1.0, 0.4), 0.2)
+	# the Skeletons pack's minion head + jaw + eyes (bind pose) when imported, else the
+	# Halloween skull prop
+	if ResourceLoader.exists(SKELETON):
+		var src: Node3D = load(SKELETON).instantiate()
+		var head := Node3D.new()
+		head.scale = Vector3.ONE * 0.42
+		head.position = Vector3(0, -0.66, 0.0)
+		model.add_child(head)
+		for part in ["Head", "Eyes", "Jaw"]:
+			var mi := src.find_child("Skeleton_Minion_" + part, true, false) as MeshInstance3D
+			if mi == null:
+				continue
+			var m := MeshInstance3D.new()
+			m.mesh = mi.mesh
+			m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			if part == "Jaw":
+				# pivot at the jaw hinge so bites can open it
+				_jaw = Node3D.new()
+				_jaw.position = Vector3(0, 1.45, -0.05)
+				head.add_child(_jaw)
+				m.position = -_jaw.position
+				_jaw.add_child(m)
+			else:
+				head.add_child(m)
+			if part == "Eyes":
+				m.material_override = Props.glow_material(Color(0.55, 1.0, 0.3), false, 1.4)
+		src.free()
+	else:
+		_prop(Props.HAL + "skull.gltf", 0.46, Vector3(0, -0.2, 0))
+		for s in [-1.0, 1.0]:
+			_glow_sphere(model, Vector3(s * 0.085, 0.02, 0.17), 0.04, Color(0.55, 1.0, 0.3), 1.2, false)
+	_halo(model, Vector3(0, 0.0, -0.05), 0.8, Color(0.6, 1.0, 0.4), 0.2)
 	_wisps(model, Vector3(0, -0.14, -0.1), Color(0.6, 1.0, 0.45, 0.7), 10)
 
 
@@ -586,6 +616,8 @@ func _process(dt: float) -> void:
 		light.light_energy = 1.8 + 0.4 * sin(_t * 9.0)
 	if _orbiters:
 		_orbiters.rotation.y = _t * 1.6
+	if _jaw and not _acting:
+		_jaw.rotation.x = maxf(0.0, sin(_t * 3.1)) * 0.18
 	if _glint:
 		var g := fmod(_t, 2.6)
 		_glint.scale = Vector3.ONE * (sin(clampf(g / 0.35, 0.0, 1.0) * PI) * 1.0 + 0.01)
@@ -640,6 +672,12 @@ func spin(time := 0.45) -> void:
 
 ## Opens wide (mimic lid / big squash) for a chomp.
 func chomp() -> void:
+	if _jaw:
+		var tj := _jaw.create_tween()
+		tj.tween_property(_jaw, "rotation:x", 0.7, 0.1 / speed)
+		tj.tween_property(_jaw, "rotation:x", 0.0, 0.08 / speed)
+		tj.tween_property(_jaw, "rotation:x", 0.5, 0.08 / speed)
+		tj.tween_property(_jaw, "rotation:x", 0.0, 0.08 / speed)
 	if _lid:
 		var t := _lid.create_tween()
 		t.tween_property(_lid, "rotation:x", -1.0, 0.1 / speed).set_trans(Tween.TRANS_QUAD)

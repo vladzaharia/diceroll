@@ -39,7 +39,8 @@ var cap := 0
 var pet_id := ""
 var pet_level := 0
 
-var _row: HBoxContainer
+var _row: BoxContainer
+var _mode := "top"
 var _tip: PanelContainer
 var _tip_tween: Tween
 var _flow: GameFlow
@@ -179,19 +180,28 @@ func _place() -> void:
 		visible = want
 	if not want or size.x <= 0.0:
 		return
-	var land := UiTheme.side_slot(size).size.x > 0.0
-	if land != _landscape:
-		_landscape = land
+	var safe := UiTheme.safe_margins(self)
+	var mode := _pick_mode(safe)
+	if mode != _mode:
+		_mode = mode
+		_landscape = mode != "top"
+		_set_vertical(mode == "side_v")
 		set_belt(belt)
-		meter.custom_minimum_size = Vector2.ONE * (METER_PX_LAND if land else METER_PX)
+		meter.custom_minimum_size = Vector2.ONE * (METER_PX_LAND if _landscape else METER_PX)
 	strip.reset_size()
 	var s := strip.get_combined_minimum_size()
 	strip.size = s
-	var left_band := (size.x - UiTheme.tray_width(size)) * 0.5
-	if land and left_band >= s.x + 40.0:
+	var band := (size.x - UiTheme.tray_width(size)) * 0.5
+	if _mode == "side_h":
 		# landscape: centred in the band left of the tray, level with the tray
 		var th := UiTheme.tray_height(size)
-		strip.position = Vector2((left_band - s.x) * 0.5, size.y - th * 0.5 - s.y * 0.5)
+		var x0 := safe.left
+		strip.position = Vector2(x0 + (band - x0 - s.x) * 0.5, size.y - th * 0.5 - s.y * 0.5)
+	elif _mode == "side_v":
+		# narrower landscape (4:3 tablets): a column in the band left of the tray, bottom-aligned
+		var x0 := safe.left
+		strip.position = Vector2(x0 + (band - x0 - s.x) * 0.5, size.y - safe.bottom - 24.0 - s.y)
+	if _mode != "top":
 		for t in tops:
 			(t as HudTop).reserve_right = 0.0
 			(t as HudTop).extra_bottom = 0.0
@@ -202,6 +212,36 @@ func _place() -> void:
 		for t in tops:
 			(t as HudTop).reserve_right = s.x + 16.0
 			(t as HudTop).extra_bottom = strip.get_global_rect().end.y - (t as HudTop).global_position.y
+
+
+## "side_h" (a row left of the tray, wide landscape), "side_v" (a column there, 4:3 landscape)
+## or "top" (under the HUD chips row: portrait, and landscape too narrow for the band).
+func _pick_mode(safe: UiTheme.Margins) -> String:
+	if size.x <= size.y:
+		return "top"
+	var band := (size.x - UiTheme.tray_width(size)) * 0.5 - safe.left
+	var n := cap + (1 if pet_id != "" else 0)
+	var len := n * (SLOT_PX_LAND + 8) + 30
+	if band >= len + 32.0:
+		return "side_h"
+	if band >= METER_PX_LAND + 40.0 and size.y - 260.0 >= len:
+		return "side_v"
+	return "top"
+
+
+func _set_vertical(on: bool) -> void:
+	if (_row is VBoxContainer) == on:
+		return
+	var nr: BoxContainer = UiTheme.vbox(8) if on else UiTheme.hbox(6)
+	nr.alignment = BoxContainer.ALIGNMENT_CENTER
+	var kids := _row.get_children()
+	for k in kids:
+		_row.remove_child(k)
+		nr.add_child(k)
+	strip.remove_child(_row)
+	_row.queue_free()
+	_row = nr
+	strip.add_child(_row)
 
 
 ## Screen centre of belt slot i (global canvas coordinates).

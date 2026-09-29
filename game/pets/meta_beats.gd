@@ -84,6 +84,7 @@ static func _potion_used(c: GameController, ev: Dictionary) -> void:
 	Audio.play_sfx("heal" if type in ["healing", "cleanse"] else "buff")
 	Fx.burst(world, hp + Vector3.UP * 1.3, {"amount": 20, "lifetime": 0.7, "speed": Vector2(1.0, 2.6), "spread": 60.0,
 		"gravity": Vector3(0, -3.5, 0), "size": 0.2, "color": col, "tex": "dot"})
+	_bottle_tip(c, world, hp, col)
 	var label := PotionDefs.name_of(type).to_upper()
 	if slot < 0:
 		label += "  (drunk at once)"
@@ -111,6 +112,21 @@ static func _potion_used(c: GameController, ev: Dictionary) -> void:
 			Fx.burst(world, hp + Vector3.UP * 0.4, {"amount": 16, "lifetime": 1.0, "speed": Vector2(0.3, 1.0), "spread": 40.0,
 				"gravity": Vector3(0, 1.8, 0), "radius": 0.45, "size": 0.26, "color": col, "tex": "dot", "explosiveness": 0.4})
 	await c.wait(0.35)
+
+
+## A little 3D bottle (KayKit dungeon) in the potion's colour tips up over the hero's head.
+static func _bottle_tip(c: GameController, world: Node3D, hp: Vector3, col: Color) -> void:
+	var b := Props.inst(Props.DUN + "bottle_A_labeled_green.gltf", 0.42, false)
+	Props.tint(b, col, 0.75, col * 0.35)
+	b.position = hp + Vector3.UP * 1.55
+	b.scale = Vector3.ONE * 0.05
+	world.add_child(b)
+	var t := b.create_tween()
+	t.tween_property(b, "scale", Vector3.ONE * 0.42, 0.14 / c.speed).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t.tween_property(b, "rotation:z", 2.3, 0.3 / c.speed).set_trans(Tween.TRANS_SINE)
+	t.parallel().tween_property(b, "position:y", hp.y + 1.85, 0.3 / c.speed)
+	t.tween_property(b, "scale", Vector3.ONE * 0.01, 0.16 / c.speed)
+	t.tween_callback(b.queue_free)
 
 
 ## Small icons flying across the screen (reroll pips, Crowns).
