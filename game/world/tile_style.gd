@@ -3,7 +3,7 @@ extends RefCounted
 ## Tile colours and the small 3D prop that identifies each tile type.
 
 const TYPES := ["start", "forge", "treasury", "portal", "enemy", "elite", "miniboss", "chest", "event", "campfire",
-	"trap", "ice", "lava", "empty"]
+	"trap", "ice", "lava", "minigame", "empty"]
 
 ## Inset top colour per type (sRGB).
 const COLORS := {
@@ -20,6 +20,7 @@ const COLORS := {
 	"trap": Color(0.5, 0.44, 0.52),
 	"ice": Color(0.66, 0.88, 1.0),
 	"lava": Color(1.0, 0.4, 0.12),
+	"minigame": Color(0.98, 0.42, 0.74),
 	"empty": Color(0.7, 0.66, 0.6),
 }
 
@@ -47,7 +48,7 @@ static func glyph(type: String) -> String:
 
 ## Builds the identifying prop for a tile type. Props sit around y = 0 (the tile top) and
 ## fit inside ~1.4 x 1.4. Enemy figures are not included (BoardView adds Characters).
-static func make_prop(type: String) -> Node3D:
+static func make_prop(type: String, game := "") -> Node3D:
 	var root := Node3D.new()
 	root.name = "Prop_" + type
 	match type:
@@ -85,6 +86,8 @@ static func make_prop(type: String) -> Node3D:
 			root.add_child(_ice_slab())
 		"lava":
 			root.add_child(_lava_vent())
+		"minigame":
+			root.add_child(MinigameProps.make(game))
 		"enemy":
 			pass
 		"elite":

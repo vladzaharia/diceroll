@@ -46,6 +46,15 @@ const SFX := {
 	"portal": [[DIGI + "phaseJump1.ogg", DIGI + "zapThreeToneUp.ogg"], -6.0],
 	"trap": [[IMPACT + "impactMining_000.ogg", IMPACT + "impactMining_001.ogg", IMPACT + "impactMining_002.ogg"], -1.0],
 	"chest": [[RPG + "creak1.ogg", RPG + "creak2.ogg", RPG + "metalLatch.ogg"], -2.0],
+	# minigames (ui/minigames)
+	"dig": [[IMPACT + "impactMining_003.ogg", IMPACT + "impactMining_004.ogg", IMPACT + "footstep_snow_000.ogg"], -3.0],
+	"clink": [[IMPACT + "impactPlate_light_000.ogg", IMPACT + "impactPlate_light_001.ogg", IMPACT + "impactPlate_light_002.ogg"], -4.0],
+	"pop": [[UI + "drop_001.ogg", UI + "drop_002.ogg", UI + "drop_003.ogg", UI + "drop_004.ogg"], -2.0],
+	"scratch": [[UI + "scratch_001.ogg", UI + "scratch_002.ogg", UI + "scratch_003.ogg", UI + "scratch_004.ogg", UI + "scratch_005.ogg"], -3.0],
+	"reveal": [[UI + "confirmation_001.ogg", UI + "confirmation_002.ogg"], -5.0],
+	"tick": [[UI + "tick_001.ogg", UI + "tick_002.ogg", UI + "tick_004.ogg"], -4.0],
+	"claw": [[RPG + "metalClick.ogg"], -2.0],
+	"whirr": [[UI + "maximize_003.ogg", UI + "maximize_006.ogg"], -6.0],
 }
 
 const M := "res://assets/audio/music/"

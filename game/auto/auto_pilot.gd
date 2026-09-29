@@ -149,7 +149,7 @@ func can_act() -> bool:
 	if ui.pause.visible or ui.settings.visible or ui.auto_settings.visible or ui.inspector.visible:
 		return false
 	var any_open := false
-	for m: UiModal in [ui.draft, ui.passive, ui.rune_assign, ui.shop, ui.forge, ui.event]:
+	for m: UiModal in [ui.draft, ui.passive, ui.rune_assign, ui.shop, ui.forge, ui.event, ui.minigame_reward]:
 		if m.visible:
 			# opening or closing: wait for the tween to finish
 			if not m.is_open() or m.scrim.modulate.a < 0.99:
@@ -205,8 +205,11 @@ func _present(cmd: Array, hold := 0.0) -> float:
 			var p := c.rig.camera.unproject_position(c.board.tile_global_position(t))
 			hud.highlight(Rect2(p - Vector2(60, 44), Vector2(120, 88)), dur)
 		"pick_draft":
-			var m: UiModal = ui.passive if String(c.flow.offer.get("kind", "")) == "passive" else ui.draft
+			var kind := String(c.flow.offer.get("kind", ""))
+			var m: UiModal = ui.passive if kind == "passive" else (ui.minigame_reward if kind == "reward" else ui.draft)
 			return _pick_card(m, int(a[0]), dur)
+		"minigame_auto", "minigame_finish":
+			hud.highlight(ui.minigame.auto_btn, dur)
 		"rune_assign":
 			ui.rune_assign.select(int(a[0]))
 			hud.highlight(_nth(ui.rune_assign.get("_chips"), int(a[0])), dur + PICK_EXTRA / c.speed)
