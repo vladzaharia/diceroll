@@ -1050,6 +1050,7 @@ func shop_buy(i: int, die_idx := -1) -> Array[Dictionary]:
 		"face_raise":
 			var f := run.dice[die_idx].lowest_face()
 			run.dice[die_idx].raise_face(f)
+			run.stats.face_edits = int(run.stats.get("face_edits", 0)) + 1
 			ev.append(_face_ev(die_idx, f))
 		"combat_reroll":
 			run.combat_rerolls += 1
@@ -1103,6 +1104,7 @@ func forge_apply(die_idx: int, face_idx: int, op: String, src_face := -1) -> Arr
 	if op != "skip":
 		var fs := String(offer.get("source", "tile"))
 		_upgrade("forge" if fs == "tile" else fs)
+		run.stats.face_edits = int(run.stats.get("face_edits", 0)) + 1
 	if op == "raise":
 		run.dice[die_idx].raise_face(face_idx)
 		ev.append(_face_ev(die_idx, face_idx))
@@ -1256,6 +1258,8 @@ func event_choose(i: int) -> Array[Dictionary]:
 					var f := run.dice[d].lowest_face()
 					if run.dice[d].raise_face(f):
 						ev.append(_face_ev(d, f))
+	if run.board.biome == "hollow":
+		run.stats.hollow_events = int(run.stats.get("hollow_events", 0)) + 1
 	if run.board.biome == "hollow" and run.hp > 0:
 		# Hollow twist: restless spirits mend you after every event.
 		var hh := run.heal(run.pct_of_max(Balance.HOLLOW_EVENT_HEAL_PCT))

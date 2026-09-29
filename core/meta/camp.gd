@@ -16,6 +16,11 @@ extends RefCounted
 ##   set_loadout(minigames, pet)  up to loadout_slots() owned minigames, one owned pet or ""
 ##   set_class(id) / set_mode("standard"|"short") / set_ascension(n)
 ##   bank_run(stats)            banks a finished run (game_over.stats)
+##   equip_skin(class, skin)    Wardrobe: equip an owned skin (free; prestige is a toggle)
+##   buy_skin(class, skin)      Wardrobe: buy a non-prestige skin for SkinDefs.BUY_PRICE Crowns
+##                              once every Crowns sink is maxed (Profile.crowns_capped())
+##   set_prestige(class, on)    Wardrobe: show / hide the owned A10 prestige overlay
+##   mark_skins_seen(class)     Wardrobe: clears the "new" dots of a class ("" = all)
 ##
 ## Events: crowns_changed {amount, total} · sigils_changed {amount, total} ·
 ##   upgrade_bought {track: "workshop"|"armory"|"arcade"|"pet_den", id, level} ·
@@ -23,7 +28,9 @@ extends RefCounted
 ##   pool_toggled {kind, id, enabled} · starter_kind_set {kind} ·
 ##   loadout_changed {class, mode, minigames, pet} · ascension_changed {selected, unlocked} ·
 ##   milestone {id, desc, unlocks} · first {kind, id, sigils} · run_banked {crowns, sigils,
-##   milestones, unlocked, ascension_unlocked} · error {msg}
+##   milestones, unlocked, ascension_unlocked, skins_unlocked} · skin_unlocked {class, skin,
+##   source: "record"|"crowns"} · skin_equipped {class, skin} · prestige_set {class, on} ·
+##   skins_seen {class} · error {msg}
 
 var profile: Profile
 
@@ -94,7 +101,7 @@ func level_pet(id: String) -> Array[Dictionary]:
 func unlock(kind: String, id: String) -> Array[Dictionary]:
 	if profile.owns(kind, id):
 		return _err("already unlocked")
-	var cost := UnlockDefs.sigil_cost(kind, id)
+	var cost := UnlockDefs.sigil_cost(kind, id, profile.unlocks.get("classes", []))
 	if cost.is_empty():
 		return _err("can't be bought: %s/%s" % [kind, id])
 	if not profile.can_afford(cost):
@@ -179,9 +186,56 @@ func bank_run(stats: Dictionary) -> Array[Dictionary]:
 		ev.append({"type": "unlocked", "kind": String(u[0]), "id": String(u[1]), "source": "milestone"})
 	if int(res.ascension_unlocked) > 0:
 		ev.append({"type": "ascension_changed", "selected": int(profile.ascension.selected), "unlocked": int(profile.ascension.unlocked)})
+	for sk in res.skins_unlocked:
+		ev.append({"type": "skin_unlocked", "class": String(sk[0]), "skin": String(sk[1]), "source": "record"})
 	ev.append({"type": "run_banked", "crowns": int(res.crowns), "sigils": int(res.sigils), "milestones": res.milestones,
-		"unlocked": res.unlocked, "ascension_unlocked": int(res.ascension_unlocked)})
+		"unlocked": res.unlocked, "ascension_unlocked": int(res.ascension_unlocked), "skins_unlocked": res.skins_unlocked})
 	return ev
+
+func equip_skin(class_id: String, skin: String) -> Array[Dictionary]:
+	if not SkinDefs.has(class_id, skin):
+		return _err("unknown skin %s/%s" % [class_id, skin])
+	if SkinDefs.is_prestige(skin):
+		return set_prestige(class_id, true)
+	if not profile.owns_skin(class_id, skin):
+		return _err("skin locked: " + SkinDefs.cond_text(class_id, skin))
+	var eq: Dictionary = profile.cosmetics.get("equipped", {})
+	eq[class_id] = skin
+	profile.cosmetics["equipped"] = eq
+	return [{"type": "skin_equipped", "class": class_id, "skin": skin}]
+
+func buy_skin(class_id: String, skin: String) -> Array[Dictionary]:
+	if not SkinDefs.has(class_id, skin):
+		return _err("unknown skin %s/%s" % [class_id, skin])
+	if profile.owns_skin(class_id, skin):
+		return _err("already owned")
+	if skin == "default" or SkinDefs.is_prestige(skin):
+		return _err("the prestige skin can't be bought")
+	if not profile.crowns_capped():
+		return _err("skins are for sale once every Crowns upgrade is maxed")
+	var cost := {"crowns": SkinDefs.BUY_PRICE}
+	if not profile.can_afford(cost):
+		return _err("not enough Crowns")
+	var ev := _pay(cost)
+	profile.grant_skin(class_id, skin)
+	ev.append({"type": "skin_unlocked", "class": class_id, "skin": skin, "source": "crowns"})
+	return ev
+
+func set_prestige(class_id: String, on: bool) -> Array[Dictionary]:
+	if not profile.owns_skin(class_id, "prestige"):
+		return _err("skin locked: " + SkinDefs.cond_text(class_id, "prestige"))
+	var pr: Dictionary = profile.cosmetics.get("prestige", {})
+	pr[class_id] = on
+	profile.cosmetics["prestige"] = pr
+	return [{"type": "prestige_set", "class": class_id, "on": on}]
+
+func mark_skins_seen(class_id := "") -> Array[Dictionary]:
+	var keep: Array = []
+	for u in profile.cosmetics.get("unseen", []):
+		if class_id != "" and not String(u).begins_with(class_id + ":"):
+			keep.append(u)
+	profile.cosmetics["unseen"] = keep
+	return [{"type": "skins_seen", "class": class_id}]
 
 ## Replays one command: [name, args...].
 func apply(cmd: Array) -> Array[Dictionary]:
@@ -197,6 +251,10 @@ func apply(cmd: Array) -> Array[Dictionary]:
 		"set_class": return set_class(String(cmd[1]))
 		"set_mode": return set_mode(String(cmd[1]))
 		"set_ascension": return set_ascension(int(cmd[1]))
+		"equip_skin": return equip_skin(String(cmd[1]), String(cmd[2]))
+		"buy_skin": return buy_skin(String(cmd[1]), String(cmd[2]))
+		"set_prestige": return set_prestige(String(cmd[1]), bool(cmd[2]))
+		"mark_skins_seen": return mark_skins_seen(String(cmd[1]) if cmd.size() > 1 else "")
 	return _err("unknown command " + str(cmd[0]))
 
 # ------------------------------------------------------------------ catalogue (UI + bot)
@@ -223,7 +281,14 @@ func catalog() -> Array:
 	for kind in UnlockDefs.SIGIL_PRICE:
 		for id in UnlockDefs.all_ids(kind):
 			if not profile.owns(kind, String(id)):
-				_cat(out, ["unlock", kind, id], "sigils", kind, String(id), String(id), 0, 1, UnlockDefs.sigil_cost(kind, String(id)))
+				_cat(out, ["unlock", kind, id], "sigils", kind, String(id), String(id), 0, 1,
+					UnlockDefs.sigil_cost(kind, String(id), profile.unlocks.get("classes", [])))
+	if profile.crowns_capped():
+		for cid in profile.unlocks.get("classes", []):
+			for s in SkinDefs.of(String(cid)):
+				if bool(s.buyable) and not profile.owns_skin(String(cid), String(s.id)):
+					_cat(out, ["buy_skin", cid, s.id], "wardrobe", "skins", "%s:%s" % [cid, s.id], String(s.name), 0, 1,
+						{"crowns": SkinDefs.BUY_PRICE})
 	return out
 
 func _cat(out: Array, cmd: Array, track: String, kind: String, id: String, name: String, lvl: int, mx: int, cost: Dictionary) -> void:

@@ -15,6 +15,24 @@ const KINDS := ["classes", "biomes", "bosses", "minibosses", "pets", "minigames"
 const SIGIL_PRICE := {
 	"classes": 8, "biomes": 5, "bosses": 4, "minibosses": 4, "pets": 6, "minigames": 6, "packs": 6, "gear": 4, "potions": 4,
 }
+## Per-id Sigil price overrides (the late classes cost more).
+const SIGIL_PRICE_BY_ID := {"classes": {"ninja": 10, "druid": 10, "engineer": 12, "necromancer": 12}}
+## Sigils can buy only the next SIGIL_NEXT_CLASSES locked classes in HeroDefs.IDS order.
+const SIGIL_NEXT_CLASSES := 2
+## Secret classes: never sold for Sigils, outside the next-two rule (HeroDefs.DATA[id].secret).
+static func is_secret_class(id: String) -> bool:
+	return bool((HeroDefs.DATA.get(id, {}) as Dictionary).get("secret", false))
+
+## The locked classes Sigils may buy now (the next two in unlock order, secrets excluded).
+static func buyable_classes(owned: Array) -> Array:
+	var out: Array = []
+	for id in HeroDefs.IDS:
+		if owned.has(id) or is_secret_class(String(id)):
+			continue
+		out.append(id)
+		if out.size() >= SIGIL_NEXT_CLASSES:
+			break
+	return out
 
 ## A fresh profile. Classes: Knight only (all four when the profile's lock_classes flag is off).
 ## Route: Glade -> Hollow -> Throne with the Pumpkin Knight and the Lich. No pet on run 1.
@@ -93,17 +111,26 @@ static func pool_from_packs(packs: Array, kind: String) -> Array:
 			out.append(id)
 	return out
 
-## Sigil price to unlock `id` of `kind` early; {} when it can't be bought.
-static func sigil_cost(kind: String, id: String) -> Dictionary:
+## Sigil price to unlock `id` of `kind` early; {} when it can't be bought. Classes: pass the
+## owned classes to apply the next-two rule (null skips it, e.g. for price labels).
+static func sigil_cost(kind: String, id: String, owned_classes: Variant = null) -> Dictionary:
 	if not SIGIL_PRICE.has(kind) or not all_ids(kind).has(id):
 		return {}
-	return {"sigils": int(SIGIL_PRICE[kind])}
+	if kind == "classes":
+		if is_secret_class(id):
+			return {}
+		if owned_classes is Array and not buyable_classes(owned_classes).has(id):
+			return {}
+	return {"sigils": int((SIGIL_PRICE_BY_ID.get(kind, {}) as Dictionary).get(id, SIGIL_PRICE[kind]))}
 
 # ------------------------------------------------------------------ milestones
 
 ## Milestones, checked after every banked run against Profile.records (counters are cumulative
 ## over all runs; best_* are records). A milestone fires once and grants its unlocks for free.
-## cond: {stat, min} or {any: [cond, ...]}. Stats: runs, laps, fights, minigames, rerolls, kept,
+## cond: {stat, min}, {class_wins: id, min}, {boss_kills: id, min}, {any: [...]} or {all: [...]}.
+## A milestone may be `hidden` (a secret: the shelf shows its hint only). Stats: runs, laps,
+## fights, minigames, rerolls, kept, face_edits, kills, hollow_events, classes_at_boss,
+## classes_owned,
 ## poison_kills, cashouts, block, straights, minibosses_reached, minibosses_killed,
 ## bosses_reached, wins, act2_runs, act3_runs, frost_visits, throne_wins, mage_wins,
 ## full_runes, best_lap.
@@ -154,6 +181,25 @@ const MILESTONES := [
 			["minibosses", "mini_moonfang"], ["minibosses", "mini_orc_warchief"]]},
 	{"id": "archmage", "run": 20, "desc": "Win 3 runs with the Mage.", "cond": {"stat": "mage_wins", "min": 3},
 		"unlocks": [["packs", "pyromancy"]]},
+	# --- class unlock table (docs/design/2026-09-28-classes-enemies-skins.md §2.2)
+	{"id": "oathsworn", "run": 6, "desc": "Win a run with the Knight, or play 8 runs.",
+		"cond": {"any": [{"class_wins": "knight", "min": 1}, {"stat": "runs", "min": 8}]}, "unlocks": [["classes", "paladin"]]},
+	{"id": "pathfinder_trail", "run": 13, "desc": "Reach the final boss with 3 different classes, or play 16 runs.",
+		"cond": {"any": [{"stat": "classes_at_boss", "min": 3}, {"stat": "runs", "min": 16}]}, "unlocks": [["classes", "ranger"]]},
+	{"id": "shadow_pact", "run": 19, "desc": "Win a run with the Rogue, or use 1,800 combat rerolls, or play 22 runs.",
+		"cond": {"any": [{"class_wins": "rogue", "min": 1}, {"stat": "rerolls", "min": 1800}, {"stat": "runs", "min": 22}]},
+		"unlocks": [["classes", "ninja"]]},
+	{"id": "long_road", "run": 23, "desc": "Complete 250 laps in total, or play 26 runs.",
+		"cond": {"any": [{"stat": "laps", "min": 250}, {"stat": "runs", "min": 26}]}, "unlocks": [["classes", "druid"]]},
+	{"id": "tinker_bench", "run": 27, "desc": "Edit 60 die faces (Forge edits and Face Raises), or play 30 runs.",
+		"cond": {"any": [{"stat": "face_edits", "min": 60}, {"stat": "runs", "min": 30}]}, "unlocks": [["classes", "engineer"]]},
+	{"id": "grave_calling", "run": 32, "desc": "Defeat the Bone Warden twice, or defeat 1,000 enemies, or play 36 runs.",
+		"cond": {"any": [{"boss_kills": "boss_bone_warden", "min": 2}, {"stat": "kills", "min": 1000}, {"stat": "runs", "min": 36}]},
+		"unlocks": [["classes", "necromancer"]]},
+	{"id": "trick_or_treat", "run": 23, "hidden": true, "hint": "Something in the Hollow wants to play dress-up.",
+		"desc": "Finish 13 events in The Hollow while owning 6 classes, or play 40 runs.",
+		"cond": {"any": [{"all": [{"stat": "hollow_events", "min": 13}, {"stat": "classes_owned", "min": 6}]}, {"stat": "runs", "min": 40}]},
+		"unlocks": [["classes", "monster_kid"]]},
 	{"id": "rune_lord", "run": 24, "desc": "In 15 runs, fight with 5 dice that all carry runes.", "cond": {"stat": "full_runes", "min": 15},
 		"unlocks": [["packs", "resonance"]]},
 ]

@@ -52,6 +52,9 @@ var potions: int = 0
 var pet_state: Dictionary = {}
 ## Board rerolls left in this lap's pool (Boots, Crystal Wisp perk); refilled on every lap.
 var lap_rerolls: int = 0
+## Equipped skin (SkinDefs slot id) and the A10 prestige overlay: presentation only.
+var skin: String = "default"
+var skin_prestige: bool = false
 ## A7 biome curse: faces set to 1 until the next Forge visit: [{die, face, value}].
 var cursed_faces: Array[Dictionary] = []
 
@@ -362,6 +365,7 @@ func to_dict() -> Dictionary:
 		"route": Array(route), "miniboss_id": miniboss_id, "boss_id": boss_id, "chill": chill,
 		"meta": meta.duplicate(true), "mode": mode, "belt": Array(belt), "potions": potions, "potion_cap": potion_cap,
 		"pet_state": pet_state.duplicate(true), "lap_rerolls": lap_rerolls, "cursed_faces": cursed_faces.duplicate(true),
+		"skin": skin, "skin_prestige": skin_prestige,
 	}
 
 static func from_dict(d: Dictionary) -> RunState:
@@ -409,6 +413,8 @@ static func from_dict(d: Dictionary) -> RunState:
 	r.sync_potions()
 	r.potion_cap = int(d.get("potion_cap", 0))
 	r.lap_rerolls = int(d.get("lap_rerolls", 0))
+	r.skin = String(d.get("skin", "default"))
+	r.skin_prestige = bool(d.get("skin_prestige", false))
 	for c in d.get("cursed_faces", []):
 		r.cursed_faces.append({"die": int(c.die), "face": int(c.face), "value": int(c.value)})
 	var pst: Dictionary = d.get("pet_state", {})

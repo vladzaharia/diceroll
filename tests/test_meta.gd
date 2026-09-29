@@ -122,12 +122,14 @@ func test_camp_traits_are_switchable_after_level_4() -> void:
 func test_camp_sigil_unlocks_and_pool_toggle() -> void:
 	var p := Profile.fresh()
 	var camp := Camp.new(p)
-	assert_eq(camp.unlock("classes", "mage")[0].type, "error", "no Sigils")
+	assert_eq(camp.unlock("classes", "paladin")[0].type, "error", "no Sigils")
 	p.sigils = 20
-	var ev := camp.unlock("classes", "mage")
-	assert_eq(_first(ev, "unlocked"), {"type": "unlocked", "kind": "classes", "id": "mage", "source": "sigils"})
+	assert_eq(camp.unlock("classes", "mage")[0].type, "error", "only the next two locked classes")
+	var ev := camp.unlock("classes", "paladin")
+	assert_eq(_first(ev, "unlocked"), {"type": "unlocked", "kind": "classes", "id": "paladin", "source": "sigils"})
 	assert_eq(p.sigils, 20 - int(UnlockDefs.SIGIL_PRICE.classes))
-	assert_eq(camp.unlock("classes", "mage")[0].type, "error", "already owned")
+	assert_eq(camp.unlock("classes", "paladin")[0].type, "error", "already owned")
+	assert_eq(UnlockDefs.buyable_classes(p.unlocks.classes), ["barbarian", "mage"])
 	# pool toggle: at most 25% of each unlocked pool off
 	var owned := p.pool("runes").size()
 	var allowed := int(floor(owned * UnlockDefs.POOL_TOGGLE_MAX))
