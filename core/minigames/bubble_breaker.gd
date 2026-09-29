@@ -127,7 +127,7 @@ func score() -> float:
 	return float(popped + bonus)
 
 func _public() -> Dictionary:
-	return {"w": W, "h": H, "colors": COLORS, "min_cluster": MIN_CLUSTER, "grid": Array(grid), "popped": popped,
+	return {"w": W, "h": H, "colors": COLORS, "min_cluster": MIN_CLUSTER, "grid": grid.duplicate(), "popped": popped,
 		"chain": chain, "best": best}
 
 func _save() -> Dictionary:

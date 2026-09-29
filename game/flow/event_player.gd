@@ -247,6 +247,9 @@ func _one(ev: Dictionary) -> void:
 			await _wait(1.1)
 		"combat_won":
 			await c.end_combat(ev)
+		# --- minigames (game/minigames/minigame_beats.gd) ---------------------------------
+		"minigame_started", "minigame_update", "minigame_result", "crowns_pending":
+			await MinigameBeats.play(c, ev)
 		_:
 			pass
 

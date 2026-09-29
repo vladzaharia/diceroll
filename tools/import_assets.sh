@@ -225,6 +225,30 @@ sync "$MYS/4 - October 2023 - Werewolf/assets/gltf" "$KK/mystery/woodcutter"
 sync "$MYS/10 - April 2024 - Paladin/assets/gltf" "$KK/mystery/paladin" --include='paladin_statue*' \
 	--include='paladin_texture_A.png' --exclude='*'
 cp -f "$MYS/License.txt" "$KK/mystery/License.txt" 2>/dev/null || true
+echo "== Minigames (WP-E2): dig treasures, claw prizes, dig tools (EXTRA packs: never commit these)"
+RB="KayKit_ResourceBits_1.0_EXTRA"
+rb_keep=""
+for f in Gem_Large Gem_Medium Gem_Small Gems_Pile_Small Gems_Chest Money_Pile_Small Money_Coins_Stack_Medium Gold_Nugget_Large; do
+	rb_keep="$rb_keep --include=$f.gltf --include=$f.bin"
+done
+# shellcheck disable=SC2086
+sync "$SRC/$RB/Assets/gltf" "$KK/resources" $rb_keep --include='resource_bits_texture.png' --exclude='*'
+lic "$RB" "$KK/resources"
+TX="KayKit_RPGToolsBits_1.0_EXTRA"
+tx_keep=""
+for f in pickaxe magnifying_glass map_rolled trowel lantern shovel; do
+	tx_keep="$tx_keep --include=$f.gltf --include=$f.bin"
+done
+# shellcheck disable=SC2086
+sync "$SRC/$TX/Assets/gltf" "$KK/tools_extra" $tx_keep --include='tools_bits_texture.png' --exclude='*'
+lic "$TX" "$KK/tools_extra"
+MM="KayKit_Mystery_Monthly_Series_4"
+sync "$SRC/$MM/11 - May 2024 - Clown/assets/gltf" "$KK/mystery/clown" --include='balloon_dog_*' --include='clown_ball.*' \
+	--include='clown_texture.png' --exclude='*'
+mkdir -p "$KK/mystery/figures"
+cp -f "$SRC/$MM/12 - June 2024 - Robot/characters/Robot_One.glb" "$KK/mystery/figures/Robot_One.glb"
+cp -f "$SRC/$MM/6 - December 2023 - Action Figure/character/gltf/ActionFigure.glb" "$KK/mystery/figures/ActionFigure.glb"
+lic "$MM" "$KK/mystery"
 
 echo "== Music beds (mixkit, re-encoded to 96 kbps mp3 to keep the repo lean)"
 MUS="$DST/audio/music"

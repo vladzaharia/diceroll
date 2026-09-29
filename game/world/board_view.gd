@@ -170,7 +170,7 @@ func _norm(t: Dictionary) -> Dictionary:
 	if type == "":
 		type = "empty"
 	var enemies: Array = t.get("enemies", [])
-	return {"type": type, "enemies": enemies.duplicate(), "elite": bool(t.get("elite", type == "elite"))}
+	return {"type": type, "enemies": enemies.duplicate(), "elite": bool(t.get("elite", type == "elite")), "game": String(t.get("game", ""))}
 
 
 func _build_tile(i: int) -> void:
@@ -230,7 +230,7 @@ func _dress_tile(i: int, animate: bool) -> void:
 	holder.position = Vector3(0, TILE_TOP, 0)
 	_tile_nodes[i].add_child(holder)
 	var type := String(t.type)
-	holder.add_child(TileStyle.make_prop(type))
+	holder.add_child(TileStyle.make_prop(type, String(t.get("game", ""))))
 	var figs: Array[Character] = []
 	var ids: Array = t.enemies
 	if type == "miniboss" and not ids.is_empty():

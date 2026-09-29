@@ -1495,7 +1495,7 @@ func _minigame_result(ratio: float, auto: bool) -> Array[Dictionary]:
 	var ev: Array[Dictionary] = []
 	var id := minigame.id
 	var tier := MinigameDefs.tier_for(ratio)
-	var mult := MinigameDefs.skill_mult(ratio) * MinigameDefs.mastery_mult(minigame.level)
+	var mult := MinigameDefs.skill_mult(ratio, id) * MinigameDefs.mastery_mult(minigame.level)
 	var crowns := int(Economy.CROWNS_MINIGAME[tier])
 	run.stats.minigame_crowns = int(run.stats.get("minigame_crowns", 0)) + crowns
 	ev.append({"type": "minigame_result", "id": id, "score": minigame.score(), "ratio": snappedf(ratio, 0.001), "tier": tier,

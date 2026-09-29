@@ -245,10 +245,10 @@ func _in_run() -> bool:
 func _phase_modal_open() -> bool:
 	if ui == null:
 		return false
-	for m: UiModal in [ui.draft, ui.passive, ui.rune_assign, ui.shop, ui.forge, ui.event]:
+	for m: UiModal in [ui.draft, ui.passive, ui.rune_assign, ui.shop, ui.forge, ui.event, ui.minigame_reward]:
 		if m.visible:
 			return true
-	return false
+	return ui.minigame != null and ui.minigame.visible
 
 
 func _layout() -> void:
