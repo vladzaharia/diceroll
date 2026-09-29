@@ -6,6 +6,7 @@ extends Node
 ## --scenario=<name>  replaces the main scene with Scenarios.build(name)
 ## --shot=<png>       after --wait seconds saves the viewport, prints "SHOT_SAVED <path>", quits
 ## --frames=N         additionally saves N more shots 0.25 s apart as <png>_1.._N
+## --ui-scale=F       multiplies the window's content_scale_factor (UI zoom / OS scaling tests)
 ## Without --shot the scenario just runs (handy for manual poking).
 ## A safety timer force-quits wait + frames*0.25 + 10 s after start.
 
@@ -20,6 +21,8 @@ func _ready() -> void:
 	if not args.has("scenario"):
 		return
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	if args.has("ui-scale"):
+		get_window().content_scale_factor *= float(args["ui-scale"])
 	var wait := float(args.get("wait", "1.5"))
 	var frames := int(args.get("frames", "0"))
 	if args.has("shot"):
