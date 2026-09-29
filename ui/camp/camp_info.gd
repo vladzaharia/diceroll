@@ -35,7 +35,10 @@ const MINIGAME_COLOR := {"fossil_hunter": Color("e0b070"), "bubble_breaker": Col
 	"scratch_off": Color("ffc93d"), "claw_machine": Color("ff6fae"), "bubble_shooter": Color("7f8cff"), "plinko": Color("5fe0c0"),
 	"shell_game": Color("e08a4a"), "memory_match": Color("b58cff"), "fishing": Color("4ac0e8"), "lucky_wheel": Color("ff7a5a"),
 	"high_low": Color("9ae05a")}
-const GEAR_ICON := {"helm": "shield", "blade": "sword", "boots": "speed", "charm": "coin"}
+const GEAR_ICON := {"helm": "shield", "blade": "sword", "boots": "speed", "charm": "coin",
+	"weapon": "sword", "offhand": "shield", "armor": "shield", "trinket": "coin"}
+## Armory rank groups (the "gear" unlock kind since the real-item Armory).
+const GROUP_NAME := {"weapon": "Weapon rank", "offhand": "Off-hand rank", "armor": "Armor rank", "trinket": "Trinket rank"}
 const FEATURE_NAME := {"potion_belt": "Third Potion Slot", "loadout_slot": "Third Minigame Slot"}
 
 ## Camp stations in display order: id -> {name, icon, color, blurb}.
@@ -63,7 +66,7 @@ static func name_of(kind: String, id: String) -> String:
 		"packs":
 			return String(UnlockDefs.PACKS[id].name) if UnlockDefs.PACKS.has(id) else id
 		"gear":
-			return GearDefs.name_of(id)
+			return String(GROUP_NAME.get(id, GearDefs.name_of(id)))
 		"potions":
 			return PotionDefs.name_of(id)
 		"features":
@@ -128,7 +131,7 @@ static func station_state(p: Profile, id: String) -> Dictionary:
 	match id:
 		"armory":
 			if (p.unlocks.get("gear", []) as Array).is_empty():
-				return {"locked": true, "text": String(milestone_for("gear", "helm").get("desc", "Finish a run."))}
+				return {"locked": true, "text": String(milestone_for("gear", "armor").get("desc", "Finish a run."))}
 		"pet_den":
 			if (p.unlocks.get("pets", []) as Array).is_empty():
 				return {"locked": true, "text": String(milestone_for("pets", "pumpkin_sprite").get("desc", "Reach lap 5."))}

@@ -96,7 +96,7 @@ static func all_ids(kind: String) -> Array:
 		"pets": return PetDefs.IDS.duplicate()
 		"minigames": return MinigameDefs.IDS.duplicate()
 		"packs": return PACK_IDS.duplicate()
-		"gear": return GearDefs.SLOTS.duplicate()
+		"gear": return ItemDefs.GROUPS.duplicate()
 		"potions": return PotionDefs.IDS.duplicate()
 		"features": return ["potion_belt", "loadout_slot", "affixes"]
 		"runes": return Runes.IDS.duplicate()
@@ -143,21 +143,22 @@ static func sigil_cost(kind: String, id: String, owned_classes: Variant = null) 
 ## `run` is the design target (median run number for the sim's greedy bot, fresh profile).
 const MILESTONES := [
 	{"id": "first_steps", "run": 1, "desc": "Finish your first run.", "cond": {"stat": "runs", "min": 1},
-		"unlocks": [["gear", "helm"]]},
+		"unlocks": [["gear", "armor"]]},
 	{"id": "lap_five", "run": 1, "desc": "Reach lap 5.", "cond": {"stat": "best_lap", "min": 5},
 		"unlocks": [["pets", "pumpkin_sprite"]]},
 	{"id": "wanderer", "run": 2, "desc": "Complete 20 laps in total.", "cond": {"stat": "laps", "min": 20},
-		"unlocks": [["gear", "blade"], ["biomes", "crypt"]]},
+		"unlocks": [["gear", "weapon"], ["biomes", "crypt"], ["items", "hand_axe"], ["items", "coin_purse"]]},
 	{"id": "brawler", "run": 3, "desc": "Win 45 fights in total.", "cond": {"stat": "fights", "min": 45},
 		"unlocks": [["classes", "barbarian"], ["features", "affixes"]]},
 	{"id": "gate_crasher", "run": 4, "desc": "Reach the mini-boss twice.", "cond": {"stat": "minibosses_reached", "min": 2},
-		"unlocks": [["packs", "gamblers_kit"], ["gear", "boots"]]},
+		"unlocks": [["packs", "gamblers_kit"], ["gear", "offhand"], ["items", "compass"], ["items", "lantern"]]},
 	{"id": "arcade_regular", "run": 5, "desc": "Play 14 minigames.", "cond": {"stat": "minigames", "min": 14},
 		"unlocks": [["minigames", "fossil_hunter"]]},
 	{"id": "deep_delver", "run": 7, "desc": "Reach the third biome in 7 runs.", "cond": {"stat": "act3_runs", "min": 7},
 		"unlocks": [["biomes", "frost"], ["potions", "stoneskin"]]},
 	{"id": "boss_seen", "run": 6, "desc": "Reach the final boss 5 times.", "cond": {"stat": "bosses_reached", "min": 5},
-		"unlocks": [["pets", "skull_buddy"], ["gear", "charm"], ["features", "potion_belt"]]},
+		"unlocks": [["pets", "skull_buddy"], ["gear", "trinket"], ["features", "potion_belt"], ["items", "crossbow"],
+			["items", "healers_flask"]]},
 	{"id": "frostbitten", "run": 8, "desc": "Visit Frostpeak.", "cond": {"stat": "frost_visits", "min": 1},
 		"unlocks": [["packs", "cold_steel"]]},
 	{"id": "champion", "run": 10, "desc": "Defeat 5 mini-bosses.", "cond": {"stat": "minibosses_killed", "min": 5},
@@ -249,6 +250,9 @@ const MILESTONES := [
 	{"id": "sun_seeker", "run": 21, "desc": "Defeat 4 different final bosses, or play 22 runs.",
 		"cond": {"any": [{"stat": "boss_kinds", "min": 4}, {"stat": "runs", "min": 22}]},
 		"unlocks": [["biomes", "ruins"], ["bosses", "boss_sand_colossus"]]},
+	# --- 2026-09-29 Armory (docs/design/2026-09-29-armory-items.md §4.5): the skeleton cloaks
+	{"id": "bone_collector", "run": 20, "desc": "Defeat 300 skeletons.", "cond": {"stat": "skeleton_kills", "min": ItemDefs.SKELETON_KILLS},
+		"unlocks": [["items", "bone_cloak"], ["items", "tattered_cloak"], ["items", "grave_cape"]]},
 ]
 
 static func milestone(id: String) -> Dictionary:

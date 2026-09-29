@@ -52,6 +52,8 @@ var extra_dice: Array[Die] = []    # temporary dice for this fight (Bone dice), 
 var pending_bones: int = 0         # Bone dice raised this turn: they join the pool next turn
 var attack_target: int = -1        # the main attack's target this turn (BOO!)
 var bones_raised: int = 0          # Bone dice raised this fight (max ClassLogic.BONE_MAX)  # runes that triggered in the last attack [{rune, value, die}] (Grimoire)
+# Armory items (ItemLogic): this fight's item bookkeeping (attacks, rampage, spark, vanish, focus...)
+var item_state: Dictionary = {}
 
 # ---------------------------------------------------------------- setup
 
@@ -102,6 +104,11 @@ func begin(run: RunState, ids: Array, p_elite: bool, p_boss: bool, p_tile: int, 
 		ev.append({"type": "status", "target": "hero", "status": "chill", "value": run.chill})
 		run.chill = 0
 	ev.append_array(ClassLogic.on_combat_start(run, self))
+	ev.append_array(ItemLogic.on_combat_start(run, self))
+	if all_dead():
+		# the Opening Volley finished the fight before the first turn
+		ev.append_array(_win(run))
+		return ev
 	ev.append_array(start_turn(run))
 	return ev
 
@@ -242,6 +249,7 @@ func start_turn(run: RunState) -> Array[Dictionary]:
 	var cev := ClassLogic.before_turn(run, self)
 	var pd := pool_dice(run)
 	run.stats.combat_turns = int(run.stats.get("combat_turns", 0)) + 1
+	var prev_block := run.block
 	run.block = 0
 	rerolls_left = run.combat_rerolls + run.banked_rerolls
 	run.banked_rerolls = 0
@@ -260,8 +268,6 @@ func start_turn(run: RunState) -> Array[Dictionary]:
 		pev.append({"type": "block_gained", "target": "hero", "amount": run.block, "total": run.block})
 	if not run.meta.is_empty():
 		var extra := 0
-		if turn == 1 and run.has_trait("helm_bulwark"):
-			extra += int(GearDefs.TRAIT_BONUS.helm_bulwark)
 		if stoneskin > 0:
 			extra += stoneskin
 			stoneskin = 0
@@ -271,6 +277,7 @@ func start_turn(run: RunState) -> Array[Dictionary]:
 			pev.append({"type": "block_gained", "target": "hero", "amount": extra, "total": run.block})
 		if boost:
 			rerolls_left += 1
+		pev.append_array(ItemLogic.turn_start(run, self, prev_block))
 	var n := pd.size()
 	marked.resize(n)
 	marked.fill(false)
@@ -300,6 +307,7 @@ func start_turn(run: RunState) -> Array[Dictionary]:
 		dice_values[i] = pd[i].value(dice_faces[i])
 		all.append(i)
 	ev.append({"type": "dice_rolled", "values": dice_values.duplicate(), "indices": all, "context": "combat", "faces": dice_faces.duplicate(), "rerolls_left": rerolls_left})
+	ev.append_array(ItemLogic.after_roll(run, self))
 	ev.append_array(PetLogic.on_turn_start(run, self))
 	ev.append_array(ClassLogic.on_turn_start(run, self))
 	return ev
@@ -344,6 +352,7 @@ func reroll(run: RunState) -> Array[Dictionary]:
 		refunded = true
 		ev.append(_passive("encore", 1))
 	ev.append_array(ClassLogic.on_reroll(run, self, idx, refunded))
+	ev.append_array(ItemLogic.on_reroll(run, self, idx))
 	ev.append_array(PetLogic.on_reroll(run))
 	ev.push_front({"type": "dice_rolled", "values": dice_values.duplicate(), "indices": idx, "context": "combat", "faces": dice_faces.duplicate(), "rerolls_left": rerolls_left})
 	return ev
@@ -462,6 +471,7 @@ func attack(run: RunState) -> Array[Dictionary]:
 	var bonus := int(cls_bonus[1])
 	var flat := 0
 	var act := rune_active(run, group, eff)
+	ItemLogic.arcana(run, self, pd, act, times, ev)
 	last_runes.clear()
 	for i in act.size():
 		if act[i]:
@@ -520,15 +530,13 @@ func attack(run: RunState) -> Array[Dictionary]:
 			ev.append(_passive("midas_fist", m))
 	var factor := 1.0
 	if not run.meta.is_empty():
-		if cid == "pair" and run.has_trait("blade_pair"):
-			flat += int(GearDefs.TRAIT_BONUS.blade_pair)
-			ev.append({"type": "trait_triggered", "id": "blade_pair", "value": int(GearDefs.TRAIT_BONUS.blade_pair)})
-		if cid == "high_roller" and run.has_trait("blade_high"):
-			flat += int(GearDefs.TRAIT_BONUS.blade_high)
-			ev.append({"type": "trait_triggered", "id": "blade_high", "value": int(GearDefs.TRAIT_BONUS.blade_high)})
-		if boss and turn == 1 and run.has_trait("blade_boss_opener") and int(run.stats.get("boss_stage", 0)) == 0:
-			factor *= float(GearDefs.TRAIT_BONUS.blade_boss_opener)
-			ev.append({"type": "trait_triggered", "id": "blade_boss_opener", "value": 0})
+		var im := ItemLogic.attack_mods(run, self, cid, pd, eff, group, act, mult, ev)
+		mult += float(im.mult)
+		bonus += int(im.bonus)
+		flat += int(im.flat)
+		factor *= float(im.factor)
+		if cid == "high_roller":
+			run.stats.high_rollers = int(run.stats.get("high_rollers", 0)) + 1
 		for i in rerolled.size():
 			if not rerolled[i]:
 				run.stats.kept_dice = int(run.stats.get("kept_dice", 0)) + 1
@@ -552,18 +560,13 @@ func attack(run: RunState) -> Array[Dictionary]:
 	var soak := int(enemies[target].hp) + int(enemies[target].block) if alive(target) else 0
 	var tgt0 := target
 	attack_target = tgt0
+	if not run.meta.is_empty():
+		ev.append_array(ItemLogic.pre_hit(run, self))
+		soak = int(enemies[target].hp) + int(enemies[target].block) if alive(target) else 0
 	ev.append_array(damage_enemy(target, total, "attack", run))
 	ev.append_array(ClassLogic.after_main_hit(run, self, tgt0, last_overkill))
-	if run.has_trait("blade_overflow") and not alive(tgt0) and total > soak:
-		var spill := int(floor((total - soak) * float(GearDefs.TRAIT_BONUS.blade_overflow)))
-		var nxt := -1
-		for j in enemies.size():
-			if alive(j):
-				nxt = j
-				break
-		if spill > 0 and nxt >= 0:
-			ev.append({"type": "trait_triggered", "id": "blade_overflow", "value": spill})
-			ev.append_array(damage_enemy(nxt, spill, "cleave", run))
+	if not run.meta.is_empty():
+		ev.append_array(ItemLogic.after_hit(run, self, tgt0, total, soak, cid, pd, eff, group, act))
 	if alive(tgt0) and total > 0 and has_trait(enemies[tgt0], "frenzy"):
 		ev.append_array(_frenzy(tgt0))
 	if thorny and total > 0:
@@ -579,10 +582,11 @@ func attack(run: RunState) -> Array[Dictionary]:
 	for i in pd.size():
 		if pd[i].rune == "ember" and act[i]:
 			for k in times[i]:
-				ev.append(_rune(i, "ember", "damage_all", 6))
+				var emb := 6 + ItemLogic.rune_dmg(run)
+				ev.append(_rune(i, "ember", "damage_all", emb))
 				for j in enemies.size():
 					if alive(j):
-						ev.append_array(damage_enemy(j, 6, "ember", run))
+						ev.append_array(damage_enemy(j, emb, "ember", run))
 	# Thunder (REROLLED): pips to a random enemy
 	for i in pd.size():
 		if pd[i].rune == "thunder" and act[i]:
@@ -591,8 +595,9 @@ func attack(run: RunState) -> Array[Dictionary]:
 				if a.is_empty():
 					break
 				var j: int = run.rng.pick(a)
-				ev.append(_rune(i, "thunder", "damage_random", int(eff[i])))
-				ev.append_array(damage_enemy(j, int(eff[i]), "thunder", run))
+				var thd := int(eff[i]) + (ItemLogic.rune_dmg(run) if int(eff[i]) > 0 else 0)
+				ev.append(_rune(i, "thunder", "damage_random", thd))
+				ev.append_array(damage_enemy(j, thd, "thunder", run))
 	if run.has_passive("gold_tooth"):
 		var sixes := 0
 		for i in pd.size():
@@ -618,8 +623,9 @@ func attack(run: RunState) -> Array[Dictionary]:
 			match rune:
 				"venom":
 					if alive(target):
-						enemies[target].poison = int(enemies[target].poison) + pips
-						ev.append(_rune(i, rune, "poison", pips))
+						var vp := pips + (ItemLogic.venom_bonus(run) if pips > 0 else 0)
+						enemies[target].poison = int(enemies[target].poison) + vp
+						ev.append(_rune(i, rune, "poison", vp))
 						ev.append({"type": "status", "target": target, "status": "poison", "value": int(enemies[target].poison)})
 				"frost":
 					if alive(target):
@@ -633,6 +639,8 @@ func attack(run: RunState) -> Array[Dictionary]:
 					run.stats.block_gained = int(run.stats.get("block_gained", 0)) + pips
 					ev.append(_rune(i, rune, "block", pips))
 					ev.append({"type": "block_gained", "target": "hero", "amount": pips, "total": run.block})
+					if pips > 0:
+						ev.append_array(ItemLogic.steadfast(run, self))
 				"vampire":
 					# lifesteal on a kill: only when this attack killed an enemy
 					if killed > 0:
@@ -706,6 +714,7 @@ func damage_enemy(i: int, amount: int, source: String, run: RunState, ignore_blo
 			ev.append({"type": "hp_changed", "amount": h, "total": run.hp, "source": "bloodthirst", "max_hp": run.max_hp})
 		var ok := last_overkill
 		ev.append_array(ClassLogic.on_enemy_killed(run, self, i, source))
+		ev.append_array(ItemLogic.on_kill(run, self, i))
 		last_overkill = ok
 	elif not e.boss and int(e.phase) == 1 and float(e.hp) <= float(e.max_hp) * transform_at and EnemyDefs.transforms(String(e.id)):
 		# transform: once at <= 50% HP; drops its Block and re-rolls its intent from phase 2
@@ -855,6 +864,9 @@ func _hit_hero(run: RunState, i: int, v: int, out_dealt: Array = [], force_pierc
 	var ev: Array[Dictionary] = []
 	var e := enemies[i]
 	var pierce := force_pierce or has_trait(e, "pierce")
+	if not run.meta.is_empty():
+		v = ItemLogic.incoming(run, self, i, v, ev)
+	var block_before := run.block
 	var blocked := 0 if pierce else mini(run.block, v)
 	run.block -= blocked
 	var dealt := mini(v - blocked, run.hp)
@@ -874,6 +886,8 @@ func _hit_hero(run: RunState, i: int, v: int, out_dealt: Array = [], force_pierc
 	elif dealt > 0 and run.has_passive("thorns"):
 		ev.append(_passive("thorns", Balance.PASSIVE_THORNS))
 		ev.append_array(damage_enemy(i, Balance.PASSIVE_THORNS, "thorns", run))
+	if result == "" and not run.meta.is_empty():
+		ev.append_array(ItemLogic.after_enemy_hit(run, self, i, blocked, dealt, block_before))
 	if result == "" and pet_thorns > 0 and alive(i) and (dealt > 0 or run.pet_level() >= 5):
 		ev.append({"type": "pet_acted", "pet": run.pet_id(), "effect": "thorns", "value": pet_thorns, "target": i})
 		ev.append_array(damage_enemy(i, pet_thorns, "pet", run))
@@ -920,7 +934,7 @@ func _execute_intent(run: RunState, i: int) -> Array[Dictionary]:
 	if bool(e.get("weakened", false)) and ["attack", "chill", "drain"].has(String(e.intent.kind)):
 		# BOO! on a boss or mini-boss: its next attack deals -ClassLogic.BOO_WEAKEN
 		e.weakened = false
-		v = int(round(v * (1.0 - ClassLogic.BOO_WEAKEN)))
+		v = int(round(v * (1.0 - ItemLogic.boo_weaken(run))))
 	match String(e.intent.kind):
 		"attack":
 			ev.append_array(_hit_hero(run, i, v))
@@ -1196,7 +1210,7 @@ func to_dict() -> Dictionary:
 		"moon": moon, "transform_at": transform_at, "moon_full": moon_full,
 		"pet_thorns": pet_thorns, "pet_block_turn": pet_block_turn, "last_runes": last_runes.duplicate(true),
 		"extra_dice": extra_dice.map(func(d): return d.to_dict()), "pending_bones": pending_bones, "bones_raised": bones_raised,
-		"attack_target": attack_target,
+		"attack_target": attack_target, "item_state": item_state.duplicate(true),
 	}
 
 static func from_dict(d: Dictionary) -> CombatState:
@@ -1240,6 +1254,9 @@ static func from_dict(d: Dictionary) -> CombatState:
 	c.pending_bones = int(d.get("pending_bones", 0))
 	c.bones_raised = int(d.get("bones_raised", 0))
 	c.attack_target = int(d.get("attack_target", -1))
+	var ist: Dictionary = d.get("item_state", {})
+	for k in ist:
+		c.item_state[String(k)] = int(ist[k]) if (ist[k] is float or ist[k] is int) else ist[k]
 	for lr in d.get("last_runes", []):
 		c.last_runes.append({"rune": String(lr.rune), "value": int(lr.value), "die": int(lr.die)})
 	c.last_combo = _norm_combo(d.last_combo)

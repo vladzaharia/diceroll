@@ -6,8 +6,17 @@ extends RefCounted
 ## Commands (see apply() for the replay format):
 ##   buy_upgrade(track, id)     Crowns upgrades: workshop whetstone|starter_kit, armory
 ##                              potion_belt, arcade loadout_slot (UnlockDefs.UPGRADES)
-##   level_gear(slot)           Armory: craft / level helm|blade|boots|charm (Crowns)
-##   set_trait(slot, tier, id)  Armory: pick the L4 / L8 trait (free, switchable)
+##   rank_up(group)             Armory: raise a rank group weapon|offhand|armor|trinket R0..8
+##                              (Crowns, ItemDefs.RANK_COSTS; the group must be unlocked)
+##   buy_pouch()                Armory: the Belt Pouch (2nd trinket slot), 400 Crowns, Trinket R5+
+##   buy_item(id, currency)     Armory shop: an item for Crowns ("crowns") or Sigils ("sigils")
+##   craft_variant(item, variant, currency)  craft an unlocked blueprint (Crowns or 2 Sigils)
+##   equip_item(class, slot, id, variant)    equip an owned item / variant ("" empties the slot)
+##   unequip_item(class, slot)  = equip_item(class, slot, "")
+##   set_appearance(class, slot, value)      head: item|"own"|"hidden", body: item|"own"
+##   mark_items_seen()          Armory: clears the "new" dots
+##   level_gear(slot)           legacy alias: helm|blade|boots|charm -> rank_up(armor|weapon|offhand|trinket)
+##   set_trait(slot, tier, id)  legacy: always an error (the traits are item rules now)
 ##   level_pet(id)              Pet Den: buy levels 6..10 (Crowns) once XP reached level 5
 ##   unlock(kind, id)           Spend Sigils to unlock early (classes, biomes, bosses,
 ##                              minibosses, pets, minigames, packs, gear, potions)
@@ -31,6 +40,11 @@ extends RefCounted
 ##   milestones, unlocked, ascension_unlocked, skins_unlocked} · skin_unlocked {class, skin,
 ##   source: "record"|"crowns"} · skin_equipped {class, skin} · prestige_set {class, on} ·
 ##   skins_seen {class} · error {msg}
+## Armory: upgrade_bought {track: "armory", id: group | "pouch", level} · item_unlocked {id,
+##   source: "crowns"|"sigils"|"milestone"|"feat"|"class"} · variant_crafted {item, variant,
+##   source: "crowns"|"sigils"} · blueprint_unlocked {item, variant, source: "mastery"|"feat"} ·
+##   item_equipped {class, slot, id, variant, loadout} · appearance_set {class, slot, value} ·
+##   mastery_changed {item, fights, next} · items_seen {}
 
 var profile: Profile
 
@@ -55,32 +69,139 @@ func buy_upgrade(track: String, id: String) -> Array[Dictionary]:
 	ev.append({"type": "upgrade_bought", "track": track, "id": id, "level": 1})
 	return ev
 
+## Legacy alias (the old Armory UI): an old gear piece levels its rank group.
 func level_gear(slot: String) -> Array[Dictionary]:
-	if not GearDefs.DEFS.has(slot):
+	if not ItemDefs.LEGACY_GROUP.has(slot) and not ItemDefs.GROUPS.has(slot):
 		return _err("unknown gear slot " + slot)
-	if not profile.owns("gear", slot):
-		return _err("gear not unlocked yet")
-	var lvl := profile.gear_level(slot)
-	var cost := GearDefs.cost(slot, lvl)
+	return rank_up(String(ItemDefs.LEGACY_GROUP.get(slot, slot)))
+
+func set_trait(_slot: String, _tier: String, _id: String) -> Array[Dictionary]:
+	return _err("gear traits are item rules now: equip the item that carries it")
+
+# ------------------------------------------------------------------ Armory
+
+func rank_up(group: String) -> Array[Dictionary]:
+	if not ItemDefs.GROUPS.has(group):
+		return _err("unknown rank group " + group)
+	if not profile.owns("gear", group):
+		return _err("rank not unlocked yet")
+	var r := profile.rank(group)
+	var cost := ItemDefs.rank_cost(r)
 	if cost.is_empty():
-		return _err("already at max level")
+		return _err("already at max rank")
 	if not profile.can_afford(cost):
 		return _err("not enough Crowns")
 	var ev := _pay(cost)
-	profile.gear[slot] = lvl + 1
-	ev.append({"type": "upgrade_bought", "track": "armory", "id": slot, "level": lvl + 1})
+	profile._ranks()[group] = r + 1
+	ev.append({"type": "upgrade_bought", "track": "armory", "id": group, "level": r + 1})
 	return ev
 
-func set_trait(slot: String, tier: String, id: String) -> Array[Dictionary]:
-	var opts := GearDefs.trait_options(slot, tier)
-	if not opts.has(id):
-		return _err("bad trait")
-	if profile.gear_level(slot) < int(tier):
-		return _err("reach level %s first" % tier)
-	var t: Dictionary = profile.gear_traits.get(slot, {})
-	t[tier] = id
-	profile.gear_traits[slot] = t
-	return [{"type": "trait_set", "slot": slot, "tier": tier, "id": id}]
+func buy_pouch() -> Array[Dictionary]:
+	if profile.has_pouch():
+		return _err("already bought")
+	if profile.rank("trinket") < ItemDefs.POUCH_RANK:
+		return _err("needs Trinket rank %d" % ItemDefs.POUCH_RANK)
+	var cost := {"crowns": ItemDefs.POUCH_COST}
+	if not profile.can_afford(cost):
+		return _err("not enough Crowns")
+	var ev := _pay(cost)
+	profile.armory["pouch"] = 1
+	ev.append({"type": "upgrade_bought", "track": "armory", "id": "pouch", "level": 1})
+	return ev
+
+func buy_item(id: String, currency := "crowns") -> Array[Dictionary]:
+	if not ItemDefs.has(id):
+		return _err("unknown item " + id)
+	if profile.owns_item(id):
+		return _err("already owned")
+	var cost := ItemDefs.price(id, profile.unlocks.get("classes", []), currency == "sigils")
+	if cost.is_empty():
+		return _err("not for sale: " + id)
+	if not profile.can_afford(cost):
+		return _err("not enough %s" % ("Sigils" if currency == "sigils" else "Crowns"))
+	var ev := _pay(cost)
+	profile.grant_item(id)
+	ev.append({"type": "item_unlocked", "id": id, "source": "sigils" if currency == "sigils" else "crowns"})
+	return ev
+
+func craft_variant(item: String, variant: String, currency := "crowns") -> Array[Dictionary]:
+	if not ItemDefs.VARIANTS.has(variant) or not ItemDefs.is_variant_of(variant, item):
+		return _err("unknown variant %s/%s" % [item, variant])
+	if profile.owns_variant(item, variant):
+		return _err("already crafted")
+	if not profile.owns_item(item):
+		return _err("own the %s first" % ItemDefs.name_of(item))
+	if not profile.has_blueprint(item, variant):
+		return _err("blueprint locked: " + ItemDefs.unlock_text(variant))
+	var cost := ItemDefs.craft_cost(variant, currency == "sigils")
+	if not profile.can_afford(cost):
+		return _err("not enough %s" % ("Sigils" if currency == "sigils" else "Crowns"))
+	var ev := _pay(cost)
+	profile.grant_variant(item, variant)
+	ev.append({"type": "variant_crafted", "item": item, "variant": variant, "source": "sigils" if currency == "sigils" else "crowns"})
+	return ev
+
+## Equips `id` (with `variant`, "" = its Standard) in `slot` for `class_id`; id "" empties it.
+func equip_item(class_id: String, slot: String, id: String, variant := "") -> Array[Dictionary]:
+	if not HeroDefs.DATA.has(class_id):
+		return _err("unknown class " + class_id)
+	if not ItemDefs.SLOTS.has(slot):
+		return _err("unknown slot " + slot)
+	var locked := String(ItemDefs.LOCKED_ARMOR.get(class_id, ""))
+	if locked != "" and slot in ["head", "body"]:
+		return _err("the %s is locked to this class" % ItemDefs.name_of(locked))
+	if id != "":
+		if not profile.owns_item(id):
+			return _err("item not owned: " + id)
+		if not ItemDefs.fits(id, slot):
+			return _err("%s doesn't go in the %s slot" % [ItemDefs.name_of(id), slot])
+		if String(ItemDefs.def(id).get("class_only", "")) not in ["", class_id]:
+			return _err("%s is class-only" % ItemDefs.name_of(id))
+		if variant == "":
+			variant = id
+		if not profile.owns_variant(id, variant):
+			return _err("variant not crafted: " + variant)
+		if slot == "trinket2" and not profile.has_pouch():
+			return _err("buy the Belt Pouch first")
+	var lo := profile.loadout_for(class_id)
+	if slot in ["trinket", "trinket2"] and id != "":
+		var other := "trinket2" if slot == "trinket" else "trinket"
+		if String(lo[other]) == id:
+			lo[other] = ""
+	if slot in ["weapon", "offhand", "head"]:
+		lo[slot] = {"id": id, "variant": variant if id != "" else ""}
+	else:
+		lo[slot] = id
+	var w: Dictionary = lo.weapon
+	if slot == "offhand" and id != "" and ItemDefs.hand_mount(id) and String(w.id) != "" and ItemDefs.hands(String(w.id), String(w.variant)) >= 2:
+		return _err("a two-handed weapon leaves no hand for the %s" % ItemDefs.name_of(id))
+	var eq: Dictionary = profile.armory.get("equipped", {})
+	eq[class_id] = lo
+	profile.armory["equipped"] = eq
+	var now := profile.loadout_for(class_id)
+	eq[class_id] = now
+	return [{"type": "item_equipped", "class": class_id, "slot": slot, "id": id, "variant": variant if id != "" else "",
+		"loadout": now.duplicate(true)}]
+
+func unequip_item(class_id: String, slot: String) -> Array[Dictionary]:
+	return equip_item(class_id, slot, "")
+
+func set_appearance(class_id: String, slot: String, value: String) -> Array[Dictionary]:
+	if not HeroDefs.DATA.has(class_id) or not (slot in ["head", "body"]):
+		return _err("bad appearance slot")
+	var ok := value == "own" or (value == "hidden" and slot == "head") or (profile.owns_item(value) and ItemDefs.fits(value, slot))
+	if not ok:
+		return _err("can't show %s there" % value)
+	var ap: Dictionary = profile.armory.get("appearance", {})
+	var row: Dictionary = ap.get(class_id, {})
+	row[slot] = value
+	ap[class_id] = row
+	profile.armory["appearance"] = ap
+	return [{"type": "appearance_set", "class": class_id, "slot": slot, "value": value}]
+
+func mark_items_seen() -> Array[Dictionary]:
+	profile.armory["seen_new"] = []
+	return [{"type": "items_seen"}]
 
 func level_pet(id: String) -> Array[Dictionary]:
 	if not profile.owns("pets", id):
@@ -188,8 +309,21 @@ func bank_run(stats: Dictionary) -> Array[Dictionary]:
 		ev.append({"type": "ascension_changed", "selected": int(profile.ascension.selected), "unlocked": int(profile.ascension.unlocked)})
 	for sk in res.skins_unlocked:
 		ev.append({"type": "skin_unlocked", "class": String(sk[0]), "skin": String(sk[1]), "source": "record"})
+	for item in res.get("mastery", {}):
+		var fights := int(res.mastery[item])
+		var nxt := 0
+		for th in ItemDefs.MASTERY:
+			if fights < int(th):
+				nxt = int(th)
+				break
+		ev.append({"type": "mastery_changed", "item": String(item), "fights": fights, "next": nxt})
+	for b in res.get("blueprints", []):
+		ev.append({"type": "blueprint_unlocked", "item": String(b[0]), "variant": String(b[1]), "source": String(b[2])})
+	for it in res.get("items_unlocked", []):
+		ev.append({"type": "item_unlocked", "id": String(it[0]), "source": String(it[1])})
 	ev.append({"type": "run_banked", "crowns": int(res.crowns), "sigils": int(res.sigils), "milestones": res.milestones,
-		"unlocked": res.unlocked, "ascension_unlocked": int(res.ascension_unlocked), "skins_unlocked": res.skins_unlocked})
+		"unlocked": res.unlocked, "ascension_unlocked": int(res.ascension_unlocked), "skins_unlocked": res.skins_unlocked,
+		"blueprints": res.get("blueprints", []), "items_unlocked": res.get("items_unlocked", [])})
 	return ev
 
 func equip_skin(class_id: String, skin: String) -> Array[Dictionary]:
@@ -242,6 +376,14 @@ func apply(cmd: Array) -> Array[Dictionary]:
 	match String(cmd[0]):
 		"buy_upgrade": return buy_upgrade(String(cmd[1]), String(cmd[2]))
 		"level_gear": return level_gear(String(cmd[1]))
+		"rank_up": return rank_up(String(cmd[1]))
+		"buy_pouch": return buy_pouch()
+		"buy_item": return buy_item(String(cmd[1]), String(cmd[2]) if cmd.size() > 2 else "crowns")
+		"craft_variant": return craft_variant(String(cmd[1]), String(cmd[2]), String(cmd[3]) if cmd.size() > 3 else "crowns")
+		"equip_item": return equip_item(String(cmd[1]), String(cmd[2]), String(cmd[3]), String(cmd[4]) if cmd.size() > 4 else "")
+		"unequip_item": return unequip_item(String(cmd[1]), String(cmd[2]))
+		"set_appearance": return set_appearance(String(cmd[1]), String(cmd[2]), String(cmd[3]))
+		"mark_items_seen": return mark_items_seen()
 		"set_trait": return set_trait(String(cmd[1]), String(cmd[2]), String(cmd[3]))
 		"level_pet": return level_pet(String(cmd[1]))
 		"unlock": return unlock(String(cmd[1]), String(cmd[2]))
@@ -263,10 +405,22 @@ func apply(cmd: Array) -> Array[Dictionary]:
 ## cost, affordable}]. Owned / maxed entries are left out; `cmd` is an apply() command.
 func catalog() -> Array:
 	var out: Array = []
-	for slot in GearDefs.SLOTS:
-		if profile.owns("gear", slot):
-			var lvl := profile.gear_level(slot)
-			_cat(out, ["level_gear", slot], "armory", "", slot, GearDefs.name_of(slot), lvl, GearDefs.MAX_LEVEL, GearDefs.cost(slot, lvl))
+	for g in ItemDefs.GROUPS:
+		if profile.owns("gear", g):
+			var r := profile.rank(g)
+			_cat(out, ["rank_up", g], "armory", "", g, "%s rank" % String(g).capitalize(), r, ItemDefs.RANK_MAX, ItemDefs.rank_cost(r))
+	if not profile.has_pouch() and profile.rank("trinket") >= ItemDefs.POUCH_RANK:
+		_cat(out, ["buy_pouch"], "armory", "", "pouch", "Belt Pouch", 0, 1, {"crowns": ItemDefs.POUCH_COST})
+	for id in ItemDefs.IDS:
+		if not profile.owns_item(String(id)):
+			var pc := ItemDefs.price(String(id), profile.unlocks.get("classes", []))
+			_cat(out, ["buy_item", id, "crowns"], "armory", "items", String(id), ItemDefs.name_of(String(id)), 0, 1, pc)
+	var bp: Dictionary = profile.armory.get("blueprints", {})
+	for item in bp:
+		if profile.owns_item(String(item)):
+			for v in bp[item]:
+				_cat(out, ["craft_variant", item, v, "crowns"], "armory", "variants", String(v), ItemDefs.name_of(String(v)), 0, 1,
+					ItemDefs.craft_cost(String(v)))
 	for track in UnlockDefs.UPGRADES:
 		for id in UnlockDefs.UPGRADES[track]:
 			var d: Dictionary = UnlockDefs.UPGRADES[track][id]
@@ -297,13 +451,19 @@ func _cat(out: Array, cmd: Array, track: String, kind: String, id: String, name:
 	out.append({"cmd": cmd, "track": track, "kind": kind, "id": id, "name": name, "level": lvl, "max": mx,
 		"cost": cost.duplicate(), "affordable": profile.can_afford(cost)})
 
-## Crowns still needed to buy every Crowns item (gear to L8, upgrades, pet levels 6-10 of every
-## pet), assuming every feature and pet gets unlocked.
+## Crowns still needed to buy every Crowns item (the four Armory ranks to R8, the Belt Pouch,
+## the Armory shop items and every variant blueprint, upgrades, pet levels 6-10 of every pet),
+## assuming every feature and pet gets unlocked and every class is owned (kit pieces come free).
 static func total_crowns_sink() -> int:
-	var t := 0
-	for slot in GearDefs.SLOTS:
-		for l in GearDefs.MAX_LEVEL:
-			t += int(GearDefs.COSTS[l])
+	var t := ItemDefs.POUCH_COST
+	for g in ItemDefs.GROUPS:
+		for l in ItemDefs.RANK_MAX:
+			t += int(ItemDefs.RANK_COSTS[l])
+	for id in ItemDefs.PRICES:
+		t += int(ItemDefs.PRICES[id])
+	for v in ItemDefs.VARIANTS:
+		if not (ItemDefs.VARIANTS[v].unlock as Dictionary).has("class"):
+			t += int(ItemDefs.craft_cost(String(v)).crowns)
 	for track in UnlockDefs.UPGRADES:
 		for id in UnlockDefs.UPGRADES[track]:
 			t += int(UnlockDefs.UPGRADES[track][id].cost.crowns)

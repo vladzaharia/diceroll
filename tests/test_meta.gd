@@ -78,46 +78,45 @@ func test_profile_round_trip_and_tolerant_loader() -> void:
 	var d := p.to_dict()
 	d.crowns = 12.0
 	d.unlocks.pets.append("dragon")
-	d.gear.helm = 99
+	d.armory.ranks.armor = 99
+	d.armory.owned.append("laser_sword")
 	var r := Profile.from_dict(d)
 	assert_eq(r.crowns, 12)
 	assert_true(not r.owns("pets", "dragon"), "unknown ids dropped")
-	assert_eq(r.gear_level("helm"), GearDefs.MAX_LEVEL, "levels clamped")
+	assert_true(not r.owns_item("laser_sword"), "unknown items dropped")
+	assert_eq(r.rank("armor"), ItemDefs.RANK_MAX, "ranks clamped")
+	assert_eq(r.gear_level("helm"), ItemDefs.RANK_MAX, "legacy view: helm = the Armor rank")
 	assert_eq(Profile.from_dict({}).unlocks.classes, ["knight"], "empty dict = fresh")
 
 # ================================================================ camp
 
-func test_camp_gear_levels_costs_and_caps() -> void:
+func test_camp_rank_levels_costs_and_caps() -> void:
 	var p := Profile.fresh()
 	var camp := Camp.new(p)
-	assert_eq(camp.level_gear("helm")[0].type, "error", "helm not unlocked yet")
-	p.grant("gear", "helm")
+	assert_eq(camp.rank_up("armor")[0].type, "error", "the Armor rank isn't unlocked yet")
+	p.grant("gear", "armor")
 	p.crowns = 10000
 	var spent := 0
-	for l in GearDefs.MAX_LEVEL:
-		var ev := camp.level_gear("helm")
+	for l in ItemDefs.RANK_MAX:
+		var ev := camp.level_gear("helm") if l == 0 else camp.rank_up("armor")
 		assert_eq(_first(ev, "upgrade_bought").level, l + 1)
-		spent += int(GearDefs.COSTS[l])
+		assert_eq(String(_first(ev, "upgrade_bought").id), "armor")
+		spent += int(ItemDefs.RANK_COSTS[l])
 	assert_eq(p.crowns, 10000 - spent)
-	assert_eq(camp.level_gear("helm")[0].type, "error", "max level")
-	var st := GearDefs.stats({"helm": 8, "blade": 8, "boots": 8, "charm": 8})
-	assert_eq(st.max_hp, GearDefs.HP_CAP)
-	assert_eq(st.atk, GearDefs.ATK_CAP)
-	assert_eq(st.lap_rerolls, 1)
-	assert_near(st.gold_pct, GearDefs.GOLD_CAP)
-	assert_eq(GearDefs.stats({"boots": GearDefs.BOOTS_REROLL_LEVEL - 1}).lap_rerolls, 0)
+	assert_eq(camp.rank_up("armor")[0].type, "error", "max rank")
+	var st := ItemDefs.base_stats({"weapon": 8, "armor": 8})
+	assert_eq(st.max_hp, ItemDefs.HP_CAP)
+	assert_eq(st.atk, 1)
+	assert_eq(ItemDefs.base_stats({"weapon": 7, "armor": 3}).atk, 0)
+	assert_eq(ItemDefs.base_stats({"armor": 3}).max_hp, 1)
 
-func test_camp_traits_are_switchable_after_level_4() -> void:
+func test_camp_traits_are_gone() -> void:
 	var p := Profile.fresh()
 	var camp := Camp.new(p)
 	p.grant("gear", "blade")
-	assert_eq(camp.set_trait("blade", "4", "blade_high")[0].type, "error", "needs L4")
-	p.gear.blade = 4
-	assert_eq(camp.set_trait("blade", "4", "blade_high")[0].type, "trait_set")
-	assert_true(p.active_traits().has("blade_high"))
-	assert_eq(camp.set_trait("blade", "4", "helm_bulwark")[0].type, "error", "wrong slot")
-	camp.set_trait("blade", "4", "blade_pair")
-	assert_true(p.active_traits().has("blade_pair") and not p.active_traits().has("blade_high"), "free respec")
+	assert_true(p.owns("gear", "weapon") and p.owns("gear", "blade"), "a legacy piece id grants its rank group")
+	assert_eq(camp.set_trait("blade", "4", "blade_high")[0].type, "error", "traits are item rules now")
+	assert_eq(p.active_traits(), [])
 
 func test_camp_sigil_unlocks_and_pool_toggle() -> void:
 	var p := Profile.fresh()

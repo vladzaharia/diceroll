@@ -167,13 +167,13 @@ func test_camp_equip_buy_and_prestige() -> void:
 			found = true
 	assert_true(found, "the catalogue lists skins after the caps")
 
-func test_profile_v2_round_trip_and_v1_migration() -> void:
+func test_profile_v3_round_trip_and_v1_migration() -> void:
 	var p := Profile.fresh()
 	p.apply_run_result(_stats(true))
 	Camp.new(p).equip_skin("knight", "victor")
 	var back := Profile.from_json(Profile.to_json(p))
 	assert_eq(back.to_dict(), p.to_dict())
-	assert_eq(int(p.to_dict().version), 2)
+	assert_eq(int(p.to_dict().version), 3)
 	# a version-1 file: no cosmetics, no new records, a Mage win
 	var v1 := Profile.fresh().to_dict()
 	v1.version = 1

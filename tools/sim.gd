@@ -10,8 +10,11 @@ extends SceneTree
 ## --policy: greedy = the naive Bot.next_command floor; realistic = Bot.decide with
 ## AutoRules.skill "realistic" (the balance reference); expert (alias smart) = full smart AUTO.
 ##        [--campaign=N [--campaigns=M] [--snapshot=R]] [--seed-step=N]
-## Analysis: [--strip=gear|hp|atk|boots|charm|traits|gear4|pet|pet4|belt|whetstone|starter|slot|
-##           mastery|packs|midpacks|-<pack>|t:<slot>:<tier>:<trait>|lv:<slot>:<level>,...]
+## Analysis: [--strip=armory|gear|hp|atk|affinity|pouch|slot:<slot>|rank:<group>:<n>|pet|pet4|belt|
+##           whetstone|starter|slot|mastery|packs|midpacks|-<pack>,...]
+##           [--armory=<slot>:<item>[:<variant>],...] equip an item (owned for the sim) for every class
+##           [--variant=<item>:<variant>] every class holding <item> uses that variant (crafted for the sim)
+##           [--kit=default|best] the loadout picker: the profile's (default) or BotMeta.best_loadout
 ##           [--affixes=off|on|force:<id>] [--force] [--hero=<class>.<field>=<v>] [--cl=<KNOB>=<v>]
 ##           [--tune-hp= --tune-atk= --tune-boss= --tune-base= --tune-step= --tune-atk-step=
 ##            --tune-gold= --tune-shop=1,3,5] [--danger=lo,hi] [--real-heur=p|scope:p,...] [--items]
@@ -56,6 +59,10 @@ var gold_sum := 0
 ## --force (and any explicit --class=<id>[,<id>...]): classes the profile has locked are granted
 ## for the sim instead of skipped, so per-class rows exist at every profile.
 var force_classes := false
+## --armory / --variant / --kit (Armory analysis).
+var armory_specs: Array = []
+var variant_specs: Array = []
+var kit_mode := "default"
 
 func _init() -> void:
 	var runs := 100
@@ -180,6 +187,12 @@ func _init() -> void:
 			Bot.danger_hi = arg.substr(9).get_slice(",", 1).to_float()
 		elif arg.begins_with("--strip="):
 			strip = Array(arg.substr(8).split(",", false))
+		elif arg.begins_with("--armory="):
+			armory_specs.append_array(Array(arg.substr(9).split(",", false)))
+		elif arg.begins_with("--variant="):
+			variant_specs.append_array(Array(arg.substr(10).split(",", false)))
+		elif arg.begins_with("--kit="):
+			kit_mode = arg.substr(6)
 		elif arg == "--items":
 			track_items = true
 		elif arg.begins_with("--affixes="):
@@ -222,6 +235,7 @@ func _init() -> void:
 		if pet_override != "":
 			prof.loadout.pet = "" if pet_override == "none" else pet_override
 		_strip(prof, strip)
+		prof = _armory(prof, strip)
 		opts["profile"] = prof
 	var classes: Array = HeroDefs.IDS if cls == "all" else Array(cls.split(",", false))
 	if not prof.is_empty() and (force_classes or cls != "all"):
@@ -368,20 +382,12 @@ func _init() -> void:
 func _strip(p: Dictionary, parts: Array) -> void:
 	for part in parts:
 		match String(part):
-			"gear":
-				for k in p.gear:
-					p.gear[k] = 0
-			"traits":
-				for k in p.gear:
-					p.gear[k] = mini(int(p.gear[k]), 3)
 			"hp":
-				p.gear["helm"] = 0
+				ItemDefs.HP_CAP = 0
 			"atk":
-				p.gear["blade"] = 0
-			"boots":
-				p.gear["boots"] = 0
-			"charm":
-				p.gear["charm"] = 0
+				ItemDefs.ATK_BONUS = 0
+			"affinity":
+				ItemDefs.AFFINITY = 0
 			"pet":
 				p.loadout.pet = ""
 			"belt":
@@ -397,9 +403,6 @@ func _strip(p: Dictionary, parts: Array) -> void:
 				p.unlocks.packs = ["starter"]
 			"mastery":
 				p.minigame_plays = {}
-			"gear4":
-				for k in p.gear:
-					p.gear[k] = mini(int(p.gear[k]), 4)
 			"pet4":
 				p.pet_bought = {}
 				for k in p.pet_xp:
@@ -407,18 +410,63 @@ func _strip(p: Dictionary, parts: Array) -> void:
 			"midpacks":
 				p.unlocks.packs = ["starter", "gamblers_kit", "cold_steel", "numerology"]
 			_:
-				if String(part).begins_with("t:"):
-					# t:<slot>:<tier>:<trait id> picks a different gear trait
-					var bits := String(part).split(":")
-					var t: Dictionary = p.gear_traits.get(bits[1], {})
-					t[bits[2]] = bits[3]
-					p.gear_traits[bits[1]] = t
-				elif String(part).begins_with("lv:"):
-					# lv:<slot>:<level>
-					var b2 := String(part).split(":")
-					p.gear[b2[1]] = int(b2[2])
-				elif String(part).begins_with("-"):
+				if String(part).begins_with("-"):
 					(p.unlocks.packs as Array).erase(String(part).substr(1))
+
+## Armory analysis on a profile dict: --strip=armory|gear (every rank R0, no pouch), pouch,
+## slot:<slot> (empty for every class), rank:<group>:<n>; then --armory equips and --variant
+## swaps (granting what the sim needs). Returns the new profile dict.
+func _armory(d: Dictionary, parts: Array) -> Dictionary:
+	var p := Profile.from_dict(d)
+	var eq: Dictionary = p.armory.get("equipped", {})
+	for part in parts:
+		var sp := String(part)
+		if sp == "armory" or sp == "gear":
+			for g in ItemDefs.GROUPS:
+				p._ranks()[g] = 0
+			p.armory.pouch = 0
+		elif sp == "pouch":
+			p.armory.pouch = 0
+		elif sp.begins_with("slot:"):
+			for cid in HeroDefs.IDS:
+				var row: Dictionary = eq.get(cid, {})
+				row[sp.substr(5)] = {"id": "", "variant": ""} if sp.substr(5) in ["weapon", "offhand", "head"] else ""
+				eq[cid] = row
+		elif sp.begins_with("rank:"):
+			var b := sp.split(":")
+			p.grant("gear", b[1])
+			p._ranks()[b[1]] = clampi(int(b[2]), 0, ItemDefs.RANK_MAX)
+	for spec in armory_specs:
+		var b2 := String(spec).split(":")
+		var slot := b2[0]
+		var id := b2[1]
+		var v := b2[2] if b2.size() > 2 else id
+		p.grant_item(id)
+		if v != id:
+			p.grant_variant(id, v)
+		if slot == "trinket2":
+			p.armory.pouch = 1
+		for cid in HeroDefs.IDS:
+			var row: Dictionary = eq.get(cid, {})
+			row[slot] = {"id": id, "variant": v} if slot in ["weapon", "offhand", "head"] else id
+			eq[cid] = row
+	p.armory["equipped"] = eq
+	for spec in variant_specs:
+		var b3 := String(spec).split(":")
+		p.grant_variant(b3[0], b3[1])
+		for cid in HeroDefs.IDS:
+			var lo := p.loadout_for(cid)
+			for slot in ["weapon", "offhand", "head"]:
+				if String(lo[slot].id) == b3[0]:
+					var row2: Dictionary = eq.get(cid, {})
+					row2[slot] = {"id": b3[0], "variant": b3[1]}
+					eq[cid] = row2
+	p.armory["equipped"] = eq
+	if kit_mode == "best":
+		for cid in HeroDefs.IDS:
+			eq[cid] = BotMeta.best_loadout(p, cid)
+		p.armory["equipped"] = eq
+	return p.to_dict()
 
 ## Plays one run with the Bot. Returns {flow, last_fight, minis:[won bools], crowns}.
 func _play(c: String, s: int, board: int, opts: Dictionary, verbose := false) -> Dictionary:
@@ -502,6 +550,8 @@ func _campaign(n: int, m: int, seed0: int, board: int, mode: String) -> void:
 			var lo := BotMeta.choose_loadout(p)
 			camp.set_class(c)
 			camp.set_loadout(lo[0], String(lo[1]))
+			for ecmd in BotMeta.equip_cmds(p, c):
+				camp.apply(ecmd)
 			var s: int = seed0 + cmp * 104729 + r * 7919
 			var res := _play(c, s, board, {"profile": p.to_dict(), "mode": mode})
 			var f: GameFlow = res.flow
@@ -544,10 +594,11 @@ func _campaign(n: int, m: int, seed0: int, board: int, mode: String) -> void:
 				have_all = r + 1
 			spent = p.records.crowns_earned - p.crowns
 			if snapshot_run == r + 1:
-				print("snapshot run %d: gear=%s upgrades=%s pets=%s pet_lv=%s classes=%s packs=%s minigames=%s potions=%s crowns=%d sigils=%d asc=%s biomes=%s bosses=%s mg_plays=%s traits=%s" % [
-					r + 1, str(p.gear), str(p.upgrades), str(p.unlocks.pets), str(p.pet_xp), str(p.unlocks.classes),
+				print("snapshot run %d: ranks=%s pouch=%d items=%s variants=%s blueprints=%s mastery=%s upgrades=%s pets=%s pet_lv=%s classes=%s packs=%s minigames=%s potions=%s crowns=%d sigils=%d asc=%s biomes=%s bosses=%s mg_plays=%s" % [
+					r + 1, str(p.armory.ranks), int(p.armory.pouch), str(p.armory.owned), str(p.armory.variants), str(p.armory.blueprints),
+					str(p.armory.mastery), str(p.upgrades), str(p.unlocks.pets), str(p.pet_xp), str(p.unlocks.classes),
 					str(p.unlocks.packs), str(p.unlocks.minigames), str(p.unlocks.potions), p.crowns, p.sigils, str(p.ascension),
-					str(p.unlocks.biomes), str(p.unlocks.bosses), str(p.minigame_plays), str(p.gear_traits)])
+					str(p.unlocks.biomes), str(p.unlocks.bosses), str(p.minigame_plays)])
 			if not got_max and spent >= sink:
 				got_max = true
 				maxed_at.append(r + 1)

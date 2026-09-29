@@ -142,7 +142,7 @@ func _do_board_roll() -> Array[Dictionary]:
 ## Sets the current board roll and auto-selects the two moving dice (see pick_move_dice).
 func _select_move(values: Array[int]) -> void:
 	board_roll = values.duplicate()
-	board_choice = pick_move_dice(values, run.rng, run.has_trait("boots_pair_pick"))
+	board_choice = pick_move_dice(values, run.rng, ItemLogic.pair_pick(run))
 	board_move = 0
 	for i in board_choice:
 		board_move += board_roll[i]
@@ -274,6 +274,7 @@ func confirm_move() -> Array[Dictionary]:
 	var doubles := hop > 0
 	if doubles:
 		ev.append_array(PetLogic.on_board_double(run))
+		ev.append_array(ItemLogic.on_board_double(run))
 	if doubles and run.has_passive("double_trouble") and run.banked_rerolls < Balance.MAX_BANKED_REROLLS:
 		run.banked_rerolls += 1
 		ev.append(_passive_ev("double_trouble", 1))
@@ -319,11 +320,12 @@ func _move(steps: int, teleport: bool) -> Array[Dictionary]:
 		p = cut
 	var dest: int = p.back()
 	run.pos = dest
-	if not teleport and run.has_trait("boots_treasury_step"):
+	var step := ItemLogic.treasury_step(run)
+	if not teleport and step > 0:
 		for k in range(0, p.size() - 1):
 			if String(run.board.tiles[p[k]].type) == "treasury":
-				run.treasury += int(GearDefs.TRAIT_BONUS.boots_treasury_step)
-				ev.append({"type": "trait_triggered", "id": "boots_treasury_step", "value": int(GearDefs.TRAIT_BONUS.boots_treasury_step), "treasury": run.treasury})
+				run.treasury += step
+				ev.append(ItemLogic.ev(run, "coin_purse", "treasury_step", step, {"treasury": run.treasury}))
 	ev.append({"type": "hero_moved", "path": ([dest] as Array[int]) if teleport else p, "teleport": teleport})
 	if not teleport:
 		# Magma lava scorches every lava tile passed over (landing is handled by the tile).
@@ -333,7 +335,7 @@ func _move(steps: int, teleport: bool) -> Array[Dictionary]:
 	if crossing:
 		# Sunscorched Ruins: heat at the lap's end, before the lap heal (never lethal)
 		_heat(run.lap, ev)
-		var healed := run.heal(run.pct_of_max(run.lap_heal_pct()))
+		var healed := run.heal(run.pct_of_max(run.lap_heal_pct()) + ItemLogic.lap_heal_flat(run))
 		var completed := run.lap
 		if final_lap:
 			run.stats.laps_completed = int(run.stats.get("laps_completed", 0)) + 1
@@ -447,13 +449,13 @@ func _trigger_tile(idx: int, ev: Array[Dictionary]) -> void:
 			_consume(idx, ev)
 			if run.potion_cap > 0 and run.rng.chance(Balance.CHEST_POTION_CHANCE):
 				_gain_potion(ev, "chest")
-			if run.rng.chance(Balance.CHEST_RUNE_CHANCE):
-				_open_rune_choice("chest", ev, 4 if run.has_pet("grimoire") else 3)
+			if ItemLogic.force_rune_chest(run) or run.rng.chance(Balance.CHEST_RUNE_CHANCE):
+				_open_rune_choice("chest", ev, maxi(4 if run.has_pet("grimoire") else 3, ItemLogic.chest_choices(run)))
 			else:
 				var roll := run.rng.randi_range(Balance.CHEST_GOLD_MIN, Balance.CHEST_GOLD_MAX)
 				if run.has_pet("coin_mimic") and run.pet_level() >= 10:
 					roll = maxi(roll, run.rng.randi_range(Balance.CHEST_GOLD_MIN, Balance.CHEST_GOLD_MAX))
-				var g := run.gold_bonus(int(round(roll * Balance.gold_scale(run.eff_lap()))))
+				var g := run.gold_bonus(int(round(roll * Balance.gold_scale(run.eff_lap()) * ItemLogic.chest_gold_mult(run))))
 				if run.has_passive("treasure_sense"):
 					g = int(round(g * Balance.PASSIVE_TREASURE_MULT))
 					ev.append(_passive_ev("treasure_sense", g))
@@ -464,8 +466,7 @@ func _trigger_tile(idx: int, ev: Array[Dictionary]) -> void:
 		"campfire":
 			_consume(idx, ev)
 			var pct := Balance.GLADE_CAMPFIRE_HEAL_PCT if run.board.biome == "glade" else Balance.CAMPFIRE_HEAL_PCT
-			if run.has_trait("helm_campfire"):
-				pct += float(GearDefs.TRAIT_BONUS.helm_campfire)
+			pct += ItemLogic.campfire_pct(run)
 			if run.has_pet("pumpkin_sprite"):
 				pct += 0.05
 			var h := run.heal(run.pct_of_max(pct))
@@ -512,12 +513,15 @@ func _trigger_tile(idx: int, ev: Array[Dictionary]) -> void:
 			_oasis(idx, ev)
 		"forge":
 			_lift_curse(ev)
-			var uses := 2 if run.has_passive("blacksmith") else 1
+			var uses := (2 if run.has_passive("blacksmith") else 1) + ItemLogic.forge_edits(run)
+			if ItemLogic.forge_edits(run) > 0:
+				ev.append(ItemLogic.ev(run, "wrench", "tinker", ItemLogic.forge_edits(run)))
 			_set_offer({"kind": "forge", "ops": ["raise", "mirror"], "source": "tile", "uses": uses}, Phase.FORGE, ev)
 		"treasury":
 			var amount := run.treasury
-			if run.has_trait("charm_treasury"):
-				amount = int(round(amount * float(GearDefs.TRAIT_BONUS.charm_treasury)))
+			if ItemLogic.cashout_mult(run) > 1.0 and amount > 0:
+				amount = int(round(amount * ItemLogic.cashout_mult(run)))
+				ev.append(ItemLogic.ev(run, "coin_purse", "cashout", amount))
 			if amount > 0:
 				run.stats.cashouts = int(run.stats.get("cashouts", 0)) + 1
 			run.treasury = Balance.TREASURY_START
@@ -536,7 +540,7 @@ func _trigger_tile(idx: int, ev: Array[Dictionary]) -> void:
 ## Portal destinations from the hero's tile. On the last lap they stop at Start (the boss).
 func _portal_tiles(from: int) -> Array:
 	var out: Array = []
-	var reach := run.board.portal_range() + (int(GearDefs.TRAIT_BONUS.boots_portal) if run.has_trait("boots_portal") else 0)
+	var reach := run.board.portal_range() + ItemLogic.portal_bonus(run)
 	for t in run.board.path(from, reach):
 		out.append(t)
 		if t == 0 and run.lap >= run.total_laps():
@@ -639,6 +643,7 @@ func _on_combat_won(ev: Array[Dictionary]) -> void:
 			_cauldron_brew(ev)
 	if c.gold_reward > 0:
 		_gold(ev, run.gold_bonus(c.gold_reward), "combat")
+	ev.append_array(ItemLogic.on_fight_won(run))
 	if c.tile >= 0 and not c.boss:
 		run.board.clear_enemies(c.tile)
 		ev.append({"type": "board_mutated", "changes": [run.board.change(c.tile)]})
@@ -739,6 +744,13 @@ func _summary() -> Dictionary:
 	for k in mini(run.act, run.route.size()):
 		visited.append(run.route[k])
 	s["biomes_visited"] = visited
+	# Armory: the equipped items (feats) and the fights they won (mastery)
+	var lo := {}
+	var its: Dictionary = run.meta.get("items", {})
+	for slot in its:
+		lo[slot] = {"id": String(its[slot].id), "variant": String(its[slot].get("variant", its[slot].id))}
+	s["loadout"] = lo
+	s["item_fights"] = int(run.stats.get("fights_won", 0)) if not lo.is_empty() else 0
 	for k in ["minibosses_killed", "bosses_killed"]:
 		s[k] = (run.stats.get(k, []) as Array).duplicate()
 	s["rewards"] = MetaRun.rewards(run, bool(run.stats.get("victory", false)))
@@ -775,6 +787,7 @@ func _new_biome(dest: int, ev: Array[Dictionary]) -> void:
 	if run.has_passive("rune_bloom"):
 		_rune_bloom(ev)
 	ev.append_array(ClassLogic.on_biome(run))
+	ev.append_array(ItemLogic.on_biome(run))
 
 # ================================================================ draft & runes
 
@@ -961,14 +974,14 @@ func rune_assign(die_idx: int) -> Array[Dictionary]:
 
 func _open_shop(ev: Array[Dictionary]) -> void:
 	var o := {"kind": "shop", "items": _shop_stock(), "restock_price": _restock_price()}
-	o["free_restocks"] = (1 if run.has_trait("charm_free_restock") else 0) + (1 if run.has_pet("coin_mimic") and run.pet_level() >= 5 else 0)
+	o["free_restocks"] = ItemLogic.free_restocks(run) + (1 if run.has_pet("coin_mimic") and run.pet_level() >= 5 else 0)
 	_set_offer(o, Phase.SHOP, ev)
 
 ## Restock price: A3 raises it, the Charm's Haggle trait lowers it.
 func _restock_price() -> int:
 	var off := PetDefs.TINKER_RESTOCK_OFF if run.has_pet("tinker_gear") else 0
-	if run.has_trait("charm_cheap_restock"):
-		return maxi(0, int(GearDefs.TRAIT_BONUS.charm_cheap_restock) - off)
+	if ItemLogic.restock_price(run) >= 0:
+		return maxi(0, ItemLogic.restock_price(run) - off)
 	return maxi(0, (UnlockDefs.ASC_RESTOCK if run.has_asc("shop_tax") else Balance.SHOP_RESTOCK_PRICE) - off)
 
 ## 3-4 items. While the pool is below MAX_DICE the first item is always a die (random kind);
@@ -984,7 +997,7 @@ func _shop_stock() -> Array:
 		if id == "passive" and Passives.roll_regular(Rng.new(1), 1, _passive_excluded()).is_empty():
 			continue
 		weights[id] = ShopDefs.ITEMS[id].weight
-	var n := run.rng.randi_range(Balance.SHOP_MIN_ITEMS, Balance.SHOP_MAX_ITEMS)
+	var n := run.rng.randi_range(Balance.SHOP_MIN_ITEMS, Balance.SHOP_MAX_ITEMS) + ItemLogic.shop_extra_items(run)
 	var items: Array = []
 	var used := {}
 	var dice := 0
@@ -1000,7 +1013,7 @@ func _shop_stock() -> Array:
 		elif id != "rune":
 			weights.erase(id) # at most one of each other non-rune item
 		items.append(_shop_item(id, used))
-	if run.has_trait("charm_shop_potion"):
+	if ItemLogic.shop_potion(run):
 		var has_potion := false
 		for it in items:
 			if it.id == "potion":
@@ -1034,6 +1047,8 @@ func _shop_item(id: String, used: Dictionary) -> Dictionary:
 				item.desc = "%s Goes on your belt; drunk at once if the belt is full." % String(PotionDefs.DEFS[pt].desc)
 		"face_raise":
 			item.price = Balance.SHOP_FACE_RAISE_PRICE
+			if ItemLogic.face_raise_price(run) > 0:
+				item.price = mini(item.price, ItemLogic.face_raise_price(run))
 		"combat_reroll":
 			item.price = Balance.SHOP_REROLL_ITEM_PRICE
 		"rune":
@@ -1055,6 +1070,8 @@ func _shop_item(id: String, used: Dictionary) -> Dictionary:
 			item.label = String(pd.name)
 			item.desc = String(pd.desc)
 			item.price = int(Balance.PASSIVE_PRICE[pd.rarity])
+	if (id == "die" or id == "face_raise") and ItemLogic.appraise(run) < 1.0:
+		item.price = int(round(item.price * ItemLogic.appraise(run)))
 	if run.has_passive("haggler"):
 		item.price = int(round(item.price * Balance.PASSIVE_HAGGLE))
 	if run.has_asc("shop_tax"):
@@ -1179,7 +1196,7 @@ func forge_apply(die_idx: int, face_idx: int, op: String, src_face := -1) -> Arr
 		var again := offer.duplicate(true)
 		again["uses"] = uses - 1
 		_close_offer(ev)
-		if String(again.get("source", "tile")) == "tile":
+		if String(again.get("source", "tile")) == "tile" and run.has_passive("blacksmith"):
 			ev.append(_passive_ev("blacksmith", uses - 1))
 		_set_offer(again, Phase.FORGE, ev)
 		return ev
@@ -1561,7 +1578,8 @@ func _second_boss() -> String:
 
 ## Trap / ice dodge: roll + bonus >= min (Sure Foot trait: 3+; Skull Buddy perk: +1 to the roll).
 func _dodge_min() -> int:
-	return int(GearDefs.TRAIT_BONUS.boots_sure_foot) if run.has_trait("boots_sure_foot") else Balance.TRAP_DODGE_MIN
+	var lm := ItemLogic.dodge_min(run)
+	return mini(lm, Balance.TRAP_DODGE_MIN) if lm > 0 else Balance.TRAP_DODGE_MIN
 
 func _dodge_bonus() -> int:
 	return 1 if run.has_pet("skull_buddy") else 0

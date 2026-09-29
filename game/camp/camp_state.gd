@@ -82,7 +82,7 @@ static func _armory(p: Profile) -> Dictionary:
 		gl[sl] = p.gear_level(sl)
 	var st := {"levels": levels, "gear": owned.duplicate(), "gear_levels": gl, "belt": int(p.upgrades.get("potion_belt", 0))}
 	if owned.is_empty():
-		st.state = "construction" if _near(p, "gear", "helm") >= 0.5 else "ruined"
+		st.state = "construction" if _near(p, "gear", "armor") >= 0.5 else "ruined"
 		st.tier = 0
 	elif levels == 0:
 		st.state = "construction"
