@@ -199,12 +199,14 @@ func apply_state(s: Dictionary) -> void:
 
 
 func set_hero(class_id: String) -> void:
-	if class_id == hero_class and hero != null:
+	var look := str((state.get("skins", {}) as Dictionary).get(class_id, []))
+	if class_id == hero_class and hero != null and look == String(hero.get_meta("look", "")):
 		return
 	hero_class = class_id
 	if hero:
 		hero.queue_free()
 	hero = _class_npc(class_id, "Sit_Chair_Idle")
+	hero.set_meta("look", look)
 	hero.name = "Hero"
 	hero.scale = Vector3.ONE * HERO_SCALE
 	add_child(hero)
@@ -457,11 +459,11 @@ func _others(s: Dictionary) -> Array:
 	return out
 
 
-## A class character in its default look: Character.MODELS by the class's model id, else an
-## Adventurers EXTRA GLB of that name, else the mannequin (new classes need no code here).
+## A class character in its equipped look (HeroLook: signature kit, Wardrobe skin, prestige).
 func _class_npc(class_id: String, anim: String) -> Character:
-	var model := String((HeroDefs.DATA.get(class_id, {}) as Dictionary).get("model", class_id))
-	var ch := CampProps.npc(model, {}, "idle")
+	var look: Array = (state.get("skins", {}) as Dictionary).get(class_id, ["default", false])
+	var ch := HeroLook.create(class_id, String(look[0]), bool(look[1]))
+	ch.play("idle", 0.0)
 	if ch.has_anim(anim):
 		ch.play(anim, 0.0)
 	return ch

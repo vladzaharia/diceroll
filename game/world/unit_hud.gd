@@ -36,6 +36,10 @@ var _traits: Array = []
 var affix_badges: Array[MeshInstance3D] = []
 var affixes: Array = []
 var _affix_count: Label3D
+## BOO! (Monster Kid): a cowering enemy's intent shows a scared face; a Brave chip after.
+var scare_badge: MeshInstance3D
+var brave_chip: MeshInstance3D
+const SCARE_COLOR := Color(0.36, 0.62, 0.24)
 
 var _bar_mat: ShaderMaterial
 var _intent_mat: ShaderMaterial
@@ -85,6 +89,16 @@ func _init() -> void:
 	status_label = _label(54, Color(0.6, 1.0, 0.45), 12)
 	status_label.position = Vector3(0, -0.2, 0.01)
 	add_child(status_label)
+	scare_badge = affix_badge("intent_cower", SCARE_COLOR, 0.46)
+	scare_badge.name = "Cower"
+	scare_badge.position = Vector3(0.0, 0.42, 0.0)
+	scare_badge.visible = false
+	add_child(scare_badge)
+	brave_chip = affix_badge("trait_brave", Color(0.72, 0.56, 0.2), 0.28)
+	brave_chip.name = "Brave"
+	brave_chip.position = Vector3(-BAR_SIZE.x * 0.5 - 0.1, 0.0, 0.006)
+	brave_chip.visible = false
+	add_child(brave_chip)
 	name_label = _label(64, Color(1.0, 0.86, 0.5), 12)
 	name_label.position = Vector3(0, 0.82, 0.01)
 	name_label.visible = false
@@ -130,8 +144,12 @@ func set_data(data: Dictionary, animate := true) -> void:
 		st.append("POISON %d" % int(data.get("poison", 0)))
 	if bool(data.get("frozen", false)):
 		st.append("FROZEN")
+	if bool(data.get("weakened", false)):
+		st.append("SPOOKED")
 	status_label.text = "  ".join(st)
 	status_label.modulate = Fx.STATUS_COLORS["poison"] if int(data.get("poison", 0)) > 0 else Fx.STATUS_COLORS["frost"]
+	if bool(data.get("weakened", false)) and int(data.get("poison", 0)) <= 0 and not bool(data.get("frozen", false)):
+		status_label.modulate = SCARE_COLOR.lightened(0.45)
 	if data.has("affixes"):
 		set_affixes(data.affixes, int(data.get("frenzy", 0)))
 	if int(data.get("frenzy", 0)) > 0 and not affixes.has("frenzied"):
@@ -140,6 +158,7 @@ func set_data(data: Dictionary, animate := true) -> void:
 		status_label.modulate = SkinRules.AFFIXES.frenzied.color
 	if data.has("traits"):
 		set_traits(data.traits)
+	set_scared(bool(data.get("cower", false)), bool(data.get("brave", false)), animate)
 	var nm := String(data.get("name", ""))
 	var mini := bool(data.get("miniboss", false))
 	name_label.visible = (boss or mini) and nm != ""
@@ -162,6 +181,22 @@ func set_intent(kind: String, value: int, animate := true) -> void:
 	if animate and key != _intent_key:
 		_punch(intent_badge, 1.35)
 	_intent_key = key
+
+
+## BOO!: `cower` swaps the intent for the scared face (its next action is skipped); `brave`
+## (scared once this fight) shows a small chip left of the HP bar, under the block badge.
+func set_scared(cower: bool, brave: bool, animate := true) -> void:
+	if cower != scare_badge.visible:
+		scare_badge.visible = cower
+		if cower and animate:
+			_punch(scare_badge, 1.4)
+	intent_badge.visible = intent_badge.visible and not cower
+	intent_label.visible = intent_label.visible and not cower
+	var show_brave := brave and not cower and not block_badge.visible
+	if show_brave != brave_chip.visible:
+		brave_chip.visible = show_brave
+		if show_brave and animate:
+			_punch(brave_chip, 1.3)
 
 
 ## Trait chips (armor, thorns, ward, pierce) to the right of the HP bar.
@@ -256,6 +291,8 @@ func set_opacity(a: float) -> void:
 		_affix_count.outline_modulate.a = a
 	for c in trait_chips:
 		(c.material_override as ShaderMaterial).set_shader_parameter("opacity", a)
+	for c in [scare_badge, brave_chip]:
+		((c as MeshInstance3D).material_override as ShaderMaterial).set_shader_parameter("opacity", a)
 	for m in [_bar_mat, _intent_mat, _block_mat]:
 		(m as ShaderMaterial).set_shader_parameter("opacity", a)
 	for l in [hp_label, intent_label, block_label, status_label, name_label]:

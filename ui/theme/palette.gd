@@ -71,6 +71,16 @@ const KIND := {
 	"twin": [6, Color("ff6fae")],
 	"gambler": [7, Color("3fcf6a")],
 	"giant": [8, Color("ffb020")],
+	# class-only kinds: the Monster Kid's Pretend die (★ face) and the Necromancer's Bone dice
+	"pretend": [10, Color("8ee35a")],
+	"bone": [9, Color("7cf0b8")],
+}
+
+## Class accent colours (class cards, the class badge, mechanic pops, HeroLook).
+const CLASS := {
+	"knight": Color("6fa8ff"), "barbarian": Color("ff7a4a"), "mage": Color("b58cff"), "rogue": Color("5fd68a"),
+	"paladin": Color("ffd257"), "ranger": Color("a6d65a"), "ninja": Color("ff5a6e"), "druid": Color("4fd69a"),
+	"engineer": Color("f0a64a"), "necromancer": Color("7cf0b8"), "monster_kid": Color("8ee35a"),
 }
 
 ## Die body colours.
@@ -129,6 +139,10 @@ static func passive_color(rarity: String) -> Color:
 
 static func kind_color(kind: String) -> Color:
 	return KIND.get(kind, KIND["standard"])[1]
+
+
+static func class_color(class_id: String) -> Color:
+	return CLASS.get(class_id, GOLD_BRIGHT)
 
 
 static func kind_mark(kind: String) -> int:
