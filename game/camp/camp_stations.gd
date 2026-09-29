@@ -2,7 +2,7 @@ class_name CampStations
 extends RefCounted
 ## Builds a Camp station's body for its CampState entry: ruined (rubble, broken timbers,
 ## overgrown), construction (scaffolding, crates, tools, a worker, and the basic version that
-## already works) or built tiers 1..3 (the Armory's racks fill with weapons as gear levels rise,
+## already works) or built tiers 1..3 (the Armory's racks fill with the owned weapons and armor,
 ## the Workshop fills with dice per pack, the Pet Den gets a bed per pet, the Arcade a booth per
 ## minigame). Local frame: the station faces +z, footprint about 3.4 x 2.6 (the CampScene scales
 ## stations up). Deterministic: the same entry always builds the same body.
@@ -92,7 +92,7 @@ static func _scaffold(b: Node3D, id: String) -> void:
 
 # ------------------------------------------------------------------ armory
 
-static func _armory_core(b: Node3D, tier: int) -> void:
+static func _armory_core(b: Node3D, tier: int, at := Vector3(0.35, 0.0, 0.55), k := 1.0) -> void:
 	var stump := MeshInstance3D.new()
 	var cm := CylinderMesh.new()
 	cm.top_radius = 0.3
@@ -101,100 +101,193 @@ static func _armory_core(b: Node3D, tier: int) -> void:
 	cm.radial_segments = 8
 	cm.rings = 1
 	stump.mesh = BiomeBlocks.faceted(cm, Color(0.46, 0.3, 0.2), 0.02, 4)
-	stump.position = Vector3(0.35, 0.22, 0.55)
+	stump.position = at + Vector3(0, 0.22, 0) * k
+	stump.scale = Vector3.ONE * k
 	b.add_child(stump)
-	Props.put(b, Props.TOOLS + "anvil.gltf", Vector3(0.35, 0.45, 0.55), 90.0, 0.85)
-	Props.put(b, Props.TOOLS + "tongs.gltf", Vector3(0.95, 0.02, 0.95), 70.0, 1.0)
+	Props.put(b, Props.TOOLS + "anvil.gltf", at + Vector3(0, 0.45, 0) * k, 90.0, 0.85 * k)
+	Props.put(b, Props.TOOLS + "tongs.gltf", at + Vector3(0.6, 0.02, 0.4) * k, 70.0, 1.0)
 
 
+## The built Armory (docs/design/2026-09-29-armory-items.md §8.3): the forge and the anvil, a
+## weapon rack along the back with every owned weapon and crafted variant (6 pegs, 12 from tier
+## 2), the shields hung on its top beam, a table of trinkets, books and quivers, and a mannequin
+## row wearing owned bodies and heads (1, 2 at tier 2, 3 at tier 3). The hero class's equipped
+## kit glows. Everything is a real ItemMounts model, so the racks fill as the profile grows.
 static func _armory(b: Node3D, st: Dictionary, tier: int) -> void:
-	var D := Props.DUN
-	var W := P.WX if ResourceLoader.exists(P.WX + "sword_F.gltf") else Props.WPN
-	var levels := int(st.get("levels", 0))
 	P.planks(b, Vector2(3.4, 2.6), Color(0.46, 0.32, 0.22))
-	_armory_core(b, tier)
+	# the anvil sits front-right, clear of the rack
+	_armory_core(b, tier, Vector3(0.95, 0.0, 0.8), 0.8)
+	var kit: Array = st.get("kit", [])
 	# the forge: a stone brazier with a fire
 	var braz := MeshInstance3D.new()
 	var bc := CylinderMesh.new()
-	bc.top_radius = 0.42
-	bc.bottom_radius = 0.5
-	bc.height = 0.55
+	bc.top_radius = 0.36
+	bc.bottom_radius = 0.44
+	bc.height = 0.5
 	bc.radial_segments = 8
 	bc.rings = 1
 	braz.mesh = BiomeBlocks.faceted(bc, Color(0.42, 0.4, 0.44), 0.03, 21, Color(0.26, 0.24, 0.28))
-	braz.position = Vector3(1.25, 0.28, -0.55)
+	braz.position = Vector3(-1.38, 0.25, -0.82)
 	b.add_child(braz)
 	var coals := MeshInstance3D.new()
 	var cs := SphereMesh.new()
-	cs.radius = 0.36
-	cs.height = 0.2
+	cs.radius = 0.3
+	cs.height = 0.18
 	coals.mesh = cs
 	coals.material_override = Props.glow_material(Color(1.0, 0.4, 0.1), false, 2.2)
-	coals.position = Vector3(1.25, 0.56, -0.55)
+	coals.position = Vector3(-1.38, 0.5, -0.82)
 	b.add_child(coals)
-	Biome.flame(b, Vector3(1.25, 0.7, -0.55), Color(1.0, 0.5, 0.15), 0.55, 12)
-	Biome.flicker_light(b, Vector3(1.25, 1.3, -0.35), Color(1.0, 0.55, 0.25), 2.0, 4.5)
-	# weapon rack along the back: fills up as the gear levels rise (2..6 weapons)
+	Biome.flame(b, Vector3(-1.38, 0.62, -0.82), Color(1.0, 0.5, 0.15), 0.5, 12)
+	Biome.flicker_light(b, Vector3(-1.2, 1.2, -0.55), Color(1.0, 0.55, 0.25), 2.0, 4.5)
+	# weapon rack along the back
 	var wood := Color(0.44, 0.29, 0.18)
-	for x in [-1.55, 0.35]:
-		P.post(b, Vector3(x, 0, -0.95), 1.7, wood)
-	for y in [0.6, 1.45]:
-		P.box(b, Vector3(2.05, 0.09, 0.1), Vector3(-0.6, y, -0.95), wood.lightened(0.08))
-	var ws := ["sword_F.gltf", "axe_D.gltf", "halberd.gltf", "sword_G.gltf", "spear_B.gltf", "hammer_D.gltf"]
-	var n := clampi(2 + levels / 3, 2, ws.size())
-	for i in n:
-		var path := W + String(ws[i])
-		if not ResourceLoader.exists(path):
-			path = Props.WPN + "sword_A.gltf"
-		var w := Props.put(b, path, Vector3(-1.35 + 0.31 * i, 0.12, -0.85), 0.0, 0.85)
-		w.rotation_degrees = Vector3(-10.0, 90.0, 0.0)
-	if tier >= 2:
-		var sh := ["shield_B.gltf", "shield_C.gltf", "shield_D.gltf"]
-		for i in clampi(levels / 7, 1, 3):
-			P.opt(b, W + String(sh[i]), Vector3(-1.25 + 0.62 * i, 1.35, -0.84), 0.0, 0.62)
-		P.opt(b, P.TX + "grindstone.gltf", Vector3(-1.35, 0, 0.8), 30.0, 0.5)
-		Props.put(b, D + "barrel_small.gltf", Vector3(-1.45, 0, -0.1), 30.0, 0.62)
-		for k in 2:
-			var s := Props.put(b, Props.WPN + "sword_A.gltf", Vector3(-1.52 + 0.14 * k, 1.05, -0.12), 0.0, 0.7)
-			s.rotation_degrees = Vector3(8.0 - 16.0 * k, 20.0, 180.0)
-	if tier >= 3:
-		P.opt(b, P.MM + "paladin/paladin_statue.gltf", Vector3(1.55, 0, 0.55), -35.0, 0.55)
-		P.opt(b, D + "banner_patternA_red.gltf", Vector3(-0.6, 1.72, -1.05), 0.0, 0.3)
-	# the owned gear pieces on a little table: Helm (shield), Blade (sword), Boots (compass),
-	# Charm (gems); a piece at L8 glows
-	var table := Node3D.new()
-	table.name = "GearTable"
-	table.position = Vector3(-0.45, 0, 0.35)
-	b.add_child(table)
-	P.box(table, Vector3(0.9, 0.08, 0.55), Vector3(0, 0.62, 0), Color(0.5, 0.34, 0.22))
-	for x in [-0.38, 0.38]:
-		P.box(table, Vector3(0.08, 0.62, 0.08), Vector3(x, 0.31, 0), Color(0.4, 0.26, 0.16))
-	var looks := {"helm": [P.ADX + "assets/shield_badge_color.gltf", Vector3(-0.3, 0.66, 0.0), Vector3(-70, 0, 0), 0.5],
-		"blade": [P.ADX + "assets/sword_2handed_color.gltf", Vector3(-0.05, 0.68, 0.05), Vector3(90, 0, 70), 0.42],
-		"boots": [Props.TOOLS + "compass_base.gltf", Vector3(0.18, 0.66, -0.1), Vector3.ZERO, 0.7],
-		"charm": [P.RX + "Gems_Pile_Small.gltf", Vector3(0.32, 0.66, 0.12), Vector3.ZERO, 0.45]}
-	var gl: Dictionary = st.get("gear_levels", {})
-	for slot in GearDefs.SLOTS:
-		if int(gl.get(slot, 0)) <= 0:
+	var rack := Node3D.new()
+	rack.name = "WeaponRack"
+	b.add_child(rack)
+	var x0 := -0.9
+	var x1 := 1.1
+	for x in [x0, x1]:
+		P.post(rack, Vector3(x, 0, -1.02), 2.05, wood)
+	# a pale board behind the pegs: grey steel reads against it at night
+	P.box(rack, Vector3(x1 - x0, 1.8, 0.04), Vector3((x0 + x1) * 0.5, 1.05, -1.06), Color(0.72, 0.56, 0.38))
+	for y in [0.18, 1.2, 1.95]:
+		P.box(rack, Vector3(x1 - x0 + 0.14, 0.08, 0.1), Vector3((x0 + x1) * 0.5, y, -1.02), wood.lightened(0.08))
+	# a lamp over the rack so the pieces read at night
+	var lamp := OmniLight3D.new()
+	lamp.light_color = Color(1.0, 0.86, 0.62)
+	lamp.light_energy = 2.4
+	lamp.omni_range = 2.8
+	lamp.position = Vector3((x0 + x1) * 0.5, 2.0, 0.2)
+	rack.add_child(lamp)
+	var pegs := 12 if tier >= 2 else 6
+	var weapons: Array = (st.get("weapons", []) as Array).slice(0, pegs)
+	var step := (x1 - x0 - 0.3) / float(maxi(pegs - 1, 1))
+	for i in weapons.size():
+		var id := String(weapons[i])
+		var w := ItemMounts.upright(id)
+		if w == null:
 			continue
-		var d: Array = looks[slot]
-		var it := P.opt(table, String(d[0]), d[1], 0.0, float(d[3]))
-		if it:
-			it.rotation_degrees = d[2]
-		if int(gl.get(slot, 0)) >= GearDefs.MAX_LEVEL:
-			var l := OmniLight3D.new()
-			l.light_color = Color(1.0, 0.85, 0.4)
-			l.light_energy = 0.8
-			l.omni_range = 0.9
-			l.position = d[1] + Vector3.UP * 0.25
-			table.add_child(l)
+		var h := ItemMounts.local_bounds(w).size.y
+		var s := clampf(1.0 / maxf(h, 0.01), 0.3, 0.9)
+		w.scale = Vector3.ONE * s
+		# centred on the rack, so a young armory's few pieces sit in the middle
+		w.position = Vector3((x0 + x1) * 0.5 + step * (float(i) - float(weapons.size() - 1) * 0.5), 0.1, -0.92)
+		w.rotation_degrees = Vector3(-9.0, 0.0, 0.0)
+		rack.add_child(w)
+		if kit.has(id):
+			_glow(rack, w.position + Vector3(0, 1.08, 0.3))
+	# shields hang on the rack's top beam
+	var shields: Array = (st.get("shields", []) as Array).slice(0, 3 if tier <= 1 else 5)
+	for i in shields.size():
+		var id := String(shields[i])
+		var sh := ItemMounts.upright(id)
+		if sh == null:
+			continue
+		var sz := ItemMounts.local_bounds(sh).size
+		sh.scale = Vector3.ONE * clampf(0.52 / maxf(maxf(sz.x, sz.y), 0.01), 0.25, 0.7)
+		sh.position = Vector3(x0 + 0.3 + (x1 - x0 - 0.6) * (float(i) + 0.5) / float(maxi(shields.size(), 1)), 1.3, -0.95)
+		rack.add_child(sh)
+		if kit.has(id):
+			_glow(rack, sh.position + Vector3(0, 0.32, 0.3))
+	# the table: trinkets, books, quivers, bombs
+	var table := Node3D.new()
+	table.name = "TrinketTable"
+	table.position = Vector3(1.28, 0, -0.25)
+	table.rotation_degrees.y = -90.0
+	b.add_child(table)
+	P.box(table, Vector3(0.95, 0.08, 0.6), Vector3(0, 0.6, 0), Color(0.5, 0.34, 0.22))
+	for x in [-0.4, 0.4]:
+		for z in [-0.22, 0.22]:
+			P.box(table, Vector3(0.07, 0.6, 0.07), Vector3(x, 0.3, z), Color(0.4, 0.26, 0.16))
+	var items: Array = (st.get("table", []) as Array).slice(0, 8)
+	for i in items.size():
+		var id := String(items[i])
+		var it := ItemMounts.upright(id)
+		if it == null:
+			continue
+		var sz := ItemMounts.local_bounds(it).size
+		it.scale = Vector3.ONE * clampf(0.26 / maxf(maxf(sz.x, maxf(sz.y, sz.z)), 0.01), 0.1, 0.6)
+		var col := i % 4
+		var row := i / 4
+		it.position = Vector3(-0.33 + 0.22 * col, 0.64, -0.14 + 0.27 * row)
+		it.rotation_degrees.y = -15.0 + 12.0 * col
+		table.add_child(it)
+		if kit.has(id):
+			_glow(table, it.position + Vector3(0, 0.15, 0))
+	# the mannequin row: owned bodies and heads (the hero class's kit first)
+	var bodies: Array = st.get("bodies", [])
+	var heads: Array = st.get("heads", [])
+	var n := mini(bodies.size(), 1 if tier <= 1 else (2 if tier == 2 else 3))
+	var kit_body := ""
+	var kit_head := ""
+	for k in kit:
+		if bodies.has(String(k)):
+			kit_body = String(k)
+		if heads.has(String(k)):
+			kit_head = String(k)
+	var order: Array = []
+	if kit_body != "":
+		order.append(kit_body)
+	for bd in bodies:
+		if not order.has(bd) and String(bd) != "dino_suit":
+			order.append(bd)
+	var hs: Array = []
+	if kit_head != "":
+		hs.append(kit_head)
+	for hd in heads:
+		if not hs.has(hd):
+			hs.append(hd)
+	var spots := [Vector3(-1.4, 0, 0.3), Vector3(-0.85, 0, 0.95), Vector3(-0.2, 0, 1.2)]
+	for i in n:
+		if i >= order.size():
+			break
+		var lo := {"body": String(order[i])}
+		if i < hs.size():
+			lo["head"] = String(hs[i])
+		var m := Character.create("mannequin", "", lo)
+		m.name = "Mannequin%d" % i
+		m.position = spots[i]
+		m.rotation_degrees.y = 25.0
+		m.scale = Vector3.ONE * 0.46
+		b.add_child(m)
+		m.play("Idle_B" if m.has_anim("Idle_B") else "idle", 0.0)
+		m.anim_player.seek(0.4, true)
+		m.anim_player.pause()
+		# a little stand under each mannequin
+		P.box(b, Vector3(0.36, 0.05, 0.36), spots[i] + Vector3(0, 0.025, 0), Color(0.36, 0.24, 0.15))
+		if i == 0 and kit_body != "":
+			_glow(b, spots[i] + Vector3(0, 0.6, 0.15))
+	if tier >= 2:
+		Props.put(b, Props.DUN + "barrel_small.gltf", Vector3(-1.6, 0, 0.1), 30.0, 0.5)
+	if tier >= 3:
+		P.opt(b, Props.DUN + "banner_patternA_red.gltf", Vector3((x0 + x1) * 0.5, 1.78, -1.08), 0.0, 0.3)
 	var smith := P.glb_character(P.ADX + "characters/Barbarian_Large.glb", "large", {}, "idle")
 	if smith:
 		smith.name = "Keeper"
-		smith.position = Vector3(0.35, 0, -0.25)
-		smith.scale = Vector3.ONE * 0.5
+		smith.position = Vector3(-1.45, 0, -0.3)
+		smith.rotation_degrees.y = 180.0
+		smith.scale = Vector3.ONE * 0.42
 		b.add_child(smith)
 		P.loop_clip(smith, "Melee_2H_Attack_Chop", 2.4)
+
+
+## A soft gold glow marking a piece of the hero's equipped kit.
+static func _glow(parent: Node3D, at: Vector3) -> void:
+	var l := OmniLight3D.new()
+	l.name = "KitGlow"
+	l.light_color = Color(1.0, 0.82, 0.4)
+	l.light_energy = 0.7
+	l.omni_range = 0.7
+	l.position = at
+	parent.add_child(l)
+	var spark := MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = 0.035
+	sm.height = 0.07
+	spark.mesh = sm
+	spark.material_override = Props.glow_material(Color(1.0, 0.85, 0.45), false, 3.0)
+	spark.position = at + Vector3(0, 0.12, 0.05)
+	parent.add_child(spark)
 
 
 # ------------------------------------------------------------------ workshop

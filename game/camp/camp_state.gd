@@ -72,15 +72,58 @@ static func _near(p: Profile, kind: String, id: String) -> float:
 	return float(pr[0]) / maxf(1.0, float(pr[1]))
 
 
+## The Armory's racks (docs/design/2026-09-29-armory-items.md §8.3): what the profile owns, as
+## display ids (ItemMounts ids; crafted variants hang next to their Standard), and the hero
+## class's equipped kit (glows).
+##   {ranks, levels (rank sum), pouch, weapons, shields (hand off-hands), table (trinkets + belt
+##    and back off-hands), bodies, heads, backs, kit: [display ids worn by the hero class]}
 static func _armory(p: Profile) -> Dictionary:
 	var owned: Array = p.unlocks.get("gear", [])
+	var ranks := {}
 	var levels := 0
-	for s in GearDefs.SLOTS:
-		levels += p.gear_level(s)
-	var gl := {}
-	for sl in GearDefs.SLOTS:
-		gl[sl] = p.gear_level(sl)
-	var st := {"levels": levels, "gear": owned.duplicate(), "gear_levels": gl, "belt": int(p.upgrades.get("potion_belt", 0))}
+	for g in ItemDefs.GROUPS:
+		ranks[String(g)] = p.rank(String(g))
+		levels += p.rank(String(g))
+	var weapons: Array = []
+	var shields: Array = []
+	var table: Array = []
+	var bodies: Array = []
+	var heads: Array = []
+	var backs: Array = []
+	for id in ItemDefs.IDS:
+		var sid := String(id)
+		if not p.owns_item(sid):
+			continue
+		match ItemDefs.slot_of(sid):
+			"weapon":
+				weapons.append_array(p.owned_variants(sid))
+			"offhand":
+				if ItemDefs.hand_mount(sid):
+					shields.append_array(p.owned_variants(sid))
+				else:
+					table.append(sid)
+			"trinket":
+				table.append(sid)
+			"body":
+				bodies.append(sid)
+			"head":
+				heads.append_array(p.owned_variants(sid))
+			"back":
+				backs.append(sid)
+	var hero := String(p.loadout.get("class", "knight"))
+	var kit: Array = []
+	if p.class_allowed(hero):
+		var lo := p.loadout_for(hero)
+		for slot in ["weapon", "offhand", "head"]:
+			var e: Dictionary = lo[slot]
+			if String(e.id) != "":
+				kit.append(String(e.variant) if String(e.variant) != "" else String(e.id))
+		for slot in ["body", "trinket", "trinket2", "back"]:
+			if String(lo[slot]) != "":
+				kit.append(String(lo[slot]))
+	var st := {"levels": levels, "ranks": ranks, "gear": owned.duplicate(), "pouch": int(p.armory.get("pouch", 0)),
+		"weapons": weapons, "shields": shields, "table": table, "bodies": bodies, "heads": heads, "backs": backs,
+		"kit": kit, "hero": hero, "belt": int(p.upgrades.get("potion_belt", 0))}
 	if owned.is_empty():
 		st.state = "construction" if _near(p, "gear", "armor") >= 0.5 else "ruined"
 		st.tier = 0
@@ -168,5 +211,7 @@ static func diff(a: Dictionary, b: Dictionary) -> Array:
 static func _skins(p: Profile, classes: Array) -> Dictionary:
 	var out := {}
 	for id in classes:
-		out[String(id)] = [p.equipped_skin(String(id)), p.prestige_on(String(id))]
+		var skin := p.equipped_skin(String(id))
+		var pres := p.prestige_on(String(id))
+		out[String(id)] = [skin, pres, ArmoryLook.of_profile(p, String(id), skin, pres)]
 	return out

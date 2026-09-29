@@ -314,6 +314,53 @@ func passive_pop(at: Vector2, id: String, text := "") -> void:
 	t.tween_callback(row.queue_free)
 
 
+## An Armory item fired (item_triggered): a small pill with the item's 3D picture and the rule
+## ("Twin Edge +3"), rising a little above `at`. `top` / `floor_y` bound it vertically (under the
+## top HUD, above the dice tray frame), so it never covers a HUD or crosses the tray frame.
+## `avoid`: screen rects (enemy HUDs: intent badge, HP bar) the pill must not cover; it slides
+## sideways off them.
+func item_pop(at: Vector2, item_id: String, text: String, color: Color, top := 0.0, floor_y := 0.0, avoid: Array = []) -> void:
+	var p := PanelContainer.new()
+	var sb := UiTheme.box(Color(0.06, 0.05, 0.14, 0.93), 22, 2, Color(color, 0.9), 10, Color(color, 0.3), Vector2.ZERO)
+	UiTheme.pad(sb, 6, 2)
+	sb.content_margin_right = 14
+	p.add_theme_stylebox_override("panel", sb)
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var row := UiTheme.hbox(6)
+	p.add_child(row)
+	row.add_child(ItemThumb.make(item_id, 50))
+	row.add_child(UiTheme.label(text, 24, color.lightened(0.3), true, 6))
+	_popups.add_child(p)
+	p.reset_size()
+	var s := p.get_combined_minimum_size()
+	p.size = s
+	var want := at - Vector2(s.x * 0.5, s.y)
+	if floor_y > 0.0:
+		want.y = minf(want.y, floor_y - s.y - 6.0)
+	want.y = maxf(want.y, top + 6.0)
+	var pos := _stack(want, s)
+	pos.y = maxf(pos.y, top + 6.0)
+	for r in avoid:
+		var rr: Rect2 = r
+		# the pill's whole path (it rises a little) stays off the rect
+		if Rect2(pos - Vector2(0, 36), s + Vector2(0, 36)).intersects(rr):
+			if pos.x + s.x * 0.5 < rr.get_center().x:
+				pos.x = rr.position.x - s.x - 6.0
+			else:
+				pos.x = rr.end.x + 6.0
+			pos.x = clampf(pos.x, 8.0, size.x - s.x - 8.0)
+	p.position = pos
+	p.pivot_offset = s * 0.5
+	p.scale = Vector2(0.3, 0.3)
+	var rise := minf(34.0, maxf(0.0, pos.y - top - 6.0))
+	var t := create_tween()
+	t.tween_property(p, "scale", Vector2(1.08, 1.08), _d(0.14)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t.tween_property(p, "scale", Vector2.ONE, _d(0.1))
+	t.tween_property(p, "position:y", pos.y - rise, _d(0.9)).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	t.parallel().tween_property(p, "modulate:a", 0.0, _d(0.3)).set_delay(_d(0.65))
+	t.tween_callback(p.queue_free)
+
+
 # --- announcements -------------------------------------------------------------------------
 
 ## Big centred title + subtitle that pops in, holds, and fades (non-blocking).

@@ -12,7 +12,7 @@ extends RefCounted
 ##                   rules don't know yet gets a faked pet_acted event (--effect=<e> picks one;
 ##                   --pet=new runs the six newer pets)
 ##  level_up_auto    an automatic level-up (+max HP toast, level badge pulse)
-##  events_misc      second_boss, face_cursed, trait_triggered, a doubles board roll and a
+##  events_misc      second_boss, face_cursed, item_triggered, a doubles board roll and a
 ##                   Crowns pop, one after another (--only=<event> plays just that one)
 ##
 ## Every run scenario starts from the max meta profile (MetaPresets) so the belt holds 3

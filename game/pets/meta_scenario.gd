@@ -213,7 +213,7 @@ func _level_up() -> void:
 	await c.play_events(ev)
 
 
-## second_boss, face_cursed, trait_triggered, a doubles roll and a Crowns pop (--only=<one>).
+## second_boss, face_cursed, item_triggered, a doubles roll and a Crowns pop (--only=<one>).
 func _events_misc() -> void:
 	var only := String(args.get("only", ""))
 	var f := _flow()
@@ -227,8 +227,8 @@ func _events_misc() -> void:
 		if only == "doubles":
 			return
 	if only == "" or only == "trait":
-		var tev: Array[Dictionary] = [{"type": "trait_triggered", "id": "boots_treasury_step", "value": 5, "treasury": f.run.treasury + 5}]
-		f.run.treasury += 5
+		var tev: Array[Dictionary] = [{"type": "item_triggered", "id": "compass", "variant": "compass", "slot": "trinket",
+			"effect": "wayfinder", "value": 2}]
 		await c.play_events(tev)
 		await _pause(0.6)
 		if only == "trait":
@@ -250,7 +250,7 @@ func _events_misc() -> void:
 		c.board.place_hero(3)
 		await c.play_events(f.debug_open("combat", "skeleton_warrior,skeleton_minion"))
 		await _pause(0.3)
-		await c.play_events([{"type": "trait_triggered", "id": "blade_pair", "value": 1}])
+		await c.play_events([{"type": "item_triggered", "id": "sword", "variant": "sword", "slot": "weapon", "effect": "twin_edge", "value": 1}])
 		await _pause(0.8)
 		if only == "trait_combat":
 			return

@@ -9,6 +9,7 @@ extends RefCounted
 ##   hp:int, atk:int, lap_rerolls:int, hazard_mult:float, gold_pct:float, traits:[] (legacy),
 ##   items:{slot: {id, variant, tier}} (Armory items with tier >= 1; ItemLogic), back:id,
 ##   appearance:{head, body}, ranks:{weapon, offhand, armor, trinket},
+##   look: the full equipped loadout (Profile.loadout_for, inactive items too; presentation only),
 ##   potion_cap:int, potions:int (start), potion_types:[ids unlocked for shops],
 ##   whetstone:int, starter_kind:String, pet:{id, level} | {},
 ##   minigames:[loadout ids], mastery:{id: level},
@@ -39,6 +40,7 @@ static func build(profile_dict: Dictionary, class_id := "") -> Dictionary:
 		"hp": int(g.max_hp), "atk": int(g.atk), "lap_rerolls": int(g.lap_rerolls),
 		"hazard_mult": float(g.hazard_mult), "gold_pct": float(g.gold_pct), "traits": [],
 		"items": items, "back": String(p.loadout_for(cid).back), "appearance": p.appearance_of(cid),
+		"look": p.loadout_for(cid),
 		"ranks": (p.armory.get("ranks", {}) as Dictionary).duplicate(),
 		"potion_cap": cap, "potions": mini(potions, cap), "potion_types": Array(p.unlocks.potions),
 		"whetstone": int(p.upgrades.get("whetstone", 0)),
@@ -97,6 +99,12 @@ static func normalize(m: Dictionary) -> Dictionary:
 	out.back = String(out.get("back", ""))
 	var ap: Dictionary = out.get("appearance", {})
 	out.appearance = {"head": String(ap.get("head", "own")), "body": String(ap.get("body", "own"))}
+	var lk := {}
+	var src_look: Dictionary = out.get("look", {})
+	for slot in src_look:
+		var le: Variant = src_look[slot]
+		lk[String(slot)] = {"id": String(le.get("id", "")), "variant": String(le.get("variant", ""))} if le is Dictionary else String(le)
+	out.look = lk
 	var rk := {}
 	var src_r: Dictionary = out.get("ranks", {})
 	for k in src_r:

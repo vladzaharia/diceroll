@@ -23,6 +23,7 @@ func rebuild(p: Profile) -> void:
 	if not p.class_allowed(cur):
 		cur = "knight"
 	body.add_child(hero_card(p, cur))
+	body.add_child(_kit(p, cur))
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 10)
@@ -66,7 +67,7 @@ static func hero_card(p: Profile, id: String) -> Control:
 	var por := HeroPortrait.new()
 	por.custom_minimum_size = Vector2(190, 230)
 	por.ring_color = UiPalette.class_color(id)
-	por.set_hero(id, p.equipped_skin(id), p.prestige_on(id), false)
+	por.set_hero(id, p.equipped_skin(id), p.prestige_on(id), false, ArmoryLook.of_profile(p, id))
 	row.add_child(por)
 	var col := UiTheme.vbox(8)
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -81,6 +82,38 @@ static func hero_card(p: Profile, id: String) -> Control:
 	var hp := CampUi.amount("heart", int(d.hp), UiPalette.HP, 22)
 	head.add_child(hp)
 	col.add_child(ClassDetail.mechanic_badge(id, 17))
+	return c
+
+
+## The class's equipped Armory kit (3D items with their tiers) and a shortcut to the Armory.
+func _kit(p: Profile, id: String) -> Control:
+	var c := CampUi.card(false, CampInfo.STATIONS.armory.color)
+	var v := UiTheme.vbox(6)
+	c.add_child(v)
+	var head := UiTheme.hbox(10)
+	v.add_child(head)
+	var l := UiTheme.label("KIT", 20, CampInfo.STATIONS.armory.color, false, 0, false, 800)
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(l)
+	if not bool(CampInfo.station_state(p, "armory").locked):
+		var b := GameButton.make("ARMORY", "anvil", GameButton.Kind.SECONDARY, 20)
+		b.min_height = 60
+		b.icon_tint = CampInfo.STATIONS.armory.color
+		b.pressed.connect(func() -> void: open_station.emit("armory"))
+		head.add_child(b)
+	var strip := KitStrip.of_profile(p, id, 60)
+	v.add_child(strip)
+	var names := UiTheme.para(strip.names_text(), 16, UiPalette.TEXT_DIM, 600)
+	names.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(names)
+	var active := 0
+	for e in strip.entries:
+		if int(e.tier) > 0:
+			active += 1
+	if active == 0 and not strip.entries.is_empty():
+		var hint := UiTheme.para("Forge a rank at the Armory to switch these items on.", 15, UiPalette.HP_BRIGHT, 700)
+		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		v.add_child(hint)
 	return c
 
 

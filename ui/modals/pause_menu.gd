@@ -1,7 +1,8 @@
 class_name PauseMenu
 extends UiModal
 ## Pause: run info (class, biome, lap N/15, level), the run's route (three biomes with lap
-## pips, mini-boss and final boss), the passives owned, Resume, Settings, Abandon run (with an inline confirm step).
+## pips, mini-boss and final boss), the Armory loadout (items with their tiers), the passives
+## owned, Resume, Settings, Abandon run (with an inline confirm step).
 ## Emits resume_pressed, settings_pressed, abandon_confirmed.
 
 signal resume_pressed
@@ -11,6 +12,7 @@ signal abandon_confirmed
 var _info: Label
 var _track: HBoxContainer
 var _passives: HFlowContainer
+var _kit: VBoxContainer
 var _main: VBoxContainer
 var _confirm: VBoxContainer
 
@@ -25,6 +27,8 @@ func _build() -> void:
 	_track = UiTheme.hbox(14)
 	_track.alignment = BoxContainer.ALIGNMENT_CENTER
 	body.add_child(_track)
+	_kit = UiTheme.vbox(4)
+	body.add_child(_kit)
 	_passives = HFlowContainer.new()
 	_passives.alignment = FlowContainer.ALIGNMENT_CENTER
 	_passives.add_theme_constant_override("h_separation", 8)
@@ -76,6 +80,16 @@ func refresh(flow: GameFlow) -> void:
 	# this run's route: the three biomes with lap pips, and the two bosses ahead
 	UiTheme.clear(_track)
 	_track.add_child(RouteStrip.make(flow.route_info(), r.act, r.lap, true))
+	UiTheme.clear(_kit)
+	var strip := KitStrip.of_run(r, 58)
+	if not strip.entries.is_empty():
+		_kit.add_child(strip)
+		var names := UiTheme.para(strip.names_text(), 16, UiPalette.TEXT_MUTED, 600)
+		names.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_kit.add_child(names)
+	else:
+		strip.free()
+	_kit.visible = _kit.get_child_count() > 0
 	UiTheme.clear(_passives)
 	for id in r.passives:
 		var p := PassiveIcon.make(String(id), 48, true)

@@ -282,6 +282,23 @@ func _build_extra() -> void:
 		row.modulate.a = 0.0
 		_extra.add_child(row)
 		_cards.append(row)
+	# Armory: the run's items with their mastery, then new blueprints and feat items
+	var items_box := _items_block(evs, before, after)
+	if items_box != null:
+		_extra.add_child(UiModal.section_label("Items"))
+		items_box.modulate.a = 0.0
+		_extra.add_child(items_box)
+		_cards.append(items_box)
+		for e in evs:
+			var card: Control = null
+			if String(e.type) == "blueprint_unlocked":
+				card = _blueprint_card(String(e.item), String(e.variant), String(e.get("source", "")))
+			elif String(e.type) == "item_unlocked" and String(e.get("source", "")) == "feat":
+				card = _item_unlock_card(String(e.id))
+			if card != null:
+				card.modulate.a = 0.0
+				_extra.add_child(card)
+				_cards.append(card)
 	# unlock cards: milestones (with their rewards) and the ascension ladder
 	var ms: Array = []
 	var asc_up := -1
@@ -322,6 +339,104 @@ func _build_extra() -> void:
 			_cards.append(card)
 
 
+## One card listing the run's equipped items: the fights they won and the mastery toward the
+## next blueprint ("Arming Sword  +22  ·  37 / 45 to Knight's Sword"). null when the run had none.
+func _items_block(_evs: Array, _before: Profile, after: Profile) -> Control:
+	var st: Dictionary = results.get("stats", {})
+	var lo: Dictionary = st.get("loadout", {})
+	if after == null or lo.is_empty():
+		return null
+	var fights := int(st.get("item_fights", 0))
+	var c := CampUi.card(false, Color("ff9a5a"))
+	var v := UiTheme.vbox(8)
+	c.add_child(v)
+	var seen := {}
+	for slot in ItemDefs.STAT_SLOTS:
+		if not lo.has(slot):
+			continue
+		var e: Dictionary = lo[slot]
+		var id := String(e.get("id", ""))
+		if id == "" or seen.has(id):
+			continue
+		seen[id] = true
+		var row := UiTheme.hbox(10)
+		v.add_child(row)
+		row.add_child(ItemThumb.make(String(e.get("variant", id)), 56))
+		var col := UiTheme.vbox(2)
+		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(col)
+		var head := UiTheme.hbox(8)
+		col.add_child(head)
+		var nm := UiTheme.label(ItemDefs.name_of(String(e.get("variant", id))), 21, UiPalette.TEXT, true, 4)
+		nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		nm.custom_minimum_size.x = 60
+		head.add_child(nm)
+		if fights > 0:
+			head.add_child(UiTheme.label("+%d" % fights, 20, UiPalette.HEAL, true, 4))
+		var m := after.item_mastery(id)
+		var nxt := _next_blueprint(after, id)
+		if nxt.is_empty():
+			col.add_child(UiTheme.label("Mastery %d fights" % m, 15, UiPalette.TEXT_DIM, false, 0, false, 700))
+		else:
+			var br := UiTheme.hbox(8)
+			col.add_child(br)
+			br.add_child(CampUi.bar(float(m), float(nxt[1]), Color("e0a84a"), 12.0))
+			var bl := UiTheme.label("%d / %d  %s" % [m, int(nxt[1]), ItemDefs.name_of(String(nxt[0]))], 15, Color("e0c28a"), false, 0, false, 700)
+			br.add_child(bl)
+	if v.get_child_count() == 0:
+		return null
+	if fights <= 0:
+		v.add_child(UiTheme.para("Items count fights won once their rank group is forged.", 15, UiPalette.TEXT_MUTED, 600))
+	return c
+
+
+## [variant, fights needed] of the next mastery blueprint of `item` ([] when none is left).
+static func _next_blueprint(p: Profile, item: String) -> Array:
+	var best: Array = []
+	for v in ItemDefs.variants_of(item):
+		var u: Dictionary = ItemDefs.VARIANTS.get(String(v), {}).get("unlock", {})
+		var need := int(u.get("mastery", u.get("or_mastery", 0)))
+		if need <= 0 or p.owns_variant(item, String(v)) or p.has_blueprint(item, String(v)):
+			continue
+		if best.is_empty() or need < int(best[1]):
+			best = [String(v), need]
+	return best
+
+
+## "New blueprint: Saber" with the variant's model, its property and the craft price.
+func _blueprint_card(item: String, variant: String, source: String) -> Control:
+	var c := CampUi.card(true, UiPalette.GOLD)
+	var row := UiTheme.hbox(14)
+	c.add_child(row)
+	row.add_child(ItemThumb.make(variant, 84))
+	var v := UiTheme.vbox(0)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(v)
+	v.add_child(UiTheme.label("NEW BLUEPRINT" + ("  ·  MASTERY" if source == "mastery" else ("  ·  FEAT" if source == "feat" else "")), 16, UiPalette.GOLD, false, 0, false, 800))
+	v.add_child(UiTheme.label(ItemDefs.name_of(variant), 28, UiPalette.TEXT, true, 6))
+	v.add_child(UiTheme.para(String(ItemDefs.VARIANTS.get(variant, {}).get("desc", "")), 17, UiPalette.TEXT_DIM, 500))
+	var cc := ItemDefs.craft_cost(variant)
+	v.add_child(UiTheme.label("%s variant  ·  craft it at the Armory: %d Crowns" % [ItemDefs.name_of(item), int(cc.get("crowns", 0))],
+		16, UiPalette.GOLD_BRIGHT, false, 0, false, 700))
+	return c
+
+
+func _item_unlock_card(id: String) -> Control:
+	var c := CampUi.card(true, UiPalette.GOLD)
+	var row := UiTheme.hbox(14)
+	c.add_child(row)
+	row.add_child(ItemThumb.make(id, 84))
+	var v := UiTheme.vbox(0)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(v)
+	v.add_child(UiTheme.label("NEW ITEM", 16, UiPalette.GOLD, false, 0, false, 800))
+	v.add_child(UiTheme.label(ItemDefs.name_of(id), 28, UiPalette.TEXT, true, 6))
+	var why := String(ItemDefs.FEATS.get(String(ItemDefs.BACK_FEATS.get(id, "")), {}).get("desc", ""))
+	v.add_child(UiTheme.para(why if why != "" else "Equip it at the Armory.", 17, UiPalette.TEXT_DIM, 500))
+	return c
+
+
 func _first_chip(e: Dictionary) -> Control:
 	var kind := String(e.kind)
 	var id := String(e.id)
@@ -350,7 +465,10 @@ func _unlock_card(kind: String, id: String, why: String) -> Control:
 	var c := CampUi.card(true)
 	var row := UiTheme.hbox(14)
 	c.add_child(row)
-	row.add_child(OptionCard.Medallion.make(CampInfo.icon_of(kind, id), 64, null if kind == "biomes" else col, col))
+	if kind == "items":
+		row.add_child(ItemThumb.make(id, 72))
+	else:
+		row.add_child(OptionCard.Medallion.make(CampInfo.icon_of(kind, id), 64, null if kind == "biomes" else col, col))
 	var v := UiTheme.vbox(0)
 	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(v)

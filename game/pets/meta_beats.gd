@@ -2,14 +2,17 @@ class_name MetaBeats
 extends RefCounted
 ## Presentation beats for the meta-layer events (EventPlayer dispatches here):
 ##   potion_gained, potion_used, pet_charged, pet_acted, level_up (auto), second_boss,
-##   face_cursed, trait_triggered, crowns_pending.
+##   face_cursed, item_triggered (Armory items), crowns_pending.
 ## Like the EventPlayer it only reads events (and the flow for display), never mutates rules.
 ##
 ##   await MetaBeats.play(controller, ev)
 
 const TYPES := ["potion_gained", "potion_used", "pet_charged", "pet_acted", "level_up", "second_boss",
-	"face_cursed", "trait_triggered", "crowns_pending"]
-const TRAIT_ICONS := {"helm": "shield", "blade": "sword", "boots": "arrow_right", "charm": "coin"}
+	"face_cursed", "item_triggered", "crowns_pending"]
+## Armory colour (the station's orange) for item callouts.
+const ITEM_COLOR := Color("ffab6a")
+## Bookkeeping effects that only prime a later trigger: shown without holding the beat.
+const ITEM_QUIET := ["ambush_ready", "dominion_stack", "soul_stack"]
 const THORN_COLOR := Color(1.0, 0.7, 0.4)
 
 const DRINK_COLORS := {
@@ -38,8 +41,8 @@ static func play(c: GameController, ev: Dictionary) -> void:
 			await _second_boss(c, ev)
 		"face_cursed":
 			await _face_cursed(c, ev)
-		"trait_triggered":
-			await _trait_triggered(c, ev)
+		"item_triggered":
+			await _item_triggered(c, ev)
 		"crowns_pending":
 			await _crowns(c, ev)
 
@@ -383,34 +386,61 @@ static func _face_cursed(c: GameController, ev: Dictionary) -> void:
 	c.tray.clear_highlight()
 
 
-## A gear trait fired: a small chip flashes over the enemy HUD it affected (combat) or over
-## the hero (board).
-static func _trait_triggered(c: GameController, ev: Dictionary) -> void:
+## An Armory item fired: a pill with the item's 3D picture and its rule name / amount pops
+## over the hero, kept under the top HUD and above the dice tray's frame (never across it or
+## over an enemy's intent badge).
+static func _item_triggered(c: GameController, ev: Dictionary) -> void:
+	var text := item_text(ev)
+	if text == "":
+		return
 	var id := String(ev.get("id", ""))
-	var d: Dictionary = GearDefs.TRAIT_DEFS.get(id, {})
-	var nm := String(d.get("name", id.capitalize()))
-	var v := int(ev.get("value", 0))
-	var slot := id.get_slice("_", 0)
-	var icon := String(TRAIT_ICONS.get(slot, "star"))
-	var text := nm if v <= 0 else "%s +%d" % [nm, v]
-	var at := c.hero_screen(2.6)
-	if c.in_combat and c.flow and c.flow.combat:
-		var i := clampi(c.flow.combat.target, 0, maxi(c.stage.enemy_count() - 1, 0))
-		if i < c.stage.enemy_count():
-			var h: float = c.stage.enemy_heights()[i]
-			at = c.rig.camera.unproject_position(c.stage.enemy_position(i) + Vector3.UP * (h + 0.35))
-			# a tall enemy's HUD can sit under the top HUD: keep the chip below it
-			at.y = maxf(at.y, c.ui.combat_hud.top.content_bottom() + 60.0)
-	elif id == "boots_treasury_step":
-		at = c.ui.board_hud.top.treasury.get_global_rect().get_center() + Vector2(0, 70)
-		c.ui.board_hud.top.treasury.set_value(int(ev.get("treasury", c.flow.run.treasury)), true)
-	var hud := _hud(c)
-	if hud:
-		hud.chip(at, text, icon, UiPalette.GOLD_BRIGHT)
-	else:
-		c.overlay.popup(at, text, UiPalette.GOLD_BRIGHT, icon, 24)
+	var shown := ArmoryLook.shown_id(c.flow.run.class_id if c.flow else "", id, String(ev.get("variant", id)))
+	var at := c.hero_screen(2.4)
+	var top := 0.0
+	if c.in_combat and c.ui and c.ui.combat_hud and c.ui.combat_hud.visible:
+		top = c.ui.combat_hud.top.content_bottom()
+	elif c.ui and c.ui.board_hud and c.ui.board_hud.visible:
+		top = c.ui.board_hud.top.content_bottom()
+	var floor_y := 0.0
+	if is_instance_valid(c.tray) and c.tray.is_visible_in_tree():
+		floor_y = c.tray.get_global_rect().position.y - 4.0
+	c.overlay.item_pop(at, shown, text, ITEM_COLOR, top, floor_y, hud_rects(c))
+	if String(ev.get("effect", "")) in ITEM_QUIET:
+		return
 	Audio.play_sfx("buff")
-	await c.wait(0.22)
+	await c.wait(0.3)
+
+
+## Screen rects of the enemy HUDs in a fight (intent badge, HP bar, numbers), for callouts to
+## keep off.
+static func hud_rects(c: GameController) -> Array:
+	var out: Array = []
+	if not c.in_combat or c.stage == null or c.rig == null:
+		return out
+	var cam: Camera3D = c.rig.camera
+	for h in c.stage.huds:
+		if not is_instance_valid(h) or not h.is_visible_in_tree():
+			continue
+		var r := Rect2()
+		var first := true
+		for n in [h.bar, h.intent_badge, h.intent_label, h.hp_label]:
+			var n3 := n as Node3D
+			if n3 == null or not n3.is_visible_in_tree() or cam.is_position_behind(n3.global_position):
+				continue
+			var p := cam.unproject_position(n3.global_position)
+			if first:
+				r = Rect2(p, Vector2.ZERO)
+				first = false
+			else:
+				r = r.expand(p)
+		if not first:
+			out.append(r.grow_individual(86.0, 34.0, 86.0, 24.0))
+	return out
+
+
+## Callout text of an item_triggered event (ArmoryLook.callout_text).
+static func item_text(ev: Dictionary) -> String:
+	return ArmoryLook.callout_text(ev)
 
 
 ## Minigame Crowns (banked at run end): a small crown pop.

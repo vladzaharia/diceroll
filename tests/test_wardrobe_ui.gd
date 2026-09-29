@@ -44,7 +44,7 @@ func test_wardrobe_commands_round_trip() -> void:
 	assert_true((p.cosmetics.unseen as Array).has("knight:victor"), "new skin waits unseen")
 	camp.apply(["equip_skin", "knight", "victor"])
 	assert_eq(p.equipped_skin("knight"), "victor")
-	assert_eq(CampState.of(p).skins.knight, ["victor", false], "the camp hero wears it")
+	assert_eq((CampState.of(p).skins.knight as Array).slice(0, 2), ["victor", false], "the camp hero wears it")
 	camp.apply(["mark_skins_seen", "knight"])
 	assert_true((p.cosmetics.unseen as Array).is_empty(), "seen")
 	var ev := camp.apply(["buy_skin", "knight", "ascendant"])

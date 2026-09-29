@@ -49,8 +49,9 @@ static func profile(name: String) -> Profile:
 		"capped":
 			var p: Profile = load(CAMP_PATH).preset("max")
 			p.crowns = 1260
-			for slot in GearDefs.SLOTS:
-				p.gear[slot] = GearDefs.MAX_LEVEL
+			for g in ItemDefs.GROUPS:
+				p._ranks()[String(g)] = ItemDefs.RANK_MAX
+			p.armory["pouch"] = 1
 			for track in UnlockDefs.UPGRADES:
 				for id in UnlockDefs.UPGRADES[track]:
 					p.upgrades[id] = 1

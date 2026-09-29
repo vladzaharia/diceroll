@@ -15,8 +15,6 @@ extends RefCounted
 ##   unequip_item(class, slot)  = equip_item(class, slot, "")
 ##   set_appearance(class, slot, value)      head: item|"own"|"hidden", body: item|"own"
 ##   mark_items_seen()          Armory: clears the "new" dots
-##   level_gear(slot)           legacy alias: helm|blade|boots|charm -> rank_up(armor|weapon|offhand|trinket)
-##   set_trait(slot, tier, id)  legacy: always an error (the traits are item rules now)
 ##   level_pet(id)              Pet Den: buy levels 6..10 (Crowns) once XP reached level 5
 ##   unlock(kind, id)           Spend Sigils to unlock early (classes, biomes, bosses,
 ##                              minibosses, pets, minigames, packs, gear, potions)
@@ -33,7 +31,7 @@ extends RefCounted
 ##
 ## Events: crowns_changed {amount, total} · sigils_changed {amount, total} ·
 ##   upgrade_bought {track: "workshop"|"armory"|"arcade"|"pet_den", id, level} ·
-##   trait_set {slot, tier, id} · unlocked {kind, id, source: "sigils"|"milestone"} ·
+##   unlocked {kind, id, source: "sigils"|"milestone"} ·
 ##   pool_toggled {kind, id, enabled} · starter_kind_set {kind} ·
 ##   loadout_changed {class, mode, minigames, pet} · ascension_changed {selected, unlocked} ·
 ##   milestone {id, desc, unlocks} · first {kind, id, sigils} · run_banked {crowns, sigils,
@@ -70,14 +68,6 @@ func buy_upgrade(track: String, id: String) -> Array[Dictionary]:
 	return ev
 
 ## Legacy alias (the old Armory UI): an old gear piece levels its rank group.
-func level_gear(slot: String) -> Array[Dictionary]:
-	if not ItemDefs.LEGACY_GROUP.has(slot) and not ItemDefs.GROUPS.has(slot):
-		return _err("unknown gear slot " + slot)
-	return rank_up(String(ItemDefs.LEGACY_GROUP.get(slot, slot)))
-
-func set_trait(_slot: String, _tier: String, _id: String) -> Array[Dictionary]:
-	return _err("gear traits are item rules now: equip the item that carries it")
-
 # ------------------------------------------------------------------ Armory
 
 func rank_up(group: String) -> Array[Dictionary]:
@@ -392,7 +382,6 @@ func mark_skins_seen(class_id := "") -> Array[Dictionary]:
 func apply(cmd: Array) -> Array[Dictionary]:
 	match String(cmd[0]):
 		"buy_upgrade": return buy_upgrade(String(cmd[1]), String(cmd[2]))
-		"level_gear": return level_gear(String(cmd[1]))
 		"rank_up": return rank_up(String(cmd[1]))
 		"buy_pouch": return buy_pouch()
 		"buy_item": return buy_item(String(cmd[1]), String(cmd[2]) if cmd.size() > 2 else "crowns")
@@ -401,7 +390,6 @@ func apply(cmd: Array) -> Array[Dictionary]:
 		"unequip_item": return unequip_item(String(cmd[1]), String(cmd[2]))
 		"set_appearance": return set_appearance(String(cmd[1]), String(cmd[2]), String(cmd[3]))
 		"mark_items_seen": return mark_items_seen()
-		"set_trait": return set_trait(String(cmd[1]), String(cmd[2]), String(cmd[3]))
 		"level_pet": return level_pet(String(cmd[1]))
 		"unlock": return unlock(String(cmd[1]), String(cmd[2]))
 		"toggle_pool": return toggle_pool(String(cmd[1]), String(cmd[2]), bool(cmd[3]))

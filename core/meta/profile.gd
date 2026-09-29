@@ -20,8 +20,8 @@ extends RefCounted
 ##                body: id, trinket: id, trinket2: id, back: id}} ("" = empty; a missing class
 ##                uses its signature kit), appearance: {class: {head: id|"own"|"hidden", body: id|"own"}},
 ##     seen_new: [item / variant ids not yet seen in the Armory]
-##   gear / gear_traits (v2) are gone: `gear` is a read-only legacy view of the ranks
-##   ({helm: armor, blade: weapon, boots: offhand, charm: trinket}); from_dict migrates them.
+##   gear / gear_traits (v2) are gone; from_dict migrates them (and old unlocks.gear piece ids)
+##   into the ranks ({helm: armor, blade: weapon, boots: offhand, charm: trinket}).
 ##   upgrades: {whetstone, starter_kit, potion_belt, loadout_slot: 0|1}; starter_kind: String
 ##   pet_xp: {pet: fights won while equipped}; pet_bought: {pet: bought level 6..10}
 ##   minigame_plays: {minigame: plays} (mastery)
@@ -50,26 +50,6 @@ var flags: Dictionary = {}
 var unlocks: Dictionary = {}
 var disabled: Dictionary = {}
 var armory: Dictionary = {}
-## Legacy (v2) view of the Armory ranks by old piece: {helm, blade, boots, charm} for the owned
-## rank groups. Writing a level sets the matching rank (old callers and fixtures).
-var gear: Dictionary:
-	get:
-		var out := {}
-		for old in ItemDefs.LEGACY_GROUP:
-			var g := String(ItemDefs.LEGACY_GROUP[old])
-			if owns("gear", g):
-				out[old] = rank(g)
-		return out
-	set(v):
-		for old in v:
-			if ItemDefs.LEGACY_GROUP.has(String(old)):
-				_ranks()[String(ItemDefs.LEGACY_GROUP[old])] = clampi(int(v[old]), 0, ItemDefs.RANK_MAX)
-## Legacy (v2) trait choices: always empty (the traits live on as item rules).
-var gear_traits: Dictionary:
-	get:
-		return {}
-	set(_v):
-		pass
 var upgrades: Dictionary = {}
 var starter_kind: String = ""
 var pet_xp: Dictionary = {}
@@ -118,8 +98,6 @@ static func fresh(lock_classes := true) -> Profile:
 func owns(kind: String, id: String) -> bool:
 	if kind == "items":
 		return owns_item(id)
-	if kind == "gear" and ItemDefs.LEGACY_GROUP.has(id):
-		id = String(ItemDefs.LEGACY_GROUP[id])
 	return (unlocks.get(kind, []) as Array).has(id)
 
 func class_allowed(id: String) -> bool:
@@ -147,14 +125,6 @@ func loadout_slots() -> int:
 
 func potion_cap() -> int:
 	return mini(Balance.POTION_MAX_CAP, Balance.POTION_CAP + int(upgrades.get("potion_belt", 0)))
-
-## Legacy: an old gear piece's level is its rank group's rank (a group id works too).
-func gear_level(slot: String) -> int:
-	return rank(String(ItemDefs.LEGACY_GROUP.get(slot, slot)))
-
-## Legacy: gear traits are gone (their effects are item rules now).
-func active_traits() -> Array:
-	return []
 
 func counter(stat: String) -> int:
 	match stat:
@@ -248,13 +218,10 @@ func can_afford(cost: Dictionary) -> bool:
 	return crowns >= int(cost.get("crowns", 0)) and sigils >= int(cost.get("sigils", 0))
 
 ## Adds an unlock (no cost). Returns false if already owned or unknown. "items" grants an
-## Armory item; a class also brings its signature kit (§6); a legacy gear piece id (helm,
-## blade, boots, charm) grants its rank group.
+## Armory item; a class also brings its signature kit (§6).
 func grant(kind: String, id: String) -> bool:
 	if kind == "items":
 		return grant_item(id)
-	if kind == "gear" and ItemDefs.LEGACY_GROUP.has(id):
-		id = String(ItemDefs.LEGACY_GROUP[id])
 	if owns(kind, id) or not UnlockDefs.all_ids(kind).has(id):
 		return false
 	var owned: Array = []
@@ -506,7 +473,9 @@ static func from_dict(d: Dictionary) -> Profile:
 	var un: Dictionary = d.get("unlocks", {})
 	for kind in UnlockDefs.KINDS:
 		for id in un.get(kind, []):
-			p.grant(kind, String(id))
+			# v1/v2 files list the old gear pieces (helm, blade, boots, charm): their rank groups
+			var uid := String(ItemDefs.LEGACY_GROUP.get(String(id), id)) if kind == "gear" else String(id)
+			p.grant(kind, uid)
 	var dis: Dictionary = d.get("disabled", {})
 	for kind in ["runes", "kinds", "passives"]:
 		var a: Array = []

@@ -206,6 +206,8 @@ static func bind(ch: Character, glb: String, parts: Array, scale := 1.0, off := 
 				mi.skin = _reposed_skin(mi.skin, dskel, ch.skeleton, repose, "%s|%s|%s" % [glb, pname, repose])
 			elif mi.skin:
 				mi.skin = _fitted_skin(mi.skin, dskel, "%s|%s|%s|%s" % [glb, pname, scale, off], fit)
+			if mi.skin:
+				mi.skin = _on_skeleton(mi.skin, ch.skeleton, "%s|%s|%s|%s|%s" % [glb, pname, scale, off, ch.model_id])
 			node = mi
 		node.owner = ch.model
 		mi.owner = ch.model
@@ -272,6 +274,30 @@ static func _reposed_skin(skin: Skin, dskel: Skeleton3D, hskel: Skeleton3D, fit:
 		# mesh vertices are in the donor's model space: T moves them into the hero's
 		s.set_bind_pose(i, hskel.get_bone_global_rest(hb).affine_inverse() * t)
 	_skin_cache[key] = s
+	return s
+
+
+## The Skin with binds to bones the hero lacks (the mannequins have no hand slots) moved to the
+## nearest bone it has (handslot.l -> hand.l), so the donor still binds cleanly.
+static func _on_skeleton(skin: Skin, hskel: Skeleton3D, key: String) -> Skin:
+	var missing := false
+	for i in skin.get_bind_count():
+		var n := String(skin.get_bind_name(i))
+		if n != "" and hskel.find_bone(n) < 0:
+			missing = true
+			break
+	if not missing:
+		return skin
+	if _skin_cache.has("sk|" + key):
+		return _skin_cache["sk|" + key]
+	var s := skin.duplicate() as Skin
+	for i in s.get_bind_count():
+		var n := String(s.get_bind_name(i))
+		if n == "" or hskel.find_bone(n) >= 0:
+			continue
+		var alt := n.replace("handslot", "hand")
+		s.set_bind_name(i, alt if hskel.find_bone(alt) >= 0 else hskel.get_bone_name(0))
+	_skin_cache["sk|" + key] = s
 	return s
 
 
