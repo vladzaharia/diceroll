@@ -3,7 +3,6 @@
 All agents were stopped on purpose by Vlad. Nothing is running. Each unfinished work package lives in its own git worktree, with a WIP checkpoint commit at its tip. Nothing below is merged to `main` yet.
 
 Standing rules for every resumed agent:
-- **Git on this Mac:** since an Xcode update, `/usr/bin/git` fails with an Xcode licence prompt until `sudo xcodebuild -license accept` is run. Workaround: `export DEVELOPER_DIR=/Library/Developer/CommandLineTools`. The agent launcher can't create worktrees while this is broken, so create them by hand with `git worktree add`.
 - **Clean up:** heavy parallel sims are fine, but leave no stray processes (sims, servers, renders) behind.
 - **Test across devices:** every visual change is verified with `tools/shoot_matrix.sh <scenario> <dir> [all|desktop|mobile|dpi|zoom|quick]`, not a single resolution. The matrix covers desktop 1280×720 → 1920×1080; iPhone 17 / 17 Pro and 17 Pro Max in portrait and landscape; iPad mini and iPad Pro 13" in both orientations; iPhone Duo outer (portrait) and inner (portrait and landscape); @1x/@2x density; and UI zoom 0.8–1.5 (`--ui-scale`). Notch and home-indicator insets are emulated with `--safe`.
 - **Never launch a windowed Godot.** Use `tools/shoot.sh` for screenshots, running one at a time; from a worktree use `GODOT_PROJECT=$PWD /Users/vlad/Repos/diceroll/tools/shoot.sh ...`. Use `--headless` for tests and sims.
