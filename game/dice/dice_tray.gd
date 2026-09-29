@@ -34,7 +34,8 @@ var interactive := true
 var turret: DieVisual = null
 var _stand: Node3D = null
 var _turret_label: Label = null
-var _badge: PanelContainer = null
+var _badge: Label = null
+var _badge_icon: TextureRect = null
 
 var _viewport := SubViewport.new()
 var _view := TextureRect.new()
@@ -203,48 +204,41 @@ func set_badge(text: String, color := Color(1.0, 0.82, 0.3), icon := "") -> void
 	if _badge == null:
 		if text == "":
 			return
-		_badge = PanelContainer.new()
+		_badge = Label.new()
 		_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 6)
-		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_badge.add_child(row)
+		var font: Font = load("res://assets/fonts/LilitaOne-Regular.ttf") if ResourceLoader.exists("res://assets/fonts/LilitaOne-Regular.ttf") else null
+		if font:
+			_badge.add_theme_font_override("font", font)
+		_badge.add_theme_font_size_override("font_size", 20)
+		_badge.add_theme_color_override("font_outline_color", Color(0.08, 0.05, 0.03))
+		_badge.add_theme_constant_override("outline_size", 6)
+		_badge_icon = TextureRect.new()
+		_badge_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		_badge_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		_badge_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_badge.add_child(_badge_icon)
 		add_child(_badge)
 	_badge.visible = text != ""
 	if text == "":
 		return
-	var row := _badge.get_child(0) as HBoxContainer
-	for ch in row.get_children():
-		ch.queue_free()
+	var has_icon := icon != "" and UiIcons.exists(icon)
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.04, 0.03, 0.08, 0.82)
 	sb.set_corner_radius_all(14)
 	sb.set_border_width_all(2)
 	sb.border_color = Color(color, 0.85)
-	sb.content_margin_left = 10
+	sb.content_margin_left = 40 if has_icon else 12
 	sb.content_margin_right = 12
 	sb.content_margin_top = 3
 	sb.content_margin_bottom = 3
-	_badge.add_theme_stylebox_override("panel", sb)
-	if icon != "" and UiIcons.exists(icon):
-		row.add_child(UiIcons.rect(icon, 26))
-	var l := Label.new()
-	l.text = text
-	var font: Font = load("res://assets/fonts/LilitaOne-Regular.ttf") if ResourceLoader.exists("res://assets/fonts/LilitaOne-Regular.ttf") else null
-	if font:
-		l.add_theme_font_override("font", font)
-	l.add_theme_font_size_override("font_size", 20)
-	l.add_theme_color_override("font_color", color.lightened(0.25))
-	l.add_theme_color_override("font_outline_color", Color(0.08, 0.05, 0.03))
-	l.add_theme_constant_override("outline_size", 6)
-	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_child(l)
-	_fit_badge.call_deferred()
-
-
-func _fit_badge() -> void:
-	if _badge == null:
-		return
+	_badge.add_theme_stylebox_override("normal", sb)
+	_badge.add_theme_color_override("font_color", color.lightened(0.25))
+	_badge.text = text
+	_badge_icon.visible = has_icon
+	if has_icon:
+		_badge_icon.texture = UiIcons.tex(icon, 52)
+		_badge_icon.position = Vector2(10, 4)
+		_badge_icon.size = Vector2(24, 24)
 	_badge.size = _badge.get_combined_minimum_size()
 	_badge.position = Vector2(FRAME_PX + 8.0, FRAME_PX + 6.0)
 
