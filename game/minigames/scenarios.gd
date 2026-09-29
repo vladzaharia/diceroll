@@ -121,7 +121,7 @@ class _Driver extends Node:
 			var loaded := GameFlow.from_dict(JSON.parse_string(JSON.stringify(f.to_dict())))
 			c.start(loaded)
 			print("MG_RESUME phase=%s same_state=%s" % [GameFlow.phase_name(loaded.phase),
-				JSON.stringify(loaded.offer.get("state", {})) == JSON.stringify(f.offer.get("state", {}))])
+				JSON.stringify(loaded.minigame.public_state()) == JSON.stringify(f.minigame.public_state())])
 			return
 		# the screen cashes the game in by itself once the board settles
 		var guard := 0
@@ -208,7 +208,26 @@ class _Driver extends Node:
 				await _drag(pts)
 			"claw_machine":
 				var cb := b as ClawBoard
-				var target := float(a[0])
+				if args.get("claw", "") == "wide":
+					# keep the wide grabber and go for the best exposed prize
+					var bi := -1
+					for i in st.prizes.size():
+						var pz: Dictionary = st.prizes[i]
+						if not bool(pz.taken) and float(pz.depth) < 0.35 and (bi < 0 or int(pz.points) > int(st.prizes[bi].points)):
+							bi = i
+					a = [float(st.prizes[bi].pos)] if bi >= 0 else [0.5]
+				elif a[0] is String:
+					# the claw choice: tap its selector on the cabinet
+					var want := String(a[1])
+					_click(o + (cb.selector_rects()[ClawMachine.CLAWS.find(want)] as Rect2).get_center())
+					for k in 40:
+						if f.commands.size() > n:
+							return true
+						await _pause(0.05)
+					return false
+				if a[0] is String:
+					return false
+				var target := float(a[0]) + float(args.get("claw-offset", "0"))
 				# wait for the sweep to pass over the target, then tap
 				var guard := 0
 				while guard < 600:

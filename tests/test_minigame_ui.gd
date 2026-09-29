@@ -82,7 +82,8 @@ func test_claw_aim_matches_core() -> void:
 		var st := m.public_state()
 		for k in 101:
 			var x := k / 100.0
-			assert_eq(MgLogic.claw_target(st.prizes, x), m.prize_at(x), "seed %d x %.2f" % [s, x])
+			for c in ClawMachine.CLAWS:
+				assert_eq(MgLogic.claw_target(st.prizes, x, c), m.prize_at(x, c), "seed %d x %.2f %s" % [s, x, c])
 
 
 ## The claw sweep is deterministic: a constant-speed triangle wave from the left edge.
@@ -183,3 +184,41 @@ func test_scripted_play_reaches_reward_then_board() -> void:
 		assert_eq(f.offer.kind, "reward", game)
 		f.pick_draft(0)
 		assert_true(f.phase != P.MINIGAME, game)
+
+
+## Claw Machine (fluff heap, two claws): the claw choice is free and public; depth shrinks
+## the grip zone (a lot for the wide grabber, little for the narrow picker); a hit outside the
+## grip slips; a slip or miss brings up a puffball; deterministic and saves mid-game.
+func test_claw_fluff_rules() -> void:
+	for s in 30:
+		var m := Minigames.create("claw_machine", 2000 + s * 17, 1) as ClawMachine
+		assert_eq(m.prizes.size(), 7)
+		assert_eq(String(m.public_state().claw), "wide")
+		var legend := -1
+		for i in m.prizes.size():
+			if String(m.prizes[i].kind) == "legendary":
+				legend = i
+		for i in m.prizes.size():
+			assert_true(float(m.prizes[legend].depth) >= float(m.prizes[i].depth), "legendary sits deepest")
+		var p: Dictionary = m.prizes[legend]
+		assert_true(ClawMachine.grip_half(p, "narrow") > ClawMachine.grip_half(p, "wide"), "narrow grips buried prizes better")
+		var copy := Minigames.from_dict(JSON.parse_string(JSON.stringify(m.to_dict()))) as ClawMachine
+		# a claw choice uses no grab
+		var r0 := m.action(["claw", "narrow"])
+		assert_eq(String(r0.info.claw), "narrow")
+		assert_eq(m.actions_left, ClawMachine.GRABS)
+		assert_true(m.action(["claw", "tiny"]).has("error"))
+		# just outside the narrow grip, inside the hitbox: slips, puffball consolation
+		var g := ClawMachine.grip_half(p, "narrow")
+		var edge := float(p.pos) + (g + float(p.width) / 2.0) / 2.0
+		var r := m.action([edge])
+		if int(r.info.prize) == legend:
+			assert_eq(r.info.slipped, true)
+			assert_eq(r.info.fluff, true)
+			assert_eq(int(m.score()), ClawMachine.FLUFF_POINTS)
+		var r2 := m.action([float(p.pos)])
+		assert_eq(r2.info.grabbed, true)
+		copy.action(["claw", "narrow"])
+		copy.action([edge])
+		copy.action([float(p.pos)])
+		assert_eq(JSON.stringify(copy.public_state()), JSON.stringify(m.public_state()))

@@ -21,6 +21,7 @@ const SHOVEL := K + "tools_extra/shovel.gltf"
 const PICKAXE := K + "tools_extra/pickaxe.gltf"
 const MAGNIFIER := K + "tools_extra/magnifying_glass.gltf"
 const MAP := K + "tools_extra/map_rolled.gltf"
+const POTION := K + "dungeon/bottle_A_labeled_green.gltf"
 
 const PX := 256
 const ARM_AXIS := Vector3(1, 0, 0)

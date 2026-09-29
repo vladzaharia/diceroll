@@ -130,6 +130,9 @@ static func minigame_command(f: GameFlow) -> Array:
 				var p: Dictionary = st.prizes[i]
 				if not bool(p.taken) and (best < 0 or int(p.points) > int(st.prizes[best].points)):
 					best = i
+			# perfect aim: the narrow picker pulls anything out of the fluff
+			if String(st.get("claw", "wide")) != "narrow":
+				return ["minigame_action", ["claw", "narrow"]]
 			return ["minigame_action", [float(st.prizes[best].pos) if best >= 0 else 0.5]]
 	return ["minigame_finish"]
 

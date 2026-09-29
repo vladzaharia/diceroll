@@ -54,6 +54,7 @@ const SFX := {
 	"reveal": [[UI + "confirmation_001.ogg", UI + "confirmation_002.ogg"], -5.0],
 	"tick": [[UI + "tick_001.ogg", UI + "tick_002.ogg", UI + "tick_004.ogg"], -4.0],
 	"claw": [[RPG + "metalClick.ogg"], -2.0],
+	"fwump": [[IMPACT + "impactSoft_medium_000.ogg", IMPACT + "impactSoft_medium_001.ogg", IMPACT + "impactSoft_medium_002.ogg"], -3.0],
 	"whirr": [[UI + "maximize_003.ogg", UI + "maximize_006.ogg"], -6.0],
 }
 
