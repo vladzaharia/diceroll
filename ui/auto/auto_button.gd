@@ -78,10 +78,13 @@ func _place() -> void:
 	pivot_offset = size * 0.5
 	var sink := 3.0 if _down else 0.0
 	var lw := _label.get_minimum_size().x
-	var total := 38.0 + 8.0 + lw
+	# centre the visible glyph + label as one group (the icon has transparent margins)
+	var g := GameButton._glyph_rect(_icon.texture)
+	var gw := 38.0 * g.size.x
+	var total := gw + 10.0 + lw
 	var x := (size.x - total) * 0.5
-	_icon.position = Vector2(x, (size.y - 38.0) * 0.5 + sink - 1.0)
-	_label.position = Vector2(x + 46.0, (size.y - _label.get_minimum_size().y) * 0.5 + sink)
+	_icon.position = Vector2(x - 38.0 * g.position.x, (size.y - 38.0) * 0.5 + sink - 1.0)
+	_label.position = Vector2(x + gw + 10.0, (size.y - _label.get_minimum_size().y) * 0.5 + sink)
 	_label.size = _label.get_minimum_size()
 
 

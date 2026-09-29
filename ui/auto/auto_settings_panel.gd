@@ -7,7 +7,7 @@ extends UiModal
 
 signal rules_changed(rules: AutoRules)
 
-const SCOPES := [["board", "Board", "dice"], ["combat", "Combat", "sword"], ["drafts", "Drafts", "star"],
+const SCOPES := [["board", "Board", "flag"], ["combat", "Combat", "sword"], ["drafts", "Drafts", "star"],
 	["shop", "Shop", "coin"], ["forge", "Forge", "anvil"], ["events", "Events", "question"], ["portal", "Portal", "portal"]]
 const STOPS := [["stop_before_miniboss", "Before the mini-boss", "skull"], ["stop_before_boss", "Before the final boss", "crown"],
 	["stop_on_boss_passive", "A boss passive is offered", "star"], ["stop_on_shop", "At a shop (Shop is off)", "coin"]]

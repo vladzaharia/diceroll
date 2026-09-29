@@ -56,7 +56,7 @@ func _init() -> void:
 	cluster.add_child(auto_btn)
 	gear_btn = GameButton.round_icon("gear", 64)
 	gear_btn.kind = GameButton.Kind.GHOST
-	gear_btn.icon_px = 30
+	gear_btn.icon_px = 40
 	gear_btn.icon_tint = Color(AutoButton.ACCENT, 0.95)
 	gear_btn.tooltip_text = "AUTO settings"
 	gear_btn.pressed.connect(func() -> void: settings_requested.emit())
@@ -262,11 +262,11 @@ func _layout() -> void:
 		top = ui.combat_hud.top if ui.combat_hud.visible else ui.board_hud.top
 	var w := minf(HudTop.MAX_W, view.x - safe.left - safe.right)
 	var right := (view.x + w) * 0.5
-	var y := (top.content_bottom() if top else safe.top + 110.0) + 14.0
+	var y := (top.content_bottom() if top else safe.top + 110.0) + 10.0
 	cluster.reset_size()
 	if view.x - safe.right - right >= cluster.size.x + 56.0:
 		# landscape: the free corner right of the top HUD (clear of enemy intents / HP bars)
-		cluster.position = Vector2(view.x - safe.right - 28.0 - cluster.size.x, safe.top + 14.0)
+		cluster.position = Vector2(view.x - safe.right - 28.0 - cluster.size.x, safe.top + 12.0)
 	else:
 		cluster.position = Vector2(right - cluster.size.x, y)
 	_place_ticker()
