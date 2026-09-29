@@ -1055,6 +1055,9 @@ static func _avg_attack(id: String, atk_mult: float, atk_bonus: int) -> float:
 	if EnemyDefs.is_boss(id):
 		for ph in def.phases:
 			pats.append_array(ph)
+	elif def.has("phases"):
+		for ph in def.phases:
+			pats.append_array(ph)
 	else:
 		pats = def.pattern
 	var s := 0.0
@@ -1112,6 +1115,8 @@ static func _combat_model(f: GameFlow, rules: AutoRules) -> CombatModel:
 				other = v * 0.4
 			"buff":
 				other = v * 2.0
+			"rally":
+				other = v * 2.0 * c.alive_indices().size()
 			"curse":
 				other = 3.0 * v
 			"summon":

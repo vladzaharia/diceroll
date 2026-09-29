@@ -94,12 +94,13 @@ static func make_enemy(rng: Rng, id: String, p_act: int, p_lap: int, p_elite: bo
 	var hp := int(round(float(def.hp) * hp_mult))
 	var step := 0
 	if not is_boss and def.mode == "cycle":
-		step = rng.randi_range(0, def.pattern.size() - 1)
+		step = rng.randi_range(0, EnemyDefs.pattern(id, 1).size() - 1)
 	return {
 		"id": id, "name": String(def.name), "hp": hp, "max_hp": hp, "block": 0, "atk_bonus": 0,
 		"poison": 0, "frozen": false, "intent": {"kind": "aim", "value": 0}, "boss": is_boss, "phase": 1,
 		"elite": p_elite, "atk_mult": atk_mult, "step": step, "summoned": summoned,
 		"miniboss": EnemyDefs.is_miniboss(id), "traits": EnemyDefs.traits(id, 1).duplicate(),
+		"frenzy": 0, "form": EnemyDefs.form(id, 1),
 	}
 
 ## Meta-layer enemy modifiers (ascension): A1 elites +15% HP; A6 +4% HP/attack (not bosses);
@@ -159,7 +160,7 @@ func roll_intent(rng: Rng, i: int) -> void:
 	if e.boss:
 		pattern = EnemyDefs.BOSSES[e.id].phases[int(e.phase) - 1]
 	else:
-		pattern = EnemyDefs.def(e.id).pattern
+		pattern = EnemyDefs.pattern(String(e.id), int(e.phase))
 		mode = EnemyDefs.def(e.id).mode
 	var entry: Dictionary
 	if mode == "random":
@@ -485,6 +486,8 @@ func attack(run: RunState) -> Array[Dictionary]:
 		if spill > 0 and nxt >= 0:
 			ev.append({"type": "trait_triggered", "id": "blade_overflow", "value": spill})
 			ev.append_array(damage_enemy(nxt, spill, "cleave", run))
+	if alive(tgt0) and total > 0 and has_trait(enemies[tgt0], "frenzy"):
+		ev.append_array(_frenzy(tgt0))
 	if thorny and total > 0:
 		# Briar thorns: reflect damage to the hero, never lethal.
 		var th := mini(Balance.ENEMY_THORNS, run.hp - 1)
@@ -608,6 +611,18 @@ func damage_enemy(i: int, amount: int, source: String, run: RunState, ignore_blo
 		var ok := last_overkill
 		ev.append_array(ClassLogic.on_enemy_killed(run, self, i, source))
 		last_overkill = ok
+	elif not e.boss and int(e.phase) == 1 and int(e.hp) * 2 <= int(e.max_hp) and EnemyDefs.transforms(String(e.id)):
+		# transform: once at <= 50% HP; drops its Block and re-rolls its intent from phase 2
+		e.phase = 2
+		e.step = 0
+		e.form = EnemyDefs.form(String(e.id), 2)
+		if int(e.block) > 0:
+			var lost2 := int(e.block)
+			e.block = 0
+			ev.append({"type": "block_gained", "target": i, "amount": -lost2, "total": 0, "source": "transform"})
+		roll_intent(run.rng, i)
+		ev.append({"type": "enemy_transformed", "enemy_idx": i, "form": String(e.form), "id": String(e.id)})
+		ev.append({"type": "enemy_intent", "enemy_idx": i, "intent": e.intent.duplicate()})
 	elif e.boss and int(e.phase) == 1 and int(e.hp) * 2 <= int(e.max_hp):
 		var was_armored := has_trait(e, "armor")
 		e.phase = 2
@@ -620,6 +635,19 @@ func damage_enemy(i: int, amount: int, source: String, run: RunState, ignore_blo
 			e.block = 0
 			ev.append({"type": "block_gained", "target": i, "amount": -lost, "total": 0, "source": "shatter"})
 	return ev
+
+## Frenzy: +FRENZY_STEP attack after surviving a main-attack hit, up to +FRENZY_MAX per fight.
+func _frenzy(i: int) -> Array[Dictionary]:
+	var e := enemies[i]
+	var gain := mini(EnemyDefs.FRENZY_STEP, EnemyDefs.FRENZY_MAX - int(e.get("frenzy", 0)))
+	if gain <= 0:
+		return []
+	e.frenzy = int(e.get("frenzy", 0)) + gain
+	e.atk_bonus = int(e.atk_bonus) + gain
+	var out: Array[Dictionary] = [{"type": "status", "target": i, "status": "frenzy", "value": int(e.frenzy), "max": EnemyDefs.FRENZY_MAX}]
+	if (e.get("affixes", []) as Array).has("frenzied"):
+		out.append({"type": "affix_triggered", "enemy_idx": i, "affix": "frenzied", "value": int(e.frenzy)})
+	return out
 
 ## Living summoned allies.
 func _summons_alive() -> int:
@@ -774,6 +802,12 @@ func _execute_intent(run: RunState, i: int) -> Array[Dictionary]:
 		"buff":
 			e.atk_bonus = int(e.atk_bonus) + v
 			ev.append({"type": "status", "target": i, "status": "buff", "value": int(e.atk_bonus)})
+		"rally":
+			# every living enemy (the caster included) gains +v attack for the fight
+			for k in enemies.size():
+				if alive(k):
+					enemies[k].atk_bonus = int(enemies[k].atk_bonus) + v
+					ev.append({"type": "status", "target": k, "status": "buff", "value": int(enemies[k].atk_bonus), "source": i, "rally": true})
 		"curse":
 			pending_curse += v
 			ev.append({"type": "status", "target": "hero", "status": "curse", "value": v, "source": i, "pending": true})
@@ -909,6 +943,7 @@ static func _norm_enemy(ed: Dictionary) -> Dictionary:
 		"phase": int(ed.phase), "elite": bool(ed.elite), "atk_mult": float(ed.atk_mult), "step": int(ed.step),
 		"summoned": bool(ed.summoned), "miniboss": bool(ed.get("miniboss", false)),
 		"traits": _strings(ed.get("traits", [])),
+		"frenzy": int(ed.get("frenzy", 0)), "form": String(ed.get("form", "")),
 	}
 
 static func _strings(a: Array) -> Array:

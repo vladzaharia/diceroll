@@ -9,7 +9,12 @@ extends RefCounted
 ## from a random starting offset.
 ## traits (optional): "armor" (its Block never expires), "thorns" (reflects ENEMY_THORNS to
 ## the hero when hit by the main attack, never lethal), "ward" (takes half damage while any
-## summoned ally lives), "pierce" (its attacks ignore Block). Bosses set traits per phase.
+## summoned ally lives), "pierce" (its attacks ignore Block), "frenzy" (+FRENZY_STEP attack for
+## the fight after surviving a hit from the main attack, max +FRENZY_MAX), "ward_allies" (the
+## Warded affix: half damage while any other non-warded enemy lives). Bosses set traits per phase.
+## rally intent: every living enemy (the caster included) gains +value attack for the fight.
+## transform: a regular/mini-boss with `phases: [p1, p2]` (and `forms` names) switches pattern once
+## at <= 50% HP, dropping its Block (enemy_transformed {enemy_idx, form}).
 
 const ENEMIES := {
 	"skeleton_minion": {"name": "Skeleton Minion", "hp": 12, "gold": 4, "xp": 3, "mode": "random",
@@ -41,6 +46,22 @@ const ENEMIES := {
 		"pattern": [{"kind": "burn", "value": 2}, {"kind": "attack", "value": 5}]},
 	"magma_brute": {"name": "Magma Brute", "hp": 36, "gold": 12, "xp": 9, "mode": "cycle",
 		"pattern": [{"kind": "burn", "value": 2}, {"kind": "block", "value": 8}, {"kind": "attack", "value": 12}]},
+	# --- 2026-09-28 roster (docs/design/2026-09-28-classes-enemies-skins.md §3)
+	"bone_cutthroat": {"name": "Bone Cutthroat", "hp": 13, "gold": 5, "xp": 4, "mode": "cycle", "traits": ["pierce"],
+		"pattern": [{"kind": "attack", "value": 4}, {"kind": "attack", "value": 4}, {"kind": "block", "value": 3}]},
+	"bone_golem": {"name": "Bone Golem", "hp": 44, "gold": 13, "xp": 10, "mode": "cycle",
+		"pattern": [{"kind": "block", "value": 10}, {"kind": "aim", "value": 0}, {"kind": "attack", "value": 16}]},
+	"orc_raider": {"name": "Orc Raider", "hp": 22, "gold": 7, "xp": 5, "mode": "cycle", "traits": ["frenzy"],
+		"pattern": [{"kind": "attack", "value": 5}, {"kind": "attack", "value": 7}]},
+	"orc_drummer": {"name": "Orc Drummer", "hp": 20, "gold": 7, "xp": 5, "mode": "cycle",
+		"pattern": [{"kind": "rally", "value": 2}, {"kind": "block", "value": 5}, {"kind": "attack", "value": 4}]},
+	# transform: phases [man, wolf]; the switch happens once at <= 50% HP (forms names the phases)
+	"werewolf": {"name": "Werewolf", "hp": 26, "gold": 8, "xp": 6, "mode": "cycle", "forms": ["man", "wolf"],
+		"pattern": [{"kind": "block", "value": 5}, {"kind": "attack", "value": 6}],
+		"phases": [[{"kind": "block", "value": 5}, {"kind": "attack", "value": 6}],
+			[{"kind": "attack", "value": 5}, {"kind": "drain", "value": 6}, {"kind": "attack", "value": 9}]]},
+	"fallen_paladin": {"name": "Fallen Paladin", "hp": 40, "gold": 12, "xp": 9, "mode": "cycle",
+		"pattern": [{"kind": "attack", "value": 9}, {"kind": "heal", "value": 6}, {"kind": "block", "value": 8}]},
 }
 
 ## Bosses have two phases; phase 2 starts at or below half HP. Boss numbers are not scaled.
@@ -93,6 +114,12 @@ const MINIBOSSES := {
 		"pattern": [{"kind": "attack", "value": 8}, {"kind": "heal", "value": 10}, {"kind": "attack", "value": 10}]},
 	"mini_cinder_brute": {"name": "Cinder Brute", "hp": 110, "gold": 30, "xp": 15, "mode": "cycle",
 		"pattern": [{"kind": "burn", "value": 3}, {"kind": "attack", "value": 11}, {"kind": "block", "value": 10}]},
+	"mini_moonfang": {"name": "Moonfang", "hp": 105, "gold": 30, "xp": 15, "mode": "cycle", "forms": ["man", "wolf"],
+		"pattern": [{"kind": "block", "value": 10}, {"kind": "attack", "value": 9}, {"kind": "curse", "value": 1}],
+		"phases": [[{"kind": "block", "value": 10}, {"kind": "attack", "value": 9}, {"kind": "curse", "value": 1}],
+			[{"kind": "attack", "value": 8}, {"kind": "drain", "value": 10}, {"kind": "attack", "value": 12}]]},
+	"mini_orc_warchief": {"name": "Orc Warchief", "hp": 100, "gold": 30, "xp": 15, "mode": "cycle", "summon": "orc_raider",
+		"pattern": [{"kind": "summon", "value": 1}, {"kind": "rally", "value": 3}, {"kind": "attack", "value": 11}, {"kind": "block", "value": 8}]},
 }
 
 ## Legacy per-act defaults (old saves, scenarios). The run uses RunState.miniboss_id.
@@ -115,6 +142,28 @@ const POOLS := [
 ]
 ## [min, max] enemies per tile for each band.
 const COUNTS := [[2, 2], [2, 2], [2, 3], [2, 3], [2, 3]]
+
+## Frenzy trait: attack gained per main-attack hit survived, and its cap.
+const FRENZY_STEP := 2
+const FRENZY_MAX := 6
+
+## Intent pattern of a non-boss enemy in `phase` (1-based): transforming enemies (a "phases"
+## entry) switch to phases[1] once at <= 50% HP.
+static func pattern(id: String, phase := 1) -> Array:
+	var d := def(id)
+	if d.has("phases") and not BOSSES.has(id):
+		var ph: Array = d.phases
+		return ph[clampi(phase - 1, 0, ph.size() - 1)]
+	return d.pattern
+
+## True for regular enemies and mini-bosses that transform (Werewolf, Moonfang).
+static func transforms(id: String) -> bool:
+	return not BOSSES.has(id) and def(id).has("phases")
+
+## Form name for `phase` ("" when the enemy has no forms).
+static func form(id: String, phase: int) -> String:
+	var f: Array = def(id).get("forms", [])
+	return String(f[phase - 1]) if phase - 1 < f.size() and phase >= 1 else ""
 
 static func band(lap: int) -> int:
 	return clampi((lap - 1) / 3, 0, POOLS.size() - 1)

@@ -69,7 +69,7 @@ func test_route_one_biome_per_tier_and_deterministic() -> void:
 		minis[f.run.miniboss_id] = true
 	assert_eq(routes.size(), 8, "every route shows up")
 	assert_eq(bosses.size(), 4, "every final boss shows up")
-	assert_eq(minis.size(), 4, "every tier-2 mini-boss shows up")
+	assert_eq(minis.size(), 6, "every tier-2 mini-boss shows up")
 
 func test_forced_route_and_bosses() -> void:
 	var f := GameFlow.new_run("mage", 5, 28, {"route": ["glade", "frost", "magma"], "miniboss": "mini_frost_warden", "boss": "boss_magma_golem"})
@@ -78,7 +78,7 @@ func test_forced_route_and_bosses() -> void:
 	assert_eq(f.run.boss_id, "boss_magma_golem")
 	assert_eq(f.run.board.biome, "glade")
 	var g := GameFlow.new_run("mage", 5, 28, {"route": ["crypt", "hollow", "throne"]})
-	assert_true(["mini_pumpkin_knight", "mini_grave_mage"].has(g.run.miniboss_id))
+	assert_true(["mini_pumpkin_knight", "mini_grave_mage", "mini_moonfang"].has(g.run.miniboss_id))
 	assert_true(["boss_lich", "boss_bone_warden"].has(g.run.boss_id))
 	# invalid overrides are ignored
 	var h := GameFlow.new_run("mage", 5, 28, {"route": ["magma", "glade", "frost"], "boss": "nope"})
@@ -86,8 +86,8 @@ func test_forced_route_and_bosses() -> void:
 	assert_true(EnemyDefs.BOSSES.has(h.run.boss_id))
 
 func test_candidates_per_biome() -> void:
-	assert_eq(BiomeDefs.miniboss_candidates(["crypt", "hollow", "throne"]), ["mini_pumpkin_knight", "mini_grave_mage"])
-	assert_eq(BiomeDefs.miniboss_candidates(["crypt", "frost", "throne"]), ["mini_frost_warden", "mini_bone_champion"])
+	assert_eq(BiomeDefs.miniboss_candidates(["crypt", "hollow", "throne"]), ["mini_pumpkin_knight", "mini_grave_mage", "mini_moonfang"])
+	assert_eq(BiomeDefs.miniboss_candidates(["crypt", "frost", "throne"]), ["mini_frost_warden", "mini_bone_champion", "mini_orc_warchief"])
 	assert_eq(BiomeDefs.boss_candidates(["crypt", "hollow", "throne"]), ["boss_lich", "boss_bone_warden"])
 	assert_eq(BiomeDefs.boss_candidates(["crypt", "hollow", "magma"]), ["boss_cinder_king", "boss_magma_golem"])
 	var finals := {}
@@ -106,7 +106,7 @@ func test_candidates_per_biome() -> void:
 	assert_true(finals.size() >= 4, "at least 4 final bosses")
 	assert_true(EnemyDefs.MINIBOSSES.has("mini_briar_beast") and EnemyDefs.MINIBOSSES.has("mini_cinder_brute"))
 	var n := EnemyDefs.ENEMIES.size()
-	assert_true(n >= 12 and n <= 14, "12-14 regular enemies (%d)" % n)
+	assert_true(n >= 18 and n <= 22, "18-22 regular enemies (%d)" % n)
 
 func test_route_info() -> void:
 	var f := GameFlow.new_run("knight", 1, 28, {"route": ["crypt", "frost", "throne"], "miniboss": "mini_bone_champion", "boss": "boss_lich"})
