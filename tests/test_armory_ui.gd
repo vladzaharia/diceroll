@@ -116,6 +116,7 @@ func test_camp_racks_build() -> void:
 	assert_true(body.get_node_or_null("Mannequin2") != null, "three mannequins at tier 3")
 	assert_true(body.find_children("*KitGlow*", "", true, false).size() >= 3, "the equipped kit glows")
 	body.free()
+	Character.clear_cache()
 
 
 func test_kit_strip() -> void:
@@ -168,3 +169,14 @@ func test_armory_screen_commands() -> void:
 		types.append(String(c[0]))
 	assert_true(types.has("equip_item") and types.has("set_appearance"))
 	m.free()
+	Character.clear_cache()
+
+
+## Picker rule text: "tier III:" clauses show tier III's numbers, tier-I prose reads naturally.
+func test_picker_rule_text() -> void:
+	for id in ItemDefs.IDS:
+		for t in [1, 2, 3]:
+			var s := ArmoryModal.rule_text(String(id), t, String(id))
+			assert_true(not s.contains("{"), "placeholders filled: %s %d: %s" % [id, t, s])
+			assert_true(not s.contains("+0%") and not s.contains("(s)") and not s.contains("turns 1-1"), "reads naturally: %s %d: %s" % [id, t, s])
+	assert_eq(ArmoryModal.rule_text("knight_cape", 1), "Style")

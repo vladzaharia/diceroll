@@ -143,9 +143,7 @@ class _Driver extends Node:
 		if target == null:
 			return
 		if a._wide() and at in ["picker", "variants"]:
-			# landscape: the picker is its own column; bring the variants row up
-			if at == "picker":
-				return
+			return    # landscape: the picker is its own column, already in view
 		var top := target.get_global_rect().position.y - a._scroll.get_global_rect().position.y
 		a._scroll.scroll_vertical = int(a._scroll.scroll_vertical + top - 10.0)
 

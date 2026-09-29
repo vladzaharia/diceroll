@@ -185,6 +185,13 @@ func _doll(p: Profile, wide: bool) -> Control:
 	var skin := p.equipped_skin(view_class)
 	var pres := p.prestige_on(view_class)
 	_portrait.set_hero(view_class, skin, pres, false, ArmoryLook.of_profile(p, view_class, skin, pres))
+	# tap the hero: a preview of the equipped weapon's attack
+	_portrait.mouse_filter = Control.MOUSE_FILTER_STOP
+	_portrait.tooltip_text = "Tap to preview the attack"
+	_portrait.gui_input.connect(func(ev: InputEvent) -> void:
+		var mb := ev as InputEventMouseButton
+		if mb and mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT and _portrait.hero:
+			_portrait.cheer("attack"))
 	row.add_child(_portrait)
 	var right := UiTheme.vbox(10)
 	right.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -293,10 +300,45 @@ func _tier(p: Profile, id: String, slot: String) -> int:
 	return ItemDefs.tier_for(id, sl, view_class, p.rank(String(ItemDefs.GROUP_OF.get(sl, "weapon"))))
 
 
-## ItemDefs.rule_text with the tier-I edge cases read naturally ("turns 1-1" -> "turn 1").
+## ItemDefs.rule_text, read naturally: "tier II: / tier III:" clauses carry that tier's own
+## numbers (not the current tier's zero), and tier-I edge cases read as prose ("turns 1-1" ->
+## "turn 1", "1 time(s)" -> "once", "1 dice" -> "1 die").
 static func rule_text(id: String, tier: int, variant := "") -> String:
-	var t := ItemDefs.rule_text(id, tier, variant)
-	return t.replace("turns 1-1", "turn 1").replace(" of 1 dice", " of 1 die").replace("max 1 dice", "max 1 die")
+	var eff: Dictionary = ItemDefs.def(id).get("effect", {})
+	if eff.is_empty():
+		return "Style"
+	var desc := String(eff.get("desc", ""))
+	var re := RegEx.create_from_string("tier (III|II):")
+	var out := ""
+	var at := 0
+	var t := maxi(1, tier)
+	for m in re.search_all(desc):
+		out += _fill(id, desc.substr(at, m.get_start() - at), t, variant)
+		var mt := 3 if m.get_string(1) == "III" else 2
+		var nxt := re.search(desc, m.get_end())
+		var end := nxt.get_start() if nxt else desc.length()
+		out += _fill(id, desc.substr(m.get_start(), end - m.get_start()), mt, variant)
+		at = end
+	out += _fill(id, desc.substr(at), t, variant)
+	out = out.replace("turns 1-1", "turn 1").replace(" of 1 dice", " of 1 die").replace(", 1 dice", ", 1 die")
+	out = RegEx.create_from_string("\\b1 dice\\b").sub(out, "1 die", true)
+	out = RegEx.create_from_string("\\b1 time\\(s\\)").sub(out, "once", true)
+	out = RegEx.create_from_string("\\b1 (\\w+)\\(s\\)").sub(out, "1 $1", true)
+	out = RegEx.create_from_string("\\b(\\d+) (\\w+)\\(s\\)").sub(out, "$1 $2s", true)
+	return out
+
+
+## One clause of a rule with `tier`'s numbers (ItemDefs.rule_text's placeholders).
+static func _fill(id: String, text: String, tier: int, variant: String) -> String:
+	var eff: Dictionary = ItemDefs.def(id).get("effect", {})
+	var s := text
+	for key in (eff.get("n", {}) as Dictionary):
+		var v := ItemDefs.num(id, String(key), tier, variant)
+		s = s.replace("{%s%%}" % key, "%s%%" % ItemDefs._fmt(snappedf(v * 100.0, 0.1)))
+		s = s.replace("{%s}" % key, ItemDefs._fmt(v))
+	if id == "spear":
+		s = s.replace("{boss_factor}", ItemDefs._fmt(ItemDefs.num(id, "factor", tier, variant) + ItemDefs.num(id, "boss", tier, variant)))
+	return s
 
 
 static func _tier_badge(tier: int, font := 15) -> Control:
@@ -495,6 +537,13 @@ func _item_card(p: Profile, id: String) -> Control:
 		if tier <= 0 and owned:
 			var g := String(ItemDefs.GROUP_OF.get(_slot_kind(sel_slot), "weapon"))
 			col.add_child(UiTheme.para("Inactive until %s rank 1." % String(GROUP_NAMES[g]), 17, UiPalette.HP_BRIGHT, 700))
+		var lo := p.loadout_for(view_class)
+		var w: Dictionary = lo.weapon
+		var off: Dictionary = lo.offhand
+		if sel_slot == "offhand" and ItemDefs.hand_mount(id) and String(w.id) != "" and ItemDefs.hands(String(w.id), String(w.variant)) >= 2:
+			col.add_child(UiTheme.para("Needs a free hand: the %s is two-handed." % ItemDefs.name_of(String(w.variant)), 16, UiPalette.HP_BRIGHT, 700))
+		elif sel_slot == "weapon" and not is_eq and ItemDefs.hands(id, id) >= 2 and ItemDefs.hand_mount(String(off.id)):
+			col.add_child(UiTheme.para("Two-handed: the %s comes off." % ItemDefs.name_of(String(off.variant)), 16, Color("ffc27a"), 700))
 		if sel_slot == "trinket2" and id == "compass":
 			col.add_child(UiTheme.para("The board reroll only works in the first trinket slot.", 16, UiPalette.TEXT_MUTED, 600))
 	# mastery / how to get it
@@ -516,8 +565,17 @@ func _item_card(p: Profile, id: String) -> Control:
 				cr += 1
 		var s := "%d variants" % vs.size() + ("  ·  %d owned" % have if have > 0 else "") + ("  ·  %d to craft" % cr if cr > 0 else "")
 		col.add_child(UiTheme.label(s + "  ▸", 16, UiPalette.GOLD if cr > 0 else UiPalette.TEXT_MUTED, false, 0, false, 700))
+	var lo2 := p.loadout_for(view_class)
+	var blocked: bool = sel_slot == "offhand" and ItemDefs.hand_mount(id) and String(lo2.weapon.id) != "" \
+		and ItemDefs.hands(String(lo2.weapon.id), String(lo2.weapon.variant)) >= 2
+	if blocked:
+		t.modulate = Color(1, 1, 1, 0.7)
 	t.pressed.connect(func() -> void:
-		if owned and not is_eq and ItemDefs.LOCKED_ARMOR.get(view_class, "") != id:
+		if blocked and owned:
+			UiTheme.sfx("error")
+			focus = id
+			show_profile(profile)
+		elif owned and not is_eq and ItemDefs.LOCKED_ARMOR.get(view_class, "") != id:
 			focus = id
 			chip = ""
 			_equip(id, id)
@@ -551,6 +609,13 @@ func _mastery_line(p: Profile, id: String) -> Control:
 	if next == 0:
 		if m <= 0 or ItemDefs.variants_of(id).size() <= 1:
 			return null if m <= 0 else UiTheme.label("Mastery: %d fights won" % m, 16, UiPalette.TEXT_MUTED, false, 0, false, 700)
+		var feats := 0
+		for v in ItemDefs.variants_of(id):
+			if not p.owns_variant(id, String(v)) and not p.has_blueprint(id, String(v)):
+				feats += 1
+		if feats > 0:
+			return UiTheme.label("Mastery %d  ·  %s from feats" % [m, "1 more blueprint" if feats == 1 else "%d more blueprints" % feats], 16,
+				Color("e0c28a"), false, 0, false, 700)
 		return UiTheme.label("Mastery %d  ·  every blueprint earned" % m, 16, UiPalette.HEAL, false, 0, false, 700)
 	var box := UiTheme.vbox(2)
 	var l := UiTheme.label("MASTERY %d / %d  ·  %s blueprint" % [m, next, ItemDefs.name_of(next_v)], 16, Color("e0c28a"), false, 0, false, 700)

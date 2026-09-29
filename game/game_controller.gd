@@ -908,7 +908,7 @@ func _upgrade_text(e: Dictionary) -> String:
 			if ItemDefs.GROUPS.has(id):
 				var t := ItemDefs.rank_tier(int(e.level))
 				var up := t > ItemDefs.rank_tier(int(e.level) - 1)
-				return "%s  Rank %d" % [CampInfo.name_of("gear", id), int(e.level)] + ("  ·  Tier %s!" % ["", "I", "II", "III"][t] if up else "")
+				return "%s %d" % [CampInfo.name_of("gear", id), int(e.level)] + ("  ·  Tier %s!" % ["", "I", "II", "III"][t] if up else "")
 			if id == "pouch":
 				return "Belt Pouch bought: a 2nd trinket slot!"
 			return CampInfo.name_of("features", id) + " bought!"

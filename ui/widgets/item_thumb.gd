@@ -20,6 +20,8 @@ const SLOT_ICON := {"weapon": "sword", "offhand": "shield", "head": "helmet", "b
 	"trinket2": "ring", "back": "cape"}
 
 static var _cache: Dictionary = {}
+## Failed renders per key (a busy frame can return no image): retried up to twice.
+static var _fails: Dictionary = {}
 static var _renderer: _Renderer
 
 var id := ""
@@ -196,7 +198,11 @@ class _Renderer:
 			if ItemThumb._cache.get(k, null) is Texture2D:
 				continue
 			var tex := await _render(String(q[1]), String(q[2]))
-			ItemThumb._cache[k] = tex
+			if tex != null or int(ItemThumb._fails.get(k, 0)) >= 2:
+				ItemThumb._cache[k] = tex
+			else:
+				ItemThumb._fails[k] = int(ItemThumb._fails.get(k, 0)) + 1
+				_queue.append(q)
 			done.emit(k, tex)
 		_busy = false
 
@@ -224,7 +230,8 @@ class _Renderer:
 		else:
 			frame = _bounds(node, false)
 		if frame.size == Vector3.ZERO:
-			node.queue_free()
+			_world.remove_child(node)
+			node.free()
 			return null
 		var c := frame.get_center()
 		var span := maxf(frame.size.x, frame.size.y)
@@ -235,8 +242,9 @@ class _Renderer:
 		_vp.render_target_update_mode = SubViewport.UPDATE_ONCE
 		await RenderingServer.frame_post_draw
 		var img := _vp.get_texture().get_image() if is_instance_valid(_vp) else null
-		node.queue_free()
-		await get_tree().process_frame
+		if is_instance_valid(node):
+			_world.remove_child(node)
+			node.free()
 		if img == null or img.is_empty():
 			return null
 		img.generate_mipmaps()
