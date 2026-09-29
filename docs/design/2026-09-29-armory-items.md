@@ -17,7 +17,8 @@ Reads with:
 
 - **Stat slots:** **Weapon**, **Off-hand**, **Head**, **Body** (the torso + both arms as one
   set), **Trinket**, and a late **2nd Trinket**.
-  - **Back** (capes, cloaks, backpacks, the pelt) is **cosmetic only**.
+  - **Back** (capes, cloaks, backpacks, the pelt) is a **normal item slot whose items have no
+    stats yet**. They carry `effect: {}` and `cosmetic: true`, and the UI shows a "Style" tag.
   - **Legs/Boots** is listed as a future option (§4.4).
 - **Armor uses the real character parts.** The KayKit character GLBs are split into skinned
   parts on the shared Medium rig (`Knight_Helmet`, `Mage_Hat`, `Paladin_Helmet`, `Knight_Body` +
@@ -31,7 +32,7 @@ Reads with:
   - Head: 8 base, 12 variants.
   - Body: 10 pieces, plus the Monster Kid's Dino Suit.
   - Trinkets: 8.
-  - Back (cosmetic): 12 pieces.
+  - Back: 12 items (no stats yet).
   - Every stat item has one dice-centric sidegrade. All 16 of today's gear traits live on as item
     effects.
 - **Variants are not cosmetic.** Each concrete model variant (e.g. FantasyWeapons `sword_A`–`G`)
@@ -76,7 +77,7 @@ Reads with:
 | **Body** | yes | replaces `<Class>_Body` + `_ArmLeft` + `_ArmRight` as one set | **Armor rank** | (shared with Head) | 10 (+ Dino Suit) |
 | **Trinket** | yes | hip/belt socket (0.6×) + an icon in the run HUD | Trinket rank | – | 8 |
 | **Trinket 2** (Belt Pouch) | yes | second hip socket | Trinket rank, **tier −1** (min I), **no rank breakpoints** | – | same 8 |
-| **Back** | **no (cosmetic)** | replaces the cape, cloak or backpack part | – | – | 12 |
+| **Back** | **no stats yet** (`effect: {}`, `cosmetic: true`; shown as "Style") | replaces the cape, cloak or backpack part | none (no rank) | – | 12 |
 
 Rules:
 - **Tier:**
@@ -204,21 +205,30 @@ and hazard rules. It stays out for now:
 
 Revisit it if the hero camera gets closer (the Camp, class select).
 
-### 4.5 Back (cosmetic only)
+### 4.5 Back (a real item slot, no stats yet)
 
-No stats. It is chosen freely in the Wardrobe or Armory "Appearance" tab, like skins.
+Back pieces are **obtainable items** like every other slot:
+- owned in `armory.owned`
+- shown in the Armory with 3D previews
+- equipped per class.
 
-| piece | part | owned via |
-|---|---|---|
-| Knight Cape, Mage Cape, Ranger Cape, Rogue Cape, Hooded Cape, Paladin Cape | `<Class>_Cape` | owning the class |
-| Druid Backpack, Engineer Backpack | `<Class>_Backpack` | owning the class |
-| Bone Cloak (Warrior), Tattered Cloak (Minion), Grave Cape (Rogue) | `Skeleton_*_Cloak/Cape` | milestone: defeat 300 skeletons (new counter `skeleton_kills`) |
-| Orc Warpack | `Orc_Warpack` | defeat the Orc Warchief once |
-| Bear Pelt | `Barbarian_Large_BearPelt` (Large rig: **fit test** on Medium; if it fails, it stays part of the Chieftain skin only) | Barbarian A10 win (the prestige line) |
-| "No back" | – | always |
+They grant **no stats for now**. Each `ItemDefs` entry has `slot: "back"`, `effect: {}` and
+`cosmetic: true`. The UI shows **"Style"** where other items show their rule and tier. There is
+no Back rank. When stats are added later, it only takes filling `effect` (and optionally a rank
+group). No schema change is needed.
 
-Any not-yet-owned back piece costs **80 Crowns** once the Crowns caps are reached (the skins rule
-of "after caps, Crowns buy only cosmetics").
+| id | name | part | how to get it |
+|---|---|---|---|
+| `knight_cape` | Knight Cape | `Knight_Cape` | Knight kit (fresh profile) |
+| `mage_cape`, `ranger_cape`, `rogue_cape`, `hooded_cape`, `paladin_cape` | class capes | `<Class>_Cape` | the class kit (on class unlock), or **60 Crowns / 2 Sigils** before owning the class |
+| `druid_backpack`, `engineer_backpack` | backpacks | `<Class>_Backpack` | the class kit, or 60 Crowns / 2 Sigils |
+| `bone_cloak`, `tattered_cloak`, `grave_cape` | skeleton cloaks | `Skeleton_Warrior_Cloak`, `Skeleton_Minion_Cloak`, `Skeleton_Rogue_Cape` | milestone **"Bone Collector"**: defeat 300 skeletons (new counter `skeleton_kills`) grants all three |
+| `orc_warpack` | Orc Warpack | `Orc_Warpack` | feat: defeat the Orc Warchief once |
+| `bear_pelt` | Bear Pelt | `Barbarian_Large_BearPelt` (Large rig; **fit test** on Medium, otherwise it is offered only on the Barbarian's Chieftain skin) | feat: win with the Barbarian at A6+ |
+| (empty) | No back | – | always available |
+
+Back pieces have no variants for now. The `variants` map works for them if models are added
+later.
 
 ---
 
@@ -346,7 +356,7 @@ Other heads (Paladin Helm, Bear Hat, Goggles, Bone Crown) are Standard only.
 
 ## 6. Class signature kits (the default loadout; +1 tier affinity)
 
-| class | weapon (variant) | off-hand | head | body | back (cosmetic) |
+| class | weapon (variant) | off-hand | head | body | back (Style item) |
 |---|---|---|---|---|---|
 | Knight | Arming Sword | Round Shield (badge look) | Knight Helm | Knight Plate | Knight Cape |
 | Barbarian | Great Axe | – (2H) | Bear Hat | Barbarian Harness | – |
@@ -422,13 +432,12 @@ campaign sim.
 armory: {
   ranks:    {weapon: 0..8, offhand: 0..8, armor: 0..8, trinket: 0..8},
   pouch:    0|1,                                   # 2nd trinket slot
-  owned:    [item ids],                            # weapons, off-hands, heads, bodies, trinkets
+  owned:    [item ids],                            # weapons, off-hands, heads, bodies, trinkets, back
   variants: {item_id: [variant ids]},              # "standard" is implicit for owned items
   blueprints: {item_id: [variant ids]},            # unlocked, not yet crafted
   mastery:  {item_id: fights_won},
-  back_owned: [back ids],
   equipped: {class_id: {weapon: {id, variant}, offhand: {id, variant}, head: {id, variant},
-                        body: id, trinket: id, trinket2: id, back: id}},
+                        body: id, trinket: id, trinket2: id, back: id | ""}},   # back = a normal owned item
   appearance: {class_id: {head: id | "own" | "hidden", body: id | "own"}},
   seen_new: [ids]
 }
@@ -509,14 +518,14 @@ Notes:
   - Heroes keep their rim/outline and HP bar, and enemies keep their glowing eyes + tint (≥ 0.6),
     so a hero in a Bone Helm never reads as a skeleton.
   - The Armory preview shows the tile-scale silhouette thumbnail next to the big turntable.
-- **Back (cosmetic):** the same hide + bind method for `<Class>_Cape`/`_Backpack`. The Bear Pelt
+- **Back items:** the same hide + bind method for `<Class>_Cape`/`_Backpack`. The Bear Pelt
   needs a Large-on-Medium fit test.
 
 ### 8.3 Armory and Camp UI
 
 - **Armory tabs:**
-  - Weapon · Off-hand · Head · Body · Trinkets (2 slots) · Appearance (head/body overrides +
-    Back).
+  - Weapon · Off-hand · Head · Body · **Back** (Style items) · Trinkets (2 slots) · Appearance
+    (head/body overrides).
   - A class switcher sits at the top.
   - The left side holds the **3D hero turntable** wearing the selection, with a "Preview attack"
     button.
@@ -622,7 +631,9 @@ exists, and step 5 is independent of step 4.
    - **Weapon, Off-hand, Trinket** as designed.
    - Plus **Head** and **Body** armor, from the real skinned character parts.
    - **Body = torso + both arms** as one set.
-   - **Back = cosmetic only** (capes, cloaks, backpacks, the pelt).
+   - **Back = a normal item slot with obtainable items** (capes, cloaks, backpacks, the pelt),
+     earned like other items. It has **no stats for now** (`effect: {}`, `cosmetic: true`, shown
+     as "Style"), so stats can be added later with no schema change.
    - **Boots/Legs** is a future option only (§4.4).
    - The **Quiver stays the Ranger's off-hand**.
 2. **Second trinket slot:** the Belt Pouch (400 Crowns, requires Trinket rank ≥ 5). It works one
