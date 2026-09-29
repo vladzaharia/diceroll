@@ -205,6 +205,7 @@ func _draw_board() -> void:
 	rrect(tank.grow(4.0), UiPalette.OUTLINE, 32)
 	rrect(tank, Color("12305a"), 30)
 	rrect(tank.grow(-6.0), Color("0b1d3a"), 26)
+	rrect(Rect2(tank.position + Vector2(6, 6), Vector2(tank.size.x - 12, tank.size.y * 0.35)), Color(0.3, 0.6, 1.0, 0.07), 26)
 	# rising background fizz
 	for k in 14:
 		var hx := float(hash(k * 131) % 1000) / 1000.0

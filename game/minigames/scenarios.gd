@@ -12,6 +12,8 @@ extends RefCounted
 ##                      drop -> results -> tap the reward card + TAKE -> back on the board.
 ##                      Saves <shot>_step_NN.png per step, prints MG_PLAY_OK / MG_PLAY_FAIL
 ##                      and quits (exit 0 / 1).
+##      --state=resume  two actions, then the run is JSON round-tripped and presented again
+##                      (Continue mid-minigame); prints MG_RESUME
 ##      --auto=1        (fresh) press the screen's AUTO button (par result)
 ##      --state=anim    --actions=N actions after --delay=S seconds (frame sequences: pair it
 ##                      with --wait and --frames)
@@ -94,7 +96,7 @@ class _Driver extends Node:
 		var scr := c.ui.minigame
 		if st == "result":
 			scr.set_meta("hold", 999.0)
-		var n := {"mid": 2, "anim": int(args.get("actions", "1")), "result": 99, "reward": 99, "play": 99}.get(st, 2) as int
+		var n := {"mid": 2, "resume": 2, "anim": int(args.get("actions", "1")), "result": 99, "reward": 99, "play": 99}.get(st, 2) as int
 		if args.has("delay"):
 			await _pause(float(args.delay))
 		if st == "play":
@@ -110,6 +112,13 @@ class _Driver extends Node:
 			if st == "play":
 				await _snap("after action %d" % played)
 		if st == "mid" or st == "anim":
+			return
+		if st == "resume":
+			# quit mid-game and Continue: the save (JSON) resumes the same board
+			var loaded := GameFlow.from_dict(JSON.parse_string(JSON.stringify(f.to_dict())))
+			c.start(loaded)
+			print("MG_RESUME phase=%s same_state=%s" % [GameFlow.phase_name(loaded.phase),
+				JSON.stringify(loaded.offer.get("state", {})) == JSON.stringify(f.offer.get("state", {}))])
 			return
 		# the screen cashes the game in by itself once the board settles
 		var guard := 0

@@ -329,9 +329,12 @@ func play_result(ev: Dictionary) -> void:
 	var title := UiTheme.label(MgLogic.tier_label(tier), 64, col, true, 12, true)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col_box.add_child(title)
+	var game := UiTheme.label(MinigameDefs.name_of(String(ev.get("id", game_id))).to_upper(), 20, UiPalette.TEXT_MUTED, false, 0, false, 700)
+	game.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col_box.add_child(game)
 	var med := float(MinigameDefs.MEDIAN.get(String(ev.get("id", game_id)), 1.0))
 	var score := float(ev.get("score", 0.0))
-	var line := "Par result" if auto else "Score %d   ·   Median %d" % [int(score), int(med)]
+	var line := "AUTO took the par result" if auto else "Score %d   ·   Median %d" % [int(score), int(med)]
 	var sub := UiTheme.label(line, 28, UiPalette.TEXT, false, 0, false, 700)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col_box.add_child(sub)
@@ -345,11 +348,6 @@ func play_result(ev: Dictionary) -> void:
 	crow.add_child(UiIcons.rect("crown", 40))
 	var cl := UiTheme.label("+%d Crown%s" % [int(ev.get("crowns", 0)), "" if int(ev.get("crowns", 0)) == 1 else "s"], 32, UiPalette.GOLD_BRIGHT, true, 6)
 	crow.add_child(cl)
-	if auto:
-		var chip := UiTheme.panel("pill")
-		chip.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		chip.add_child(UiTheme.label("AUTO  ·  PAR RESULT", 20, UiPalette.TEXT_DIM, false, 0, false, 700))
-		col_box.add_child(chip)
 	var tap := UiTheme.label("Tap to continue", 20, UiPalette.TEXT_MUTED, false, 0, false, 600)
 	tap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col_box.add_child(tap)

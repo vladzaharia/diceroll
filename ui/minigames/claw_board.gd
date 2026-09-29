@@ -254,6 +254,11 @@ func _draw_board() -> void:
 	draw_rect(Rect2(Vector2(w.position.x + 8, _rail_y - 8), Vector2(w.size.x - 16, 12)), Color("9aa3b8"))
 	draw_rect(Rect2(Vector2(w.position.x + 8, _rail_y - 8), Vector2(w.size.x - 16, 4)), Color("d9e0ee"))
 	var cx := floor_x(_claw)
+	# the claw's soft shadow on the floor (moves with it: easy to read where it will land)
+	var sh_k := clampf(_cable / maxf(_floor_y - _rail_y, 1.0), 0.0, 1.0)
+	draw_set_transform(Vector2(cx, _floor_y + 4.0), 0.0, Vector2(1.0, 0.28))
+	draw_circle(Vector2.ZERO, (30.0 - 10.0 * sh_k) * u, Color(0, 0, 0, 0.25 + 0.25 * sh_k))
+	draw_set_transform(Vector2.ZERO)
 	if _mode == "swing" and not locked:
 		var y0 := _rail_y + _rest_len() + 60 * u
 		var yy := y0
