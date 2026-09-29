@@ -92,6 +92,44 @@ done
 sync "$SRC/$RES/Assets/gltf" "$KK/resources" $res_keep --include='*.png' --exclude='*'
 lic "$RES" "$KK/resources"
 
+echo "== Camp EXTRA packs (never committed): weapons, keepers, stores, dressing"
+sync "$SRC/KayKit_FantasyWeaponsBits_1.0_EXTRA/Assets/gltf" "$KK/weapons_x"
+lic "KayKit_FantasyWeaponsBits_1.0_EXTRA" "$KK/weapons_x"
+ADX="KayKit_Adventurers_2.0_EXTRA"
+sync "$SRC/$ADX/Characters/gltf" "$KK/adventurers_x/characters" \
+	--include='Druid.glb' --include='Engineer.glb' --include='Barbarian_Large.glb' --include='Rogue_Hooded.glb' --exclude='*'
+sync "$SRC/$ADX/Assets/gltf" "$KK/adventurers_x/assets"
+lic "$ADX" "$KK/adventurers_x"
+RX="KayKit_ResourceBits_1.0_EXTRA"
+rx_keep=""
+for r in Food_Basket_A_Berries Food_Basket_B_Berries Food_Crate_Large_Apples Food_Crate_Small_Berries Food_Barrel_Fish \
+	Containers_Crate_Medium_Wood Containers_Pile_Small Gems_Chest Gems_Pile_Small Gems_Sack Money_Pile_Small Money_Coins_Stack_Medium \
+	Gold_Bars_Stack_Medium Iron_Bars_Stack_Medium Copper_Bars_Stack_Small; do
+	rx_keep="$rx_keep --include=$r.gltf --include=$r.bin"
+done
+# shellcheck disable=SC2086
+sync "$SRC/$RX/Assets/gltf" "$KK/resources_x" $rx_keep --include='*.png' --exclude='*'
+lic "$RX" "$KK/resources_x"
+DX="KayKit_Dungeon_Pack_1.1_EXTRA"
+dx_keep=""
+for r in bench bucket_pickaxes chest_mimic crate_large_decorated rocks_gold bookcase_single_decoratedA keg_decorated \
+	barrel_large_decorated table_long_decorated_A banner_triple_red banner_triple_blue banner_thin_yellow banner_thin_green; do
+	dx_keep="$dx_keep --include=$r.gltf --include=$r.bin"
+done
+# shellcheck disable=SC2086
+sync "$SRC/$DX/Assets/gltf" "$KK/dungeon_x" $dx_keep --include='*.png' --exclude='*'
+lic "$DX" "$KK/dungeon_x"
+TX="KayKit_RPGToolsBits_1.0_EXTRA"
+sync "$SRC/$TX/Assets/gltf" "$KK/tools_x" --include='grindstone.*' --include='fishing_rod.*' --include='fishing_tacklebox.*' \
+	--include='map_rolled.*' --include='journal_open.*' --include='key_A.*' --include='*.png' --exclude='*'
+lic "$TX" "$KK/tools_x"
+MM="$SRC/KayKit_Mystery_Monthly_Series_4"
+sync "$MM/4 - October 2023 - Werewolf/assets/gltf" "$KK/mystery/werewolf"
+sync "$MM/11 - May 2024 - Clown/assets/gltf" "$KK/mystery/clown"
+sync "$MM/10 - April 2024 - Paladin/assets/gltf" "$KK/mystery/paladin"
+sync "$MM/1 - July 2023 - Orc Raider/assets/gltf" "$KK/mystery/orc" --include='Orc_Wardrum*' --include='*.png' --exclude='*'
+cp -f "$MM/License.txt" "$KK/mystery/License.txt"
+
 echo "== Music beds (mixkit, re-encoded to 96 kbps mp3 to keep the repo lean)"
 MUS="$DST/audio/music"
 mkdir -p "$MUS"

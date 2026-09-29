@@ -20,8 +20,8 @@ static func exists(path := PATH) -> bool:
 static func load_profile(path := PATH) -> Profile:
 	if not FileAccess.file_exists(path):
 		return null
-	var txt := FileAccess.get_file_as_string(path)
-	var v: Variant = JSON.parse_string(txt)
+	var j := JSON.new()
+	var v: Variant = j.data if j.parse(FileAccess.get_file_as_string(path)) == OK else null
 	if not (v is Dictionary) or (v as Dictionary).is_empty():
 		push_warning("ProfileStore: %s is unreadable, starting a fresh profile" % path)
 		return null

@@ -26,6 +26,8 @@ extends RefCounted
 ##  play_auto     full run driven by Bot through the real presentation; periodic shots
 ##                <shot>_NN.png (--shots=N --every=S), final shot <shot>_final.png, quits at
 ##                game end or --timeout. Run it with a large --wait (e.g. --wait=5000).
+##                Runs start from a profile (--profile=fresh|mid|max, --profile-file=<json>)
+##                and are banked; --runs=N chains runs through results -> Camp (see _auto()).
 ##                --ui-auto=1 drives it through the real AUTO toggle (AutoPilot + Bot.decide)
 ##                instead (--auto-rules=all|default, --stop=boss,miniboss,passive,shop).
 ##  ui_speed_auto / ui_auto_settings / game_auto   see game/auto/auto_scenarios.gd
@@ -67,6 +69,8 @@ class _Driver extends Node:
 		_shot_base = String(args.get("shot", "user://auto.png")).get_basename()
 		c = GameController.new()
 		c.autosave = false
+		c.persist_profile = false
+		c.minigame_fallback = false
 		add_child(c)
 		c.set_speed(float(args.get("speed", "3" if scenario == "play_auto" else "1")))
 		match scenario:
@@ -324,14 +328,73 @@ class _Driver extends Node:
 
 	# --- full auto run ------------------------------------------------------------------------
 
+	## play_auto: runs start from a meta profile (never the legacy no-profile path) and are
+	## banked into it. --profile=fresh|mid|max (default fresh) picks the starting profile;
+	## --profile-file=<abs path> loads it from (and saves it back to) a JSON file, creating it from
+	## the preset the first time, so separate invocations continue one campaign. --runs=N plays N
+	## runs back to back through the results screen and the Camp (shots <shot>_results_NN.png and
+	## <shot>_camp_NN.png), spending Crowns / Sigils between runs with BotMeta (--spend=0 skips).
 	func _auto() -> void:
-		var f := _flow()
-		if String(args.get("ui-auto", "0")) == "1":
-			var code: int = await AutoScenarios.run_ui_auto(self, c, f, args, _shot_base)
-			await _pause(2.5)
-			await _save("%s_final.png" % _shot_base)
-			await _quit(code)
-			return
+		var pf := String(args.get("profile-file", ""))
+		c.profile = ProfileStore.load_profile(pf) if pf != "" else null
+		if c.profile == null:
+			c.profile = load("res://game/camp/scenarios.gd").preset(String(args.get("profile", "fresh")))
+			if String(args.get("profile", "fresh")) == "fresh":
+				c.profile = Profile.fresh()
+		c.persist_profile = pf != ""
+		if pf != "":
+			c.profile_path = pf
+			c.save_profile()
+		c.ensure_profile()
+		var runs := maxi(1, int(args.get("runs", "1")))
+		var code := 0
+		for k in runs:
+			if args.has("class"):
+				c.profile.loadout["class"] = String(args["class"])
+			var f := GameFlow.new_run(String(c.profile.loadout.get("class", "knight")), int(args.get("seed", "7")) + k,
+				Balance.BOARD_SIZE, c.run_opts().merged(run_opts(), true))
+			print("AUTO_PROFILE run=%d/%d runs_banked=%d crowns=%d sigils=%d classes=%s pets=%s gear=%s meta=%s" % [k + 1, runs,
+				int(c.profile.records.get("runs", 0)), c.profile.crowns, c.profile.sigils, str(c.profile.unlocks.classes),
+				str(c.profile.unlocks.pets), str(c.profile.gear), str(not f.run.meta.is_empty())])
+			if String(args.get("ui-auto", "0")) == "1":
+				code = await AutoScenarios.run_ui_auto(self, c, f, args, _shot_base)
+			else:
+				code = await _auto_run(f)
+			if code != 0:
+				break
+			await _pause(3.5)
+			await _save("%s_results_%02d.png" % [_shot_base, k + 1] if runs > 1 else "%s_final.png" % _shot_base)
+			if runs > 1:
+				c.show_camp()
+				await _pause(0.8)
+				if String(args.get("spend", "1")) == "1":
+					_spend()
+				await _pause(1.6)
+				await _save("%s_camp_%02d.png" % [_shot_base, k + 1])
+		print("AUTO_CAMPAIGN_END runs=%d crowns=%d sigils=%d milestones=%s unlocked_classes=%s pets=%s gear=%s" % [
+			int(c.profile.records.get("runs", 0)), c.profile.crowns, c.profile.sigils, str(c.profile.milestones),
+			str(c.profile.unlocks.classes), str(c.profile.unlocks.pets), str(c.profile.gear)])
+		await _quit(code)
+
+	## Between runs: spend like the campaign bot, then pick the loadout (least-played class).
+	func _spend() -> void:
+		var bought := BotMeta.spend(c.camp)
+		var lo := BotMeta.choose_loadout(c.profile)
+		c.camp.set_loadout(lo[0], String(lo[1]))
+		var best := String(c.profile.loadout.get("class", "knight"))
+		var rbc: Dictionary = c.profile.records.get("runs_by_class", {})
+		for id in HeroDefs.IDS:
+			if c.profile.class_allowed(String(id)) and int(rbc.get(id, 0)) < int(rbc.get(best, 0)):
+				best = String(id)
+		c.camp.set_class(best)
+		c.save_profile()
+		c.camp_scene.apply_profile(c.profile)
+		c.ui.camp.show_profile(c.profile, false)
+		print("AUTO_SPEND bought=%s loadout=%s class=%s crowns_left=%d sigils_left=%d" % [str(bought), str(lo), best,
+			c.profile.crowns, c.profile.sigils])
+
+	## One run driven by the greedy Bot through the real presentation; 0 = finished.
+	func _auto_run(f: GameFlow) -> int:
 		var shots := int(args.get("shots", "25"))
 		var every := float(args.get("every", "8"))
 		var timeout := float(args.get("timeout", "1500"))
@@ -346,13 +409,15 @@ class _Driver extends Node:
 		while not f.is_over():
 			if _elapsed() > timeout:
 				print("AUTO_TIMEOUT after %.0fs phase=%s" % [_elapsed(), GameFlow.phase_name(f.phase)])
-				await _quit(3)
-				return
+				return 3
 			if f.phase != last_phase or f.run.act != last_act:
 				last_phase = f.phase
 				last_act = f.run.act
 				print("PHASE %s act=%d lap=%d pos=%d hp=%d/%d gold=%d lvl=%d dice=%d t=%.0fs" % [GameFlow.phase_name(f.phase),
 					f.run.act, f.run.lap, f.run.pos, f.run.hp, f.run.max_hp, f.run.gold, f.run.level, f.run.dice.size(), _elapsed()])
+			if c.busy:
+				await get_tree().process_frame
+				continue
 			var cmd := Bot.next_command(f)
 			var n := f.commands.size()
 			var evs: Array = f.apply(cmd)
@@ -360,12 +425,13 @@ class _Driver extends Node:
 				if String(ev.get("type", "")) == "error":
 					errors += 1
 					print("ERROR_EVENT %s -> %s" % [str(cmd), String(ev.get("msg", ""))])
+				elif String(ev.get("type", "")) == "level_up" and c.ui.draft.visible:
+					print("LEVEL_UP_DRAFT_OPENED (should never happen)")
 			if f.commands.size() == n:
 				stuck += 1
 				if stuck > 5:
 					print("AUTO_STUCK on %s" % str(cmd))
-					await _quit(4)
-					return
+					return 4
 			else:
 				stuck = 0
 			if args.has("trace"):
@@ -376,9 +442,7 @@ class _Driver extends Node:
 		var won := f.phase == GameFlow.Phase.VICTORY
 		print("AUTO_END %s act=%d lap=%d lvl=%d commands=%d errors=%d t=%.0fs" % ["VICTORY" if won else "GAME_OVER",
 			f.run.act, f.run.lap, f.run.level, f.commands.size(), errors, _elapsed()])
-		await _pause(2.5)
-		await _save("%s_final.png" % _shot_base)
-		await _quit(0)
+		return 0
 
 	func _shooter(n: int, every: float) -> void:
 		for i in n:

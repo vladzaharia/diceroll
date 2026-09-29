@@ -64,6 +64,8 @@ var profile_path := ProfileStore.PATH
 var persist_profile := true
 ## True when this launch created the profile (the Camp shows its welcome once).
 var profile_is_new := false
+## Plays minigame tiles on AUTO while no minigame screen exists (off for scripted drivers).
+var minigame_fallback := true
 ## The 3D camp while in the hub (null otherwise).
 var camp_scene: CampScene
 ## game_over stats of the run being presented, and whether they were banked.
@@ -921,7 +923,7 @@ func _note_game_over(evs: Array) -> void:
 ## Until the minigame screens exist (WP-E2 adds UiRoot.minigame), a minigame tile is played
 ## on AUTO (par result) so a manual run never stalls in the MINIGAME phase.
 func _minigame_fallback(ph: int) -> void:
-	if ph != GameFlow.Phase.MINIGAME or auto.enabled or ui.get("minigame") != null:
+	if not minigame_fallback or ph != GameFlow.Phase.MINIGAME or auto.enabled or ui.get("minigame") != null:
 		return
 	overlay.toast("%s: played on AUTO" % String(flow.offer.get("name", "Minigame")), "star", UiPalette.GOLD_BRIGHT)
 	run_command.call_deferred("minigame_auto")

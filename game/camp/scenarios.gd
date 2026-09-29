@@ -93,6 +93,11 @@ class _Driver extends Node:
 				c.show_camp()
 				await get_tree().create_timer(0.2).timeout
 				c.ui.camp.open_station(String(SCREENS[scenario]))
+				if args.has("debug"):
+					await get_tree().create_timer(1.0).timeout
+					var dm: CampModal = c.ui.camp.modal(String(SCREENS[scenario]))
+					print("DEBUG frame pos=%s size=%s mod=%s scale=%s panel=%s inner=%s scroll=%s vis=%s" % [dm._frame.position, dm._frame.size,
+						dm._frame.modulate, dm._frame.scale, dm.panel.size, dm._inner.get_combined_minimum_size(), dm._scroll.custom_minimum_size, dm.visible])
 				if args.has("scroll"):
 					await get_tree().create_timer(0.5).timeout
 					var m: CampModal = c.ui.camp.modal(String(SCREENS[scenario]))
