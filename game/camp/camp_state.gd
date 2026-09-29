@@ -45,6 +45,7 @@ static func of(p: Profile) -> Dictionary:
 		"stations": {"armory": _armory(p), "workshop": _workshop(p), "pet_den": _pet_den(p), "arcade": _arcade(p)},
 		"hero": hero, "classes": classes, "locked_classes": locked,
 		"pets": (p.unlocks.get("pets", []) as Array).duplicate(), "pet": String(p.loadout.get("pet", "")),
+		"pet_levels": _pet_levels(p),
 		"bosses": (f.get("boss", []) as Array).duplicate(), "minibosses": (f.get("miniboss", []) as Array).duplicate(),
 		"biomes": (f.get("biome", []) as Array).duplicate(), "class_wins": (f.get("class_win", []) as Array).duplicate(),
 		"wins": int(p.records.get("wins", 0)), "runs": runs,
@@ -53,6 +54,13 @@ static func of(p: Profile) -> Dictionary:
 		"fences": (1 if spent >= 100 else 0) + (1 if spent >= 500 else 0) + (1 if spent >= 1500 else 0),
 		"asc": int(p.ascension.get("unlocked", 0)),
 	}
+
+
+static func _pet_levels(p: Profile) -> Dictionary:
+	var out := {}
+	for id in p.unlocks.get("pets", []):
+		out[String(id)] = p.pet_level(String(id))
+	return out
 
 
 ## Milestone progress (0..1) toward the milestone that unlocks [kind, id].

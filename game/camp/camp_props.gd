@@ -110,12 +110,15 @@ static func loop_clip(ch: Character, clip: String, every: float, back := "idle")
 			ch.play_once(clip, back))
 
 
-## A pet familiar: WP-E3's model when available, else a KayKit prop with a soft light.
+## A pet familiar: PetView (the run's pet models) for known pets, else a KayKit prop, else a
+## glowing orb for ids whose models haven't landed yet (new pets never break the Camp).
 static func pet(id: String, level := 1) -> Node3D:
 	if pet_factory.is_valid():
 		var m: Node3D = pet_factory.call(id, level)
 		if m != null:
 			return m
+	if PetView.LOOKS.has(id):
+		return PetView.create(id, maxi(1, level))
 	var n := Node3D.new()
 	n.name = "Pet_" + id
 	var H := Props.HAL
@@ -139,6 +142,16 @@ static func pet(id: String, level := 1) -> Node3D:
 		"chest":
 			Props.put(n, Props.DUN + "chest.gltf", Vector3.ZERO, 200.0, 0.45)
 			c = Color(1.0, 0.8, 0.3)
+		_:
+			var orb := MeshInstance3D.new()
+			var sm := SphereMesh.new()
+			sm.radius = 0.28
+			sm.height = 0.56
+			orb.mesh = sm
+			c = Color.from_hsv(float(hash(id) % 360) / 360.0, 0.5, 1.0)
+			orb.material_override = Props.glow_material(c, false, 1.4)
+			orb.position.y = 0.45
+			n.add_child(orb)
 	var l := OmniLight3D.new()
 	l.light_color = c
 	l.light_energy = 0.9

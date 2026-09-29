@@ -96,6 +96,7 @@ var _stone_mat: StandardMaterial3D
 var _paths: Node3D
 var _skip := false
 var _focus := PackedVector3Array()
+var _life: CampLife
 
 
 func _init() -> void:
@@ -161,6 +162,9 @@ func _build() -> void:
 	_deco = Node3D.new()
 	_deco.name = "Decorations"
 	add_child(_deco)
+	_life = CampLife.new(self, FIRE_POS)
+	add_child(_life)
+	_bats()
 	var ff := Biome.ambient_particles("fireflies")
 	ff.amount = 40
 	(ff.draw_pass_1 as QuadMesh).size = Vector2(0.08, 0.08)
@@ -189,10 +193,9 @@ func apply_state(s: Dictionary) -> void:
 		_set_station(String(id), s.stations[id])
 	_set_fire(int(s.fire))
 	_set_clearing(int(s.stage))
-	_build_campers(s)
-	_build_pets(s)
 	_build_decor(s)
 	_build_paths()
+	_build_campers(s)
 
 
 func set_hero(class_id: String) -> void:
@@ -221,7 +224,7 @@ func set_pet(id: String) -> void:
 		_pet_model = null
 	if id == "" or not PetDefs.has(id):
 		return
-	_pet_model = CampProps.pet(id)
+	_pet_model = CampProps.pet(id, int((state.get("pet_levels", {}) as Dictionary).get(id, 1)))
 	_pet_holder.add_child(_pet_model)
 
 
@@ -259,11 +262,59 @@ func pick_station(screen_pos: Vector2) -> String:
 	return best
 
 
-## Bounces a station (when its screen opens).
+## A few bats crossing the sky now and then (dark flapping silhouettes on long loops).
+func _bats() -> void:
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.albedo_color = Color(0.05, 0.04, 0.09)
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	for i in 4:
+		var bat := Node3D.new()
+		bat.name = "Bat%d" % i
+		add_child(bat)
+		for side in [-1.0, 1.0]:
+			var w := MeshInstance3D.new()
+			var q := QuadMesh.new()
+			q.size = Vector2(0.45, 0.2)
+			w.mesh = q
+			w.material_override = m
+			w.position = Vector3(side * 0.22, 0, 0)
+			w.rotation.x = -PI * 0.5
+			w.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			bat.add_child(w)
+			var flap := w.create_tween().set_loops()
+			flap.tween_property(w, "rotation:z", side * 0.9, 0.12 + 0.02 * i)
+			flap.tween_property(w, "rotation:z", -side * 0.5, 0.12 + 0.02 * i)
+		var y := 7.5 + 1.2 * i
+		var z := -8.0 - 3.0 * i
+		var a := Vector3(-24.0, y, z)
+		var b := Vector3(24.0, y + 2.0, z + 5.0)
+		bat.position = a
+		bat.rotation.y = atan2(b.x - a.x, b.z - a.z)
+		var fly := bat.create_tween().set_loops()
+		fly.tween_interval(3.0 + 5.0 * i)
+		fly.tween_property(bat, "position", b, 9.0 + i).set_trans(Tween.TRANS_SINE)
+		fly.tween_callback(func() -> void: bat.position = a)
+
+
+## Pauses camp life's decisions (a Camp screen is open over the scene).
+func set_life_paused(on: bool) -> void:
+	if _life:
+		_life.paused = on
+
+
+## Bounces a station (when its screen opens) and the hero turns to it and waves.
 func bump(id: String) -> void:
 	var s: Node3D = stations.get(id)
 	if s == null:
 		return
+	if hero and not revealing:
+		var to := s.global_position - hero.global_position
+		var tw := hero.create_tween()
+		tw.tween_property(hero, "rotation:y", atan2(to.x, to.z), 0.25)
+		hero.play_once("Waving" if hero.has_anim("Waving") else "cheer", "Sit_Chair_Idle")
+		tw.tween_interval(1.6)
+		tw.tween_property(hero, "rotation:y", deg_to_rad(62.0), 0.4)
 	var t := s.create_tween()
 	t.tween_property(s, "scale", Vector3(1.08, 0.92, 1.08) * STATION_SCALE, 0.08)
 	t.tween_property(s, "scale", Vector3.ONE * STATION_SCALE, 0.35).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
@@ -420,38 +471,39 @@ func _build_campers(s: Dictionary, arriving := "") -> void:
 	if _npcs == null:
 		return
 	UiTheme.clear(_npcs)
+	_life.clear()
+	_update_spots()
+	var starts := ["sit", "sit", "dummy", "chat", "sit", "nap", "chat", "sit"]
 	var others := _others(s)
 	for k in others.size():
-		var slot: Array = SLOTS[k % SLOTS.size()]
 		var id := String(others[k])
-		var pos := FIRE_POS + (slot[0] as Vector3) + Vector3(0, 0, 0.9 * float(k / SLOTS.size()))
-		var clip := String(slot[2])
-		var ch := _class_npc(id, "idle" if clip == "spar" else clip)
+		var ch := _class_npc(id, "idle")
 		ch.name = "Camper_" + id
 		ch.scale = Vector3.ONE * HERO_SCALE
-		ch.position = pos
-		ch.rotation.y = deg_to_rad(float(slot[1]))
 		_npcs.add_child(ch)
-		match String(slot[3]):
-			"log":
-				Props.put(_npcs, RES + "Wood_Log_B.gltf", pos + Vector3(0.05, 0, 0), float(slot[1]) + 90.0, 0.95)
-			"dummy":
-				_dummy(_npcs, pos + Vector3(1.1, 0, -0.6))
-				CampProps.loop_clip(ch, "attack", 1.9)
-			"book":
-				CampProps.opt(_npcs, CampProps.ADX + "assets/spellbook_open.gltf", pos + Vector3(0.35, 0.02, -0.3), float(slot[1]), 0.5)
+		_life.add_agent(ch, String(starts[k % starts.size()]))
 		if id == arriving:
-			# walks in from the edge of the clearing
-			var from := pos + (pos - FIRE_POS).normalized() * 4.0
-			ch.position = from
-			ch.look_at_from_position(from, pos, Vector3.UP)
-			ch.rotate_y(PI)
+			# walks in from the edge of the clearing to where camp life put them
+			var pos := ch.global_position
+			var from := pos + (pos - FIRE_POS).normalized() * 4.5
+			ch.global_position = from
+			ch.rotation.y = atan2(pos.x - from.x, pos.z - from.z)
 			ch.play("walk")
 			var t := ch.create_tween()
-			t.tween_property(ch, "position", pos, 1.2)
-			t.tween_callback(func() -> void:
-				ch.rotation.y = deg_to_rad(float(slot[1]))
-				ch.play("idle" if clip == "spar" else clip))
+			t.tween_property(ch, "global_position", pos, 1.3)
+			t.tween_callback(func() -> void: ch.play("idle"))
+	_build_pets(s)
+
+
+## Rebuilds camp life's spot graph for the current layout and station states.
+func _update_spots() -> void:
+	if _life == null or not is_inside_tree():
+		return
+	var built := {}
+	for id in stations:
+		var st: Dictionary = (state.get("stations", {}) as Dictionary).get(id, {})
+		built[id] = String(st.get("state", "ruined")) == "built"
+	_life.set_spots(stations, built)
 
 
 ## A training dummy: a post, a cross-bar and a sack head.
@@ -474,30 +526,21 @@ func _build_pets(s: Dictionary, arriving := "") -> void:
 	if _pets == null:
 		return
 	UiTheme.clear(_pets)
+	_life.pets.clear()
 	var k := 0
 	for id in s.get("pets", []):
 		if String(id) == String(s.get("pet", "")):
 			continue
 		var home: Vector3 = FIRE_POS + (PET_HOMES[k % PET_HOMES.size()] as Vector3)
-		k += 1
 		var holder := Node3D.new()
 		holder.name = "Roam_" + String(id)
-		holder.position = home
 		_pets.add_child(holder)
-		var m := CampProps.pet(String(id))
+		holder.global_position = home
+		var m := CampProps.pet(String(id), int((s.get("pet_levels", {}) as Dictionary).get(id, 1)))
 		m.scale = Vector3.ONE * 0.85
 		holder.add_child(m)
-		# wander between three nearby spots, hopping
-		var t := holder.create_tween().set_loops()
-		var pts := [home, home + Vector3(0.9, 0, 0.4), home + Vector3(0.3, 0, -0.8)]
-		for j in pts.size():
-			var nxt: Vector3 = pts[(j + 1) % pts.size()]
-			t.tween_property(holder, "position", nxt, 2.4 + 0.3 * float(k % 3)).set_trans(Tween.TRANS_SINE)
-			t.tween_interval(1.2 + 0.4 * float(j))
-		var hop := m.create_tween().set_loops()
-		hop.tween_property(m, "position:y", 0.25, 0.3).set_trans(Tween.TRANS_SINE)
-		hop.tween_property(m, "position:y", 0.0, 0.3).set_trans(Tween.TRANS_SINE)
-		hop.tween_interval(0.4 + 0.2 * float(k % 3))
+		_life.add_pet(holder, k)
+		k += 1
 		if String(id) == arriving:
 			m.scale = Vector3.ONE * 0.05
 			var pop := m.create_tween()
@@ -516,19 +559,20 @@ func _build_decor(s: Dictionary, animate := false) -> void:
 	var D := Props.DUN
 	# boss trophies (skull posts) and mini-boss skulls along the back of the clearing
 	var bosses: Array = s.get("bosses", [])
-	for i in bosses.size():
-		var t := Props.put(_deco, H + "post_skull.gltf", FIRE_POS + Vector3(-1.6 + i * 1.05, 0, -3.95), 90.0, 0.62)
+	var grid := [Vector3(-0.8, 0, -4.2), Vector3(0.0, 0, -4.35), Vector3(0.8, 0, -4.2), Vector3(-0.8, 0, -5.1), Vector3(0.0, 0, -5.25),
+		Vector3(0.8, 0, -5.1), Vector3(-0.8, 0, -6.0), Vector3(0.0, 0, -6.15), Vector3(0.8, 0, -6.0)]
+	for i in mini(bosses.size(), grid.size()):
+		var t := Props.put(_deco, H + "post_skull.gltf", FIRE_POS + (grid[i] as Vector3), 90.0, 0.62)
 		if animate and i == bosses.size() - 1:
 			t.scale = Vector3.ONE * 0.05
 			t.create_tween().tween_property(t, "scale", Vector3.ONE * 0.62, 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	var minis: Array = s.get("minibosses", [])
-	for i in minis.size():
-		var at := FIRE_POS + Vector3(-2.4 - 0.75 * float(i % 3), 0, -3.7 - 0.6 * float(i / 3))
-		Props.put(_deco, H + "post_skull.gltf", at, 70.0 + 15.0 * i, 0.42)
+	for i in mini(minis.size(), grid.size() - bosses.size()):
+		Props.put(_deco, H + "post_skull.gltf", FIRE_POS + (grid[bosses.size() + i] as Vector3), 70.0 + 15.0 * i, 0.42)
 	# biome souvenirs on a little shelf by the fire
 	var biomes: Array = s.get("biomes", [])
 	if not biomes.is_empty():
-		var shelf := FIRE_POS + Vector3(-3.2, 0, 1.9)
+		var shelf := FIRE_POS + Vector3(4.3, 0, 2.9)
 		CampProps.box(_deco, Vector3(1.9, 0.1, 0.5), shelf + Vector3(0, 0.45, 0), Color(0.5, 0.34, 0.22), Vector3(0, 25, 0))
 		for x in [-0.8, 0.8]:
 			CampProps.box(_deco, Vector3(0.1, 0.45, 0.1), shelf + Vector3(x * 0.9, 0.22, x * 0.42), Color(0.4, 0.26, 0.16))
@@ -536,7 +580,7 @@ func _build_decor(s: Dictionary, animate := false) -> void:
 			_souvenir(String(biomes[i]), shelf + Vector3(-0.72 + 0.29 * i, 0.5, 0.34 - 0.13 * i))
 	# a golden chest after the first win
 	if int(s.get("wins", 0)) > 0:
-		Props.put(_deco, D + "chest_gold.gltf", FIRE_POS + (Vector3(3.2, 0, 2.5) if not portrait else Vector3(2.8, 0, 2.8)), -35.0, 0.7)
+		Props.put(_deco, D + "chest_gold.gltf", FIRE_POS + Vector3(2.6, 0, 4.4), -35.0, 0.7)
 	# a tent per class along the back: open and lit once the class is unlocked, closed before
 	var all_classes: Array = (s.get("classes", []) as Array) + (s.get("locked_classes", []) as Array)
 	var ordered: Array = []
@@ -692,13 +736,18 @@ func _set_clearing(stage: int, animate := false) -> void:
 
 
 ## Logs, a woodpile and the kettle corner around the fire (the hero's log is always there).
+## (Everything stays off camp life's ring path, r = CampLife.RING around the fire.)
 func _camp_furniture() -> void:
 	Props.put(self, RES + "Wood_Log_B.gltf", _hero_spot() + Vector3(0.05, 0, 0), 62.0, 0.95)
-	Props.put(self, RES + "Wood_Log_Stack.gltf", FIRE_POS + Vector3(-3.3, 0, -1.6), -30.0, 0.8)
-	Props.put(self, Props.DUN + "barrel_small.gltf", FIRE_POS + Vector3(3.2, 0, -0.9), 20.0, 0.9)
-	Props.put(self, Props.TOOLS + "bucket_metal.gltf", FIRE_POS + Vector3(2.7, 0, 1.6), 0.0, 1.1)
-	CampProps.opt(self, CampProps.MM + "werewolf/log_split.gltf", FIRE_POS + Vector3(-2.4, 0, -2.6), 30.0, 0.9)
-	CampProps.opt(self, CampProps.MM + "werewolf/axe.gltf", FIRE_POS + Vector3(-2.4, 0.35, -2.6), 30.0, 0.9)
+	# the seats camp life uses: right, back and back-right of the fire
+	for seat in [[Vector3(2.25, 0, 0.55), -28.0], [Vector3(0.15, 0, -2.3), 90.0], [Vector3(1.75, 0, -1.65), 45.0]]:
+		Props.put(self, RES + "Wood_Log_B.gltf", FIRE_POS + (seat[0] as Vector3) + Vector3(0, 0, 0), float(seat[1]), 0.95)
+	Props.put(self, RES + "Wood_Log_Stack.gltf", FIRE_POS + Vector3(-4.7, 0, -1.9), -30.0, 0.8)
+	Props.put(self, Props.DUN + "barrel_small.gltf", FIRE_POS + Vector3(-4.4, 0, 0.3), 20.0, 0.9)
+	Props.put(self, Props.TOOLS + "bucket_metal.gltf", FIRE_POS + Vector3(-4.2, 0, 1.3), 0.0, 1.1)
+	CampProps.opt(self, CampProps.MM + "werewolf/log_split.gltf", FIRE_POS + Vector3(-4.0, 0, -3.3), 30.0, 0.9)
+	CampProps.opt(self, CampProps.MM + "werewolf/axe.gltf", FIRE_POS + Vector3(-4.0, 0.35, -3.3), 30.0, 0.9)
+	_dummy(self, FIRE_POS + Vector3(-6.9, 0, 4.2))
 
 
 # ------------------------------------------------------------------ layout
@@ -719,6 +768,7 @@ func _on_resize() -> void:
 			s.rotation.y = deg_to_rad(yaw)
 		if not state.is_empty():
 			_build_decor(state)
+			_build_campers(state)
 		_build_paths()
 		layout_changed.emit()
 	if not revealing:
@@ -793,7 +843,7 @@ func _place_hero() -> void:
 
 func _process(dt: float) -> void:
 	_t += dt
-	if _pet_model:
+	if _pet_model and not (_pet_model is PetView):
 		_pet_model.position.y = 0.35 + sin(_t * 2.4) * 0.12
 		_pet_model.rotation.y = sin(_t * 0.9) * 0.5 + 0.5
 	if _fire_light and is_instance_valid(_fire_light):

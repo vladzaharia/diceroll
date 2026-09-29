@@ -8,6 +8,8 @@ extends RefCounted
 ##  camp_stage_0..3 the Camp as it builds out: fresh, and a realistic campaign's profile after
 ##                  runs 3, 10 and 25 (game/camp/stages/, made by tools/camp_stages.gd)
 ##  camp_reveal     the build-out moments after a fresh profile's first run (use --frames)
+##  camp_life       camp life on --profile=stage_2|stage_3|max (default stage_3): campers walk,
+##                  spar, chat and tinker, pets roam (use --frames; --clean hides the UI)
 ##  ui_armory / ui_workshop / ui_petden / ui_arcade / ui_run_setup   a Camp screen open
 ##                  (--profile=fresh|mid|max, default mid; --scroll=N scrolls the screen)
 ##  ui_results_win / ui_results_loss   the results screen after banking a run (the loss is a
@@ -17,7 +19,7 @@ extends RefCounted
 
 const NAMES := ["camp_raw", "camp_first", "camp_mid", "camp_max", "ui_armory", "ui_workshop", "ui_petden", "ui_arcade",
 	"ui_run_setup", "ui_results_win", "ui_results_loss", "flow_first_run", "camp_stage_0", "camp_stage_1", "camp_stage_2",
-	"camp_stage_3", "camp_reveal"]
+	"camp_stage_3", "camp_reveal", "camp_life"]
 const SCREENS := {"ui_armory": "armory", "ui_workshop": "workshop", "ui_petden": "pet_den", "ui_arcade": "arcade",
 	"ui_run_setup": "setup"}
 
@@ -92,6 +94,11 @@ class _Driver extends Node:
 			"camp_mid", "camp_max", "camp_stage_0", "camp_stage_1", "camp_stage_2", "camp_stage_3":
 				c.profile = _preset(scenario.substr(5))
 				c.show_camp()
+			"camp_life":
+				c.profile = _preset(String(args.get("profile", "stage_3")))
+				c.show_camp()
+				if args.has("clean"):
+					c.ui.camp.visible = false
 			"camp_reveal":
 				# a fresh profile's first run (lost on lap 6) is banked, then the Camp builds out
 				c.profile = Profile.fresh()

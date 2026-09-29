@@ -318,6 +318,7 @@ func _process(_dt: float) -> void:
 		return
 	var cam := scene.camera()
 	var hide := any_open() or revealing
+	scene.set_life_paused(any_open())
 	for id in tags:
 		var t: StationTag = tags[id]
 		var w := scene.station_anchor(String(id))
