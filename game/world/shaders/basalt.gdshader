@@ -3,12 +3,12 @@ shader_type spatial;
 // seams, lighter ash on top faces, and a few thin glowing cracks (sparse, deliberate). World
 // space, so neighbouring blocks read as one continuous floor instead of a checkerboard.
 
-uniform vec4 top_color : source_color = vec4(0.2, 0.19, 0.23, 1.0);
+uniform vec4 top_color : source_color = vec4(0.3, 0.27, 0.29, 1.0);
 uniform vec4 side_color : source_color = vec4(0.085, 0.08, 0.1, 1.0);
-uniform vec4 seam_color : source_color = vec4(0.04, 0.035, 0.05, 1.0);
+uniform vec4 seam_color : source_color = vec4(0.08, 0.065, 0.075, 1.0);
 uniform vec4 glow_color : source_color = vec4(1.0, 0.42, 0.1, 1.0);
 uniform float slab = 0.55;          // slab cells per world unit
-uniform float crack_density = 0.06; // fraction of slabs with a glowing crack edge
+uniform float crack_density = 0.035; // fraction of slabs with a glowing crack edge
 uniform float crack_energy = 2.2;
 uniform float variation = 0.18;
 uniform float heat_low = 1.0;       // side faces glow toward the bottom (lava below)

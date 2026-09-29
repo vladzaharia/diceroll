@@ -135,7 +135,7 @@ static func _lava_vent() -> Node3D:
 	var bx := BoxMesh.new()
 	bx.size = Vector3(1.22, 0.06, 1.22)
 	pool.mesh = bx
-	pool.material_override = BiomeBlocks.lava_material(1.1, 0.8, 0.58)
+	pool.material_override = BiomeBlocks.lava_material(2.3, 0.9, 0.68)
 	pool.position.y = 0.02
 	pool.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	n.add_child(pool)

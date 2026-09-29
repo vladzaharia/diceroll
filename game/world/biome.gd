@@ -326,12 +326,30 @@ static func _lava_sea() -> MeshInstance3D:
 	mi.mesh = pm
 	var m := ShaderMaterial.new()
 	m.shader = preload("res://game/world/shaders/lava_sea.gdshader")
+	# far below the island the sea is a calm backdrop: mostly crusted over, finer plates,
+	# a few hot rivers (the channel around the ring carries the bright lava)
+	m.set_shader_parameter("scale", 0.16)
+	m.set_shader_parameter("speed", 0.025)
+	m.set_shader_parameter("seam", 0.035)
+	m.set_shader_parameter("energy", 1.0)
+	m.set_shader_parameter("hot_share", 0.22)
+	m.set_shader_parameter("crust_seam", 0.08)
+	m.set_shader_parameter("plate_heat", 0.06)
+	m.set_shader_parameter("crust_color", Color(0.05, 0.035, 0.045))
+	m.set_shader_parameter("warm_crust", Color(0.09, 0.035, 0.035))
+	m.set_shader_parameter("fade_near", 13.0)
+	m.set_shader_parameter("fade_far", 30.0)
+	m.set_shader_parameter("far_glow", 0.12)
+	m.set_shader_parameter("haze_color", Color(0.06, 0.02, 0.045))
+	m.set_shader_parameter("haze_near", 12.0)
+	m.set_shader_parameter("haze_far", 40.0)
+	m.set_shader_parameter("haze_max", 0.85)
 	mi.material_override = m
 	mi.position.y = -12.0
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	var l := OmniLight3D.new()
 	l.light_color = Color(1.0, 0.4, 0.12)
-	l.light_energy = 2.0
+	l.light_energy = 1.0
 	l.omni_range = 16.0
 	l.omni_attenuation = 1.2
 	l.position = Vector3(0, 2.5, 0)

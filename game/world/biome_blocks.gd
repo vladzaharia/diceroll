@@ -51,12 +51,12 @@ const LOOKS := {
 	"magma": {
 		"sky_top": Color(0.05, 0.04, 0.12), "sky_horizon": Color(0.42, 0.12, 0.12),
 		"sky_bottom": Color(0.2, 0.06, 0.06), "sky_glow": Color(1.0, 0.45, 0.16),
-		"glow_strength": 0.6, "stars": 0.25,
+		"glow_strength": 0.45, "stars": 0.25,
 		"fog": Color(0.16, 0.08, 0.14), "fog_density": 0.0, "fog_height_density": 0.0,
 		"ambient": Color(0.46, 0.44, 0.7), "ambient_energy": 0.55,
 		"key": Color(1.0, 0.86, 0.74), "key_energy": 1.25, "key_rot": Vector3(-54.0, -140.0, 0.0),
 		"fill": Color(0.42, 0.48, 1.0), "fill_energy": 0.6,
-		"exposure": 1.0, "saturation": 1.08, "contrast": 1.1, "glow": 0.35,
+		"exposure": 1.0, "saturation": 1.08, "contrast": 1.1, "glow": 0.22,
 		"island_top": Color(0.12, 0.11, 0.13), "island_side": Color(0.09, 0.08, 0.1),
 		"island_bottom": Color(0.4, 0.12, 0.05),
 		"particles": "embers", "light": Color(1.0, 0.45, 0.15),
@@ -127,9 +127,13 @@ static func inner_corner(id: String, holder: Node3D, p: Vector3, yaw: float, sx:
 			v.name = "Vent"
 			v.position = p
 			holder.add_child(v)
-			spire(v, Vector3.ZERO, 0.62, 3 + int(sx * 2 + sz))
-			crack_decal(v, Vector3(-sx * 0.2, 0.02, sz * 0.3), 1.6, yaw)
-			Biome.flame(v, Vector3(0, 0.15, 0), Color(1.0, 0.45, 0.12), 0.22, 6)
+			basalt_columns(v, Vector3(sx * 0.2, 0, sz * 0.2), 0.95, 8, 3 + int(sx * 2 + sz), 0.55)
+			var pool := lava_pool(v, Vector3(-sx * 0.75, 0.02, -sz * 0.05), 0.42)
+			pool.name = "Fissure"
+			pool.scale = Vector3(1.0, 1.0, 0.55)
+			pool.rotation.y = deg_to_rad(yaw + 35.0)
+			crack_decal(v, Vector3(-sx * 0.5, 0.02, sz * 0.4), 1.4, yaw)
+			Biome.flame(v, Vector3(-sx * 0.75, 0.1, -sz * 0.05), Color(1.0, 0.45, 0.12), 0.2, 5)
 			Biome.flicker_light(holder, p + Vector3(0, 0.9, 0), Color(1.0, 0.42, 0.12), 0.9, 3.0)
 
 
@@ -359,15 +363,35 @@ static func basalt_material() -> ShaderMaterial:
 	return _basalt
 
 
+static var _column_mat: ShaderMaterial
+
+
+## Basalt for the hexagonal columns: lighter ash tops and warmer sides so the prisms read
+## against the paving.
+static func column_material() -> ShaderMaterial:
+	if _column_mat == null:
+		_column_mat = ShaderMaterial.new()
+		_column_mat.shader = preload("res://game/world/shaders/basalt.gdshader")
+		_column_mat.set_shader_parameter("top_color", Color(0.46, 0.41, 0.42))
+		_column_mat.set_shader_parameter("side_color", Color(0.17, 0.14, 0.16))
+		_column_mat.set_shader_parameter("slab", 1.4)
+		_column_mat.set_shader_parameter("crack_density", 0.0)
+	return _column_mat
+
+
 ## Crust-plate lava for the channel around the Magma ring (bright, fast-ish seams).
 static func channel_material() -> ShaderMaterial:
 	if _channel_mat == null:
 		_channel_mat = ShaderMaterial.new()
 		_channel_mat.shader = preload("res://game/world/shaders/lava_sea.gdshader")
-		_channel_mat.set_shader_parameter("scale", 0.75)
-		_channel_mat.set_shader_parameter("speed", 0.08)
-		_channel_mat.set_shader_parameter("energy", 1.7)
-		_channel_mat.set_shader_parameter("seam", 0.09)
+		_channel_mat.set_shader_parameter("scale", 0.42)
+		_channel_mat.set_shader_parameter("speed", 0.05)
+		_channel_mat.set_shader_parameter("energy", 1.35)
+		_channel_mat.set_shader_parameter("seam", 0.06)
+		_channel_mat.set_shader_parameter("hot_share", 0.45)
+		_channel_mat.set_shader_parameter("crust_seam", 0.18)
+		_channel_mat.set_shader_parameter("plate_heat", 0.2)
+		_channel_mat.set_shader_parameter("warm_crust", Color(0.2, 0.06, 0.04))
 	return _channel_mat
 
 
@@ -1203,15 +1227,15 @@ static func obsidian_material() -> StandardMaterial3D:
 	if _obsidian:
 		return _obsidian
 	var m := StandardMaterial3D.new()
-	m.albedo_color = Color(0.12, 0.08, 0.1)
-	m.roughness = 0.1
-	m.metallic = 0.4
+	m.albedo_color = Color(0.1, 0.085, 0.11)
+	m.roughness = 0.08
+	m.metallic = 0.55
 	m.emission_enabled = true
 	m.emission = Color(1.0, 0.3, 0.06)
-	m.emission_energy_multiplier = 0.35
+	m.emission_energy_multiplier = 0.1
 	m.rim_enabled = true
-	m.rim = 1.0
-	m.rim_tint = 0.8
+	m.rim = 0.7
+	m.rim_tint = 0.6
 	_obsidian = m
 	return m
 
@@ -1270,10 +1294,11 @@ static func _magma(root: Node3D, d: Node3D, c: Node3D) -> void:
 		Biome.flicker_light(fall, Vector3(0, CHANNEL_Y - p.y + 1.0, 1.0), Color(1.0, 0.42, 0.12), 1.6, 5.0)
 		_tag(smoke(d, p + Vector3(0, 0.2, -0.6), 1.3, smoke_col))
 	for x in [-9.4, -3.2, 3.2, 9.4]:
-		_tag(spire(d, spot(Vector3(x, 0, back_z)), _rng.randf_range(1.1, 1.5), int(x * 5 + 40)))
+		_tag(basalt_columns(d, spot(Vector3(x, 0, back_z)), _rng.randf_range(1.5, 1.8), 7, int(x * 5 + 40)))
 	# side columns: the forge yard up on the basalt shelves
 	for side in [-1.0, 1.0]:
-		_tag(spire(d, spot(Vector3(side * side_x, 0, -5.8)), 1.2, int(side * 7 + 3)))
+		_tag(basalt_columns(d, spot(Vector3(side * side_x, 0, -5.8)), 1.5, 7, int(side * 7 + 3)))
+		_tag(spire(d, spot(Vector3(side * side_x + side * 0.6, 0, -4.4)), 0.7, int(side * 7 + 5)))
 		put(d, T + "anvil.gltf", Vector3(side * side_x, 0, -2.4), side * 70.0, 1.4)
 		put(d, T + "hammer.gltf", Vector3(side * side_x + 0.1, 0.02, -1.4), side * 20.0, 1.1)
 		var bz := put(d, D + "torch_lit.gltf", Vector3(side * side_x, 0, 1.2), 0.0, 1.3)
@@ -1285,9 +1310,9 @@ static func _magma(root: Node3D, d: Node3D, c: Node3D) -> void:
 	put(d, T + "grindstone.gltf", Vector3(-side_x, 0, 5.2), 80.0, 1.2)
 	put(d, D + "sword_shield_broken.gltf", Vector3(side_x, 0, 5.4), -80.0, 0.85)
 	# front: low basalt boulders and a few thin glowing cracks (the camera side stays open)
-	for p in [Vector3(-5.2, 0, 9.9), Vector3(5.0, 0, 9.8)]:
-		_tag(spire(d, spot(p), 0.45, int(p.x * 7 + 99)))
-	for p in [Vector3(-2.6, 0, 9.4), Vector3(0.6, 0, 10.0), Vector3(2.9, 0, 9.6)]:
+	for p in [Vector3(-5.6, 0, 9.9), Vector3(5.4, 0, 9.8)]:
+		_tag(basalt_columns(d, spot(p), 1.1, 10, int(p.x * 7 + 99), 0.6))
+	for p in [Vector3(-2.2, 0, 9.6), Vector3(2.6, 0, 9.8)]:
 		_tag(crack_decal(d, spot(p) + Vector3(0, 0.02, 0), 1.5, _rng.randf() * 180.0))
 	_tag(smoke(d, spot(Vector3(-side_x, 0, -8.0)) + Vector3(0, 0.5, 0), 0.9, smoke_col))
 	_tag(smoke(d, spot(Vector3(side_x, 0, -7.0)) + Vector3(0, 0.5, 0), 0.9, smoke_col))
@@ -1335,6 +1360,41 @@ static func _magma(root: Node3D, d: Node3D, c: Node3D) -> void:
 	c.add_child(ring)
 
 
+## A cluster of hexagonal basalt columns (the Magma signature prop): stepped prisms of the
+## calm basalt, lighter ash on their tops, one glowing seam at the foot. k = overall size.
+static func basalt_columns(parent: Node3D, pos: Vector3, k: float, count := 6, seed := 1, tall := 1.0) -> Node3D:
+	var n := Node3D.new()
+	n.name = "BasaltColumns"
+	n.position = pos
+	parent.add_child(n)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed
+	var r := 0.3 * k
+	# hex packing around the centre: the centre column is the tallest
+	var spots: Array[Vector2] = [Vector2.ZERO]
+	for i in 6:
+		var a := TAU * i / 6.0 + PI / 6.0
+		spots.append(Vector2(cos(a), sin(a)) * r * 1.75)
+	for i in 6:
+		var a := TAU * i / 6.0
+		spots.append(Vector2(cos(a), sin(a)) * r * 3.1)
+	for i in mini(count, spots.size()):
+		var h := (1.0 if i == 0 else rng.randf_range(0.35, 0.8) * (0.7 if i > 6 else 1.0)) * 1.6 * k * tall
+		var mi := MeshInstance3D.new()
+		var cy := CylinderMesh.new()
+		cy.top_radius = r * 0.97
+		cy.bottom_radius = r
+		cy.height = h
+		cy.radial_segments = 6
+		cy.rings = 1
+		mi.mesh = cy
+		mi.material_override = column_material()
+		mi.position = Vector3(spots[i].x, h * 0.5 - 0.05, spots[i].y)
+		mi.rotation.y = rng.randf_range(-0.12, 0.12)
+		n.add_child(mi)
+	return n
+
+
 ## A tall obsidian spire (a few black glass crystals with an ember sheen).
 static func spire(parent: Node3D, pos: Vector3, k: float, seed := 1) -> Node3D:
 	var n := crystal_cluster(parent, pos, k, 4, seed, false, obsidian_material())
@@ -1368,3 +1428,4 @@ static func crack_decal(parent: Node3D, pos: Vector3, size: float, yaw: float) -
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(mi)
 	return mi
+
