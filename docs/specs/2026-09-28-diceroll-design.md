@@ -256,3 +256,8 @@ Principles: no premium currency, no paid or random rolls for power. Every upgrad
   - Arcade unlocks.
 - **New boards (Vlad):** Orc Warcamp, Deep Mines, Moonlit Woods and Sunscorched Ruins join the six biomes (design: docs/design/2026-09-29-new-biomes.md). **Boards with elevation** (terraces, ramps, bridges from the Forest hill kits) follow as a later pass.
 - **No AUTO in minigames (Vlad):** minigames can't be auto-played. There is no AUTO button, and the AUTO pilot pauses at every minigame ("Your turn: play the minigame") so the player always plays it by hand. `minigame_auto` stays for the sim and tests only.
+- **Real-item Armory (Vlad):** design in docs/design/2026-09-29-armory-items.md.
+  - Slots are Weapon, Off-hand and Trinket, with a 2nd Trinket slot late for about 400 Crowns.
+  - Items are 32 real KayKit models, each with a dice-centric sidegrade, shown in the hero's hands.
+  - Signature items work one tier higher for their class.
+  - **Weapon variants (e.g. sword A–G) each add their own property** on top of the base type's rule.

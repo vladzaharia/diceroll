@@ -132,6 +132,8 @@ Remaining / to verify:
 - **New biomes (approved):** Orc Warcamp, Deep Mines, Moonlit Woods, Sunscorched Ruins. Design: docs/design/2026-09-29-new-biomes.md. Vlad's decisions: tiers 3/3/4 with Moonlit in T3 and a new 6th final boss; the Short Road's 2nd biome drawn from T2 ∪ T3; the Full moon adds a rune chest; mini-bosses in home biomes; landing-only oasis; cosmetic elevation. The designer is updating the doc. Then: rules by a SEPARATE agent, branched after the core agent's enemies+affixes commit lands on main (both touch biomes.gd and board.gd); visuals after WP-F1 merges. After that, **elevation boards** (terraces/ramps/bridges).
 - **Running (manual worktrees):** (merged: G1 enemy looks + affixes) and wp-b2-new-biomes (core rules for Mines/Warcamp/Moonlit/Ruins + Moon King + Sand Colossus + Short Road draw).
 - (merged) WP-E2 minigames. **Running: Minigames 2.0** (worktree wp-e5-minigames2). Bubble Shooter, Plinko, Shell Game, Memory Match, Fishing, Lucky Wheel and High-Low Ladder (core rules + UIs + Arcade unlocks), reusing E2's framework.
+- **Real-item Armory:** design in docs/design/2026-09-29-armory-items.md. Vlad's decisions: 3 slots, a 2nd trinket slot, +1-tier affinity, the Necromancer keeps its skull staff, and variants carry properties; the designer is updating the doc. Implementation (core then presentation) is queued after the classes/skins core work merges, because both touch the profile schema.
+- **No AUTO in minigames:** being done by the Minigames 2.0 agent.
 - **Assets:** everything third-party lives in git-ignored `third_party/` (docs/ASSETS.md). A fresh worktree needs `THIRD_PARTY=/Users/vlad/Repos/diceroll/third_party tools/import_assets.sh`.
 - **Next:**
   1. Merge E1 → E2 → E3.
