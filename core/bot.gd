@@ -1195,7 +1195,7 @@ static func _class_model(cm: CombatModel, run: RunState, c: CombatState, dice: A
 			if c != null and c.bones_raised < ClassLogic.BONE_MAX and c.pool_dice(run).size() + c.pending_bones < ClassLogic.BONE_POOL_MAX:
 				cm.kill_value = 6.0 # a Bone die for the rest of the fight: kill the weak ones first
 		"aim":
-			cm.aim = ClassLogic.RANGER_AIM_MULT
+			cm.aim = ClassLogic.aim_mult(cm.n)
 			cm.aim_ok = c == null or c.rerolls_used_this_turn == 0
 			cm.pierce_carry = true
 

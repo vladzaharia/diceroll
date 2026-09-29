@@ -177,7 +177,7 @@ func test_ranger_aim_without_rerolls() -> void:
 	_setup("ranger", [["standard", ""], ["standard", ""]])
 	_dice([5, 3])
 	var ev := c.attack(run)
-	assert_eq(int(_all(ev, "combo")[0].total), int(floor(8 * ClassLogic.RANGER_AIM_MULT)), "High Roller sums every die")
+	assert_eq(int(_all(ev, "combo")[0].total), int(floor(8 * ClassLogic.aim_mult(2))), "High Roller sums every die")
 	assert_eq(_all(ev, "class_triggered", "aim").size(), 1)
 
 func test_ranger_no_aim_after_a_reroll() -> void:
@@ -202,7 +202,7 @@ func test_ranger_piercing_shot_carries_overkill_once() -> void:
 	var ev := c.attack(run)
 	var ps := _all(ev, "class_triggered", "piercing_shot")
 	assert_eq(ps.size(), 1)
-	assert_eq(int(ps[0].value), int(floor(18 * ClassLogic.RANGER_AIM_MULT)) - 3)
+	assert_eq(int(ps[0].value), int(floor(18 * ClassLogic.aim_mult(2))) - 3)
 	assert_eq(int(ps[0].enemy_idx), 1)
 	assert_true(not c.alive(1))
 	assert_eq(int(c.enemies[2].hp), 100, "only one carry")

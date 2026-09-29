@@ -54,12 +54,13 @@ func test_new_cond_forms() -> void:
 	assert_eq(p.counter("classes_at_boss"), 2)
 	assert_eq(p.counter("classes_owned"), 1)
 
-func test_paladin_unlocks_on_the_second_knight_win() -> void:
+func test_paladin_unlocks_on_the_third_knight_win() -> void:
 	var p := Profile.fresh()
 	var res := p.apply_run_result(_stats(true))
 	assert_true(not res.milestones.has("oathsworn"))
 	res = p.apply_run_result(_stats(true))
-	assert_true(res.milestones.has("oathsworn"))
+	res = p.apply_run_result(_stats(true))
+	assert_true(p.milestones.has("oathsworn"))
 	assert_true(p.owns("classes", "paladin"))
 
 func test_one_class_per_run_from_milestones() -> void:

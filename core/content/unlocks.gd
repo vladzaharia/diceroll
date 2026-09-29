@@ -198,8 +198,8 @@ const MILESTONES := [
 	{"id": "brewmaster", "run": 30, "desc": "Drink 95 potions.", "cond": {"stat": "potions", "min": 95},
 		"unlocks": [["pets", "cauldron"]]},
 	# --- class unlock table (docs/design/2026-09-28-classes-enemies-skins.md §2.2)
-	{"id": "oathsworn", "run": 6, "desc": "Win 2 runs with the Knight, or play 8 runs.",
-		"cond": {"any": [{"class_wins": "knight", "min": 2}, {"stat": "runs", "min": 8}]}, "unlocks": [["classes", "paladin"]]},
+	{"id": "oathsworn", "run": 6, "desc": "Win 3 runs with the Knight, or play 8 runs.",
+		"cond": {"any": [{"class_wins": "knight", "min": 3}, {"stat": "runs", "min": 8}]}, "unlocks": [["classes", "paladin"]]},
 	{"id": "pathfinder_trail", "run": 13, "desc": "Reach the final boss with 4 different classes, or play 16 runs.",
 		"cond": {"any": [{"stat": "classes_at_boss", "min": 4}, {"stat": "runs", "min": 16}]}, "unlocks": [["classes", "ranger"]]},
 	{"id": "shadow_pact", "run": 19, "desc": "Win 2 runs with the Rogue, or use 1,700 combat rerolls, or play 22 runs.",

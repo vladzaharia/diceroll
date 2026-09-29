@@ -15,7 +15,8 @@ extends RefCounted
 ##                         Oath die in the group ("oath_kept"). Sanctify: each biome change sets
 ##                         the lowest non-Oath face of the die with the fewest Oath faces to the
 ##                         Oath (face_changed {source: "sanctify"}). Shops weight Twin/Even x2.
-##   aim (Ranger)          no combat reroll this turn: the main attack deals xRANGER_AIM_MULT;
+##   aim (Ranger)          no combat reroll this turn: the main attack deals x aim_mult(pool size)
+##                         (RANGER_AIM_SMALL with 3 dice or fewer, else RANGER_AIM_MULT);
 ##                         overkill on the target carries once to the next living enemy
 ##                         (Piercing Shot, event id "piercing_shot")
 ##   shadow_step (Ninja)   a reroll after which a rerolled die matches another die's non-blank
@@ -57,7 +58,10 @@ static var PALADIN_SANCTIFY := 2
 ## Shop die-kind weight multipliers for the Paladin (only kinds in the unlocked pool).
 const PALADIN_SHOP_KINDS := {"twin": 2.0, "even": 2.0}
 const SET_COMBOS := ["pair", "two_pair", "three_kind", "full_house", "four_kind", "five_kind", "six_kind"]
-static var RANGER_AIM_MULT := 1.2
+static var RANGER_AIM_MULT := 1.15
+## Aim with a small pool (RANGER_AIM_SMALL_DICE dice or fewer): one breath, one arrow.
+static var RANGER_AIM_SMALL := 1.3
+static var RANGER_AIM_SMALL_DICE := 3
 static var RANGER_PIERCE_CARRIES := 1
 static var NINJA_REFUNDS_PER_TURN := 2
 static var NINJA_BOARD_REFUNDS := 1
@@ -82,6 +86,8 @@ static func tune_knob(knob: String, v: float) -> bool:
 		"PALADIN_OATH_PIP": PALADIN_OATH_PIP = int(v)
 		"PALADIN_SANCTIFY": PALADIN_SANCTIFY = int(v)
 		"RANGER_AIM_MULT": RANGER_AIM_MULT = v
+		"RANGER_AIM_SMALL": RANGER_AIM_SMALL = v
+		"RANGER_AIM_SMALL_DICE": RANGER_AIM_SMALL_DICE = int(v)
 		"RANGER_PIERCE_CARRIES": RANGER_PIERCE_CARRIES = int(v)
 		"NINJA_REFUNDS_PER_TURN": NINJA_REFUNDS_PER_TURN = int(v)
 		"NINJA_BOARD_REFUNDS": NINJA_BOARD_REFUNDS = int(v)
@@ -235,13 +241,18 @@ static func rerolled_match(values: Array, idx: Array) -> bool:
 				return true
 	return false
 
+## Ranger Aim factor for a combat pool of `n` dice (steadier with fewer dice).
+static func aim_mult(n: int) -> float:
+	return RANGER_AIM_SMALL if n <= RANGER_AIM_SMALL_DICE else RANGER_AIM_MULT
+
 ## Damage factor for this turn's main attack (after the multiplier and passives' factors).
 static func attack_factor(run: RunState, c: CombatState, out: Array[Dictionary]) -> float:
 	match mech(run):
 		"aim":
 			if c.rerolls_used_this_turn == 0:
-				out.append(ev(run, "aim", int(round(RANGER_AIM_MULT * 100.0))))
-				return RANGER_AIM_MULT
+				var am := aim_mult(c.dice_values.size())
+				out.append(ev(run, "aim", int(round(am * 100.0))))
+				return am
 	return 1.0
 
 ## After the main attack hit enemy `tgt` for `total`; `overkill` is the damage left after its
