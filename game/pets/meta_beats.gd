@@ -301,6 +301,8 @@ static func _trait_triggered(c: GameController, ev: Dictionary) -> void:
 		if i < c.stage.enemy_count():
 			var h: float = c.stage.enemy_heights()[i]
 			at = c.rig.camera.unproject_position(c.stage.enemy_position(i) + Vector3.UP * (h + 0.35))
+			# a tall enemy's HUD can sit under the top HUD: keep the chip below it
+			at.y = maxf(at.y, c.ui.combat_hud.top.content_bottom() + 60.0)
 	elif id == "boots_treasury_step":
 		at = c.ui.board_hud.top.treasury.get_global_rect().get_center() + Vector2(0, 70)
 		c.ui.board_hud.top.treasury.set_value(int(ev.get("treasury", c.flow.run.treasury)), true)
