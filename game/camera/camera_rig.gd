@@ -110,8 +110,8 @@ func follow(target: Node3D, instant := false) -> void:
 	_begin(instant)
 
 
-## Resting board framing: centred on the hero, wider than follow() so a good part of the
-## ring around them is visible (between turns).
+## Resting board framing (between turns): the whole ring always fits, leaning toward the
+## hero's side; steeper on tall screens so the ring fills the free area.
 func home(target: Node3D, instant := false) -> void:
 	_follow_target = target
 	_follow_wide = 1.75
@@ -315,6 +315,22 @@ func _recompute() -> void:
 			var bc := _bounds.get_center()
 			var far := clampf((bc.z - c.z) / maxf(_bounds.size.z * 0.5, 0.1), 0.0, 1.0)
 			_pitch += 12.0 * far
+			if _follow_wide > 1.0:
+				# home: the whole ring always fits (every aspect, 0.46 .. 2.4), plus the box
+				# around the hero; on a tall free area look down more steeply to fill it
+				var hp := _follow_box(c, r * 0.5, 0.8)
+				for i in 8:
+					hp.append(_bounds.get_endpoint(i))
+				pts = hp
+				if portrait:
+					var hkey := "h|%s|%s|%s|%d" % [rect, view, _bounds, int(_pitch * 4.0)]
+					if hkey != _fill_key:
+						_fill_key = hkey
+						var p1 := _pitch
+						_fill_val = _search_fill(func(p: float) -> Array: return [hp, p], p1, maxf(p1, 72.0), rect, view)
+					_pitch = _fill_val
+				_desired = solve_framing(pts, _yaw, deg_to_rad(_pitch), rect, view, camera.fov)
+				return
 			# the framed box's depth grows (0.8r .. 1.7r) until it fills a tall free area,
 			# so phones show more of the ring instead of an empty band
 			var key := "f|%s|%s|%d|%.2f" % [rect, view, int(_pitch * 4.0), _follow_wide]
