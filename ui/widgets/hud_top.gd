@@ -49,6 +49,12 @@ var _burn := 0
 var side_reserve := 0.0
 ## Scale applied to the HUD row when the screen is narrower than its natural width.
 var _fit := 1.0
+## Width kept free at the right end of the passives bar (the meta HUD strip sits there).
+var reserve_right := 0.0:
+	set(v):
+		if not is_equal_approx(v, reserve_right):
+			reserve_right = v
+			_layout()
 
 
 func _init() -> void:
@@ -174,9 +180,10 @@ func _layout() -> void:
 	_row.scale = Vector2(_fit, _fit)
 	var rh := _row.size.y * _fit
 	passives.position = Vector2(_row.position.x + 4.0, _row.position.y + rh + 8.0)
-	passives.size = Vector2(w - 8.0, 0)
+	var pw := maxf(w - 8.0 - reserve_right, 120.0)
+	passives.size = Vector2(pw, 0)
 	passives.reset_size()
-	passives.size.x = w - 8.0
+	passives.size.x = pw
 	var extra := passives.size.y + 8.0 if not _passive_ids.is_empty() else 0.0
 	_scrim.position = Vector2.ZERO
 	_scrim.size = Vector2(view.x, safe.top + rh + extra + 90.0)
@@ -210,12 +217,22 @@ func side_pos(sz: Vector2) -> Vector2:
 	return Vector2(x, y)
 
 
+## Bottom (local y) of anything docked under the row (the meta HUD strip); content_bottom()
+## covers it, so what stacks under the HUD (the AUTO cluster) stays clear.
+var extra_bottom := 0.0
+
+
+## Global rect of the lap chip (the meta HUD strip anchors under it).
+func chips_rect() -> Rect2:
+	return _act_chip.get_global_rect()
+
+
 ## Bottom edge of the HUD block (row + passives bar), in local coordinates.
 func content_bottom() -> float:
 	var b := _row.position.y + _row.size.y * _fit
 	if not _passive_ids.is_empty():
 		b = passives.position.y + passives.size.y
-	return b
+	return maxf(b, extra_bottom)
 
 
 func _place_hp() -> void:

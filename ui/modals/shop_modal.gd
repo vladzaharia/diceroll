@@ -83,6 +83,11 @@ func refresh(flow: GameFlow) -> void:
 			c.set_die(String(it.get("kind", "standard")))
 		elif id == "passive" and it.has("passive"):
 			c.set_passive(String(it.passive))
+		elif id == "potion" and it.has("potion") and UiIcons.exists("potion_" + String(it.potion)):
+			# the potion's type: its own bottle icon and a tag
+			c.set_icon("potion_" + String(it.potion), Color.WHITE)
+			c.set_tag("POTION" + ("  ·  COMBAT" if PotionDefs.combat_only(String(it.potion)) else ""),
+				MetaHud.POTION_COLORS.get(String(it.potion), UiPalette.HP_BRIGHT))
 		else:
 
 			c.set_icon(ICONS.get(id, "star"))

@@ -168,7 +168,8 @@ func _fill_move(flow: GameFlow) -> void:
 		tag.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(UiPalette.GOLD, 0.2), 12, 2, UiPalette.GOLD_BRIGHT), 10, 2))
 		tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		tag.add_child(UiTheme.label("DOUBLES!", 22, UiPalette.GOLD_BRIGHT, true, 4))
+		var pv := flow.board_pair_value()
+		tag.add_child(UiTheme.label("DOUBLES · PAIR OF %d" % pv if pv > 0 else "DOUBLES!", 22, UiPalette.GOLD_BRIGHT, true, 4))
 		_move_row.add_child(tag)
 	elif flow.run.lap >= Balance.TOTAL_LAPS and flow.run.board.crosses_start(flow.run.pos, flow.board_move):
 		_move_row.add_child(UiTheme.label("BOSS!", 26, UiPalette.HP_BRIGHT, true, 4))
