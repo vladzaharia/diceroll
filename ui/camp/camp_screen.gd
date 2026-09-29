@@ -21,6 +21,8 @@ signal settings_pressed
 var scene: CampScene
 var profile: Profile
 var can_continue := false
+var revealing := false
+var _skip_hint: Label
 
 var header: PanelContainer
 var home_btn: GameButton
@@ -123,6 +125,10 @@ func _init() -> void:
 	settings_btn.icon_tint = UiPalette.GOLD
 	settings_btn.pressed.connect(func() -> void: settings_pressed.emit())
 	add_child(settings_btn)
+	_skip_hint = UiTheme.label("TAP TO SKIP", 22, UiPalette.TEXT_DIM, false, 4, true, 700)
+	_skip_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_skip_hint.visible = false
+	add_child(_skip_hint)
 	resized.connect(_layout)
 	_bottom.minimum_size_changed.connect(_layout.call_deferred)
 
@@ -185,6 +191,16 @@ func any_open() -> bool:
 		if m.visible and m.is_open():
 			return true
 	return welcome.visible and welcome.is_open()
+
+
+## While the camp plays its build-out reveal: the labels and the bottom panel step aside and a
+## "tap to skip" hint shows.
+func set_revealing(on: bool) -> void:
+	revealing = on
+	_bottom.visible = not on
+	_skip_hint.visible = on
+	for id in tags:
+		(tags[id] as Control).visible = not on
 
 
 func show_welcome() -> void:
@@ -283,6 +299,8 @@ func _layout() -> void:
 	home_btn.position = Vector2(safe.left, safe.top - 2.0)
 	settings_btn.reset_size()
 	settings_btn.position = Vector2(size.x - safe.right - settings_btn.get_combined_minimum_size().x, safe.top - 2.0)
+	_skip_hint.size = Vector2(size.x, 40)
+	_skip_hint.position = Vector2(0, size.y - safe.bottom - 70)
 	var w := minf(620.0, size.x - safe.left - safe.right)
 	_bottom.reset_size()
 	var bh := _bottom.get_combined_minimum_size().y
@@ -299,7 +317,7 @@ func _process(_dt: float) -> void:
 	if not visible or scene == null or not is_instance_valid(scene) or not scene.is_inside_tree():
 		return
 	var cam := scene.camera()
-	var hide := any_open()
+	var hide := any_open() or revealing
 	for id in tags:
 		var t: StationTag = tags[id]
 		var w := scene.station_anchor(String(id))

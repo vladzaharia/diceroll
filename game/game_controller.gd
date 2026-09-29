@@ -71,6 +71,8 @@ var camp_scene: CampScene
 ## game_over stats of the run being presented, and whether they were banked.
 var _game_over_stats: Dictionary = {}
 var _banked := false
+## CampState before the last banked run: the next show_camp() plays the build-out reveal.
+var camp_before: Dictionary = {}
 
 
 func _init() -> void:
@@ -830,6 +832,7 @@ func show_camp() -> void:
 	Audio.play_music("calm")
 	overlay.set_black(true)
 	overlay.fade_in(0.5)
+	await _camp_reveal()
 	if profile_is_new:
 		profile_is_new = false
 		await wait(0.6)
@@ -905,9 +908,10 @@ func bank_run() -> void:
 	ensure_profile()
 	var stats := _game_over_stats if not _game_over_stats.is_empty() else flow._summary()
 	var before := profile.to_dict()
+	camp_before = CampState.of(profile)
 	var evs := camp.bank_run(stats)
 	save_profile()
-	ui.summary.results = {"events": evs, "before": before, "after": profile}
+	ui.summary.results = {"stats": stats, "events": evs, "before": before, "after": profile}
 	var last: Dictionary = evs.back()
 	print("RUN_BANKED victory=%s crowns=%d sigils=%d total_crowns=%d total_sigils=%d runs=%d unlocked=%s" % [
 		str(bool(stats.get("victory", false))), int(last.get("crowns", 0)), int(last.get("sigils", 0)), profile.crowns,
@@ -951,9 +955,27 @@ func _leave_camp_world() -> void:
 	rig.camera.make_current()
 
 
+## The build-out moments for what the last run unlocked (camera pans, the camp grows).
+## Tapping skips; game speed (2x / 4x) speeds it up.
+func _camp_reveal() -> void:
+	if camp_before.is_empty() or camp_scene == null:
+		return
+	var before := camp_before
+	camp_before = {}
+	if CampState.diff(before, CampState.of(profile)).is_empty():
+		return
+	ui.camp.set_revealing(true)
+	await camp_scene.reveal(before, CampState.of(profile), overlay, speed)
+	if is_inside_tree() and mode == "camp":
+		ui.camp.set_revealing(false)
+
+
 func _camp_input(event: InputEvent) -> void:
 	var mb := event as InputEventMouseButton
 	if mb == null or not mb.pressed or mb.button_index != MOUSE_BUTTON_LEFT or camp_scene == null:
+		return
+	if camp_scene.revealing:
+		camp_scene.skip_reveal()
 		return
 	if get_tree().paused or ui.camp.any_open():
 		return

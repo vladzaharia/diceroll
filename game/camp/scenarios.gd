@@ -5,6 +5,9 @@ extends RefCounted
 ##  camp_raw        the 3D CampScene alone (art iteration; --profile=fresh|mid|max, --pet=<id>)
 ##  camp_first      the Camp on a fresh profile, with the first-launch welcome
 ##  camp_mid / camp_max   the Camp on the mid / max preset profiles
+##  camp_stage_0..3 the Camp as it builds out: fresh, and a realistic campaign's profile after
+##                  runs 3, 10 and 25 (game/camp/stages/, made by tools/camp_stages.gd)
+##  camp_reveal     the build-out moments after a fresh profile's first run (use --frames)
 ##  ui_armory / ui_workshop / ui_petden / ui_arcade / ui_run_setup   a Camp screen open
 ##                  (--profile=fresh|mid|max, default mid; --scroll=N scrolls the screen)
 ##  ui_results_win / ui_results_loss   the results screen after banking a run (the loss is a
@@ -13,7 +16,8 @@ extends RefCounted
 ##                  card, one shot per step: <shot>_step_NN.png
 
 const NAMES := ["camp_raw", "camp_first", "camp_mid", "camp_max", "ui_armory", "ui_workshop", "ui_petden", "ui_arcade",
-	"ui_run_setup", "ui_results_win", "ui_results_loss", "flow_first_run"]
+	"ui_run_setup", "ui_results_win", "ui_results_loss", "flow_first_run", "camp_stage_0", "camp_stage_1", "camp_stage_2",
+	"camp_stage_3", "camp_reveal"]
 const SCREENS := {"ui_armory": "armory", "ui_workshop": "workshop", "ui_petden": "pet_den", "ui_arcade": "arcade",
 	"ui_run_setup": "setup"}
 
@@ -33,6 +37,10 @@ static func build(name: String) -> Node:
 
 ## A preset profile by name, with a few extra touches so shots look lived-in.
 static func preset(name: String) -> Profile:
+	if name.begins_with("stage_"):
+		if name == "stage_0":
+			return Profile.fresh()
+		return ProfileStore.load_profile("res://game/camp/stages/%s.json" % name)
 	var p := Profile.from_dict(MetaPresets.get_preset(name))
 	match name:
 		"mid":
@@ -81,8 +89,22 @@ class _Driver extends Node:
 				c.profile = Profile.fresh()
 				c.profile_is_new = true
 				c.show_camp()
-			"camp_mid", "camp_max":
+			"camp_mid", "camp_max", "camp_stage_0", "camp_stage_1", "camp_stage_2", "camp_stage_3":
 				c.profile = _preset(scenario.substr(5))
+				c.show_camp()
+			"camp_reveal":
+				# a fresh profile's first run (lost on lap 6) is banked, then the Camp builds out
+				c.profile = Profile.fresh()
+				c.ensure_profile()
+				c.camp_before = CampState.of(c.profile)
+				var f := GameFlow.new_run("knight", 5, Balance.BOARD_SIZE, {"profile": c.profile.to_dict()})
+				f.run.lap = 6
+				f.run.act = 2
+				f.run.stats.merge({"fights_won": 12, "max_act": 2}, true)
+				var ev: Array[Dictionary] = []
+				f._finish(false, ev)
+				c.camp.bank_run(ev.back().stats)
+				c.set_speed(float(args.get("speed", "1")))
 				c.show_camp()
 			"ui_results_win", "ui_results_loss":
 				await _results(scenario == "ui_results_win")

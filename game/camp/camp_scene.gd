@@ -1,34 +1,32 @@
 class_name CampScene
 extends Node3D
-## The Camp (spec §16): a cozy camp on a floating island at dusk. A campfire in the middle
-## (flickering light, embers, smoke), the chosen hero sitting by the fire with the equipped
-## pet beside them, and four building stations made from KayKit props:
-##   Armory (anvil, weapon rack) · Dice Workshop (workbench, tools, big dice) ·
-##   Pet Den (a cosy nook with pumpkins and lanterns) · Arcade (a claw-machine booth).
-## Stations are tappable (pick_station) and labelled by the UI (station_anchor). Locked
-## stations are dimmed. Decorations grow with milestones: boss trophies, class banners, a
-## golden chest after the first win.
+## The Camp (spec §16), the game's home screen: a camp on a floating island at dusk that
+## BUILDS OUT with the profile. Everything is data-driven from CampState.of(profile), so the
+## same profile always gives the same camp; the scene is the progress bar:
+##   * a campfire that grows with the runs played, the clearing widening around it;
+##   * four stations (Armory, Dice Workshop, Pet Den, Arcade), each ruined -> under
+##     construction -> built -> upgraded (CampStations), tappable and labelled by the UI;
+##   * the chosen hero by the fire, every other unlocked class busy around camp (sitting by
+##     the fire, sparring, reading, cheering), and a tent per class (dark until unlocked);
+##   * the equipped pet beside the hero and every other owned pet roaming;
+##   * milestone decorations: boss trophies, mini-boss skulls, biome souvenirs, class-win
+##     banners, a golden chest, lantern posts and string lights with runs, fences with Crowns
+##     spent, ascension banners.
+## reveal(before, after) plays the build-out moments after a run (camera pan, dust, the new
+## part popping in, a banner); skip_reveal() jumps to the end.
 ##
 ##   var camp := CampScene.new(); add_child(camp)
-##   camp.apply_profile(profile)          # hero, pet, locks, trophies
-##   camp.set_pet("pumpkin_sprite")       # hook for the pet familiar (placeholder model)
+##   camp.apply_profile(profile)
+##   await camp.reveal(CampState.of(old_profile), CampState.of(profile), overlay, speed)
 ##   var id := camp.pick_station(tap_pos)
 
 signal layout_changed
+signal reveal_finished
 
 const HERO_SCALE := 0.85
+const NPC_SCALE := 0.8
 const FOREST := "res://assets/kaykit/forest/color%d/%s_Color%d.gltf"
 const RES := "res://assets/kaykit/resources/"
-## KayKit EXTRA packs (optional: every use checks the file exists).
-const WX := "res://assets/kaykit/weapons_x/"
-const ADX := "res://assets/kaykit/adventurers_x/"
-const RX := "res://assets/kaykit/resources_x/"
-const DX := "res://assets/kaykit/dungeon_x/"
-const TX := "res://assets/kaykit/tools_x/"
-const MM := "res://assets/kaykit/mystery/"
-## Optional factory for real pet models (WP-E3): func(id: String) -> Node3D. When unset (or it
-## returns null) a KayKit-prop placeholder stands in.
-static var pet_factory: Callable
 
 const LOOK := {
 	"sky_top": Color(0.04, 0.05, 0.15), "sky_horizon": Color(0.36, 0.2, 0.36), "sky_bottom": Color(0.04, 0.03, 0.08),
@@ -40,7 +38,7 @@ const LOOK := {
 }
 const ISLAND_HALF := 16.0
 
-## Station positions per orientation (x, z) and the fire / hero spots.
+## Station positions per orientation (the fire sits in front, the hero on its left).
 const LAYOUT := {
 	"landscape": {
 		"armory": Vector3(-7.2, 0, -0.3), "workshop": Vector3(-3.2, 0, -4.9),
@@ -52,9 +50,24 @@ const LAYOUT := {
 	},
 }
 const FIRE_POS := Vector3(0, 0, 1.8)
-## Yaw each station turns to face the fire / camera.
 const STATION_SCALE := 1.5
 const STATION_YAW := {"armory": 38.0, "workshop": 14.0, "pet_den": -14.0, "arcade": -38.0}
+## Clearing radii (x, z) per camp stage.
+const CLEARING := [Vector2(3.6, 2.9), Vector2(4.6, 3.6), Vector2(5.3, 4.1), Vector2(5.9, 4.6)]
+## Activity slots for the other unlocked classes (relative to the fire): [offset, yaw, clip, seat].
+const SLOTS := [
+	[Vector3(2.25, 0, 0.55), -118.0, "Sit_Chair_Idle", "log"],
+	[Vector3(0.15, 0, -2.3), 0.0, "Sit_Chair_Idle", "log"],
+	[Vector3(-4.6, 0, 3.3), 60.0, "spar", "dummy"],
+	[Vector3(4.4, 0, 3.4), -40.0, "Cheering", ""],
+	[Vector3(-1.6, 0, 4.4), 160.0, "Sit_Floor_Idle", "book"],
+	[Vector3(1.9, 0, 4.2), -160.0, "Waving", ""],
+	[Vector3(-5.6, 0, 1.0), 90.0, "idle_b", ""],
+	[Vector3(5.6, 0, 1.2), -90.0, "idle_b", ""],
+]
+## Homes of the roaming pets (relative to the fire).
+const PET_HOMES := [Vector3(1.4, 0, 2.9), Vector3(-3.4, 0, 0.2), Vector3(3.6, 0, -1.2), Vector3(-0.6, 0, -3.3),
+	Vector3(2.8, 0, 3.6), Vector3(-2.6, 0, 3.8)]
 
 var rig: CameraRig
 var hero: Character
@@ -63,15 +76,26 @@ var pet_id := ""
 var stations: Dictionary = {}
 var locked: Dictionary = {}
 var portrait := false
+## The CampState currently shown.
+var state: Dictionary = {}
+var revealing := false
+
 var _pet_holder: Node3D
 var _pet_model: Node3D
+var _npcs: Node3D
+var _pets: Node3D
 var _deco: Node3D
+var _fire: Node3D
 var _fire_light: OmniLight3D
+var _fire_level := -1
+var _ground_mat: ShaderMaterial
 var _t := 0.0
 var _rng := RandomNumberGenerator.new()
 var _built := false
 var _stone_mat: StandardMaterial3D
 var _paths: Node3D
+var _skip := false
+var _focus := PackedVector3Array()
 
 
 func _init() -> void:
@@ -103,27 +127,37 @@ func _build() -> void:
 	pm.subdivide_width = 48
 	pm.subdivide_depth = 48
 	top.mesh = pm
-	var gm := ShaderMaterial.new()
-	gm.shader = preload("res://game/camp/camp_ground.gdshader")
-	gm.set_shader_parameter("clear_center", Vector2(FIRE_POS.x, FIRE_POS.z - 0.9))
-	gm.set_shader_parameter("clear_radius", Vector2(5.8, 4.5))
-	gm.set_shader_parameter("island_half", ISLAND_HALF - 0.15)
-	top.material_override = gm
+	_ground_mat = ShaderMaterial.new()
+	_ground_mat.shader = preload("res://game/camp/camp_ground.gdshader")
+	_ground_mat.set_shader_parameter("clear_center", Vector2(FIRE_POS.x, FIRE_POS.z - 0.9))
+	_ground_mat.set_shader_parameter("clear_radius", CLEARING[3])
+	_ground_mat.set_shader_parameter("island_half", ISLAND_HALF - 0.15)
+	top.material_override = _ground_mat
 	top.position.y = 0.004
 	top.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(top)
 	add_child(Biome._cloud_sea(LOOK))
 	_ground()
 	_backdrop()
-	_campfire()
+	_fire = Node3D.new()
+	_fire.name = "Fire"
+	add_child(_fire)
+	_camp_furniture()
 	_pet_holder = Node3D.new()
 	_pet_holder.name = "Pet"
 	add_child(_pet_holder)
 	for id in CampInfo.STATION_IDS:
-		var s := _station(String(id))
+		var s := Node3D.new()
 		s.name = "Station_" + String(id)
+		s.scale = Vector3.ONE * STATION_SCALE
 		add_child(s)
 		stations[id] = s
+	_npcs = Node3D.new()
+	_npcs.name = "Campers"
+	add_child(_npcs)
+	_pets = Node3D.new()
+	_pets.name = "Pets"
+	add_child(_pets)
 	_deco = Node3D.new()
 	_deco.name = "Decorations"
 	add_child(_deco)
@@ -140,15 +174,25 @@ func _build() -> void:
 
 # ------------------------------------------------------------------ public API
 
-## Applies a profile: hero = loadout class, pet = loadout pet, station locks, trophies.
+## Shows the camp for a profile.
 func apply_profile(p: Profile) -> void:
+	apply_state(CampState.of(p))
+
+
+## Rebuilds everything that depends on the profile from a CampState.
+func apply_state(s: Dictionary) -> void:
 	_build()
-	set_hero(String(p.loadout.get("class", "knight")))
-	set_pet(String(p.loadout.get("pet", "")))
+	state = s
+	set_hero(String(s.hero))
+	set_pet(String(s.pet))
 	for id in CampInfo.STATION_IDS:
-		set_locked(String(id), bool(CampInfo.station_state(p, String(id)).locked))
-	_show_gear(p)
-	_decorate(p)
+		_set_station(String(id), s.stations[id])
+	_set_fire(int(s.fire))
+	_set_clearing(int(s.stage))
+	_build_campers(s)
+	_build_pets(s)
+	_build_decor(s)
+	_build_paths()
 
 
 func set_hero(class_id: String) -> void:
@@ -157,13 +201,13 @@ func set_hero(class_id: String) -> void:
 	hero_class = class_id
 	if hero:
 		hero.queue_free()
-	var model := String(HeroDefs.DATA.get(class_id, HeroDefs.DATA.knight).model)
-	hero = Character.create(model)
+	hero = _class_npc(class_id, "Sit_Chair_Idle")
 	hero.name = "Hero"
 	hero.scale = Vector3.ONE * HERO_SCALE
 	add_child(hero)
 	_place_hero()
-	hero.play("Sit_Chair_Idle")
+	if state.has("classes"):
+		_build_campers(state)
 
 
 ## Equips the pet familiar shown next to the hero ("" = none).
@@ -177,37 +221,23 @@ func set_pet(id: String) -> void:
 		_pet_model = null
 	if id == "" or not PetDefs.has(id):
 		return
-	var m: Node3D = null
-	if pet_factory.is_valid():
-		m = pet_factory.call(id)
-	if m == null:
-		m = _pet_placeholder(id)
-	_pet_model = m
-	_pet_holder.add_child(m)
+	_pet_model = CampProps.pet(id)
+	_pet_holder.add_child(_pet_model)
 
 
+## Legacy lock toggle (the state decides now); kept for callers that only know "locked".
 func set_locked(id: String, on: bool) -> void:
-	if locked.get(id, null) == on:
-		return
 	locked[id] = on
-	var s: Node3D = stations.get(id)
-	if s == null:
-		return
-	var body: Node3D = s.get_node("Body")
-	var cover: Node3D = s.get_node_or_null("Cover")
-	if cover:
-		cover.visible = on
-	for l in s.find_children("*", "Light3D", true, false):
-		(l as Light3D).visible = not on
-	for pp in s.find_children("*", "GPUParticles3D", true, false):
-		(pp as GPUParticles3D).emitting = not on
-	body.visible = not on
 
 
 ## World point the UI hangs a station's label on.
 func station_anchor(id: String) -> Vector3:
 	var s: Node3D = stations.get(id)
-	return s.global_position + Vector3.UP * (2.4 if id != "arcade" else 2.7) * STATION_SCALE if s else Vector3.ZERO
+	var h := 2.7 if id != "arcade" else 2.9
+	var st: Dictionary = (state.get("stations", {}) as Dictionary).get(id, {})
+	if String(st.get("state", "built")) == "ruined":
+		h = 1.7
+	return s.global_position + Vector3.UP * h * STATION_SCALE if s else Vector3.ZERO
 
 
 ## Station under a screen point (3D picking against each station's footprint), or "".
@@ -243,11 +273,432 @@ func bump(id: String) -> void:
 func set_safe_rects(portrait_rect: Rect2, landscape_rect: Rect2) -> void:
 	rig.safe_rect_portrait = portrait_rect
 	rig.safe_rect_landscape = landscape_rect
-	_frame(true)
+	if not revealing:
+		_frame(true)
 
 
 func camera() -> Camera3D:
 	return rig.camera
+
+
+# ------------------------------------------------------------------ build-out reveal
+
+## Plays the build-out moments between two CampStates (CampState.diff): for each change the
+## camera pans to the spot, dust and sparkles burst, the new part pops in (a rebuilt station,
+## a class walking in, a pet, a trophy) and `overlay` announces it. `speed` scales every beat
+## (2x / 4x); skip_reveal() jumps to the final state. Returns when done.
+func reveal(before: Dictionary, after: Dictionary, overlay: Node = null, speed := 1.0) -> void:
+	var items := CampState.diff(before, after)
+	if items.is_empty():
+		apply_state(after)
+		return
+	revealing = true
+	_skip = false
+	apply_state(before)
+	speed = maxf(speed, 0.25)
+	await _wait(0.5 / speed)
+	var cur := before.duplicate(true)
+	for it in items:
+		if _skip or not is_inside_tree():
+			break
+		var kind := String(it.kind)
+		var id := String(it.id)
+		var at := _reveal_spot(kind, id)
+		_focus_on(at, 2.2 if kind == "station" else 1.6)
+		await _wait(0.7 / speed)
+		if _skip:
+			break
+		CampProps.burst(self, at, Color(1.0, 0.85, 0.5), 1.4 if kind == "station" else 0.9)
+		UiTheme.sfx("fanfare" if kind in ["station", "class"] else "buff")
+		match kind:
+			"station":
+				cur.stations[id] = after.stations[id]
+				_set_station(id, after.stations[id], true)
+			"class":
+				(cur.classes as Array).append(id)
+				_build_campers(cur, id)
+			"pet":
+				(cur.pets as Array).append(id)
+				_build_pets(cur, id)
+			"boss":
+				(cur.bosses as Array).append(id)
+				_build_decor(cur, true)
+			"stage":
+				cur.stage = after.stage
+				cur.fire = after.fire
+				_set_fire(int(after.fire), true)
+				_set_clearing(int(after.stage), true)
+		if overlay and overlay.has_method("announce"):
+			overlay.announce(String(it.text).to_upper(), "", UiPalette.GOLD_BRIGHT, 1.0 / speed)
+		await _wait(1.5 / speed)
+	apply_state(after)
+	revealing = false
+	_frame(false)
+	reveal_finished.emit()
+
+
+## Ends a running reveal at its final state.
+func skip_reveal() -> void:
+	_skip = true
+
+
+func _reveal_spot(kind: String, id: String) -> Vector3:
+	match kind:
+		"station":
+			return (stations[id] as Node3D).position
+		"class":
+			var others := _others(state)
+			var k := maxi(0, others.find(id))
+			return FIRE_POS + (SLOTS[k % SLOTS.size()][0] as Vector3)
+		"pet":
+			return FIRE_POS + (PET_HOMES[maxi(0, (state.pets as Array).find(id)) % PET_HOMES.size()] as Vector3)
+		"boss":
+			return FIRE_POS + Vector3(0, 0, -3.9)
+	return FIRE_POS
+
+
+func _focus_on(p: Vector3, r: float) -> void:
+	var pts := PackedVector3Array()
+	for x in [-r, r]:
+		for z in [-r * 0.8, r * 0.8]:
+			pts.append(p + Vector3(x, 0, z))
+	pts.append(p + Vector3.UP * r * 1.4)
+	rig.smooth_time = 0.5
+	rig.frame_points(pts, 0.0, 38.0 if portrait else 32.0, false)
+
+
+func _wait(t: float) -> void:
+	if t <= 0.0 or not is_inside_tree():
+		return
+	var left := t
+	while left > 0.0 and not _skip and is_inside_tree():
+		await get_tree().process_frame
+		left -= get_process_delta_time()
+
+
+# ------------------------------------------------------------------ stations
+
+func _set_station(id: String, st: Dictionary, animate := false) -> void:
+	var s: Node3D = stations.get(id)
+	if s == null:
+		return
+	var old := s.get_node_or_null("Body")
+	if old:
+		old.name = "Old"
+		old.queue_free()
+	var body := CampStations.build(id, st)
+	s.add_child(body)
+	if animate:
+		body.scale = Vector3(0.2, 0.05, 0.2)
+		var t := body.create_tween()
+		t.tween_property(body, "scale", Vector3(1.1, 1.15, 1.1), 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		t.tween_property(body, "scale", Vector3.ONE, 0.25).set_trans(Tween.TRANS_SINE)
+
+
+# ------------------------------------------------------------------ campers (classes)
+
+## Unlocked classes other than the hero, in content order.
+func _others(s: Dictionary) -> Array:
+	var out: Array = []
+	for id in s.get("classes", []):
+		if String(id) != String(s.get("hero", hero_class)):
+			out.append(String(id))
+	return out
+
+
+## A class character in its default look: Character.MODELS by the class's model id, else an
+## Adventurers EXTRA GLB of that name, else the mannequin (new classes need no code here).
+func _class_npc(class_id: String, anim: String) -> Character:
+	var model := String((HeroDefs.DATA.get(class_id, {}) as Dictionary).get("model", class_id))
+	var ch := CampProps.npc(model, {}, "idle")
+	if ch.has_anim(anim):
+		ch.play(anim, 0.0)
+	return ch
+
+
+func _build_campers(s: Dictionary, arriving := "") -> void:
+	if _npcs == null:
+		return
+	UiTheme.clear(_npcs)
+	var others := _others(s)
+	for k in others.size():
+		var slot: Array = SLOTS[k % SLOTS.size()]
+		var id := String(others[k])
+		var pos := FIRE_POS + (slot[0] as Vector3) + Vector3(0, 0, 0.9 * float(k / SLOTS.size()))
+		var clip := String(slot[2])
+		var ch := _class_npc(id, "idle" if clip == "spar" else clip)
+		ch.name = "Camper_" + id
+		ch.scale = Vector3.ONE * HERO_SCALE
+		ch.position = pos
+		ch.rotation.y = deg_to_rad(float(slot[1]))
+		_npcs.add_child(ch)
+		match String(slot[3]):
+			"log":
+				Props.put(_npcs, RES + "Wood_Log_B.gltf", pos + Vector3(0.05, 0, 0), float(slot[1]) + 90.0, 0.95)
+			"dummy":
+				_dummy(_npcs, pos + Vector3(1.1, 0, -0.6))
+				CampProps.loop_clip(ch, "attack", 1.9)
+			"book":
+				CampProps.opt(_npcs, CampProps.ADX + "assets/spellbook_open.gltf", pos + Vector3(0.35, 0.02, -0.3), float(slot[1]), 0.5)
+		if id == arriving:
+			# walks in from the edge of the clearing
+			var from := pos + (pos - FIRE_POS).normalized() * 4.0
+			ch.position = from
+			ch.look_at_from_position(from, pos, Vector3.UP)
+			ch.rotate_y(PI)
+			ch.play("walk")
+			var t := ch.create_tween()
+			t.tween_property(ch, "position", pos, 1.2)
+			t.tween_callback(func() -> void:
+				ch.rotation.y = deg_to_rad(float(slot[1]))
+				ch.play("idle" if clip == "spar" else clip))
+
+
+## A training dummy: a post, a cross-bar and a sack head.
+func _dummy(parent: Node3D, pos: Vector3) -> void:
+	CampProps.post(parent, pos, 1.3, Color(0.45, 0.3, 0.2))
+	CampProps.box(parent, Vector3(0.8, 0.1, 0.1), pos + Vector3(0, 1.0, 0), Color(0.45, 0.3, 0.2))
+	var head := MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = 0.2
+	sm.height = 0.4
+	head.mesh = BiomeBlocks.faceted(sm, Color(0.8, 0.7, 0.5), 0.02, 3)
+	head.position = pos + Vector3(0, 1.4, 0)
+	parent.add_child(head)
+	CampProps.opt(parent, Props.WPN + "shield_A.gltf", pos + Vector3(0, 0.8, 0.12), 0.0, 0.5)
+
+
+# ------------------------------------------------------------------ pets
+
+func _build_pets(s: Dictionary, arriving := "") -> void:
+	if _pets == null:
+		return
+	UiTheme.clear(_pets)
+	var k := 0
+	for id in s.get("pets", []):
+		if String(id) == String(s.get("pet", "")):
+			continue
+		var home: Vector3 = FIRE_POS + (PET_HOMES[k % PET_HOMES.size()] as Vector3)
+		k += 1
+		var holder := Node3D.new()
+		holder.name = "Roam_" + String(id)
+		holder.position = home
+		_pets.add_child(holder)
+		var m := CampProps.pet(String(id))
+		m.scale = Vector3.ONE * 0.85
+		holder.add_child(m)
+		# wander between three nearby spots, hopping
+		var t := holder.create_tween().set_loops()
+		var pts := [home, home + Vector3(0.9, 0, 0.4), home + Vector3(0.3, 0, -0.8)]
+		for j in pts.size():
+			var nxt: Vector3 = pts[(j + 1) % pts.size()]
+			t.tween_property(holder, "position", nxt, 2.4 + 0.3 * float(k % 3)).set_trans(Tween.TRANS_SINE)
+			t.tween_interval(1.2 + 0.4 * float(j))
+		var hop := m.create_tween().set_loops()
+		hop.tween_property(m, "position:y", 0.25, 0.3).set_trans(Tween.TRANS_SINE)
+		hop.tween_property(m, "position:y", 0.0, 0.3).set_trans(Tween.TRANS_SINE)
+		hop.tween_interval(0.4 + 0.2 * float(k % 3))
+		if String(id) == arriving:
+			m.scale = Vector3.ONE * 0.05
+			var pop := m.create_tween()
+			pop.tween_property(m, "scale", Vector3.ONE * 1.0, 0.4).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			pop.tween_property(m, "scale", Vector3.ONE * 0.85, 0.2)
+
+
+# ------------------------------------------------------------------ decorations
+
+## Trophies, souvenirs, banners, tents, lanterns and fences from the CampState.
+func _build_decor(s: Dictionary, animate := false) -> void:
+	if _deco == null:
+		return
+	UiTheme.clear(_deco)
+	var H := Props.HAL
+	var D := Props.DUN
+	# boss trophies (skull posts) and mini-boss skulls along the back of the clearing
+	var bosses: Array = s.get("bosses", [])
+	for i in bosses.size():
+		var t := Props.put(_deco, H + "post_skull.gltf", FIRE_POS + Vector3(-1.6 + i * 1.05, 0, -3.95), 90.0, 0.62)
+		if animate and i == bosses.size() - 1:
+			t.scale = Vector3.ONE * 0.05
+			t.create_tween().tween_property(t, "scale", Vector3.ONE * 0.62, 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	var minis: Array = s.get("minibosses", [])
+	for i in minis.size():
+		var at := FIRE_POS + Vector3(-2.4 - 0.75 * float(i % 3), 0, -3.7 - 0.6 * float(i / 3))
+		Props.put(_deco, H + "post_skull.gltf", at, 70.0 + 15.0 * i, 0.42)
+	# biome souvenirs on a little shelf by the fire
+	var biomes: Array = s.get("biomes", [])
+	if not biomes.is_empty():
+		var shelf := FIRE_POS + Vector3(-3.2, 0, 1.9)
+		CampProps.box(_deco, Vector3(1.9, 0.1, 0.5), shelf + Vector3(0, 0.45, 0), Color(0.5, 0.34, 0.22), Vector3(0, 25, 0))
+		for x in [-0.8, 0.8]:
+			CampProps.box(_deco, Vector3(0.1, 0.45, 0.1), shelf + Vector3(x * 0.9, 0.22, x * 0.42), Color(0.4, 0.26, 0.16))
+		for i in biomes.size():
+			_souvenir(String(biomes[i]), shelf + Vector3(-0.72 + 0.29 * i, 0.5, 0.34 - 0.13 * i))
+	# a golden chest after the first win
+	if int(s.get("wins", 0)) > 0:
+		Props.put(_deco, D + "chest_gold.gltf", FIRE_POS + (Vector3(3.2, 0, 2.5) if not portrait else Vector3(2.8, 0, 2.8)), -35.0, 0.7)
+	# a tent per class along the back: open and lit once the class is unlocked, closed before
+	var all_classes: Array = (s.get("classes", []) as Array) + (s.get("locked_classes", []) as Array)
+	var ordered: Array = []
+	for id in HeroDefs.IDS:
+		if all_classes.has(id):
+			ordered.append(String(id))
+	var n := ordered.size()
+	var span := minf(14.0, 3.2 * float(n))
+	for i in n:
+		var id := String(ordered[i])
+		var x := -span * 0.5 + span * (float(i) + 0.5) / float(n)
+		var open: bool = (s.get("classes", []) as Array).has(id)
+		var won: bool = (s.get("class_wins", []) as Array).has(id)
+		_tent(_deco, Vector3(x, 0, -10.6 - 0.4 * float(i % 2)), 180.0 + (x * -2.0), _class_color(id), open, won)
+	# lantern posts and string lights with the runs played
+	var posts := [Vector3(-5.0, 0, -2.4), Vector3(5.0, 0, -2.4), Vector3(0.0, 0, -8.6), Vector3(-6.4, 0, 4.2)]
+	var lit := int(s.get("lanterns", 0))
+	for i in mini(lit, posts.size()):
+		var p: Vector3 = posts[i]
+		Props.put(_deco, H + "post_lantern.gltf", p, 90.0 if p.x <= 0 else -90.0, 0.95)
+		Biome.flicker_light(_deco, p + Vector3(0, 2.7, 0), Color(1.0, 0.72, 0.42), 1.5, 5.0)
+	if lit >= 3:
+		_string_lights(_deco, posts[0] + Vector3(0, 3.0, 0), posts[2] + Vector3(0, 3.2, 0), 10, Color(1.0, 0.8, 0.45))
+		_string_lights(_deco, posts[1] + Vector3(0, 3.0, 0), posts[2] + Vector3(0, 3.2, 0), 10, Color(1.0, 0.65, 0.4))
+	# fences along the front edge with the Crowns spent
+	var fences := int(s.get("fences", 0))
+	for i in fences * 4:
+		var side := -1.0 if i % 2 == 0 else 1.0
+		var k := i / 2
+		Props.put(_deco, H + "fence.gltf", Vector3(side * (8.2 + 2.0 * k), 0, 9.6 - 0.8 * k), side * 12.0, 0.8)
+	# ascension banners on poles at the back left
+	var asc := int(s.get("asc", 0))
+	var colors := ["red", "blue", "green", "yellow", "white"]
+	for i in mini(asc, 10):
+		var at := Vector3(-9.5 + 0.9 * float(i % 5), 0, -7.8 - 0.9 * float(i / 5))
+		CampProps.post(_deco, at, 2.6, Color(0.4, 0.28, 0.18), 0.1)
+		Props.put(_deco, D + "banner_thin_%s.gltf" % colors[i % colors.size()], at + Vector3(0, 1.0, 0.1), 0.0, 0.4)
+	# early camps are overgrown: bushes and rocks crowd the clearing until the camp grows
+	var stage := int(s.get("stage", 0))
+	var growth := [[Vector3(-4.6, 0, 3.6), "Bush_1_D"], [Vector3(4.8, 0, 3.4), "Bush_2_D"], [Vector3(-2.2, 0, -3.4), "Bush_4_C"],
+		[Vector3(2.4, 0, -3.1), "Rock_3_B"], [Vector3(-5.2, 0, -1.2), "Rock_1_C"], [Vector3(5.4, 0, -0.8), "Bush_1_C"],
+		[Vector3(0.9, 0, 4.8), "Bush_2_C"]]
+	for i in growth.size():
+		if i < (3 - stage) * 3:
+			var g: Array = growth[i]
+			CampProps.forest(_deco, String(g[1]), [1, 2, 4][i % 3], FIRE_POS + (g[0] as Vector3), 40.0 * i, 1.2)
+
+
+func _souvenir(biome: String, at: Vector3) -> void:
+	var H := Props.HAL
+	match biome:
+		"glade":
+			CampProps.forest(_deco, "Bush_1_B", 1, at, 0.0, 0.35)
+		"crypt":
+			Props.put(_deco, H + "gravestone.gltf", at, 0.0, 0.18)
+		"hollow":
+			Props.put(_deco, H + "pumpkin_orange_small.gltf", at, 0.0, 0.3)
+		"frost":
+			BiomeBlocks.crystal_cluster(_deco, at, 0.12, 3, 5)
+		"throne":
+			Props.put(_deco, H + "skull_candle.gltf", at, 0.0, 0.3)
+		"magma":
+			var r := MeshInstance3D.new()
+			var sm := SphereMesh.new()
+			sm.radius = 0.1
+			sm.height = 0.16
+			r.mesh = sm
+			r.material_override = Props.glow_material(Color(1.0, 0.4, 0.1), false, 2.0)
+			r.position = at + Vector3.UP * 0.06
+			_deco.add_child(r)
+
+
+static func _class_color(id: String) -> Color:
+	var cols := {"knight": Color(0.48, 0.6, 0.86), "barbarian": Color(0.86, 0.46, 0.36), "mage": Color(0.62, 0.48, 0.86),
+		"rogue": Color(0.45, 0.72, 0.5)}
+	if cols.has(id):
+		return cols[id]
+	return Color.from_hsv(float(hash(id) % 360) / 360.0, 0.45, 0.8)
+
+
+# ------------------------------------------------------------------ fire & clearing
+
+func _set_fire(level: int, animate := false) -> void:
+	if level == _fire_level:
+		return
+	_fire_level = level
+	UiTheme.clear(_fire)
+	var k := 1.5 + 0.3 * level
+	var fire := TileStyle.make_prop("campfire")
+	fire.name = "Campfire"
+	fire.position = FIRE_POS
+	fire.scale = Vector3.ONE * k
+	_fire.add_child(fire)
+	for l in fire.find_children("*", "OmniLight3D", true, false):
+		(l as OmniLight3D).visible = false
+	_fire_light = OmniLight3D.new()
+	_fire_light.name = "FireLight"
+	_fire_light.light_color = Color(1.0, 0.56, 0.24)
+	_fire_light.light_energy = 3.2
+	_fire_light.omni_range = 8.0 + 1.4 * level
+	_fire_light.omni_attenuation = 1.3
+	_fire_light.shadow_enabled = true
+	_fire_light.position = FIRE_POS + Vector3(0, 1.3, 0)
+	_fire.add_child(_fire_light)
+	Biome.flame(_fire, FIRE_POS + Vector3(0, 0.25 * k, 0), Color(1.0, 0.45, 0.12), 0.4 * k, 12 + 3 * level)
+	var e := GPUParticles3D.new()
+	e.name = "Embers"
+	e.amount = 14 + 6 * level
+	e.lifetime = 3.2
+	e.preprocess = 3.0
+	e.position = FIRE_POS + Vector3(0, 0.3 * k, 0)
+	var pm := ParticleProcessMaterial.new()
+	pm.direction = Vector3.UP
+	pm.spread = 18.0
+	pm.initial_velocity_min = 0.8
+	pm.initial_velocity_max = 1.6
+	pm.gravity = Vector3(0.08, 0.15, 0.0)
+	pm.turbulence_enabled = true
+	pm.turbulence_noise_strength = 0.8
+	pm.turbulence_noise_scale = 1.6
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	pm.emission_sphere_radius = 0.15 * k
+	pm.scale_min = 0.5
+	pm.scale_max = 1.1
+	var grad := Gradient.new()
+	grad.offsets = PackedFloat32Array([0.0, 0.2, 0.7, 1.0])
+	grad.colors = PackedColorArray([Color(1.0, 0.9, 0.5, 0.0), Color(1.0, 0.75, 0.3, 1.0), Color(1.0, 0.35, 0.08, 0.9), Color(0.6, 0.1, 0.05, 0.0)])
+	var gt := GradientTexture1D.new()
+	gt.gradient = grad
+	pm.color_ramp = gt
+	e.process_material = pm
+	var q := QuadMesh.new()
+	q.size = Vector2(0.09, 0.09)
+	q.material = Props.particle_material("hard")
+	e.draw_pass_1 = q
+	e.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	e.visibility_aabb = AABB(Vector3(-3, -1, -3), Vector3(6, 8, 6))
+	_fire.add_child(e)
+	BiomeBlocks.smoke(_fire, FIRE_POS + Vector3(0, 0.6 * k, 0), 0.35 * k, Color(0.16, 0.14, 0.2, 0.35))
+	if animate:
+		fire.scale = Vector3.ONE * (k - 0.3)
+		fire.create_tween().tween_property(fire, "scale", Vector3.ONE * k, 0.6).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+func _set_clearing(stage: int, animate := false) -> void:
+	var r: Vector2 = CLEARING[clampi(stage, 0, CLEARING.size() - 1)]
+	if animate:
+		var from: Vector2 = _ground_mat.get_shader_parameter("clear_radius")
+		var t := create_tween()
+		t.tween_method(func(v: Vector2) -> void: _ground_mat.set_shader_parameter("clear_radius", v), from, r, 0.8)
+	else:
+		_ground_mat.set_shader_parameter("clear_radius", r)
+
+
+## Logs, a woodpile and the kettle corner around the fire (the hero's log is always there).
+func _camp_furniture() -> void:
+	Props.put(self, RES + "Wood_Log_B.gltf", _hero_spot() + Vector3(0.05, 0, 0), 62.0, 0.95)
+	Props.put(self, RES + "Wood_Log_Stack.gltf", FIRE_POS + Vector3(-3.3, 0, -1.6), -30.0, 0.8)
+	Props.put(self, Props.DUN + "barrel_small.gltf", FIRE_POS + Vector3(3.2, 0, -0.9), 20.0, 0.9)
+	Props.put(self, Props.TOOLS + "bucket_metal.gltf", FIRE_POS + Vector3(2.7, 0, 1.6), 0.0, 1.1)
+	CampProps.opt(self, CampProps.MM + "werewolf/log_split.gltf", FIRE_POS + Vector3(-2.4, 0, -2.6), 30.0, 0.9)
+	CampProps.opt(self, CampProps.MM + "werewolf/axe.gltf", FIRE_POS + Vector3(-2.4, 0.35, -2.6), 30.0, 0.9)
 
 
 # ------------------------------------------------------------------ layout
@@ -266,13 +717,15 @@ func _on_resize() -> void:
 			if p and id in ["armory", "arcade"]:
 				yaw = 32.0 if id == "armory" else -32.0
 			s.rotation.y = deg_to_rad(yaw)
-		_place_deco_spots()
+		if not state.is_empty():
+			_build_decor(state)
 		_build_paths()
 		layout_changed.emit()
-	_frame(true)
+	if not revealing:
+		_frame(true)
 
 
-## Stepping stones from the clearing to each station of the current layout.
+## Stepping stones from the clearing to each station that stands (not ruined).
 func _build_paths() -> void:
 	if _paths == null:
 		return
@@ -280,28 +733,32 @@ func _build_paths() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 99 if portrait else 98
 	var from := FIRE_POS + Vector3(0, 0, -0.9)
+	var r0: Vector2 = CLEARING[clampi(int(state.get("stage", 3)), 0, 3)]
 	for id in stations:
+		var st: Dictionary = (state.get("stations", {}) as Dictionary).get(id, {})
+		if String(st.get("state", "built")) == "ruined":
+			continue
 		var to: Vector3 = (stations[id] as Node3D).position
 		var dir := (to - from).normalized()
 		var dist := from.distance_to(to)
 		var k := 0
-		var t := 3.2
+		var t := r0.y * 0.75
 		while t < dist - 1.9:
 			var p := from + dir * t
-			var st := MeshInstance3D.new()
+			var st_m := MeshInstance3D.new()
 			var sc := CylinderMesh.new()
 			sc.top_radius = 0.32
 			sc.bottom_radius = 0.38
 			sc.height = 0.1
 			sc.radial_segments = 7
 			sc.rings = 1
-			st.mesh = sc
-			st.material_override = _stone_mat
+			st_m.mesh = sc
+			st_m.material_override = _stone_mat
 			var side := Vector3(-dir.z, 0, dir.x) * (0.22 if k % 2 == 0 else -0.22)
-			st.position = p + side + Vector3(0, 0.03, 0)
-			st.rotation.y = rng.randf() * TAU
-			st.scale = Vector3(1.0 + 0.25 * float(k % 3), 1.0, 0.85)
-			_paths.add_child(st)
+			st_m.position = p + side + Vector3(0, 0.03, 0)
+			st_m.rotation.y = rng.randf() * TAU
+			st_m.scale = Vector3(1.0 + 0.25 * float(k % 3), 1.0, 0.85)
+			_paths.add_child(st_m)
 			t += 0.95
 			k += 1
 
@@ -311,13 +768,13 @@ func _frame(instant := false) -> void:
 		return
 	var pts := PackedVector3Array()
 	for id in stations:
-		var s: Node3D = stations[id]
 		var base: Vector3 = LAYOUT["portrait" if portrait else "landscape"][id]
 		var side := 2.7 if id in ["armory", "arcade"] else 0.0
 		pts.append(base + Vector3(-side if base.x < 0 else side, 0, 1.4))
 		pts.append(base + Vector3.UP * 3.6)
 	pts.append(FIRE_POS + Vector3(0, 0, 2.2))
 	pts.append(_hero_spot() + Vector3(-0.4, 0, 1.4))
+	rig.smooth_time = 0.55
 	rig.frame_points(pts, 0.0, 48.0 if portrait else 36.0, instant)
 
 
@@ -339,7 +796,7 @@ func _process(dt: float) -> void:
 	if _pet_model:
 		_pet_model.position.y = 0.35 + sin(_t * 2.4) * 0.12
 		_pet_model.rotation.y = sin(_t * 0.9) * 0.5 + 0.5
-	if _fire_light:
+	if _fire_light and is_instance_valid(_fire_light):
 		_fire_light.light_energy = 3.2 + sin(_t * 11.0) * 0.25 + sin(_t * 6.3 + 1.0) * 0.35 + sin(_t * 17.0) * 0.12
 
 
@@ -544,27 +1001,22 @@ func _backdrop() -> void:
 		Vector3(6.2, 0, 9.6), Vector3(0.0, 0, -9.0)]
 	for i in rocks.size():
 		_forest(d, "Rock_%d_%s" % [[1, 3, 5][i % 3], ["A", "B", "C"][i % 3]], 1, rocks[i], _rng.randf() * 360.0, _rng.randf_range(1.2, 1.8))
-	# two tents at the back, a woodpile and a cart of supplies
-	_tent(d, Vector3(-6.2, 0, -9.4), 20.0, Color(0.86, 0.6, 0.36))
-	_tent(d, Vector3(6.4, 0, -9.6), -18.0, Color(0.48, 0.6, 0.86))
+	# a woodpile and a cart of supplies
 	Props.put(d, RES + "Wood_Log_Stack.gltf", Vector3(-10.2, 0, -5.8), 70.0, 1.1)
 	Props.put(d, RES + "Wood_Log_A.gltf", Vector3(-9.1, 0, -4.6), 10.0, 1.0)
 	Props.put(d, RES + "Textiles_Stack_Large_Colored.gltf", Vector3(10.4, 0, -5.4), -30.0, 1.0)
 	Props.put(d, Props.DUN + "crates_stacked.gltf", Vector3(11.2, 0, -3.4), -60.0, 0.8)
-	# lantern posts around the clearing, string lights between them
-	var posts := [Vector3(-5.0, 0, -2.4), Vector3(5.0, 0, -2.4), Vector3(0.0, 0, -8.6)]
-	for p in posts:
-		Props.put(d, H + "post_lantern.gltf", p, 90.0 if p.x < 0 else -90.0, 0.95)
-		Biome.flicker_light(d, p + Vector3(0, 2.7, 0), Color(1.0, 0.72, 0.42), 1.5, 5.0)
-	_string_lights(d, posts[0] + Vector3(0, 3.0, 0), posts[2] + Vector3(0, 3.2, 0), 10, Color(1.0, 0.8, 0.45))
-	_string_lights(d, posts[1] + Vector3(0, 3.0, 0), posts[2] + Vector3(0, 3.2, 0), 10, Color(1.0, 0.65, 0.4))
 	# flowers near the front edge
 	BiomeBlocks._rng.seed = 77
 	BiomeBlocks.flower_patch(d, Vector3(-8.5, 0, 9.4), 1.8, 22)
 	BiomeBlocks.flower_patch(d, Vector3(8.8, 0, 9.0), 1.6, 18)
 	BiomeBlocks.flower_patch(d, Vector3(-11.8, 0, -1.6), 1.2, 10)
 
-func _tent(parent: Node3D, pos: Vector3, yaw: float, color: Color) -> void:
+## A class tent: open with a warm glow (and a banner once the class has won), or closed and dark
+## while the class is locked.
+func _tent(parent: Node3D, pos: Vector3, yaw: float, color: Color, open := true, won := false) -> void:
+	if not open:
+		color = color.darkened(0.55).lerp(Color(0.3, 0.3, 0.36), 0.5)
 	var n := Node3D.new()
 	n.name = "Tent"
 	n.position = pos
@@ -606,7 +1058,27 @@ func _tent(parent: Node3D, pos: Vector3, yaw: float, color: Color) -> void:
 	l.light_energy = 1.2
 	l.omni_range = 2.4
 	l.position = Vector3(0, 0.5, 0.2)
+	l.visible = open
 	n.add_child(l)
+	if not open:
+		# a closed flap over the opening
+		var flap := MeshInstance3D.new()
+		var fst := SurfaceTool.new()
+		fst.begin(Mesh.PRIMITIVE_TRIANGLES)
+		fst.set_color(color.darkened(0.15))
+		for v in [Vector3(-w * 0.72, 0, depth * 0.5), Vector3(w * 0.72, 0, depth * 0.5), Vector3(0, h * 0.74, depth * 0.5)]:
+			fst.set_normal(Vector3.BACK)
+			fst.add_vertex(v)
+		var fm := fst.commit()
+		var fmat := StandardMaterial3D.new()
+		fmat.vertex_color_use_as_albedo = true
+		fmat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		fm.surface_set_material(0, fmat)
+		flap.mesh = fm
+		n.add_child(flap)
+	if won:
+		CampProps.post(n, Vector3(w + 0.3, 0, depth * 0.3), 2.3, Color(0.42, 0.3, 0.2), 0.08)
+		Props.put(n, Props.DUN + "banner_thin_yellow.gltf", Vector3(w + 0.3, 0.9, depth * 0.3 + 0.08), 0.0, 0.38)
 	# ridge pole
 	var pole := MeshInstance3D.new()
 	var cm := CylinderMesh.new()
@@ -649,587 +1121,4 @@ func _string_lights(parent: Node3D, a: Vector3, b: Vector3, n: int, color: Color
 	parent.add_child(mmi)
 
 
-# ------------------------------------------------------------------ campfire
 
-func _campfire() -> void:
-	var fire := TileStyle.make_prop("campfire")
-	fire.name = "Campfire"
-	fire.position = FIRE_POS
-	fire.scale = Vector3.ONE * 2.3
-	add_child(fire)
-	for l in fire.find_children("*", "OmniLight3D", true, false):
-		(l as OmniLight3D).visible = false
-	_fire_light = OmniLight3D.new()
-	_fire_light.name = "FireLight"
-	_fire_light.light_color = Color(1.0, 0.56, 0.24)
-	_fire_light.light_energy = 3.2
-	_fire_light.omni_range = 12.0
-	_fire_light.omni_attenuation = 1.3
-	_fire_light.shadow_enabled = true
-	_fire_light.position = FIRE_POS + Vector3(0, 1.3, 0)
-	add_child(_fire_light)
-	Biome.flame(self, FIRE_POS + Vector3(0, 0.55, 0), Color(1.0, 0.45, 0.12), 0.9, 18)
-	# embers rising into the night
-	var e := GPUParticles3D.new()
-	e.name = "Embers"
-	e.amount = 28
-	e.lifetime = 3.2
-	e.preprocess = 3.0
-	e.position = FIRE_POS + Vector3(0, 0.7, 0)
-	var pm := ParticleProcessMaterial.new()
-	pm.direction = Vector3.UP
-	pm.spread = 18.0
-	pm.initial_velocity_min = 0.8
-	pm.initial_velocity_max = 1.6
-	pm.gravity = Vector3(0.08, 0.15, 0.0)
-	pm.turbulence_enabled = true
-	pm.turbulence_noise_strength = 0.8
-	pm.turbulence_noise_scale = 1.6
-	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
-	pm.emission_sphere_radius = 0.35
-	pm.scale_min = 0.5
-	pm.scale_max = 1.1
-	var grad := Gradient.new()
-	grad.offsets = PackedFloat32Array([0.0, 0.2, 0.7, 1.0])
-	grad.colors = PackedColorArray([Color(1.0, 0.9, 0.5, 0.0), Color(1.0, 0.75, 0.3, 1.0), Color(1.0, 0.35, 0.08, 0.9), Color(0.6, 0.1, 0.05, 0.0)])
-	var gt := GradientTexture1D.new()
-	gt.gradient = grad
-	pm.color_ramp = gt
-	e.process_material = pm
-	var q := QuadMesh.new()
-	q.size = Vector2(0.09, 0.09)
-	q.material = Props.particle_material("hard")
-	e.draw_pass_1 = q
-	e.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	e.visibility_aabb = AABB(Vector3(-3, -1, -3), Vector3(6, 8, 6))
-	add_child(e)
-	BiomeBlocks.smoke(self, FIRE_POS + Vector3(0, 1.4, 0), 0.8, Color(0.16, 0.14, 0.2, 0.35))
-	# log seats around the fire
-	Props.put(self, RES + "Wood_Log_B.gltf", _hero_spot() + Vector3(0.05, 0, 0), 62.0, 0.95)
-	Props.put(self, RES + "Wood_Log_B.gltf", FIRE_POS + Vector3(2.2, 0, 0.6), -60.0, 0.95)
-	Props.put(self, RES + "Wood_Log_A.gltf", FIRE_POS + Vector3(0.2, 0, -2.3), 90.0, 0.9)
-	# a kettle and a few cosy bits
-	var D := Props.DUN
-	Props.put(self, D + "barrel_small.gltf", FIRE_POS + Vector3(3.2, 0, -0.9), 20.0, 0.9)
-	Props.put(self, RES + "Wood_Log_Stack.gltf", FIRE_POS + Vector3(-3.3, 0, -1.6), -30.0, 0.8)
-	Props.put(self, Props.TOOLS + "bucket_metal.gltf", FIRE_POS + Vector3(2.7, 0, 1.6), 0.0, 1.1)
-
-
-# ------------------------------------------------------------------ stations
-
-func _station(id: String) -> Node3D:
-	var root := Node3D.new()
-	root.scale = Vector3.ONE * STATION_SCALE
-	var body := Node3D.new()
-	body.name = "Body"
-	root.add_child(body)
-	match id:
-		"armory":
-			_armory(body)
-		"workshop":
-			_workshop(body)
-		"pet_den":
-			_pet_den(body)
-		"arcade":
-			_arcade(body)
-	var cover := _covered(id)
-	cover.name = "Cover"
-	cover.visible = false
-	root.add_child(cover)
-	return root
-
-
-## A locked station: a tarp-covered pile with rope and a wooden sign.
-func _covered(id: String) -> Node3D:
-	var n := Node3D.new()
-	var tarp := MeshInstance3D.new()
-	var sm := SphereMesh.new()
-	sm.radius = 1.0
-	sm.height = 1.2
-	sm.radial_segments = 9
-	sm.rings = 4
-	sm.is_hemisphere = true
-	var col := Color(0.42, 0.36, 0.3) if id == "armory" else Color(0.36, 0.34, 0.44)
-	tarp.mesh = BiomeBlocks.faceted(sm, col, 0.1, 3 + id.length(), col.darkened(0.3), Vector3(1.25, 1.1, 0.95))
-	n.add_child(tarp)
-	for p in [Vector3(-1.1, 0, 0.5), Vector3(1.15, 0, 0.45), Vector3(0.0, 0, 1.05)]:
-		var peg := MeshInstance3D.new()
-		var bx := BoxMesh.new()
-		bx.size = Vector3(0.08, 0.3, 0.08)
-		peg.mesh = bx
-		peg.material_override = Props.flat_material(Color(0.4, 0.28, 0.18))
-		peg.position = p + Vector3.UP * 0.12
-		n.add_child(peg)
-	Props.put(n, RES + "Pallet_Wood.gltf", Vector3(-0.3, 0.0, 1.35), 12.0, 0.9)
-	Props.put(n, RES + "Wood_Planks_Stack_Small.gltf", Vector3(-0.3, 0.3, 1.35), 100.0, 0.85)
-	Props.put(n, RES + "Wood_Log_B.gltf", Vector3(1.2, 0.0, 1.0), 60.0, 0.7)
-	n.scale = Vector3.ONE * 1.15
-	return n
-
-
-func _armory(b: Node3D) -> void:
-	var D := Props.DUN
-	var W := WX if ResourceLoader.exists(WX + "sword_F.gltf") else Props.WPN
-	_floor_planks(b, Vector2(3.4, 2.6), Color(0.46, 0.32, 0.22))
-	# the forge: a stone brazier with a fire, the anvil on a stump, a grindstone
-	var braz := MeshInstance3D.new()
-	var bc := CylinderMesh.new()
-	bc.top_radius = 0.42
-	bc.bottom_radius = 0.5
-	bc.height = 0.55
-	bc.radial_segments = 8
-	bc.rings = 1
-	braz.mesh = BiomeBlocks.faceted(bc, Color(0.42, 0.4, 0.44), 0.03, 21, Color(0.26, 0.24, 0.28))
-	braz.position = Vector3(1.25, 0.28, -0.55)
-	b.add_child(braz)
-	var coals := MeshInstance3D.new()
-	var cs := SphereMesh.new()
-	cs.radius = 0.36
-	cs.height = 0.2
-	coals.mesh = cs
-	coals.material_override = Props.glow_material(Color(1.0, 0.4, 0.1), false, 2.2)
-	coals.position = Vector3(1.25, 0.56, -0.55)
-	b.add_child(coals)
-	Biome.flame(b, Vector3(1.25, 0.7, -0.55), Color(1.0, 0.5, 0.15), 0.55, 12)
-	Biome.flicker_light(b, Vector3(1.25, 1.3, -0.35), Color(1.0, 0.55, 0.25), 2.0, 4.5)
-	var stump := MeshInstance3D.new()
-	var cm := CylinderMesh.new()
-	cm.top_radius = 0.3
-	cm.bottom_radius = 0.36
-	cm.height = 0.45
-	cm.radial_segments = 8
-	cm.rings = 1
-	stump.mesh = BiomeBlocks.faceted(cm, Color(0.46, 0.3, 0.2), 0.02, 4)
-	stump.position = Vector3(0.35, 0.22, 0.55)
-	b.add_child(stump)
-	Props.put(b, Props.TOOLS + "anvil.gltf", Vector3(0.35, 0.45, 0.55), 90.0, 0.85)
-	_opt(b, TX + "grindstone.gltf", Vector3(-1.35, 0, 0.8), 30.0, 0.5)
-	Props.put(b, Props.TOOLS + "tongs.gltf", Vector3(0.95, 0.02, 0.95), 70.0, 1.0)
-	# weapon rack along the back: two posts, two rails, weapons leaning in
-	var wood := Color(0.44, 0.29, 0.18)
-	for x in [-1.55, 0.35]:
-		_box(b, Vector3(0.12, 1.7, 0.12), Vector3(x, 0.85, -0.95), wood)
-	for y in [0.6, 1.45]:
-		_box(b, Vector3(2.05, 0.09, 0.1), Vector3(-0.6, y, -0.95), wood.lightened(0.08))
-	var ws := [["sword_F.gltf", -1.35], ["axe_D.gltf", -1.0], ["halberd.gltf", -0.68], ["sword_G.gltf", -0.36],
-		["spear_B.gltf", -0.08], ["hammer_D.gltf", 0.2]]
-	for w in ws:
-		var path := W + String(w[0])
-		if not ResourceLoader.exists(path):
-			path = Props.WPN + "sword_A.gltf"
-		var n := Props.put(b, path, Vector3(float(w[1]), 0.12, -0.85), 0.0, 0.85)
-		n.rotation_degrees = Vector3(-10.0, 90.0, 0.0)
-	# shields hung on the top rail
-	var sh := ["shield_B.gltf", "shield_C.gltf", "shield_D.gltf"]
-	for i in sh.size():
-		_opt(b, W + String(sh[i]), Vector3(-1.25 + 0.62 * i, 1.35, -0.84), 0.0, 0.62)
-	# a barrel of spare blades and a paladin statue guarding the forge
-	Props.put(b, D + "barrel_small.gltf", Vector3(-1.45, 0, -0.1), 30.0, 0.62)
-	for k in 2:
-		var n := Props.put(b, Props.WPN + "sword_A.gltf", Vector3(-1.52 + 0.14 * k, 1.05, -0.12), 0.0, 0.7)
-		n.rotation_degrees = Vector3(8.0 - 16.0 * k, 20.0, 180.0)
-	_opt(b, MM + "paladin/paladin_statue.gltf", Vector3(1.55, 0, 0.55), -35.0, 0.55)
-	# gear display: the profile's gear pieces on a little table (filled by _show_gear())
-	var table := Node3D.new()
-	table.name = "GearTable"
-	table.position = Vector3(-0.45, 0, 0.35)
-	b.add_child(table)
-	_box(table, Vector3(0.9, 0.08, 0.55), Vector3(0, 0.62, 0), Color(0.5, 0.34, 0.22))
-	for x in [-0.38, 0.38]:
-		_box(table, Vector3(0.08, 0.62, 0.08), Vector3(x, 0.31, 0), Color(0.4, 0.26, 0.16))
-	# the smith
-	var smith := _keeper("Barbarian_Large.glb", "large", {}, "idle")
-	if smith:
-		smith.position = Vector3(0.35, 0, -0.25)
-		smith.scale = Vector3.ONE * 0.5
-		smith.name = "Keeper"
-		b.add_child(smith)
-		_hammer_loop(smith)
-
-
-## A table of the owned gear: Helm (shield), Blade (sword), Boots (compass), Charm (gems).
-## Pieces at L8 glow gold.
-func _show_gear(p: Profile) -> void:
-	var s: Node3D = stations.get("armory")
-	if s == null:
-		return
-	var table: Node3D = s.get_node_or_null("Body/GearTable")
-	if table == null:
-		return
-	var old := table.get_node_or_null("Items")
-	if old:
-		old.free()
-	var items := Node3D.new()
-	items.name = "Items"
-	table.add_child(items)
-	var looks := {"helm": [ADX + "assets/shield_badge_color.gltf", Vector3(-0.3, 0.66, 0.0), Vector3(-70, 0, 0), 0.5],
-		"blade": [ADX + "assets/sword_2handed_color.gltf", Vector3(-0.05, 0.68, 0.05), Vector3(90, 0, 70), 0.42],
-		"boots": [Props.TOOLS + "compass_base.gltf", Vector3(0.18, 0.66, -0.1), Vector3.ZERO, 0.7],
-		"charm": [RX + "Gems_Pile_Small.gltf", Vector3(0.32, 0.66, 0.12), Vector3.ZERO, 0.45]}
-	for slot in GearDefs.SLOTS:
-		if not p.owns("gear", slot) or p.gear_level(slot) <= 0:
-			continue
-		var d: Array = looks[slot]
-		if not ResourceLoader.exists(String(d[0])):
-			continue
-		var n := Props.put(items, String(d[0]), d[1], 0.0, float(d[3]))
-		n.rotation_degrees = d[2]
-		if p.gear_level(slot) >= GearDefs.MAX_LEVEL:
-			var l := OmniLight3D.new()
-			l.light_color = Color(1.0, 0.85, 0.4)
-			l.light_energy = 0.8
-			l.omni_range = 0.9
-			l.position = d[1] + Vector3.UP * 0.25
-			items.add_child(l)
-
-
-func _workshop(b: Node3D) -> void:
-	var D := Props.DUN
-	var T := Props.TOOLS
-	var B := Props.BGB
-	_floor_planks(b, Vector2(3.4, 2.6), Color(0.5, 0.36, 0.24))
-	var bench := _opt(b, DX + "table_long_decorated_A.gltf", Vector3(-0.15, 0, -0.35), 0.0, 0.62)
-	if bench == null:
-		Props.put(b, D + "table_medium.gltf", Vector3(-0.15, 0, -0.35), 0.0, 0.62)
-	var top := 0.62
-	Props.put(b, T + "saw.gltf", Vector3(-0.85, top, -0.4), 20.0, 0.7)
-	Props.put(b, T + "blueprint.gltf", Vector3(0.1, top, -0.35), -10.0, 0.6)
-	Props.put(b, T + "hammer.gltf", Vector3(-0.45, top + 0.12, -0.2), 70.0, 0.6)
-	Props.put(b, T + "wrench_A.gltf", Vector3(0.45, top + 0.1, -0.2), 20.0, 0.6)
-	var lamp := Props.put(b, T + "lantern.gltf", Vector3(0.62, top, -0.55), 0.0, 0.65)
-	lamp.name = "Lamp"
-	Biome.flicker_light(b, Vector3(0.62, top + 0.7, -0.35), Color(1.0, 0.8, 0.5), 1.6, 3.8)
-	# big showcase dice out front
-	Props.put(b, B + "D6_A_blue.gltf", Vector3(1.05, 0.34, 0.55), 25.0, 0.9)
-	Props.put(b, B + "D6_B_red.gltf", Vector3(-1.2, 0.3, 0.6), -15.0, 0.8)
-	Props.put(b, B + "D20_yellow.gltf", Vector3(-1.5, 0.3, -0.1), 0.0, 0.62)
-	Props.put(b, B + "D6_A_green.gltf", Vector3(-0.8, top + 0.14, -0.55), 50.0, 0.36)
-	Props.put(b, B + "D8_red.gltf", Vector3(-0.2, top + 0.14, -0.55), 10.0, 0.36)
-	_opt(b, RX + "Containers_Crate_Medium_Wood.gltf", Vector3(-1.45, 0, -0.55), 10.0, 0.62)
-	Props.put(b, RES + "Parts_Pile_Small.gltf", Vector3(0.9, 0, 1.0), 30.0, 0.7)
-	_opt(b, TX + "grindstone.gltf", Vector3(1.5, 0, 0.9), -40.0, 0.45)
-	var eng := _keeper("Engineer.glb", "medium", {"handslot.r": ADX + "assets/engineer_Wrench.gltf"}, "Lockpicking")
-	if eng:
-		eng.position = Vector3(1.05, 0, -0.25)
-		eng.rotation.y = deg_to_rad(-60.0)
-		eng.scale = Vector3.ONE * 0.58
-		eng.name = "Keeper"
-		b.add_child(eng)
-
-
-func _pet_den(b: Node3D) -> void:
-	var H := Props.HAL
-	var D := Props.DUN
-	# a little lean-to roof over a soft bed
-	var wood := Color(0.46, 0.3, 0.2)
-	for x in [-1.25, 1.25]:
-		_box(b, Vector3(0.12, 1.75, 0.12), Vector3(x, 0.88, 0.55), wood)
-		_box(b, Vector3(0.12, 2.1, 0.12), Vector3(x, 1.05, -1.0), wood)
-	var roof := MeshInstance3D.new()
-	var rb := BoxMesh.new()
-	rb.size = Vector3(2.9, 0.1, 2.0)
-	roof.mesh = BiomeBlocks.faceted(rb, Color(0.74, 0.36, 0.26), 0.0, 8, Color(0.5, 0.22, 0.16))
-	roof.position = Vector3(0, 1.98, -0.2)
-	roof.rotation.x = deg_to_rad(-12.0)
-	b.add_child(roof)
-	_box(b, Vector3(2.6, 1.2, 0.1), Vector3(0, 0.6, -1.05), wood.darkened(0.15))
-	Props.put(b, D + "bed_floor.gltf", Vector3(0.1, 0, -0.35), 90.0, 0.55)
-	Props.put(b, H + "pumpkin_orange_jackolantern.gltf", Vector3(-1.2, 0, 1.0), 20.0, 0.62)
-	Props.put(b, H + "pumpkin_yellow_small.gltf", Vector3(-0.75, 0, 1.2), -30.0, 0.8)
-	Props.put(b, H + "pumpkin_orange.gltf", Vector3(1.25, 0, 1.05), 10.0, 0.62)
-	Biome.flicker_light(b, Vector3(-1.2, 0.5, 1.1), Color(1.0, 0.55, 0.2), 1.2, 2.6)
-	var lan := Props.put(b, H + "lantern_hanging.gltf", Vector3(0.9, 1.75, 0.55), 0.0, 0.7)
-	lan.name = "Lantern"
-	Biome.flicker_light(b, Vector3(0.9, 1.35, 0.7), Color(1.0, 0.72, 0.4), 1.4, 3.4)
-	Props.put(b, H + "candle_triple.gltf", Vector3(1.2, 0, -0.55), 0.0, 0.8)
-	_opt(b, RX + "Food_Basket_A_Berries.gltf", Vector3(0.65, 0, 1.05), 0.0, 0.7)
-	_opt(b, RX + "Food_Crate_Small_Berries.gltf", Vector3(-1.35, 0, -0.35), 20.0, 0.6)
-	_opt(b, DX + "bench.gltf", Vector3(0.0, 0, 1.25), 0.0, 0.5)
-	var druid := _keeper("Druid.glb", "medium", {"handslot.r": ADX + "assets/druid_staff.gltf"}, "idle_b")
-	if druid:
-		druid.position = Vector3(-0.55, 0, 0.2)
-		druid.rotation.y = deg_to_rad(25.0)
-		druid.scale = Vector3.ONE * 0.58
-		druid.name = "Keeper"
-		b.add_child(druid)
-
-
-func _arcade(b: Node3D) -> void:
-	var B := Props.BGB
-	var P := Props.PLAT
-	# checkered booth floor of coloured game tiles
-	var tiles := ["tile_red.gltf", "tile_blue.gltf", "tile_yellow.gltf", "tile_green.gltf"]
-	for ix in 4:
-		for iz in 3:
-			var t := Props.put(b, B + tiles[(ix + iz * 2) % 4], Vector3(-1.2 + ix * 0.8, -0.1, -0.8 + iz * 0.8), 0.0, 0.8)
-			Props.set_shadows(t, false)
-	_claw_machine(b, B, P)
-	# circus podium with a balloon dog, hoop, juggling pins and a bunch of balloons
-	var pod := _opt(b, MM + "clown/circus_podium.gltf", Vector3(1.25, 0, 0.35), 0.0, 0.55)
-	if pod:
-		_opt(b, MM + "clown/balloon_dog_blue.gltf", Vector3(1.25, 0.62, 0.35), -40.0, 0.7)
-	_opt(b, MM + "clown/circus_hoop.gltf", Vector3(-1.35, 0, -0.4), 70.0, 0.6)
-	for i in 3:
-		_opt(b, MM + "clown/juggling_pin_%s.gltf" % ["red", "yellow", "green"][i], Vector3(1.0 + 0.16 * i, 0, 1.05), 0.0, 0.6)
-	var bunch := Node3D.new()
-	bunch.name = "Balloons"
-	bunch.position = Vector3(-1.35, 0, 0.75)
-	b.add_child(bunch)
-	var cols := ["red", "yellow", "blue", "green"]
-	for i in cols.size():
-		var bl := _opt(bunch, MM + "clown/balloon_%s.gltf" % cols[i], Vector3(0.18 * cos(i * 1.6), 1.6 + 0.2 * (i % 2), 0.18 * sin(i * 1.6)), 0.0, 0.55)
-		if bl:
-			var bob := bl.create_tween().set_loops()
-			bob.tween_property(bl, "position:y", bl.position.y + 0.12, 1.3 + 0.2 * i).set_trans(Tween.TRANS_SINE)
-			bob.tween_property(bl, "position:y", bl.position.y, 1.3 + 0.2 * i).set_trans(Tween.TRANS_SINE)
-	_opt(b, MM + "orc/Orc_Wardrum.gltf.glb", Vector3(-1.45, 0, 0.0), 30.0, 0.5)
-	Props.put(b, B + "coin_10_gold.gltf", Vector3(0.6, 0.0, 1.1), 30.0, 0.7)
-	Props.put(b, B + "coin_5_silver.gltf", Vector3(0.8, 0.0, 0.95), 0.0, 0.7)
-	var barker := _keeper("Rogue_Hooded.glb", "medium", {}, "Waving")
-	if barker:
-		barker.position = Vector3(-0.75, 0, 0.55)
-		barker.rotation.y = deg_to_rad(20.0)
-		barker.scale = Vector3.ONE * 0.58
-		barker.name = "Keeper"
-		b.add_child(barker)
-
-
-# ------------------------------------------------------------------ station helpers
-
-## Instances a prop if its file exists (EXTRA packs are optional), else returns null.
-func _opt(parent: Node3D, path: String, pos: Vector3, yaw := 0.0, scale := 1.0) -> Node3D:
-	if not ResourceLoader.exists(path):
-		return null
-	return Props.put(parent, path, pos, yaw, scale)
-
-
-func _box(parent: Node3D, size: Vector3, pos: Vector3, color: Color) -> MeshInstance3D:
-	var mi := MeshInstance3D.new()
-	var bx := BoxMesh.new()
-	bx.size = size
-	mi.mesh = BiomeBlocks.faceted(bx, color, 0.0, int(pos.x * 10.0 + pos.z * 7.0 + 3.0))
-	mi.position = pos
-	parent.add_child(mi)
-	return mi
-
-
-## A plank deck under a station.
-func _floor_planks(parent: Node3D, size: Vector2, color: Color) -> void:
-	var n := int(ceil(size.x / 0.34))
-	for i in n:
-		var c := color.lightened(0.06 * float(i % 3) - 0.04)
-		var pl := _box(parent, Vector3(0.32, 0.08, size.y), Vector3(-size.x * 0.5 + 0.17 + i * 0.34, 0.04, 0), c)
-		pl.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-
-
-## A station keeper NPC (KayKit Adventurers EXTRA character on the shared rigs), or null when
-## the EXTRA pack isn't installed.
-func _keeper(glb: String, rig: String, gear: Dictionary, anim: String) -> Character:
-	var path := ADX + "characters/" + glb
-	if not ResourceLoader.exists(path):
-		return null
-	var c := Character.new()
-	c.model_id = glb.get_basename()
-	c._rig = rig
-	c._attack_clip = Character.ATTACKS["large" if rig == "large" else "melee_1h"]
-	c.model = (load(path) as PackedScene).instantiate()
-	c.add_child(c.model)
-	c.skeleton = c.model.find_child("Skeleton3D", true, false)
-	c.anim_player = AnimationPlayer.new()
-	c.anim_player.name = "AnimationPlayer"
-	c.add_child(c.anim_player)
-	c.anim_player.root_node = c.anim_player.get_path_to(c.model)
-	c.anim_player.add_animation_library("", Character._library_for(rig, c.skeleton, c.model.get_path_to(c.skeleton)))
-	c.anim_player.playback_default_blend_time = 0.2
-	for slot in gear:
-		if ResourceLoader.exists(String(gear[slot])):
-			c.attach(String(slot), String(gear[slot]))
-	c.play(anim, 0.0)
-	c.anim_player.seek(randf() * 0.8, true)
-	return c
-
-
-## The smith strikes the anvil every couple of seconds.
-func _hammer_loop(smith: Character) -> void:
-	var t := Timer.new()
-	t.wait_time = 2.4
-	t.autostart = true
-	smith.add_child(t)
-	t.timeout.connect(func() -> void:
-		if is_instance_valid(smith) and smith.is_visible_in_tree():
-			smith.play_once("Melee_2H_Attack_Chop" if smith.has_anim("Melee_2H_Attack_Chop") else "attack", "idle"))
-
-## The claw-machine cabinet: glass case, prize pile, swaying claw, marquee.
-func _claw_machine(b: Node3D, B: String, P: String) -> void:
-	# claw machine: cabinet, glass case, prize pile, claw, marquee
-	var cab := MeshInstance3D.new()
-	var bx := BoxMesh.new()
-	bx.size = Vector3(1.1, 0.9, 1.0)
-	cab.mesh = BiomeBlocks.faceted(bx, Color(0.9, 0.3, 0.62), 0.0, 1, Color(0.55, 0.16, 0.4))
-	cab.position = Vector3(0, 0.45, -0.2)
-	b.add_child(cab)
-	var glass := MeshInstance3D.new()
-	var gb := BoxMesh.new()
-	gb.size = Vector3(1.04, 1.0, 0.94)
-	glass.mesh = gb
-	var gm := StandardMaterial3D.new()
-	gm.albedo_color = Color(0.7, 0.9, 1.0, 0.18)
-	gm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	gm.roughness = 0.1
-	gm.metallic_specular = 0.9
-	glass.material_override = gm
-	glass.position = Vector3(0, 1.4, -0.2)
-	glass.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	b.add_child(glass)
-	for x in [-0.53, 0.53]:
-		for z in [-0.66, 0.26]:
-			var pole := MeshInstance3D.new()
-			var pb := BoxMesh.new()
-			pb.size = Vector3(0.06, 1.0, 0.06)
-			pole.mesh = pb
-			pole.material_override = Props.flat_material(Color(0.95, 0.85, 0.4), 0.4)
-			pole.position = Vector3(x, 1.4, z)
-			b.add_child(pole)
-	var roof := MeshInstance3D.new()
-	var rbx := BoxMesh.new()
-	rbx.size = Vector3(1.2, 0.34, 1.1)
-	roof.mesh = BiomeBlocks.faceted(rbx, Color(0.45, 0.3, 0.85), 0.0, 3, Color(0.3, 0.18, 0.6))
-	roof.position = Vector3(0, 2.05, -0.2)
-	b.add_child(roof)
-	var marquee := MeshInstance3D.new()
-	var mq := BoxMesh.new()
-	mq.size = Vector3(1.0, 0.18, 0.04)
-	marquee.mesh = mq
-	var mm := StandardMaterial3D.new()
-	mm.albedo_color = Color(1.0, 0.85, 0.35)
-	mm.emission_enabled = true
-	mm.emission = Color(1.0, 0.75, 0.3)
-	mm.emission_energy_multiplier = 2.2
-	marquee.material_override = mm
-	marquee.position = Vector3(0, 2.05, 0.36)
-	b.add_child(marquee)
-	# prizes
-	var prizes := [[P + "yellow/star_yellow.gltf", Vector3(-0.25, 1.0, -0.3), 0.55], [P + "red/heart_red.gltf", Vector3(0.22, 0.98, -0.05), 0.5],
-		[P + "blue/diamond_blue.gltf", Vector3(0.05, 1.0, -0.45), 0.5], [B + "coin_gold.gltf", Vector3(-0.3, 0.93, 0.05), 1.2],
-		[B + "D6_A_red.gltf", Vector3(0.3, 0.92, -0.42), 1.5]]
-	for pz in prizes:
-		var n := Props.put(b, String(pz[0]), pz[1], _rng.randf() * 360.0, float(pz[2]))
-		n.rotation.x = _rng.randf_range(-0.3, 0.3)
-	# the claw
-	var claw := Node3D.new()
-	claw.name = "Claw"
-	claw.position = Vector3(0.1, 1.82, -0.2)
-	b.add_child(claw)
-	var rope := MeshInstance3D.new()
-	var rc := CylinderMesh.new()
-	rc.top_radius = 0.015
-	rc.bottom_radius = 0.015
-	rc.height = 0.35
-	rope.mesh = rc
-	rope.material_override = Props.flat_material(Color(0.8, 0.8, 0.85), 0.3)
-	claw.add_child(rope)
-	for k in 3:
-		var prong := MeshInstance3D.new()
-		var pbm := BoxMesh.new()
-		pbm.size = Vector3(0.04, 0.2, 0.04)
-		prong.mesh = pbm
-		prong.material_override = Props.flat_material(Color(0.85, 0.85, 0.9), 0.25)
-		var a := TAU * k / 3.0
-		prong.position = Vector3(cos(a) * 0.07, -0.25, sin(a) * 0.07)
-		prong.rotation = Vector3(sin(a) * 0.5, 0, -cos(a) * 0.5)
-		claw.add_child(prong)
-	var sway := claw.create_tween().set_loops()
-	sway.tween_property(claw, "position:x", -0.2, 2.2).set_trans(Tween.TRANS_SINE)
-	sway.tween_property(claw, "position:x", 0.25, 2.2).set_trans(Tween.TRANS_SINE)
-	# coin slot panel + joystick
-	var knob := MeshInstance3D.new()
-	var ks := SphereMesh.new()
-	ks.radius = 0.08
-	ks.height = 0.16
-	knob.mesh = ks
-	knob.material_override = Props.flat_material(Color(1.0, 0.25, 0.3), 0.3)
-	knob.position = Vector3(-0.25, 1.02, 0.28)
-	b.add_child(knob)
-	var glow := OmniLight3D.new()
-	glow.light_color = Color(1.0, 0.5, 0.85)
-	glow.light_energy = 1.6
-	glow.omni_range = 3.2
-	glow.position = Vector3(0, 1.5, 0.4)
-	b.add_child(glow)
-
-
-# ------------------------------------------------------------------ pet + decorations
-
-func _pet_placeholder(id: String) -> Node3D:
-	var n := Node3D.new()
-	n.name = "Pet_" + id
-	var H := Props.HAL
-	match String(PetDefs.DEFS[id].model):
-		"pumpkin":
-			Props.put(n, H + "pumpkin_orange_jackolantern.gltf", Vector3.ZERO, 200.0, 0.62)
-			_pet_light(n, Color(1.0, 0.55, 0.2))
-		"skull":
-			Props.put(n, H + "skull.gltf", Vector3.ZERO, 180.0, 0.9)
-			_pet_light(n, Color(0.7, 0.9, 1.0))
-		"lantern":
-			Props.put(n, H + "lantern_standing.gltf", Vector3.ZERO, 0.0, 0.8)
-			_pet_light(n, Color(0.5, 1.0, 0.85))
-		"crystal":
-			BiomeBlocks.crystal_cluster(n, Vector3.ZERO, 0.32, 4, 7)
-			_pet_light(n, Color(0.6, 0.85, 1.0))
-		"die":
-			Props.put(n, Props.BGB + "D6_A_blue.gltf", Vector3(0, 0.35, 0), 20.0, 1.1)
-			_pet_light(n, Color(0.5, 0.7, 1.0))
-		"chest":
-			Props.put(n, Props.DUN + "chest.gltf", Vector3.ZERO, 200.0, 0.45)
-			_pet_light(n, Color(1.0, 0.8, 0.3))
-	return n
-
-
-func _pet_light(n: Node3D, c: Color) -> void:
-	var l := OmniLight3D.new()
-	l.light_color = c
-	l.light_energy = 0.9
-	l.omni_range = 1.8
-	l.position = Vector3(0, 0.5, 0.3)
-	n.add_child(l)
-
-
-## Milestone decorations: a skull trophy per final boss beaten, a banner per class that has
-## won, a golden chest after the first win, a flag per biome discovered beyond the start.
-func _decorate(p: Profile) -> void:
-	UiTheme.clear(_deco)
-	var f: Dictionary = p.records.get("firsts", {})
-	var bosses: Array = f.get("boss", [])
-	var classes: Array = f.get("class_win", [])
-	for i in bosses.size():
-		var t := Props.put(_deco, Props.HAL + "post_skull.gltf", Vector3.ZERO, 0.0, 0.62)
-		t.set_meta("spot", "trophy")
-		t.set_meta("i", i)
-	var colors := {"knight": "blue", "barbarian": "red", "mage": "white", "rogue": "green"}
-	for i in classes.size():
-		var c := String(classes[i])
-		var bn := Props.put(_deco, Props.DUN + "banner_shield_%s.gltf" % String(colors.get(c, "yellow")), Vector3.ZERO, 0.0, 0.7)
-		bn.set_meta("spot", "banner")
-		bn.set_meta("i", i)
-	if int(p.records.get("wins", 0)) > 0:
-		var ch := Props.put(_deco, Props.DUN + "chest_gold.gltf", Vector3.ZERO, 0.0, 0.7)
-		ch.set_meta("spot", "chest")
-		ch.set_meta("i", 0)
-	_place_deco_spots()
-
-
-func _place_deco_spots() -> void:
-	if _deco == null:
-		return
-	for n in _deco.get_children():
-		var i := int(n.get_meta("i", 0))
-		match String(n.get_meta("spot", "")):
-			"trophy":
-				n.position = FIRE_POS + Vector3(-1.6 + i * 1.05, 0, -3.9)
-				n.rotation.y = deg_to_rad(90.0)
-			"banner":
-				n.position = Vector3(-2.3 + i * 1.55, 0.0, -11.2)
-			"chest":
-				n.position = FIRE_POS + Vector3(3.2, 0, 2.5) if not portrait else FIRE_POS + Vector3(2.8, 0, 2.8)
-				n.rotation.y = deg_to_rad(-35.0)

@@ -7,7 +7,8 @@ extends UiModal
 ## and a "nearest goals" section with 3 progress bars. CAMP returns to the hub.
 ##
 ## The GameController banks the run before the screen opens and sets `results`:
-##   {events: Camp.bank_run() events, before: Profile.to_dict() before banking, after: Profile}
+##   {stats: game_over stats, events: Camp.bank_run() events, before: Profile.to_dict() before
+##    banking, after: Profile}
 ## Without `results` (legacy scenarios) only the run half is shown.
 ## Emits new_run_pressed (= go to Camp) and title_pressed.
 
@@ -71,7 +72,10 @@ func _build() -> void:
 
 func refresh(flow: GameFlow) -> void:
 	var r := flow.run
-	var st := r.stats
+	# the game_over stats (with the Crowns breakdown); legacy callers fall back to the summary
+	var st: Dictionary = results.get("stats", {})
+	if st.is_empty():
+		st = flow._summary()
 	var won := flow.phase == GameFlow.Phase.VICTORY or bool(st.get("victory", false))
 	set_title("VICTORY!" if won else "DEFEATED", UiPalette.GOLD if won else UiPalette.DANGER)
 	var info := flow.route_info()
@@ -384,7 +388,7 @@ func _animate() -> void:
 			var from := total - amt
 			var tt := _total_l.create_tween()
 			tt.tween_method(func(v: float) -> void: _total_l.text = str(int(round(v))), float(from), float(total), 0.3)
-		await get_tree().create_timer(0.34).timeout
+		await get_tree().create_timer(0.28).timeout
 	if gen != _anim_gen:
 		return
 	if _total_row:
@@ -392,7 +396,7 @@ func _animate() -> void:
 		UiTheme.pop(_total_row, 1.12, 0.35)
 		UiTheme.sfx("fanfare")
 	for card in _cards:
-		await get_tree().create_timer(0.22).timeout
+		await get_tree().create_timer(0.16).timeout
 		if gen != _anim_gen:
 			return
 		(card as Control).modulate.a = 1.0

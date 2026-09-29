@@ -1,0 +1,223 @@
+{
+	"ascension": {
+		"selected": 0,
+		"unlocked": 1
+	},
+	"crowns": 67,
+	"disabled": {
+		"kinds": [],
+		"passives": [],
+		"runes": []
+	},
+	"flags": {
+		"lock_classes": true
+	},
+	"gear": {
+		"blade": 5,
+		"boots": 5,
+		"charm": 5,
+		"helm": 5
+	},
+	"gear_traits": {},
+	"loadout": {
+		"class": "knight",
+		"minigames": [
+			"fossil_hunter",
+			"claw_machine",
+			"bubble_breaker"
+		],
+		"mode": "standard",
+		"pet": "pumpkin_sprite"
+	},
+	"milestones": [
+		"first_steps",
+		"lap_five",
+		"wanderer",
+		"victor",
+		"brawler",
+		"frostbitten",
+		"boss_seen",
+		"arcade_regular",
+		"gate_crasher",
+		"deep_delver",
+		"straight_talk",
+		"arcade_fan",
+		"tinkerer",
+		"champion",
+		"veteran",
+		"patience",
+		"rune_lord",
+		"stonewall",
+		"plague",
+		"throne_breaker",
+		"banker"
+	],
+	"minigame_plays": {
+		"bubble_breaker": 1,
+		"claw_machine": 42,
+		"fossil_hunter": 24,
+		"scratch_off": 9
+	},
+	"pet_bought": {
+		"pumpkin_sprite": 10
+	},
+	"pet_xp": {
+		"pumpkin_sprite": 438
+	},
+	"records": {
+		"best_ascension_win": 0,
+		"best_lap": 15,
+		"counters": {
+			"act2_runs": 25,
+			"act3_runs": 24,
+			"block": 4394,
+			"bosses_reached": 18,
+			"cashouts": 50,
+			"fights": 448,
+			"frost_visits": 16,
+			"full_runes": 25,
+			"kept": 3766,
+			"laps": 359,
+			"mage_wins": 1,
+			"minibosses_killed": 11,
+			"minibosses_reached": 11,
+			"minigames": 76,
+			"poison_kills": 64,
+			"rerolls": 2310,
+			"runs": 25,
+			"straights": 288,
+			"throne_wins": 6,
+			"wins": 10
+		},
+		"crowns_earned": 1857,
+		"firsts": {
+			"asc_clear": [],
+			"biome": [
+				"glade",
+				"hollow",
+				"throne",
+				"frost",
+				"crypt",
+				"magma"
+			],
+			"boss": [
+				"boss_lich",
+				"boss_cinder_king",
+				"boss_magma_golem",
+				"boss_bone_warden"
+			],
+			"class_win": [
+				"knight",
+				"barbarian",
+				"mage",
+				"rogue"
+			],
+			"miniboss": [
+				"mini_pumpkin_knight",
+				"mini_frost_warden",
+				"mini_bone_champion"
+			],
+			"route_win": [
+				"glade,hollow,throne",
+				"glade,frost,throne",
+				"glade,hollow,magma",
+				"crypt,frost,magma",
+				"crypt,hollow,throne",
+				"glade,frost,magma"
+			],
+			"short_win": []
+		},
+		"loss_streak": 1,
+		"runs": 25,
+		"runs_by_class": {
+			"barbarian": 6,
+			"knight": 7,
+			"mage": 6,
+			"rogue": 6
+		},
+		"sigils_earned": 31,
+		"wins": 10,
+		"wins_by_class": {
+			"barbarian": 1,
+			"knight": 4,
+			"mage": 1,
+			"rogue": 4
+		}
+	},
+	"sigils": 0,
+	"starter_kind": "",
+	"unlocks": {
+		"biomes": [
+			"glade",
+			"crypt",
+			"hollow",
+			"frost",
+			"throne",
+			"magma"
+		],
+		"bosses": [
+			"boss_lich",
+			"boss_bone_warden",
+			"boss_cinder_king",
+			"boss_magma_golem"
+		],
+		"classes": [
+			"knight",
+			"barbarian",
+			"mage",
+			"rogue"
+		],
+		"features": [
+			"potion_belt",
+			"loadout_slot"
+		],
+		"gear": [
+			"helm",
+			"blade",
+			"boots",
+			"charm"
+		],
+		"minibosses": [
+			"mini_pumpkin_knight",
+			"mini_grave_mage",
+			"mini_frost_warden",
+			"mini_bone_champion"
+		],
+		"minigames": [
+			"fossil_hunter",
+			"bubble_breaker",
+			"scratch_off",
+			"claw_machine"
+		],
+		"packs": [
+			"starter",
+			"gamblers_kit",
+			"cold_steel",
+			"pyromancy",
+			"storm",
+			"numerology",
+			"resonance",
+			"colossus"
+		],
+		"pets": [
+			"pumpkin_sprite",
+			"skull_buddy",
+			"lantern_ghost",
+			"crystal_wisp",
+			"guard_die",
+			"coin_mimic"
+		],
+		"potions": [
+			"healing",
+			"stoneskin",
+			"reroll_tonic",
+			"cleanse"
+		]
+	},
+	"upgrades": {
+		"loadout_slot": 1,
+		"potion_belt": 1,
+		"starter_kit": 1
+	},
+	"version": 1
+}
