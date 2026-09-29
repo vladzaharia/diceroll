@@ -57,7 +57,7 @@ static var PALADIN_SANCTIFY := 2
 ## Shop die-kind weight multipliers for the Paladin (only kinds in the unlocked pool).
 const PALADIN_SHOP_KINDS := {"twin": 2.0, "even": 2.0}
 const SET_COMBOS := ["pair", "two_pair", "three_kind", "full_house", "four_kind", "five_kind", "six_kind"]
-static var RANGER_AIM_MULT := 1.15
+static var RANGER_AIM_MULT := 1.2
 static var RANGER_PIERCE_CARRIES := 1
 static var NINJA_REFUNDS_PER_TURN := 2
 static var NINJA_BOARD_REFUNDS := 1

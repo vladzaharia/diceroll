@@ -127,7 +127,7 @@ func test_camp_sigil_unlocks_and_pool_toggle() -> void:
 	assert_eq(camp.unlock("classes", "mage")[0].type, "error", "only the next two locked classes")
 	var ev := camp.unlock("classes", "paladin")
 	assert_eq(_first(ev, "unlocked"), {"type": "unlocked", "kind": "classes", "id": "paladin", "source": "sigils"})
-	assert_eq(p.sigils, 20 - int(UnlockDefs.SIGIL_PRICE.classes))
+	assert_eq(p.sigils, 20 - int(UnlockDefs.sigil_cost("classes", "paladin").sigils))
 	assert_eq(camp.unlock("classes", "paladin")[0].type, "error", "already owned")
 	assert_eq(UnlockDefs.buyable_classes(p.unlocks.classes), ["barbarian", "mage"])
 	# pool toggle: at most 25% of each unlocked pool off

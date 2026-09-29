@@ -19,7 +19,7 @@ const SIGIL_PRICE := {
 ## milestones per run (biomes come bundled with their bosses on the first win, so they don't wait).
 const MAJOR_KINDS := ["classes", "pets"]
 ## Per-id Sigil price overrides (the late classes cost more).
-const SIGIL_PRICE_BY_ID := {"classes": {"ninja": 10, "druid": 10, "engineer": 12, "necromancer": 12}}
+const SIGIL_PRICE_BY_ID := {"classes": {"paladin": 12, "ninja": 10, "druid": 10, "engineer": 12, "necromancer": 12}}
 ## Sigils can buy only the next SIGIL_NEXT_CLASSES locked classes in HeroDefs.IDS order.
 const SIGIL_NEXT_CLASSES := 2
 ## Secret classes: never sold for Sigils, outside the next-two rule (HeroDefs.DATA[id].secret).
@@ -213,8 +213,8 @@ const MILESTONES := [
 		"cond": {"any": [{"boss_kills": "boss_bone_warden", "min": 2}, {"stat": "kills", "min": 1000}, {"stat": "runs", "min": 36}]},
 		"unlocks": [["classes", "necromancer"]]},
 	{"id": "trick_or_treat", "run": 23, "hidden": true, "hint": "Something in the Hollow wants to play dress-up.",
-		"desc": "Finish 40 events in The Hollow while owning 6 classes, or play 40 runs.",
-		"cond": {"any": [{"all": [{"stat": "hollow_events", "min": 40}, {"stat": "classes_owned", "min": 6}]}, {"stat": "runs", "min": 40}]},
+		"desc": "Finish 36 events in The Hollow while owning 6 classes, or play 40 runs.",
+		"cond": {"any": [{"all": [{"stat": "hollow_events", "min": 36}, {"stat": "classes_owned", "min": 6}]}, {"stat": "runs", "min": 40}]},
 		"unlocks": [["classes", "monster_kid"]]},
 	{"id": "rune_lord", "run": 24, "desc": "In 15 runs, fight with 5 dice that all carry runes.", "cond": {"stat": "full_runes", "min": 15},
 		"unlocks": [["packs", "resonance"]]},
