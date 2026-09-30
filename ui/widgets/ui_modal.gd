@@ -203,6 +203,10 @@ func close(free_after := false) -> void:
 		return
 	_is_open = false
 	_stack.erase(self)
+	if not is_inside_tree():
+		visible = false
+		closed.emit()
+		return
 	_frame.pivot_offset = _frame.size * 0.5
 	var t := create_tween().set_parallel(true)
 	_close_tween = t
@@ -226,7 +230,7 @@ func is_open() -> bool:
 func is_top() -> bool:
 	for i in range(_stack.size() - 1, -1, -1):
 		var m := _stack[i]
-		if is_instance_valid(m) and m.is_inside_tree() and m._is_open and m.is_visible_in_tree():
+		if is_instance_valid(m) and m._is_open and (m.is_visible_in_tree() if m.is_inside_tree() else m.visible):
 			return m == self
 	return false
 
@@ -257,19 +261,24 @@ func _input(event: InputEvent) -> void:
 		return
 	if k.keycode == KEY_ESCAPE:
 		if dismissible:
-			get_viewport().set_input_as_handled()
+			_handled()
 			_request_dismiss()
 		elif cancel_action != null and _usable(cancel_action):
-			get_viewport().set_input_as_handled()
+			_handled()
 			cancel_action.emit_signal("pressed")
 	elif k.keycode == KEY_ENTER or k.keycode == KEY_KP_ENTER:
 		if primary_action != null and _usable(primary_action):
-			get_viewport().set_input_as_handled()
+			_handled()
 			primary_action.emit_signal("pressed")
 
 
 static func _usable(b: BaseButton) -> bool:
-	return is_instance_valid(b) and b.is_visible_in_tree() and not b.disabled
+	return is_instance_valid(b) and (b.is_visible_in_tree() if b.is_inside_tree() else b.visible) and not b.disabled
+
+
+func _handled() -> void:
+	if is_inside_tree():
+		get_viewport().set_input_as_handled()
 
 
 ## Tapping the dimmed backdrop (outside the panel) dismisses a dismissible modal.

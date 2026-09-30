@@ -154,7 +154,8 @@ func _ready() -> void:
 	focus_entered.connect(_refresh)
 	focus_exited.connect(_refresh)
 	resized.connect(_layout)
-	InputMode.instance(get_tree())
+	if is_inside_tree():
+		InputMode.instance(get_tree())
 	_refresh()
 	_layout()
 
@@ -499,10 +500,14 @@ func _show_keycap(on: bool) -> void:
 	if on and _label and _label.visible:
 		# never over the label: hide instead
 		var lr := Rect2(_label.global_position - global_position, _label.size)
-		if lr.grow(-2.0).intersects(Rect2(r.position, _keycap.size)):
+		if lr.size.x > 4.0 and lr.size.y > 4.0 and lr.grow(-2.0).intersects(Rect2(r.position, _keycap.size)):
 			on = false
 	if _keycap_tween and _keycap_tween.is_valid():
 		_keycap_tween.kill()
+	if not is_inside_tree():
+		_keycap.visible = on
+		_keycap.modulate.a = KEYCAP_ALPHA if on else 0.0
+		return
 	if on:
 		_keycap.visible = true
 		_keycap_tween = create_tween()
