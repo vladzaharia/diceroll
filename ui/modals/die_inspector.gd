@@ -110,7 +110,7 @@ func _fill() -> void:
 	tag.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(kc, 0.16), 10, 2, Color(kc, 0.55)), 10, 2))
 	tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	tag.add_child(UiTheme.label(rar.to_upper(), 15, kc.lightened(0.3), false, 0, false, 800))
+	tag.add_child(UiTheme.label(rar.to_upper(), 16, kc.lightened(0.3), false, 0, false, 800))
 	kr.add_child(tag)
 	col.add_child(UiTheme.para(String(kd.desc), 21, UiPalette.TEXT_DIM, 500))
 	var rr := UiTheme.hbox(10)

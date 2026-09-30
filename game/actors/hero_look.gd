@@ -70,6 +70,16 @@ static func _grave_contrast(ch: Character, default_skin: bool) -> void:
 		ch.skeleton.add_child(m)
 	ch.tint_where(func(mi: MeshInstance3D) -> bool: return String(mi.name).contains("_Cape"),
 		Color(0.08, 0.02, 0.12), 0.9 if default_skin else 0.6)
+	if default_skin:
+		# the default atlas has a cream hood and a rose robe: under a strong key light (class
+		# select, Camp portrait) the violet wash still read as a white hood on a pink body, so
+		# the hood goes a deep violet and the robe a darker plum (the cape stays the darkest)
+		ch.tint_where(func(mi: MeshInstance3D) -> bool: return String(mi.name).ends_with("_Head") and mi.get_parent() == ch.skeleton,
+			Color(0.3, 0.14, 0.46), 0.85)
+		ch.tint_where(func(mi: MeshInstance3D) -> bool:
+			var n := String(mi.name)
+			return mi.get_parent() == ch.skeleton and (n.ends_with("_Body") or n.contains("_Arm") or n.contains("_Leg")),
+			Color(0.2, 0.08, 0.3), 0.85)
 	ch.tint_where(func(mi: MeshInstance3D) -> bool: return String(mi.name).contains("Necromancer_Crown"),
 		Color(0.93, 0.95, 0.88), 0.25, NECRO_GLOW * 0.3)
 	ch.tint_where(func(mi: MeshInstance3D) -> bool: return _held_in(mi, "handslot_r"),

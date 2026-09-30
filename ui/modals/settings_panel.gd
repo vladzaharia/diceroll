@@ -101,7 +101,7 @@ func _build() -> void:
 		var b := GameButton.make("%d%%" % int(round(z * 100.0)), "", GameButton.Kind.SECONDARY, 24)
 		b.toggle_mode = true
 		b.toggle_primary = true
-		b.min_height = 72
+		b.min_height = 84
 		b.pad_x = 10
 		b.pressed.connect(_set_ui_size.bind(z))
 		zr.add_child(b)

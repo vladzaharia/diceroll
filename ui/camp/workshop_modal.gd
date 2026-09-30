@@ -150,7 +150,7 @@ func _toggle(icon: String, text: String, color: Color, on: bool, can: bool) -> C
 	var l := UiTheme.label(text, 18, UiPalette.TEXT if on else UiPalette.TEXT_MUTED, false, 0, false, 600)
 	row.add_child(l)
 	if not on:
-		row.add_child(UiTheme.label("OFF", 15, UiPalette.HP_BRIGHT, false, 0, false, 700))
+		row.add_child(UiTheme.label("OFF", 16, UiPalette.HP_BRIGHT, false, 0, false, 700))
 	if not can:
 		t.modulate = Color(1, 1, 1, 0.6)
 	return t

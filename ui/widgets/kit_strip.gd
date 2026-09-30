@@ -108,7 +108,7 @@ static func _cell(e: Dictionary, px: int) -> Control:
 		var col: Color = TIER_COLORS[clampi(t, 0, 3)]
 		b.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(0.05, 0.05, 0.12, 0.95), 8, 2, col), 4, 0))
 		b.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		b.add_child(UiTheme.label(String(TIER_NAMES[t]), 12, col, true, 2))
+		b.add_child(UiTheme.label(String(TIER_NAMES[t]), 15, col, true, 2))
 		holder.add_child(b)
-		b.position = Vector2(px - 22 - (t - 1) * 5, px - 20)
+		b.position = Vector2(px - 24 - (t - 1) * 6, px - 22)
 	return well

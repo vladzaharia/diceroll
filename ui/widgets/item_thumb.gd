@@ -136,6 +136,36 @@ static func _request(p_id: String, p_slot: String) -> void:
 
 
 ## The shared off-screen renderer: one SubViewport, one model at a time.
+## Lifts the shadows of a render that is mostly near-black (the Paladin Helm's dark steel read
+## as a hole in the card): when over DARK_SHARE of the opaque pixels are darker than DARK_LUMA,
+## a screen blend raises blacks to LIFT grey, keeping hue, highlights and alpha.
+const DARK_LUMA := 0.1
+const DARK_SHARE := 0.35
+const LIFT := 0.22
+
+
+static func lift_dark(img: Image) -> void:
+	if img.get_format() != Image.FORMAT_RGBA8:
+		img.convert(Image.FORMAT_RGBA8)
+	var dark := 0
+	var n := 0
+	for y in range(0, img.get_height(), 2):
+		for x in range(0, img.get_width(), 2):
+			var c := img.get_pixel(x, y)
+			if c.a > 0.5:
+				n += 1
+				if c.get_luminance() < DARK_LUMA:
+					dark += 1
+	if n == 0 or float(dark) / float(n) < DARK_SHARE:
+		return
+	for y in img.get_height():
+		for x in img.get_width():
+			var c := img.get_pixel(x, y)
+			if c.a > 0.0:
+				img.set_pixel(x, y, Color(1.0 - (1.0 - c.r) * (1.0 - LIFT), 1.0 - (1.0 - c.g) * (1.0 - LIFT),
+					1.0 - (1.0 - c.b) * (1.0 - LIFT * 0.8), c.a))
+
+
 class _Renderer:
 	extends Node
 	signal done(key: String, tex: Texture2D)
@@ -172,9 +202,16 @@ class _Renderer:
 		_vp.add_child(key)
 		var rim := DirectionalLight3D.new()
 		rim.light_color = Color("8fb0ff")
-		rim.light_energy = 1.0
+		rim.light_energy = 1.6
 		rim.rotation_degrees = Vector3(-15, 160, 0)
 		_vp.add_child(rim)
+		# a soft fill from the camera side: dark-atlas pieces (the Paladin Helm's near-black
+		# steel) read as a black blob on the navy card with the key light alone
+		var fill := DirectionalLight3D.new()
+		fill.light_color = Color("dfe6ff")
+		fill.light_energy = 0.9
+		fill.rotation_degrees = Vector3(-8, 20, 0)
+		_vp.add_child(fill)
 		_cam = Camera3D.new()
 		_cam.projection = Camera3D.PROJECTION_ORTHOGONAL
 		_vp.add_child(_cam)
@@ -247,6 +284,7 @@ class _Renderer:
 			node.free()
 		if img == null or img.is_empty():
 			return null
+		ItemThumb.lift_dark(img)
 		img.generate_mipmaps()
 		return ImageTexture.create_from_image(img)
 

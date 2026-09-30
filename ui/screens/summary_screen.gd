@@ -33,6 +33,9 @@ var _extra: VBoxContainer
 var _goals: VBoxContainer
 var _camp_btn: GameButton
 var _anim_gen := 0
+## True once the cards have been revealed: a later rebuild (a results refresh, a resize) must
+## show its cards at once, not leave section headings over invisible cards.
+var _revealed := false
 var _footer: MarginContainer
 var _lines: Array = []
 var _cards: Array = []
@@ -106,6 +109,9 @@ func refresh(flow: GameFlow) -> void:
 	_route.add_child(strip)
 	_build_crowns(st)
 	_build_extra()
+	if _revealed:
+		for card in _cards:
+			(card as Control).modulate.a = 1.0
 	_build_goals()
 	relayout()
 
@@ -146,6 +152,7 @@ func show_now() -> void:
 
 func close(free_after := false) -> void:
 	_anim_gen += 1
+	_revealed = false
 	await super.close(free_after)
 
 
@@ -377,7 +384,7 @@ func _items_block(_evs: Array, _before: Profile, after: Profile) -> Control:
 		var m := after.item_mastery(id)
 		var nxt := _next_blueprint(after, id)
 		if nxt.is_empty():
-			col.add_child(UiTheme.label("Mastery %d fights" % m, 15, UiPalette.TEXT_DIM, false, 0, false, 700))
+			col.add_child(UiTheme.label("Mastery %d fights" % m, 16, UiPalette.TEXT_DIM, false, 0, false, 700))
 		else:
 			var br := UiTheme.hbox(8)
 			col.add_child(br)
@@ -387,7 +394,7 @@ func _items_block(_evs: Array, _before: Profile, after: Profile) -> Control:
 	if v.get_child_count() == 0:
 		return null
 	if fights <= 0:
-		v.add_child(UiTheme.para("Items count fights won once their rank group is forged.", 15, UiPalette.TEXT_MUTED, 600))
+		v.add_child(UiTheme.para("Items count fights won once their rank group is forged.", 16, UiPalette.TEXT_MUTED, 600))
 	return c
 
 
@@ -581,10 +588,14 @@ func _animate() -> void:
 		_total_l.text = str(int(_total_row.get_meta("total", total)))
 		UiTheme.pop(_total_row, 1.12, 0.35)
 		UiTheme.sfx("fanfare")
-	for card in _cards:
+	# from here on a rebuild (refresh during the reveal) shows its cards at once
+	_revealed = true
+	for card in _cards.duplicate():
 		await get_tree().create_timer(0.16).timeout
 		if gen != _anim_gen:
 			return
+		if not is_instance_valid(card) or not _cards.has(card):
+			continue
 		(card as Control).modulate.a = 1.0
 		if card is SecretReveal:
 			_scroll.ensure_control_visible(card)
@@ -602,6 +613,7 @@ func finish_now() -> void:
 		(l[1] as Label).text = "+%d" % int(l[2])
 	if _total_row:
 		_total_l.text = str(int(_total_row.get_meta("total", 0)))
+	_revealed = true
 	for card in _cards:
 		(card as Control).modulate.a = 1.0
 		if card is SecretReveal:

@@ -111,7 +111,7 @@ func _kit(p: Profile, id: String) -> Control:
 		if int(e.tier) > 0:
 			active += 1
 	if active == 0 and not strip.entries.is_empty():
-		var hint := UiTheme.para("Forge a rank at the Armory to switch these items on.", 15, UiPalette.HP_BRIGHT, 700)
+		var hint := UiTheme.para("Forge a rank at the Armory to switch these items on.", 16, UiPalette.HP_BRIGHT, 700)
 		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		v.add_child(hint)
 	return c

@@ -109,7 +109,7 @@ const ITEMS := {
 	# ---------------------------------------------------------------- weapons (§2)
 	"sword": {"name": "Arming Sword", "slot": "weapon", "hands": 1, "style": "melee_1h", "model": "sword_1handed",
 		"affinity": ["knight"], "std": "x1.2",
-		"effect": {"rule": "twin_edge", "name": "Twin Edge", "desc": "Pair or Two Pair: +{flat} damage after the multiplier ({uses} per fight).",
+		"effect": {"rule": "twin_edge", "name": "Twin Edge", "desc": "Pair or Two Pair: +{flat} damage after the multiplier ({uses|times} per fight).",
 			"n": {"flat": [1, 1, 1], "uses": [1, 1, 1]}, "scale": ["flat"]}},
 	"greatsword": {"name": "Greatsword", "slot": "weapon", "hands": 2, "style": "melee_2h", "model": "sword_2handed_color",
 		"affinity": [], "std": "x1.2",
@@ -127,12 +127,12 @@ const ITEMS := {
 	"warhammer": {"name": "Warhammer", "slot": "weapon", "hands": 1, "style": "melee_1h", "model": "paladin_hammer",
 		"affinity": ["paladin"], "std": "x1.2",
 		"effect": {"rule": "crush", "name": "Crush",
-			"desc": "The highest die in the scoring group (never a Heavy die) counts x{crush}; the extra pips add after the multiplier ({uses} per fight).",
+			"desc": "The highest die in the scoring group (never a Heavy die) gets {crush+%} pips; the extra pips add after the multiplier ({uses|times} per fight).",
 			"n": {"crush": [1.15, 1.2, 1.25], "uses": [1, 1, 1]}, "scale": ["crush"]}},
 	"spear": {"name": "Spear", "slot": "weapon", "hands": 2, "style": "spear", "model": "spear_A",
 		"affinity": [], "std": "x1.2",
 		"effect": {"rule": "first_strike", "name": "First Strike",
-			"desc": "The first attack of each fight deals x{factor} (x{boss_factor} against a final boss).",
+			"desc": "The first attack of each fight deals {factor+%} damage ({boss_factor+%} against a final boss).",
 			"n": {"factor": [1.02, 1.03, 1.05], "boss": [0.03, 0.03, 0.05]}, "scale": ["factor"]}},
 	"scythe": {"name": "Scythe", "slot": "weapon", "hands": 2, "style": "scythe", "model": "scythe",
 		"affinity": [], "std": "x1.2",
@@ -140,19 +140,19 @@ const ITEMS := {
 			"n": {"heal": [1, 1, 1], "uses": [1, 1, 1]}, "scale": ["heal"]}},
 	"dagger": {"name": "Dagger", "slot": "weapon", "hands": 1, "style": "melee_1h", "model": "dagger",
 		"affinity": ["rogue"], "std": "block2",
-		"effect": {"rule": "quick_hands", "name": "Quick Hands", "desc": "+1 combat reroll on turns 1-{turns}.",
+		"effect": {"rule": "quick_hands", "name": "Quick Hands", "desc": "+1 combat reroll on {turns|turns1}.",
 			"n": {"turns": [1, 1, 1]}, "scale": []}},
 	"katana": {"name": "Katana", "slot": "weapon", "hands": 1, "style": "melee_1h", "model": "Ninja_Katana",
 		"affinity": ["ninja"], "std": "block2",
-		"effect": {"rule": "flow", "name": "Flow", "desc": "A turn with {dice}+ dice rerolled: +{flat} damage after the multiplier ({uses} per fight).",
+		"effect": {"rule": "flow", "name": "Flow", "desc": "A turn with {dice}+ dice rerolled: +{flat} damage after the multiplier ({uses|times} per fight).",
 			"n": {"dice": [2, 2, 2], "flat": [1, 1, 1], "uses": [1, 1, 1]}, "scale": []}},
 	"arcane_staff": {"name": "Arcane Staff", "slot": "weapon", "hands": 2, "style": "magic", "model": "staff",
 		"affinity": ["mage", "necromancer"], "std": "x1.2",
-		"effect": {"rule": "channel", "name": "Channel", "desc": "Runed dice in the scoring group: +{pip} damage each after the multiplier (max {max}; {uses} per fight).",
+		"effect": {"rule": "channel", "name": "Channel", "desc": "Runed dice in the scoring group: +{pip} damage each after the multiplier (max {max}; {uses|times} per fight).",
 			"n": {"pip": [1, 1, 1], "max": [1, 1, 1], "uses": [1, 1, 1]}, "scale": []}},
 	"druid_staff": {"name": "Druid Staff", "slot": "weapon", "hands": 2, "style": "magic", "model": "druid_staff",
 		"affinity": ["druid"], "std": "block2",
-		"effect": {"rule": "grove", "name": "Grove", "desc": "At each biome change, raise the lowest face of {dice} dice by 1.",
+		"effect": {"rule": "grove", "name": "Grove", "desc": "At each biome change, raise the lowest face of {dice|die/dice} by 1.",
 			"n": {"dice": [1, 1, 1]}, "scale": []}},
 	"wand": {"name": "Wand", "slot": "weapon", "hands": 1, "style": "magic", "model": "wand",
 		"affinity": [], "std": "x1.2",
@@ -169,7 +169,7 @@ const ITEMS := {
 			"n": {"flat": [1, 1, 2]}, "scale": ["flat"]}},
 	"claws": {"name": "Claws", "slot": "weapon", "hands": 1, "style": "unarmed", "model": "fistweapon_C_right",
 		"affinity": ["monster_kid"], "std": "x1.2",
-		"effect": {"rule": "scrap", "name": "Scrap", "desc": "2+ dice showing 1 or 2: +{per} damage after the multiplier ({uses} per fight).",
+		"effect": {"rule": "scrap", "name": "Scrap", "desc": "2+ dice showing 1 or 2: +{per} damage after the multiplier ({uses|times} per fight).",
 			"n": {"dice": [2, 2, 2], "per": [1, 1, 2], "uses": [1, 2, 2]}, "scale": []}},
 	"wrench": {"name": "Wrench", "slot": "weapon", "hands": 1, "style": "melee_1h", "model": "engineer_Wrench",
 		"affinity": ["engineer"], "std": "block2",
@@ -188,11 +188,11 @@ const ITEMS := {
 			"n": {"thorns": [1, 1, 1]}, "scale": ["thorns"]}},
 	"oath_shield": {"name": "Oath Shield", "slot": "offhand", "mount": "hand", "model": "paladin_shield",
 		"affinity": ["paladin"], "std": "x1.2",
-		"effect": {"rule": "aegis", "name": "Aegis", "desc": "A Pair or better grants Block = the set's value x{x} ({uses} per fight).",
+		"effect": {"rule": "aegis", "name": "Aegis", "desc": "A Pair or better grants Block equal to {x%} of the set's value ({uses|times} per fight).",
 			"n": {"x": [0.1, 0.15, 0.2], "uses": [1, 1, 1]}, "scale": ["x"]}},
 	"parrying_dagger": {"name": "Parrying Dagger", "slot": "offhand", "mount": "hand", "model": "dagger",
 		"affinity": ["rogue"], "std": "block2",
-		"effect": {"rule": "steady", "name": "Steady", "desc": "Keep {dice}+ dice unrerolled: +1 damage after the multiplier ({uses} per fight).",
+		"effect": {"rule": "steady", "name": "Steady", "desc": "Keep {dice}+ dice unrerolled: +1 damage after the multiplier ({uses|times} per fight).",
 			"n": {"dice": [3, 3, 3], "uses": [1, 1, 1]}, "scale": []}},
 	"spellbook": {"name": "Spellbook", "slot": "offhand", "mount": "belt", "model": "spellbook_open",
 		"affinity": ["mage"], "std": "x1.2",
@@ -215,14 +215,14 @@ const ITEMS := {
 	# ---------------------------------------------------------------- head (§4.1)
 	"knight_helm": {"name": "Knight Helm", "slot": "head", "model": "Knight_Helmet", "affinity": ["knight"], "std": "x1.2",
 		"effect": {"rule": "steadfast", "name": "Steadfast",
-			"desc": "When a rune or item gives you Block: +{extra} more (once per turn, {uses} turn(s) per fight).",
+			"desc": "When a rune or item gives you Block: +{extra} more, {uses|times} per fight (at most once per turn).",
 			"n": {"extra": [1, 1, 1], "uses": [1, 1, 1]}, "scale": []}},
 	"paladin_helm": {"name": "Paladin Helm", "slot": "head", "model": "Paladin_Helmet", "affinity": ["paladin"], "std": "x1.2",
-		"effect": {"rule": "vow", "name": "Vow", "desc": "Three of a Kind or better heals {heal}, {uses} time(s) per fight.",
+		"effect": {"rule": "vow", "name": "Vow", "desc": "Three of a Kind or better heals {heal}, {uses|times} per fight.",
 			"n": {"heal": [1, 1, 1], "uses": [1, 1, 1]}, "scale": []}},
 	"wizard_hat": {"name": "Wizard Hat", "slot": "head", "model": "Mage_Hat", "affinity": ["mage"], "std": "block2",
 		"effect": {"rule": "arcana", "name": "Arcana",
-			"desc": "On turns 1-{turns} the first rune trigger fires twice (never re-doubles Resonance or Rune Echo).",
+			"desc": "On {turns|turns1} the first rune trigger fires twice (never re-doubles Resonance or Rune Echo).",
 			"n": {"turns": [1, 1, 1]}, "scale": []}},
 	"bear_hat": {"name": "Bear Hat", "slot": "head", "model": "Barbarian_BearHat", "affinity": ["barbarian"], "std": "x1.2",
 		"effect": {"rule": "ferocity", "name": "Ferocity", "desc": "Below 50% HP: +{flat} damage.",
@@ -232,10 +232,10 @@ const ITEMS := {
 			"n": {"pct": [0.05, 0.1, 0.1]}, "scale": ["pct"]}},
 	"ninja_headband": {"name": "Ninja Headband", "slot": "head", "model": "Ninja_Headband", "affinity": ["ninja"], "std": "block2",
 		"effect": {"rule": "focus", "name": "Focus",
-			"desc": "A reroll of exactly one die is free, {uses} per fight.",
+			"desc": "A reroll of exactly one die is free, {uses|times} per fight.",
 			"n": {"uses": [1, 1, 1], "per_turn": [0, 0, 0]}, "scale": []}},
 	"bandit_mask": {"name": "Bandit Mask", "slot": "head", "model": "RogueHooded_Mask", "affinity": ["rogue"], "std": "x1.2",
-		"effect": {"rule": "ambush", "name": "Ambush", "desc": "After a board move on doubles, the next fight's first attack deals x{factor}.",
+		"effect": {"rule": "ambush", "name": "Ambush", "desc": "After a board move on doubles, the next fight's first attack deals {factor+%} damage.",
 			"n": {"factor": [1.02, 1.03, 1.04]}, "scale": ["factor"]}},
 	"bone_crown": {"name": "Bone Crown", "slot": "head", "model": "Necromancer_Crown", "affinity": ["necromancer"], "std": "x1.2",
 		"effect": {"rule": "dominion", "name": "Dominion",
@@ -243,10 +243,10 @@ const ITEMS := {
 			"n": {"max": [1, 2, 2]}, "scale": ["max"]}},
 	# ---------------------------------------------------------------- body (§4.2, §4.3; one mesh each, no variants)
 	"knight_plate": {"name": "Knight Plate", "slot": "body", "model": "Knight_Body", "affinity": ["knight"], "std": "",
-		"effect": {"rule": "plated", "name": "Plated", "desc": "Elite, mini-boss and boss fights: Block {block} at the start of combat turns 1-{turns}.",
+		"effect": {"rule": "plated", "name": "Plated", "desc": "Elite and boss fights: Block {block} at the start of combat {turns|turns1}.",
 			"n": {"block": [1, 1, 1], "turns": [1, 1, 1]}, "scale": []}},
 	"paladin_cuirass": {"name": "Paladin Cuirass", "slot": "body", "model": "Paladin_Body", "affinity": ["paladin"], "std": "",
-		"effect": {"rule": "blessed", "name": "Blessed", "desc": "Two Pair or better heals {heal}, {uses} time(s) per fight.",
+		"effect": {"rule": "blessed", "name": "Blessed", "desc": "Two Pair or better heals {heal}, {uses|times} per fight.",
 			"n": {"heal": [1, 1, 1], "uses": [1, 1, 1]}, "scale": []}},
 	"barbarian_harness": {"name": "Barbarian Harness", "slot": "body", "model": "Barbarian_Body", "affinity": ["barbarian"], "std": "",
 		"effect": {"rule": "brawn", "name": "Brawn", "desc": "Heavy dice in the attack: +{pips} damage each after the multiplier (max {dice}).",
@@ -255,7 +255,7 @@ const ITEMS := {
 		"effect": {"rule": "rune_woven", "name": "Rune-woven", "desc": "Ember deals +{dmg}; tier III: Thunder too.",
 			"n": {"dmg": [1, 1, 1], "thunder": [0, 0, 1], "poison": [0, 0, 0]}, "scale": []}},
 	"rogue_leathers": {"name": "Rogue Leathers", "slot": "body", "model": "Rogue_Body", "affinity": ["rogue"], "std": "",
-		"effect": {"rule": "nimble", "name": "Nimble", "desc": "Keep 2+ dice all turn: bank +1 reroll, {max} time(s) per fight.",
+		"effect": {"rule": "nimble", "name": "Nimble", "desc": "Keep 2+ dice all turn: bank +1 reroll, {max|times} per fight.",
 			"n": {"max": [1, 1, 1]}, "scale": []}},
 	"ranger_tunic": {"name": "Ranger Tunic", "slot": "body", "model": "Ranger_Body", "affinity": ["ranger"], "std": "",
 		"effect": {"rule": "hunter", "name": "Hunter", "desc": "+{flat} damage against enemies at full HP.",
@@ -275,7 +275,7 @@ const ITEMS := {
 	"dino_suit": {"name": "Dino Suit", "slot": "body", "model": "MonsterCostume_Body", "affinity": ["monster_kid"], "std": "",
 		"locks_head": true, "class_only": "monster_kid",
 		"effect": {"rule": "thick_hide", "name": "Thick Hide",
-			"desc": "Block {block} on combat turns 1-{turns}; BOO!'s boss weaken becomes {weaken%}.",
+			"desc": "Block {block} on combat {turns|turns1}; BOO!'s boss weaken becomes {weaken%}.",
 			"n": {"block": [1, 1, 1], "turns": [1, 2, 3], "weaken": [0.35, 0.4, 0.4]}, "scale": []}},
 	# ---------------------------------------------------------------- trinkets (§7.3; tier from the Trinket rank)
 	"tankard": {"name": "Tankard", "slot": "trinket", "model": "mug_full", "affinity": [], "std": "",
@@ -290,7 +290,7 @@ const ITEMS := {
 			"n": {"pct": [0.2, 0.35, 0.5], "dodge": [0, 0, 3]}, "scale": []}},
 	"coin_purse": {"name": "Coin Purse", "slot": "trinket", "model": "Gems_Sack", "affinity": [], "std": "",
 		"effect": {"rule": "thrift", "name": "Thrift",
-			"desc": "Gold +{gold%}; tier II: passing the Treasury banks +{treasury_step}; tier III: cash-outs x1.25.",
+			"desc": "Gold +{gold%}; tier II: passing the Treasury banks +{treasury_step}; tier III: cash-outs {cashout+%}.",
 			"n": {"gold": [0.03, 0.05, 0.08], "treasury_step": [0, 3, 5], "cashout": [1.0, 1.0, 1.25]}, "scale": []}},
 	"traders_map": {"name": "Trader's Map", "slot": "trinket", "model": "map_rolled", "affinity": [], "std": "",
 		"effect": {"rule": "haggle", "name": "Haggle", "desc": "Restocks cost 7; tier II: 1 free restock per shop; tier III: shops +1 item.",
@@ -300,11 +300,11 @@ const ITEMS := {
 			"n": {"heal": [0.0, 0.0, 0.03]}, "scale": []}},
 	"skeleton_key": {"name": "Skeleton Key", "slot": "trinket", "model": "key_gold", "affinity": [], "std": "",
 		"effect": {"rule": "unlock", "name": "Unlock",
-			"desc": "Chest runes: 1 of 4; tier II: chest gold x1.25; tier III: the first chest per biome is a rune chest.",
+			"desc": "Chest runes: 1 of 4; tier II: chest gold {gold+%}; tier III: the first chest per biome is a rune chest.",
 			"n": {"choices": [4, 4, 4], "gold": [1.0, 1.25, 1.25], "first_rune": [0, 0, 1]}, "scale": []}},
 	"loaded_die": {"name": "Loaded Die", "slot": "trinket", "model": "D6_A_red", "affinity": [], "std": "",
 		"effect": {"rule": "weighted", "name": "Weighted",
-			"desc": "At the first combat roll of each fight, {dice} dice showing 0 or 1 reroll free.",
+			"desc": "The first combat roll of each fight rerolls {dice|die/dice} showing 0 or 1 for free.",
 			"n": {"dice": [1, 1, 2]}, "scale": []}},
 	# ---------------------------------------------------------------- back (§4.5: Style items, no stats yet)
 	"knight_cape": {"name": "Knight Cape", "slot": "back", "model": "Knight_Cape", "cosmetic": true, "effect": {}, "affinity": [], "std": ""},
@@ -617,19 +617,52 @@ static func sec_num(variant: String, key: String, fallback := 0.0) -> float:
 static func sec_of(variant: String) -> String:
 	return String(VARIANTS.get(variant, {}).get("sec", ""))
 
-## Rule text with the numbers of `tier` filled in ({key} and {key%} placeholders).
+## Rule text with the numbers of `tier` filled in. A "tier II:" / "tier III:" clause reads with that
+## tier's own numbers (it describes what the tier adds, so the current tier's zero would mislead).
+## Placeholders: {key} number, {key%} percent, {key+%} a factor's bonus as "+N%" (x1.15 -> +15%),
+## {key|times} once / twice / N times, {key|turns1} turn 1 / turns 1-N, {key|one/many} "1 one" / "N many".
 static func rule_text(item: String, tier: int, variant := "") -> String:
 	var eff: Dictionary = def(item).get("effect", {})
 	if eff.is_empty():
 		return "Style"
-	var s := String(eff.get("desc", ""))
+	var desc := String(eff.get("desc", ""))
 	var t := maxi(1, tier)
-	for key in (eff.get("n", {}) as Dictionary):
-		var v := num(item, String(key), t, variant)
+	var re := RegEx.create_from_string("(?i)tier (III|II):")
+	var out := ""
+	var at := 0
+	for m in re.search_all(desc):
+		out += _fill(item, desc.substr(at, m.get_start() - at), t, variant)
+		var nxt := re.search(desc, m.get_end())
+		var end := nxt.get_start() if nxt else desc.length()
+		out += _fill(item, desc.substr(m.get_start(), end - m.get_start()), 3 if m.get_string(1).to_upper() == "III" else 2, variant)
+		at = end
+	return out + _fill(item, desc.substr(at), t, variant)
+
+## One clause of a rule template with `tier`'s numbers.
+static func _fill(item: String, text: String, tier: int, variant: String) -> String:
+	var vals := {}
+	for key in (def(item).get("effect", {}).get("n", {}) as Dictionary):
+		vals[String(key)] = num(item, String(key), tier, variant)
+	if item == "spear":
+		vals["boss_factor"] = num(item, "factor", tier, variant) + num(item, "boss", tier, variant)
+	var s := text
+	for m in RegEx.create_from_string("\\{(\\w+)\\|([^}]+)\\}").search_all(text):
+		var n := int(round(float(vals.get(m.get_string(1), 0.0))))
+		var form := m.get_string(2)
+		var word := ""
+		if form == "times":
+			word = "once" if n == 1 else ("twice" if n == 2 else "%d times" % n)
+		elif form == "turns1":
+			word = "turn 1" if n <= 1 else "turns 1-%d" % n
+		else:
+			var forms := form.split("/")
+			word = "%d %s" % [n, forms[0] if n == 1 or forms.size() < 2 else forms[1]]
+		s = s.replace(m.get_string(), word)
+	for key in vals:
+		var v := float(vals[key])
+		s = s.replace("{%s+%%}" % key, "+%s%%" % _fmt(snappedf((v - 1.0) * 100.0, 0.1)))
 		s = s.replace("{%s%%}" % key, "%s%%" % _fmt(snappedf(v * 100.0, 0.1)))
 		s = s.replace("{%s}" % key, _fmt(v))
-	if item == "spear":
-		s = s.replace("{boss_factor}", _fmt(num(item, "factor", t, variant) + num(item, "boss", t, variant)))
 	return s
 
 static func _fmt(v: float) -> String:

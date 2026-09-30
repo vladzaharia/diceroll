@@ -157,7 +157,7 @@ func _swatch(p: Profile, skin: String) -> Control:
 		col.add_child(UiTheme.para(SkinDefs.cond_text(view_class, skin), 16, UiPalette.TEXT_DIM, 500))
 		var prog := progress_text(p, view_class, skin)
 		if prog != "":
-			col.add_child(UiTheme.para(prog, 15, Color("c79bff"), 700))
+			col.add_child(UiTheme.para(prog, 16, Color("c79bff"), 700))
 		if p.crowns_capped():
 			var b := CampUi.buy_button("BUY", {"crowns": SkinDefs.BUY_PRICE}, p.crowns >= SkinDefs.BUY_PRICE, 20)
 			b.min_height = 60
@@ -202,7 +202,7 @@ func _prestige(p: Profile) -> Control:
 		col.add_child(UiTheme.para(SkinDefs.cond_text(view_class, "prestige") + " Never for sale.", 17, UiPalette.TEXT_DIM, 500))
 		var prog := progress_text(p, view_class, "prestige")
 		if prog != "":
-			col.add_child(UiTheme.para(prog, 15, Color("c79bff"), 700))
+			col.add_child(UiTheme.para(prog, 16, Color("c79bff"), 700))
 	return c
 
 
@@ -261,7 +261,7 @@ class _Pick:
 			dot.position = Vector2(54, 0)
 			holder.add_child(dot)
 		var name := "???" if secret else String(HeroDefs.DATA[id].name)
-		var l := UiTheme.label(name, 15, (UiPalette.GOLD_BRIGHT if sel else UiPalette.TEXT) if owned else UiPalette.TEXT_MUTED, false, 0, false, 700)
+		var l := UiTheme.label(name, 16, (UiPalette.GOLD_BRIGHT if sel else UiPalette.TEXT) if owned else UiPalette.TEXT_MUTED, false, 0, false, 700)
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		l.custom_minimum_size.x = 40
