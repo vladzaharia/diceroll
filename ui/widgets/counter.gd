@@ -25,7 +25,7 @@ static func make(icon: String, p_value := 0, font := 30, color: Color = UiPalett
 	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var row := UiTheme.hbox(8)
 	c.add_child(row)
-	c._icon = UiIcons.rect(icon, int(font * 1.25))
+	c._icon = Icons.rect(icon, int(font * 1.25))
 	row.add_child(c._icon)
 	c._label = UiTheme.label(str(p_value), font, color, true, 6)
 	row.add_child(c._label)
