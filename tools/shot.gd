@@ -12,6 +12,8 @@ extends Node
 ##                   plus the no-spillover gate (UiAudit): AUDIT_OVERFLOW (rect outside its
 ##                   frame), AUDIT_SAFE (content outside the safe area), AUDIT_CLIP (text
 ##                   wider than its label); opt out per node with meta "allow_overflow"
+## --hover=X,Y      moves the mouse to (X, Y) (fractions of the window) 0.6 s before the shot:
+##                   desktop hover states (the GameButton hover keycap; use with --input=kbm)
 ## Without --shot the scenario just runs (handy for manual poking).
 ## --timeout=S      safety timer: force-quits S seconds after start (default wait + frames*0.25 + 10;
 ##                   CI software rendering (lavapipe) compiles shaders slowly, so tools/ci/shoot_ci.sh raises it)
@@ -73,7 +75,18 @@ func _run(name: String, wait: float, frames: int) -> void:
 	if not args.has("shot"):
 		return
 	var path := String(args["shot"])
-	await tree.create_timer(wait, true, false, true).timeout
+	if args.has("hover"):
+		var hv := String(args["hover"]).split(",")
+		await tree.create_timer(maxf(wait - 0.6, 0.1), true, false, true).timeout
+		var vs := get_viewport().get_visible_rect().size
+		var m := InputEventMouseMotion.new()
+		m.position = vs * Vector2(float(hv[0]), float(hv[1] if hv.size() > 1 else "0.5"))
+		m.global_position = m.position
+		m.relative = Vector2(4, 4)
+		get_viewport().push_input(m, true)
+		await tree.create_timer(0.6, true, false, true).timeout
+	else:
+		await tree.create_timer(wait, true, false, true).timeout
 	await _save(path)
 	if args.has("audit"):
 		print("AUDIT_BEGIN")

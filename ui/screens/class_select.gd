@@ -17,6 +17,8 @@ signal class_chosen(class_id: String)
 signal back_pressed
 
 const TAGLINES := ClassInfo.TAGLINES
+## Narrowest chip in a 4-column grid ("Necromancer" at 16 px fits on one line).
+const MIN_CHIP_W := 120.0
 ## Space kept free under the plaque's lower half inside the frame.
 const PLAQUE_CLEAR := 14.0
 
@@ -177,7 +179,7 @@ func _layout() -> void:
 	var portrait_mode := UiTheme.is_portrait(size)
 	back_btn.reset_size()
 	back_btn.position = Vector2(safe.left + 8.0, safe.top + 8.0)
-	_grid.columns = 4 if portrait_mode else 4
+	_grid.columns = _columns(portrait_mode)
 	_info.custom_minimum_size.x = 0
 	var info_h := _info.get_combined_minimum_size().y
 	if portrait_mode:
@@ -186,9 +188,11 @@ func _layout() -> void:
 		var avail := size.y - safe.bottom - top
 		# the preview keeps at least a third of the height; the info scrolls beyond that
 		var chrome := _grid.get_combined_minimum_size().y + start_btn.get_combined_minimum_size().y + 36.0 + PLAQUE_CLEAR + _frame_v()
-		var ph := minf(chrome + info_h, avail - maxf(avail * 0.3, 240.0))
-		_scroll.custom_minimum_size = Vector2(0, maxf(160.0, ph - chrome))
+		var ph := minf(chrome + info_h, avail - maxf(avail * 0.28, 220.0))
+		_scroll.custom_minimum_size = Vector2(0, maxf(110.0, ph - chrome))
 		_panel.reset_size()
+		# never taller than the screen allows: the preview above gives way first
+		ph = maxf(ph, _panel.get_combined_minimum_size().y)
 		_panel.size = Vector2(w, ph)
 		_panel.position = Vector2((size.x - w) * 0.5, size.y - safe.bottom - ph)
 		portrait.position = Vector2(0, top)
@@ -207,6 +211,17 @@ func _layout() -> void:
 		portrait.position = Vector2(size.x * 0.03, safe.top + 40.0)
 		portrait.size = Vector2(size.x * 0.46, size.y - safe.top - safe.bottom - 40.0)
 	_place_header()
+
+
+## 4 chips a row while a chip keeps MIN_CHIP_W px (labels >= 16 px); 3 on narrow canvases
+## (125 % zoom on phones) so no name shrinks or truncates.
+func _columns(portrait_mode: bool) -> int:
+	var sb := _panel.get_theme_stylebox("panel")
+	var side := (sb.get_margin(SIDE_LEFT) + sb.get_margin(SIDE_RIGHT)) if sb != null else 64.0
+	var w := minf(UiTheme.MODAL_MAX_W, size.x - UiTheme.safe_margins(self).left - UiTheme.safe_margins(self).right) \
+		if portrait_mode else minf(UiTheme.MODAL_MAX_W, size.x * 0.5)
+	var chip := (w - side - 3.0 * 8.0) / 4.0
+	return 4 if chip >= MIN_CHIP_W else 3
 
 
 ## Top + bottom content margins of the panel frame.
@@ -258,13 +273,14 @@ class _Backdrop:
 
 ## A class chip: a flat round pack pill (yellow when selected, grey-darker otherwise) with the
 ## class icon over the name. Locked classes show the icon desaturated plus a small lock badge
-## inside the pill's top-right; labels shrink (to MIN_FONT) and then end in an ellipsis.
+## inside the pill's top-right. Labels shrink to MIN_FONT (16, the 720-canvas text floor),
+## then a two-word name wraps onto two lines ("Monster / Kid"), and only then truncates.
 class ClassChip:
 	extends BaseButton
-	const H := 80.0
+	const H := 88.0
 	const ICON := 30.0
 	const FONT := 19
-	const MIN_FONT := 14
+	const MIN_FONT := 16
 	const LOCK := 18.0
 	var label := ""
 	var icon := ""
@@ -286,27 +302,50 @@ class ClassChip:
 	func _ready() -> void:
 		toggled.connect(func(_on: bool) -> void: queue_redraw())
 
-	## Font size that fits the label in `w` px (MIN_FONT at worst; then it truncates).
-	func fitted_font(w: float) -> int:
+	## The label's lines at their font size: {"lines": [..], "font": n} fitted to `w` px.
+	func layout_label(w: float) -> Dictionary:
 		var f := UiTheme.display_font()
 		var fs := FONT
 		while fs > MIN_FONT and f.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > w:
 			fs -= 1
-		return fs
-
-	## The label as drawn in `w` px (ellipsis when even MIN_FONT is too wide).
-	func shown_label(w: float) -> String:
-		var f := UiTheme.display_font()
-		var fs := fitted_font(w)
 		if f.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x <= w:
-			return label
-		var t := label
+			return {"lines": [label], "font": fs}
+		var words := label.split(" ", false)
+		if words.size() >= 2:
+			# best two-line split: the widest line as narrow as possible
+			var best: Array = []
+			var best_w := INF
+			for cut in range(1, words.size()):
+				var a := " ".join(words.slice(0, cut))
+				var b := " ".join(words.slice(cut))
+				var mw := maxf(f.get_string_size(a, HORIZONTAL_ALIGNMENT_LEFT, -1, MIN_FONT).x,
+					f.get_string_size(b, HORIZONTAL_ALIGNMENT_LEFT, -1, MIN_FONT).x)
+				if mw < best_w:
+					best_w = mw
+					best = [a, b]
+			if best_w <= w:
+				return {"lines": best, "font": MIN_FONT}
+		return {"lines": [_ellipsis(label, w, MIN_FONT)], "font": MIN_FONT}
+
+	## Font size the label gets in `w` px (never below MIN_FONT).
+	func fitted_font(w: float) -> int:
+		return int(layout_label(w).font)
+
+	## The label as drawn in `w` px (lines joined with a space; an ellipsis when truncated).
+	func shown_label(w: float) -> String:
+		return " ".join(layout_label(w).lines)
+
+	static func _ellipsis(t: String, w: float, fs: int) -> String:
+		var f := UiTheme.display_font()
+		if f.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x <= w:
+			return t
 		while t.length() > 1 and f.get_string_size(t + "…", HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > w:
 			t = t.left(t.length() - 1)
 		return t.strip_edges() + "…"
 
+	## Label width: the label sits across the pill's straight middle, so only a small inset.
 	func text_width() -> float:
-		return size.x - 24.0
+		return size.x - 20.0
 
 	func _draw() -> void:
 		var sel := button_pressed
@@ -316,25 +355,41 @@ class ClassChip:
 		var ink := UiPalette.INK_LABEL if sel and UiTheme.skinned("chip_yellow") else UiPalette.TEXT
 		if not open:
 			ink = UiPalette.TEXT_MUTED if not sel else ink
-		# icon (desaturated when locked) over the name
-		var opts := {"saturation": 1.0 if open else 0.0}
-		var tex := Icons.texture(icon, int(ICON), opts)
-		var top := 9.0
+		var f := UiTheme.display_font()
+		var lay := layout_label(text_width())
+		var lines: Array = lay.lines
+		var fs := int(lay.font)
+		var lh := f.get_height(fs) * 0.92
+		# icon (desaturated when locked) over the name, the block centred vertically
+		var block := ICON + 4.0 + lh * lines.size()
+		var top := maxf(6.0, (size.y - block) * 0.5)
+		var tex := Icons.texture(icon, int(ICON), {"saturation": 1.0 if open else 0.0})
 		if tex != null:
 			var ts := tex.get_size()
 			var k := ICON / maxf(ts.x, ts.y)
 			var d := ts * k
 			draw_texture_rect(tex, Rect2(Vector2((size.x - d.x) * 0.5, top + (ICON - d.y) * 0.5), d), false)
-		var f := UiTheme.display_font()
-		var w := text_width()
-		var fs := fitted_font(w)
-		var t := shown_label(w)
-		var tw := f.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		draw_string(f, Vector2((size.x - tw) * 0.5, top + ICON + 6.0 + f.get_ascent(fs) * 0.9), t,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, fs, ink)
+		var y := top + ICON + 4.0
+		for t in lines:
+			var tw := f.get_string_size(String(t), HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+			draw_string(f, Vector2((size.x - tw) * 0.5, y + f.get_ascent(fs) * 0.92), String(t),
+				HORIZONTAL_ALIGNMENT_LEFT, -1, fs, ink)
+			y += lh
 		if not open:
 			# lock badge inside the pill (clear of the rounded end), never hung off the corner
 			var lt := Icons.texture("lock", int(LOCK))
 			if lt != null:
-				draw_texture_rect(lt, Rect2(Vector2(size.x - size.y * 0.5 - LOCK * 0.1, 7.0), Vector2(LOCK, LOCK)), false)
+				draw_texture_rect(lt, lock_rect(), false)
+
+	## The lock badge: right of the icon, as high as the pill's rounded end allows (inside).
+	func lock_rect() -> Rect2:
+		var r := size.y * 0.5
+		var bx := minf((size.x + ICON) * 0.5 + 3.0, size.x - LOCK - 10.0)
+		var y := 6.0
+		while y < r:
+			var right := size.x - r + sqrt(maxf(r * r - (r - y) * (r - y), 0.0))
+			if bx + LOCK <= right - 3.0:
+				break
+			y += 1.0
+		return Rect2(Vector2(bx, y), Vector2(LOCK, LOCK))
 

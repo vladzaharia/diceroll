@@ -15,12 +15,17 @@ func test_title_hides_continue_without_a_save() -> void:
 
 func test_class_chip_labels_fit_on_phones() -> void:
 	# a 4-column grid on the 720 canvas leaves ~144 px per chip (~120 px for the label)
-	for name in ["Necromancer", "Monster Kid", "Barbarian", "Engineer"]:
-		var c := ClassSelect.ClassChip.make(name, "question", true)
-		c.size = Vector2(144, ClassSelect.ClassChip.H)
-		assert_eq(c.shown_label(c.text_width()), name, "%s is not truncated" % name)
-		assert_true(c.fitted_font(c.text_width()) >= ClassSelect.ClassChip.MIN_FONT, "%s font" % name)
-		c.free()
+	# (ClassSelect drops to 3 columns below MIN_CHIP_W): names never go under 16 px, long
+	# ones wrap, and none truncate
+	for w in [144.0, ClassSelect.MIN_CHIP_W]:
+		for name in ["Necromancer", "Monster Kid", "Barbarian", "Engineer"]:
+			var c := ClassSelect.ClassChip.make(name, "question", true)
+			c.size = Vector2(w, ClassSelect.ClassChip.H)
+			assert_eq(c.shown_label(c.text_width()), name, "%s is not truncated at %d px" % [name, w])
+			assert_true(c.fitted_font(c.text_width()) >= 16, "%s font >= 16" % name)
+			var lk := c.lock_rect()
+			assert_true(Rect2(Vector2.ZERO, c.size).encloses(lk), "lock badge inside the chip")
+			c.free()
 
 
 func test_locked_chip_is_marked() -> void:
