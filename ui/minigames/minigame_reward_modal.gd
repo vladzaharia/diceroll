@@ -16,6 +16,9 @@ const TAGS := {"gold": "GOLD", "crown": "META", "potion": "POTION", "potion_gold
 	"high_roller": "DICE"}
 
 var _medal: MgWidgets.Medal
+## The pack trophy (MgWidgets.trophy, slice e) in place of the drawn medal, when available.
+var _trophy: Control
+var _top: HBoxContainer
 var _sub: Label
 var _list: VBoxContainer
 var _take: GameButton
@@ -27,6 +30,7 @@ func _build() -> void:
 	var top := UiTheme.hbox(16)
 	top.alignment = BoxContainer.ALIGNMENT_CENTER
 	body.add_child(top)
+	_top = top
 	_medal = MgWidgets.Medal.new()
 	_medal.custom_minimum_size = Vector2(96, 108)
 	top.add_child(_medal)
@@ -56,6 +60,7 @@ func refresh(flow: GameFlow) -> void:
 	if not ribbon.skinned():
 		ribbon.family = "white"
 	_medal.tier = tier
+	_set_trophy(tier)
 	_sub.text = "%s\nChoose one reward" % MinigameDefs.name_of(String(offer.get("id", "")))
 	UiTheme.clear(_list)
 	_cards.clear()
@@ -81,6 +86,32 @@ func refresh(flow: GameFlow) -> void:
 	_choice = -1
 	_take.set_enabled(false)
 	relayout()
+
+
+## Swaps the drawn medal for the pack trophy (trophy_gold / silver / bronze at 96 px, spec 4.5)
+## once slice (e)'s MgWidgets.trophy(tier, px) exists; the medal stays otherwise.
+func _set_trophy(tier: String) -> void:
+	if _trophy != null and is_instance_valid(_trophy):
+		_trophy.queue_free()
+		_trophy = null
+	if not has_trophy():
+		_medal.visible = true
+		return
+	var t: Variant = (MgWidgets as Script).call("trophy", tier, 96)
+	if not t is Control:
+		_medal.visible = true
+		return
+	_trophy = t
+	_medal.visible = false
+	_top.add_child(_trophy)
+	_top.move_child(_trophy, 0)
+
+
+static func has_trophy() -> bool:
+	for m in (MgWidgets as Script).get_script_method_list():
+		if String(m.get("name", "")) == "trophy":
+			return true
+	return false
 
 
 func select(i: int) -> void:

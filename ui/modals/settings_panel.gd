@@ -62,14 +62,30 @@ static func set_ui_size(v: float) -> void:
 
 
 ## Applies the saved UI size to `win` on top of its base content scale (the first call
-## remembers the base, so OS / harness scaling is kept).
+## remembers the base, so OS / harness scaling is kept), times the landscape phone boost
+## (UiTheme.landscape_ui_boost: 1.4 on a phone held sideways, else 1). Re-applied on every
+## window resize / rotation (track_window).
 static func apply_ui_size(win: Window, v: float = -1.0) -> void:
 	if win == null:
 		return
 	if not win.has_meta("ui_base_scale"):
 		win.set_meta("ui_base_scale", win.content_scale_factor)
 	var k := ui_size() if v <= 0.0 else v
-	win.content_scale_factor = float(win.get_meta("ui_base_scale")) * k
+	win.content_scale_factor = float(win.get_meta("ui_base_scale")) * effective_ui_scale(k, Vector2(win.size))
+	track_window(win)
+
+
+## The UI scale actually used: the player's UI size times the landscape phone boost.
+static func effective_ui_scale(user_size: float, window_size: Vector2) -> float:
+	return user_size * UiTheme.landscape_ui_boost(window_size)
+
+
+## Keeps `win`'s UI scale right through rotations and resizes (connected once per window).
+static func track_window(win: Window) -> void:
+	if win == null or win.has_meta("ui_size_tracked"):
+		return
+	win.set_meta("ui_size_tracked", true)
+	win.size_changed.connect(func() -> void: apply_ui_size(win))
 
 
 func _build() -> void:
