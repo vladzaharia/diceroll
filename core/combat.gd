@@ -67,6 +67,13 @@ func begin(run: RunState, ids: Array, p_elite: bool, p_boss: bool, p_tile: int, 
 	lap = run.eff_lap()
 	for id in ids:
 		enemies.append(make_enemy(run.rng, String(id), act, lap, elite))
+	# the biome's enemy HP (BiomeDefs.enemy_hp): regular and elite enemies only
+	var bhp := BiomeDefs.enemy_hp(run.biome())
+	if bhp != 1.0:
+		for e in enemies:
+			if not bool(e.boss) and not bool(e.miniboss):
+				e.hp = maxi(1, int(round(int(e.hp) * bhp)))
+				e.max_hp = e.hp
 	if run.mode == "short":
 		# Short Road: fewer laps to build, so the final boss is lighter
 		for e in enemies:

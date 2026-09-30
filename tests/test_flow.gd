@@ -689,7 +689,7 @@ func test_elite_guarantees_passive_choice() -> void:
 	_force_roll(f, 3)
 	f.choose_move(0)
 	assert_eq(f.combat.elite, true)
-	assert_eq(f.combat.enemies[0].hp, int(round(38 * Balance.ELITE_HP_MULT * Balance.enemy_scale(1))))
+	assert_eq(f.combat.enemies[0].hp, int(round(int(round(38 * Balance.ELITE_HP_MULT * Balance.enemy_scale(1))) * BiomeDefs.enemy_hp(f.run.biome()))))
 	_win_fight(f)
 	for k in 6:
 		if f.phase == P.DRAFT and f.offer.kind == "passive":

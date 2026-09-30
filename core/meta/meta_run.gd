@@ -172,9 +172,9 @@ static func apply_start(r: RunState) -> void:
 
 # ------------------------------------------------------------------ Crowns
 
-## Run-end Crowns (Economy constants): laps (2 each, cap 30), biomes reached beyond the first
-## (5 each), the mini-boss kill (12), the win (30), minigames (2-4 by tier, plus bronze Crown
-## picks), leftover gold (1 per 25, cap 5); then x(1 + 8% per ascension) x(1 + catch-up).
+## Run-end Crowns (Economy constants): laps (3 each, cap 45), biomes reached beyond the first
+## (8 each), the mini-boss kill (18), the win (45), minigames (3-6 by tier, plus bronze Crown
+## picks), leftover gold (1 per 25, cap 8); then x(1 + 8% per ascension) x(1 + catch-up).
 ## Short Road runs count laps and biomes at their standard-run equivalent (x1.5 laps, the
 ## tier-3 biome counts as 2) and then pay SHORT_CROWN_MULT of that.
 ## Returns {crowns, breakdown: [[label, amount]]}. Legacy runs (no meta) pay nothing.

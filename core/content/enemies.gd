@@ -78,7 +78,7 @@ const BOSSES := {
 		[{"kind": "attack", "value": 18}, {"kind": "curse", "value": 2}, {"kind": "buff", "value": 3}],
 		[{"kind": "attack", "value": 18}, {"kind": "attack", "value": 20}, {"kind": "curse", "value": 2}, {"kind": "buff", "value": 3}],
 	]},
-	"boss_lich": {"name": "The Lich", "hp": 1650, "gold": 0, "xp": 0, "phases": [
+	"boss_lich": {"name": "The Lich", "hp": 1720, "gold": 0, "xp": 0, "phases": [
 		[{"kind": "attack", "value": 22}, {"kind": "curse", "value": 1}, {"kind": "block", "value": 30}],
 		[{"kind": "attack", "value": 26}, {"kind": "chaos", "value": 1}, {"kind": "attack", "value": 22}, {"kind": "curse", "value": 1}],
 	]},
@@ -96,7 +96,7 @@ const BOSSES := {
 	]},
 	# Magma Depths: a molten shell (Block never expires) in phase 1; in phase 2 the shell shatters
 	# (its Block is lost when phase 2 starts) and its attacks pierce your Block.
-	"boss_magma_golem": {"name": "Magma Golem", "hp": 960, "gold": 0, "xp": 0,
+	"boss_magma_golem": {"name": "Magma Golem", "hp": 935, "gold": 0, "xp": 0,
 		"traits": [["armor"], ["pierce"]], "phases": [
 		[{"kind": "block", "value": 32}, {"kind": "attack", "value": 22}, {"kind": "attack", "value": 26}],
 		[{"kind": "attack", "value": 24}, {"kind": "attack", "value": 28}, {"kind": "buff", "value": 3}],

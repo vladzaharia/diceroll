@@ -2246,6 +2246,8 @@ static func _fight_loss(f: GameFlow, rules: AutoRules, ids: Array, elite: bool) 
 		var scale := 1.0 if boss else Balance.enemy_scale(run.eff_lap())
 		var ascale := 1.0 if boss else Balance.enemy_atk_scale(run.eff_lap())
 		var hm := scale * (Balance.ELITE_HP_MULT if elite else 1.0)
+		if not boss and not EnemyDefs.is_miniboss(sid):
+			hm *= BiomeDefs.enemy_hp(run.biome())
 		var am := ascale * (Balance.ELITE_ATK_MULT if elite else 1.0)
 		hps.append(float(EnemyDefs.def(sid).hp) * hm)
 		atks.append(_avg_attack(sid, am, 0 if boss else drum_bonus(run)))

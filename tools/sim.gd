@@ -4,7 +4,7 @@ extends SceneTree
 ## realistic AUTO skill is the balance reference (docs/plans/balance.md).
 ## Usage: godot --headless --path . -s tools/sim.gd -- --runs=300 --class=all --seed=1
 ##        [--board=24|28|32] [--route=glade,frost,magma | mines,moonlit (with --mode=short)]
-##        [--boss=boss_lich] [--twist=off | off:<biome>,<biome>] [--verbose]
+##        [--boss=boss_lich] [--twist=off | off:<biome>,<biome>] [--biome-hp=<biome>:<mult>,...] [--verbose]
 ##        [--profile=none|fresh|mid|max] [--asc=N] [--mode=standard|short] [--mg=par|play]
 ##        [--pet=<id>|none] [--policy=greedy|realistic|expert] [--focus=balanced|damage|defense|economy]
 ## --policy: greedy = the naive Bot.next_command floor; realistic = Bot.decide with
@@ -121,6 +121,10 @@ func _init() -> void:
 					"HEAT_PCT": BiomeDefs.HEAT_PCT = bv.to_float()
 					"OASIS_HEAL_PCT": BiomeDefs.OASIS_HEAL_PCT = bv.to_float()
 					_: print("unknown --bnum ", part)
+		elif arg.begins_with("--biome-hp="):
+			# --biome-hp=hollow:1.08,warcamp:0.92 (overrides BiomeDefs "enemy_hp")
+			for part in arg.substr(11).split(",", false):
+				BiomeDefs.tune_enemy_hp[part.get_slice(":", 0)] = part.get_slice(":", 1).to_float()
 		elif arg.begins_with("--twist="):
 			# --twist=off: every new-biome twist off; --twist=off:warcamp,ruins: just those
 			var tw := arg.substr(8)
