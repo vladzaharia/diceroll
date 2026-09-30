@@ -121,7 +121,9 @@ func open() -> void:
 	_animate()
 
 
-## UiModal's layout, with the footer's height kept free under the scrolling panel.
+## UiModal's layout (MIN_W floor, shrink-to-fit via _fit), with the footer's height kept free
+## under the scrolling panel. Narrow canvases (iPhone at 125 % UI size: 576 px) scale the whole
+## frame down instead of letting wide rows (route strip, first chips) push it off-screen.
 func _layout() -> void:
 	if _frame == null or _footer == null:
 		super._layout()
@@ -129,21 +131,33 @@ func _layout() -> void:
 	var view := size
 	if view.x <= 0.0:
 		return
-	var safe := UiTheme.safe_margins(self)
-	var w := minf(max_width, view.x - safe.left - safe.right)
-	_frame.custom_minimum_size.x = w
-	_frame.size = Vector2(w, 0)
-	var avail_h := view.y - safe.top - safe.bottom
 	_apply_scale(view)
-	_fit_plaque(w)
-	var chrome := chrome_height()
-	chrome += _footer.get_combined_minimum_size().y - 26.0
+	var safe := UiTheme.safe_margins(self)
+	var avail_w := view.x - safe.left - safe.right
+	var w := minf(max_width, avail_w)
+	# never lay out narrower than MIN_W: shrink instead (as UiModal does)
+	var lw := maxf(w, minf(MIN_W, max_width))
+	_frame.custom_minimum_size.x = lw
+	_frame.size = Vector2(lw, 0)
+	_fit_plaque(lw)
+	var k := minf(1.0, w / lw)
+	var avail_h := (view.y - safe.top - safe.bottom) / k
+	var chrome := chrome_height() + _footer.get_combined_minimum_size().y - header_overlap()
 	var natural := _inner.get_combined_minimum_size().y
 	_scroll.custom_minimum_size.y = maxf(120.0, minf(natural, avail_h - chrome))
 	_frame.reset_size()
-	_frame.size.x = w
-	_frame.position = Vector2((view.x - w) * 0.5, maxf(safe.top, (view.y - _frame.size.y) * 0.5))
+	_frame.size.x = maxf(_frame.size.x, lw)
+	# content wider than the screen allows: shrink the whole frame
+	k = minf(k, avail_w / maxf(_frame.size.x, 1.0))
+	k = minf(k, (view.y - safe.top - safe.bottom) / maxf(_frame.size.y, 1.0))
+	var was := _fit
+	_fit = clampf(k, 0.6, 1.0)
+	if not is_equal_approx(was, _fit) and is_equal_approx(_frame.scale.x, was):
+		_frame.scale = Vector2.ONE * _fit
+	var fh := _frame.size.y * _fit
+	var c := Vector2(safe.left + avail_w * 0.5, maxf(safe.top, safe.top + (view.y - safe.top - safe.bottom - fh) * 0.5) + fh * 0.5)
 	_frame.pivot_offset = _frame.size * 0.5
+	_frame.position = c - _frame.size * 0.5
 
 
 func show_now() -> void:
