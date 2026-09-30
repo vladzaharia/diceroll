@@ -191,29 +191,6 @@ func on_event(ev: Dictionary, flow: GameFlow) -> void:
 				UiPalette.HEAL if bool(ev.dodged) else UiPalette.HP_BRIGHT)
 
 
-## Floating message that pops above the bottom bar and fades.
+## Floating message that pops above the bottom bar and fades (the shared Toast helper).
 func toast(text: String, icon := "", color: Color = UiPalette.TEXT) -> void:
-	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.panel_box("pill"), 24, 12))
-	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var row := UiTheme.hbox(10)
-	p.add_child(row)
-	if icon != "":
-		row.add_child(UiIcons.rect(icon, 36))
-	row.add_child(UiTheme.label(text, 28, color, true, 0, true))
-	_toast_holder.add_child(p)
-	p.reset_size()
-	var y := content_top(size) - 70.0 - _toast_holder.get_child_count() * 70.0
-	p.position = Vector2((size.x - p.size.x) * 0.5, y)
-	p.pivot_offset = p.size * 0.5
-	p.scale = Vector2(0.6, 0.6)
-	p.modulate.a = 0.0
-	var t := create_tween()
-	t.set_parallel(true)
-	t.tween_property(p, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	t.tween_property(p, "modulate:a", 1.0, 0.15)
-	t.chain().tween_interval(1.4)
-	t.chain().set_parallel(true)
-	t.tween_property(p, "position:y", y - 50.0, 0.4)
-	t.tween_property(p, "modulate:a", 0.0, 0.4)
-	t.chain().tween_callback(p.queue_free)
+	Toast.show(_toast_holder, text, icon, color, {"y": content_top(size) - 140.0, "step": -70.0, "hold": 1.4})

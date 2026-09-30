@@ -408,30 +408,6 @@ func copy_diagnostics() -> void:
 
 # ---------------------------------------------------------------- toast
 
-## Small pill at the bottom centre of `host`'s view that fades out on its own.
+## Small toast at the bottom centre of `host`'s view that fades out on its own (Toast helper).
 static func toast(host: Node, text: String, seconds := 1.8) -> void:
-	if host == null or not host.is_inside_tree():
-		return
-	var root := Control.new()
-	root.name = "DevToast"
-	root.theme = UiTheme.get_theme()
-	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiTheme.full_rect(root)
-	host.add_child(root)
-	var pill := UiTheme.panel("pill")
-	pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	pill.add_child(UiTheme.label(text, 22, UiPalette.TEXT_DIM, false, 0, false, 600))
-	root.add_child(pill)
-	pill.modulate.a = 0.0
-	var place := func() -> void:
-		pill.reset_size()
-		var view := root.get_viewport().get_visible_rect().size
-		var m := UiTheme.safe_margins(root)
-		pill.position = Vector2((view.x - pill.size.x) * 0.5, view.y - m.bottom - pill.size.y - 96.0)
-	place.call_deferred()
-	var t := root.create_tween()
-	t.tween_interval(0.02)
-	t.tween_property(pill, "modulate:a", 1.0, 0.18)
-	t.tween_interval(seconds)
-	t.tween_property(pill, "modulate:a", 0.0, 0.35)
-	t.tween_callback(root.queue_free)
+	Toast.show(host, text, "", UiPalette.TEXT_DIM, {"at": "bottom", "font": 22, "hold": seconds, "rise": 0.0})
