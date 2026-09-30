@@ -94,7 +94,8 @@ func _layout() -> void:
 	if slot.size.x > 0.0:
 		# landscape: beside the tray, bottom-aligned, so the board keeps the height
 		_col.size = Vector2(slot.size.x, h)
-		_col.position = Vector2(slot.position.x, slot.end.y - h)
+		# the slot ends at the tray's foot, which may dip under a home indicator: stay above it
+		_col.position = Vector2(slot.position.x, minf(slot.end.y, size.y - (safe.bottom if safe.bottom > UiTheme.EDGE else 0.0)) - h)
 		return
 	var w := minf(UiTheme.MODAL_MAX_W, size.x - safe.left - safe.right)
 	# portrait: the reserved band is sized for the tallest state (move pill + GO); a

@@ -199,7 +199,8 @@ func _layout() -> void:
 	if slot.size.x > 0.0:
 		w = slot.size.x
 		_bottom.size = Vector2(w, h)
-		_bottom.position = Vector2(slot.position.x, slot.end.y - h)
+		# the slot ends at the tray's foot, which may dip under a home indicator: stay above it
+		_bottom.position = Vector2(slot.position.x, minf(slot.end.y, size.y - (safe.bottom if safe.bottom > UiTheme.EDGE else 0.0)) - h)
 	else:
 		_bottom.size = Vector2(w, h)
 		_bottom.position = Vector2((size.x - w) * 0.5, UiTheme.tray_rect(size, safe).position.y - 20.0 - h)
