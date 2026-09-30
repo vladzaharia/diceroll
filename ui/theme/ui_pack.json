@@ -1200,6 +1200,51 @@
     }
    }
   },
+  "panel_tray_thin": {
+   "note": "Dice tray frame on short screens (slice b, spec 4.2): a Thin darkbrown-dark rim over the NAVY .85 fill.",
+   "fallback": "panel:hud",
+   "content": [
+    14,
+    14,
+    14,
+    14
+   ],
+   "states": {
+    "normal": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "slice": [
+        10,
+        10,
+        10,
+        10
+       ],
+       "tint": "palette:NAVY",
+       "modulate": "#ffffffd9",
+       "expand": [
+        -4,
+        -4,
+        -4,
+        -4
+       ]
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Frames/Thin/9. Brown/frame-thin-darkbrown-dark.svg",
+       "slice": [
+        22,
+        22,
+        22,
+        22
+       ],
+       "scale": 0.5,
+       "draw_center": false,
+       "runtime_tint": false
+      }
+     ]
+    }
+   }
+  },
   "plaque_yellow": {
    "note": "Modal title plaque: 3D Square 2.5 yellow-regular standard, 84 px nominal (72 on phone via fit), ink Lilita title; overlaps the frame top by half its height (spec 2.4).",
    "fallback": "empty",
