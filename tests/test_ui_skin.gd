@@ -262,3 +262,12 @@ func test_rgba_transparent_rect_is_not_drawn() -> void:
 	if FileAccess.file_exists(real):
 		var t := UiSvg.raster(UiSvg.source(real), 64)
 		assert_true(t.get_image().get_pixel(1, 1).a < 0.05, "star icon corner transparent")
+
+
+func test_key_glyph_label_of_handles_null_labels() -> void:
+	# icon_map input_glyphs use "label": null for pure-art keys (arrows, blank, mouse):
+	# they must yield "" instead of erroring, and plain keys keep their text.
+	assert_eq(KeyGlyph.label_of("key_left"), "", "arrow key has no label")
+	assert_eq(KeyGlyph.label_of("mouse_left"), "", "mouse glyph has no label")
+	assert_eq(KeyGlyph.label_of("key_space"), "SPACE")
+	assert_eq(KeyGlyph.label_of("key_unmapped_x"), "UNMAPPED_X", "unmapped ids derive a label")

@@ -460,6 +460,24 @@ static func full_rect(c: Control) -> Control:
 	return c
 
 
+## Phone-landscape UI boost (plan d proposal, verified by slice a's iPhone-landscape shots):
+## a wide phone screen (aspect above 1.9, e.g. 874x402 pt) lays the 720x1280-based canvas
+## out ~2780 logical px wide, so every label is tiny; multiplying the content scale by this
+## factor (1.4) makes modals, the HUD and the camp readable without breaking layouts.
+## `window_size` = the window in screen px. Desktops (even ultrawide) and tablets get 1.0:
+## only touch platforms, or screenshot runs emulating a phone (--safe=), qualify.
+const LANDSCAPE_BOOST := 1.4
+const LANDSCAPE_ASPECT := 1.9
+
+
+static func landscape_ui_boost(window_size: Vector2) -> float:
+	if window_size.y <= 0.0 or window_size.x / window_size.y <= LANDSCAPE_ASPECT:
+		return 1.0
+	var phone := OS.has_feature("mobile") or OS.has_feature("web_ios") or OS.has_feature("web_android") \
+		or not _emulated_safe().is_empty()
+	return LANDSCAPE_BOOST if phone else 1.0
+
+
 ## True when the canvas is taller than wide (phone portrait).
 static func is_portrait(size: Vector2) -> bool:
 	return size.y >= size.x * 0.9
@@ -723,7 +741,16 @@ static func get_theme() -> Theme:
 	t.set_icon("tick", "HSlider", ImageTexture.new())
 	t.set_constant("center_grabber", "HSlider", 1)
 
-	# CheckBox (48 px yellow boxes) and CheckButton (pack toggle) icons.
+	# CheckBox (48 px yellow boxes) and CheckButton (pack toggle) icons, drawn bare on the
+	# panel (they would otherwise inherit the Button faces) with TEXT labels.
+	for type in ["CheckBox", "CheckButton"]:
+		for st in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
+			t.set_stylebox(st, type, pad(StyleBoxEmpty.new(), 6, 20))
+		for c in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_focus_color"]:
+			t.set_color(c, type, UiPalette.TEXT)
+		t.set_color("font_disabled_color", type, UiPalette.TEXT_MUTED)
+		t.set_font("font", type, body_font(600))
+		t.set_font_size("font_size", type, 24)
 	for pair in [["CheckBox", "checkbox", 48.0], ["CheckButton", "toggle", 88.0]]:
 		for st in ["checked", "unchecked", "checked_disabled", "unchecked_disabled"]:
 			var src: String = st if UiSkin.has(pair[1], st) else st.trim_suffix("_disabled")

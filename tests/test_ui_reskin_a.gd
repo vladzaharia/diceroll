@@ -279,3 +279,10 @@ func test_toast_box() -> void:
 	assert_eq(Toast._rim_for(UiPalette.HEAL), "heal")
 	assert_eq(Toast._rim_for(UiPalette.TEXT), "info")
 	p.free()
+
+
+func test_landscape_boost_only_for_wide_phones() -> void:
+	assert_near(UiTheme.landscape_ui_boost(Vector2(1920, 1080)), 1.0, 0.001, "16:9 never")
+	assert_near(UiTheme.landscape_ui_boost(Vector2(402, 874)), 1.0, 0.001, "portrait never")
+	var phone := OS.has_feature("mobile") or not UiTheme._emulated_safe().is_empty()
+	assert_near(UiTheme.landscape_ui_boost(Vector2(874, 402)), UiTheme.LANDSCAPE_BOOST if phone else 1.0, 0.001, "wide phone")
