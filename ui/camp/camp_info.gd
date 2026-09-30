@@ -17,6 +17,8 @@ const PET_ICON := {
 const PET_COLOR := {
 	"pumpkin_sprite": Color("ff9a3a"), "skull_buddy": Color("efe6d4"), "lantern_ghost": Color("8fe0c8"),
 	"crystal_wisp": Color("9ad8f0"), "guard_die": Color("5aa7ff"), "coin_mimic": Color("ffc93d"),
+	"pebble_golem": Color("b8a890"), "frost_mote": Color("a8e4ff"), "wick": Color("ffb45a"),
+	"tinker_gear": Color("d8b46a"), "grimoire": Color("b58cff"), "cauldron": Color("7fd08a"),
 }
 const ROLE_LABEL := {"heal": "Healer", "attack": "Striker", "burn": "Poisoner", "tempo": "Tempo",
 	"defense": "Guardian", "economy": "Treasurer"}
@@ -51,6 +53,37 @@ const STATIONS := {
 	"arcade": {"name": "Arcade", "icon": "star", "color": Color("ff6fd0"), "blurb": "Minigames"},
 }
 const STATION_IDS := ["armory", "workshop", "pet_den", "arcade"]
+
+# ---------------------------------------------------------------- pack icon ids (UI reskin, d)
+# The legacy tables above (PET_ICON, MINIGAME_ICON, SLOT_ICON, GEAR_ICON, icon_of) stay on the
+# drawn glyphs for screens that still draw through UiIcons (results, OptionCard.Medallion);
+# Camp screens draw these pack ids through CampArt (which falls back to the glyphs when the pack
+# is absent). Every id below is mapped in ui/icons/icon_map.json (tests/test_camp_icons_d.gd).
+
+## Station medallions (the Armory is the anvil: station != slot).
+const STATION_ICON := {"armory": "station_armory", "workshop": "station_workshop", "pet_den": "station_pet_den",
+	"arcade": "station_arcade", "wardrobe": "wardrobe_hats", "setup": "station_setup"}
+## Pack glyph per pet (petg_*; the pet_* ids stay the in-run portraits).
+const PET_GLYPH := {
+	"pumpkin_sprite": "petg_pumpkin_sprite", "skull_buddy": "petg_skull_buddy", "lantern_ghost": "petg_lantern_ghost",
+	"crystal_wisp": "petg_crystal_wisp", "guard_die": "petg_guard_die", "coin_mimic": "petg_coin_mimic",
+	"pebble_golem": "petg_pebble_golem", "frost_mote": "petg_frost_mote", "wick": "petg_wick",
+	"tinker_gear": "petg_tinker_gear", "grimoire": "petg_grimoire", "cauldron": "petg_cauldron",
+}
+const MINIGAME_GLYPH := {"fossil_hunter": "mg_fossil_hunter", "bubble_breaker": "mg_bubble_breaker",
+	"scratch_off": "mg_scratch_off", "claw_machine": "mg_claw_machine", "bubble_shooter": "mg_bubble_shooter",
+	"plinko": "mg_plinko", "shell_game": "mg_shell_game", "memory_match": "mg_memory_match", "fishing": "mg_fishing",
+	"lucky_wheel": "mg_lucky_wheel", "high_low": "mg_high_low"}
+## One icon per Workshop pack ("pack" = the generic unlock).
+const PACK_ICON := {"starter": "pack_starter", "gamblers_kit": "pack_gamblers_kit", "cold_steel": "pack_cold_steel",
+	"pyromancy": "pack_pyromancy", "storm": "pack_storm", "numerology": "pack_numerology", "resonance": "pack_resonance",
+	"colossus": "pack_colossus"}
+const SLOT_GLYPH := {"weapon": "slot_weapon", "offhand": "slot_offhand", "head": "slot_head", "body": "slot_body",
+	"trinket": "slot_trinket", "trinket2": "slot_trinket2", "back": "cape"}
+## Armory rank groups reuse the slot glyphs (armor = the chestplate).
+const GROUP_GLYPH := {"weapon": "slot_weapon", "offhand": "slot_offhand", "armor": "slot_body", "trinket": "slot_trinket"}
+const UPGRADE_ICON := {"starter_kit": "upgrade_starter_kit", "whetstone": "upgrade_whetstone",
+	"loadout_slot": "upgrade_loadout_slot", "potion_belt": "upgrade_potion_belt"}
 
 
 static func name_of(kind: String, id: String) -> String:
@@ -92,6 +125,32 @@ static func icon_of(kind: String, id: String) -> String:
 		"potions": return "potion"
 		"features": return "plus"
 	return "star"
+
+
+## Pack icon id for an unlockable (the icon_of retarget: bosses -> boss, packs -> pack_*,
+## gear -> slot_*, features -> upgrade_*, potions -> potion_*, items -> item_icon).
+static func glyph_of(kind: String, id: String) -> String:
+	match kind:
+		"classes": return Icons.class_icon(id)
+		"biomes": return Icons.biome_icon(id)
+		"bosses": return "boss"
+		"minibosses": return "skull"
+		"pets": return String(PET_GLYPH.get(id, "station_pet_den"))
+		"minigames": return String(MINIGAME_GLYPH.get(id, "station_arcade"))
+		"packs": return String(PACK_ICON.get(id, "pack"))
+		"gear": return String(GROUP_GLYPH.get(id, "station_armory"))
+		"items": return item_icon(id)
+		"potions": return "potion_" + id if Icons.is_mapped("potion_" + id) else "potion"
+		"features": return String(UPGRADE_ICON.get(id, "unlock_feature"))
+	return "star"
+
+
+## An item's pack glyph ("item_<base>") when the map has one, else its slot glyph.
+static func item_icon(id: String) -> String:
+	var base := ItemDefs.base_of(id)
+	if Icons.is_mapped("item_" + base):
+		return "item_" + base
+	return String(SLOT_GLYPH.get(ItemDefs.slot_of(base), "station_armory"))
 
 
 static func color_of(kind: String, id: String) -> Color:

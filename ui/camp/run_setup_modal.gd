@@ -57,6 +57,8 @@ func rebuild(p: Profile) -> void:
 	go.min_height = 108
 	go.pressed.connect(func() -> void: start_pressed.emit())
 	body.add_child(go)
+	# Enter starts the run (Esc / the corner x close the screen)
+	primary_action = go
 
 
 ## The chosen hero: a turning portrait in the equipped Wardrobe look, the mechanic badge and HP.
@@ -96,7 +98,7 @@ func _kit(p: Profile, id: String) -> Control:
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(l)
 	if not bool(CampInfo.station_state(p, "armory").locked):
-		var b := GameButton.make("ARMORY", "anvil", GameButton.Kind.SECONDARY, 20)
+		var b := GameButton.make("ARMORY", CampArt.resolve("station_armory"), GameButton.Kind.SECONDARY, 20)
 		b.min_height = 60
 		b.icon_tint = CampInfo.STATIONS.armory.color
 		b.pressed.connect(func() -> void: open_station.emit("armory"))
@@ -158,12 +160,12 @@ func _loadout(p: Profile) -> Control:
 	var has_pets := not (p.unlocks.get("pets", []) as Array).is_empty()
 	if pet != "":
 		var lvl := p.pet_level(pet)
-		var tr := CampUi.title_row(String(CampInfo.PET_ICON.get(pet, "heart")), CampInfo.PET_COLOR.get(pet, UiPalette.GOLD), PetDefs.name_of(pet),
+		var tr := CampArt.title_row(String(CampInfo.PET_GLYPH.get(pet, "station_pet_den")), CampInfo.PET_COLOR.get(pet, UiPalette.GOLD), PetDefs.name_of(pet),
 			"PET  ·  LEVEL %d" % lvl, 56)
 		tr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		prow.add_child(tr)
 	else:
-		var tr := CampUi.title_row("heart", UiPalette.TEXT_MUTED, "No pet", "EQUIP ONE IN THE PET DEN" if has_pets else "FIRST PET: " + String(CampInfo.milestone_for("pets", "pumpkin_sprite").get("desc", "")).to_upper(), 56)
+		var tr := CampArt.title_row("station_pet_den", UiPalette.TEXT_MUTED, "No pet", "EQUIP ONE IN THE PET DEN" if has_pets else "FIRST PET: " + String(CampInfo.milestone_for("pets", "pumpkin_sprite").get("desc", "")).to_upper(), 56)
 		tr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		prow.add_child(tr)
 	if has_pets:
@@ -193,11 +195,12 @@ func _loadout(p: Profile) -> Control:
 	for id in p.loadout.minigames:
 		var chip := PanelContainer.new()
 		var cc: Color = CampInfo.MINIGAME_COLOR.get(String(id), UiPalette.GOLD)
-		chip.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(0.03, 0.03, 0.09, 0.7), 16, 2, Color(cc, 0.6)), 10, 6))
+		chip.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.inset_box(), 10, 6) if UiTheme.skinned("panel_inset")
+			else UiTheme.pad(UiTheme.box(Color(0.03, 0.03, 0.09, 0.7), 16, 2, Color(cc, 0.6)), 10, 6))
 		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var r := UiTheme.hbox(8)
 		chip.add_child(r)
-		r.add_child(UiIcons.rect(String(CampInfo.MINIGAME_ICON.get(String(id), "star")), 26, cc))
+		r.add_child(CampArt.icon(String(CampInfo.MINIGAME_GLYPH.get(String(id), "station_arcade")), 30, cc))
 		r.add_child(UiTheme.label(MinigameDefs.name_of(String(id)), 20, UiPalette.TEXT, false, 0, false, 600))
 		flow.add_child(chip)
 	if (p.loadout.minigames as Array).is_empty():
