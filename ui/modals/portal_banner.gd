@@ -13,12 +13,15 @@ func _init() -> void:
 	UiTheme.full_rect(self)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_panel = PanelContainer.new()
-	_panel.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(0.12, 0.06, 0.26, 0.92), 30, 3, Color("a56bff"), 22, Color(0.5, 0.25, 1.0, 0.45), Vector2.ZERO), 26, 16))
+	# callout art (spec 4.3) with the portal-violet rim; the flat glow pill without the pack
+	var sb: StyleBox = UiTheme.callout_box(Color("a56bff")) if UiTheme.skinned("callout") \
+		else UiTheme.box(Color(0.12, 0.06, 0.26, 0.92), 30, 3, Color("a56bff"), 22, Color(0.5, 0.25, 1.0, 0.45), Vector2.ZERO)
+	_panel.add_theme_stylebox_override("panel", UiTheme.pad(sb, 26, 16))
 	_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_panel)
 	var row := UiTheme.hbox(16)
 	_panel.add_child(row)
-	row.add_child(UiIcons.rect("portal", 64))
+	row.add_child(Icons.rect("portal", 64))
 	var col := UiTheme.vbox(0)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_child(col)

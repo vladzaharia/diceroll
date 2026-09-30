@@ -15,6 +15,11 @@ var lap := 0
 var compact := false
 ## Bosses beaten flags for the summary (ticks on the boss chips).
 var beaten := {"miniboss": false, "boss": false}
+## One icon, one meaning (spec 5 rule 6): the final boss is the red horned skull, not the crown
+## (Crowns are the currency); "crown" is kept when the map lacks "boss".
+static var BOSS_ICON: String:
+	get:
+		return "boss" if Icons.exists("boss") else "crown"
 
 
 static func make(p_info: Dictionary, p_current := 0, p_lap := 0, p_compact := false) -> RouteStrip:
@@ -37,7 +42,7 @@ func _rebuild() -> void:
 	add_child(row)
 	for t in route.size():
 		if t > 0:
-			var arrow := UiIcons.rect("arrow_right", 26 if compact else 34, UiPalette.TEXT_MUTED)
+			var arrow := Icons.rect("arrow_right", 26 if compact else 34, UiPalette.TEXT_MUTED)
 			arrow.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 			arrow.custom_minimum_size.y = 64 if compact else 104
 			row.add_child(arrow)
@@ -51,7 +56,7 @@ func _rebuild() -> void:
 		bosses.add_child(_boss_chip("skull", "LAP %d  ·  MINI-BOSS" % Balance.MINIBOSS_LAP if not compact else "LAP %d" % Balance.MINIBOSS_LAP,
 			String(mb.get("name", "")), Color("ff9a3a"), bool(beaten.miniboss)))
 	if not fb.is_empty():
-		bosses.add_child(_boss_chip("crown", "LAP %d  ·  FINAL BOSS" % Balance.TOTAL_LAPS if not compact else "LAP %d" % Balance.TOTAL_LAPS,
+		bosses.add_child(_boss_chip(BOSS_ICON, "LAP %d  ·  FINAL BOSS" % Balance.TOTAL_LAPS if not compact else "LAP %d" % Balance.TOTAL_LAPS,
 			String(fb.get("name", "")), UiPalette.DANGER.lightened(0.15), bool(beaten.boss)))
 
 
@@ -65,7 +70,7 @@ func _stop(b: Dictionary, tier: int) -> Control:
 	col.custom_minimum_size.x = 140 if compact else 172
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var px := 64 if compact else 104
-	var med := OptionCard.Medallion.make(UiIcons.biome_icon(id), px, null, bc if (here or current == 0) else bc.darkened(0.35))
+	var med := OptionCard.Medallion.make(Icons.biome_icon(id), px, null, bc if (here or current == 0) else bc.darkened(0.35))
 	med.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	med.modulate = Color(1, 1, 1, 0.55) if past else Color.WHITE
 	col.add_child(med)
@@ -102,11 +107,16 @@ func _stop(b: Dictionary, tier: int) -> Control:
 
 func _boss_chip(icon: String, caption: String, name: String, color: Color, done: bool) -> Control:
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(UiPalette.NAVY_2, 18, 2, Color(color, 0.45)), 14 if compact else 18, 8))
+	# a card with a rim in the boss colour (pack art; flat fallback)
+	var sb := UiTheme.card_box("normal", color)
+	sb.content_margin_left = 14 if compact else 18
+	sb.content_margin_right = 14 if compact else 18
+	sb.content_margin_top = maxf(sb.content_margin_top, 8)
+	p.add_theme_stylebox_override("panel", sb)
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var row := UiTheme.hbox(10)
 	p.add_child(row)
-	row.add_child(UiIcons.rect("check" if done else icon, 34 if compact else 44, UiPalette.HEAL if done else color))
+	row.add_child(Icons.rect("check" if done else icon, 34 if compact else 44, UiPalette.HEAL if done else color))
 	var col := UiTheme.vbox(-2)
 	row.add_child(col)
 	col.add_child(UiTheme.label(caption, 16 if compact else 17, color.lightened(0.2), false, 0, false, 800))
