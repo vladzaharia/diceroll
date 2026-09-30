@@ -18,27 +18,30 @@ Research: [`docs/research/distribution-2026-09/`](../research/distribution-2026-
   go/no-go, and are scheduled before the step they de-risk.
 - Steps marked **[Polaris]** happen in the (private) `polaris-key` repository under that repository's
   own rules; its detailed spec lives there.
-- **Agent-days vs calendar time:** an agent-day is one focused work package. With two or three lanes
-  in parallel and the maintainer's review of every PR, expect roughly 4–6 calendar months to M7.
+- **Agent-days vs calendar time:** an agent-day is one focused work package. With three or four lanes
+  in parallel and the maintainer's review of every PR, expect roughly 5–7 calendar months to M7.
 
 ## Overview
 
 ```mermaid
 flowchart LR
-  M0[M0 Stabilize<br/>3.5–4.5 d] --> M1[M1 Safety net<br/>4–6 d] --> M2[M2 Content as data<br/>47–70 d]
-  M0 --> M3[M3 Packs and trust<br/>32–45 d]
+  M0[M0 Stabilize<br/>3.5–4.5 d] --> M1[M1 Safety net<br/>4–6 d] --> M2[M2 Content as data<br/>79–113 d]
+  M0 --> M3[M3 Packs, trust, fast updates<br/>35–50 d]
   M1 --> M3
-  M3 --> M4[M4 Direct desktop core<br/>10.5–14 d]
+  M3 --> M4[M4 Direct desktop core<br/>11.5–16 d]
   M3 --> M5[M5 Native delivery<br/>20–30 d]
-  M2 --> M7[M7 First live drop<br/>3–5 d]
+  M2 --> M7[M7 First live drop<br/>4–6 d]
   M3 --> M7
   M5 --> M7
-  M6[M6 Polaris Distribution<br/>15–22 d, parallel] -. optional .-> M7
+  M6[M6 Polaris Distribution<br/>18–26 d, parallel] -. optional .-> M7
 ```
 
-**Critical path to "a new weapons set ships as data on every channel's test track":** M0 → M1 → M2
-(minimal path: 2.1, 2.2, 2.3a, 2.4, 2.5, 2.6 items only: ~22–29 d including M1) and M3 in parallel →
-M5 (at least Apple + Android + Steam) → M7. M7 doesn't wait for M6: until the Polaris service exists,
+**Critical path to "a new class, map, pet, relics and weapons ship as data on every channel's test
+track":** M0 → M1 → M2 (minimal path: 2.1, 2.5, R0–R4, R6, R7, R9, 2.6, the kit part of 2.7, 2.8-lite
+and lite versions of R10–R12, about 62–83 agent-days including M1, **26–35 working days elapsed with
+four lanes**) and M3 in parallel → M5 (at least Apple + Android + Steam) → M7. R5 (events, potions,
+ascension) and R8 (enemies with new intents) follow right after; new enemies built from today's
+intents are data as soon as 2.1 and looks land. M7 doesn't wait for M6: until the Polaris service exists,
 the static signer of step 3.4 publishes (the client only trusts root-certified keys, so switching
 later needs no client change).
 
@@ -46,7 +49,7 @@ later needs no client change).
 
 | Lane | Milestones |
 |---|---|
-| Core content (GDScript rules, tests, sim) | M1 → M2 |
+| Core content (GDScript rules, tests, sim): up to four parallel lanes after R1 | M1 → M2 |
 | Delivery and trust (GDScript + CI) | M3 → M4 |
 | Platform plugins (ObjC++, Kotlin, C++) | P1–P3 spikes → M5 |
 | Polaris (TypeScript Worker + SDK) | M6 |
@@ -175,7 +178,12 @@ later needs no client change).
 
 ---
 
-## M2 Content as data (47–70 days; minimal path ~22–29 days including M1)
+## M2 Content as data (79–113 days; minimal path ~62–83 days including M1)
+
+M2 makes practically every content domain data, **including behaviour**: weapons and all armory items,
+relics (passives), runes and dice, potions, affixes, events, shops and rewards, ascension and
+modifiers, pets, maps (biomes, tile kinds, twists), enemies and bosses, and classes. The core of it is
+the rules engine (design §4.4); a prototype of it already reproduced today's behaviour exactly.
 
 ### 2.1 ContentDB and base sets in JSON
 
@@ -187,46 +195,50 @@ later needs no client change).
 - **Done when:** golden fingerprints unchanged; tests and sim green; the consts are gone.
 - **Depends on:** 1.1, 1.3. **Size:** 4–5 d.
 
-### 2.2 Constants in the DB
+### 2.2 Engine constants in the DB
 
-- **Goal:** balance numbers are patchable by data.
-- **Deliverables:** `Balance`, `Economy`, `UnlockDefs.ASC_*` and per-type constants become static vars
+- **Goal:** the engine's own numbers (formulas, caps, economy curves) are patchable by data; each
+  owner's numbers live in its `params` (2.3).
+- **Deliverables:** `Balance`, `Economy`, `UnlockDefs.ASC_*` engine constants become static vars
   seeded from `core-base`; the `constants` op with a typed allow-list.
 - **Done when:** goldens unchanged; a test `balance-*` set changes a number and the sim sees it.
 - **Depends on:** 2.1. **Size:** 2 d.
 
-### 2.3 Rules dispatch on rule ids (sub-steps can run in parallel worktrees)
+### 2.3 The rules engine, and every domain on it (R0–R13)
 
-- **Goal:** a new entry that uses existing rules works without touching code.
-- **Sub-steps:**
+- **Goal:** one engine runs the behaviour of every content domain from data, so a new class, map, pet,
+  relic, weapon, enemy or event is a content set, not a code change.
+- **Sub-steps** (after R1, lanes A–D run in parallel worktrees, each gated by the goldens):
 
-  | Id | Scope | Main files | Size |
-  |---|---|---|---|
-  | 2.3a | **Items by `effect.rule` and `sec`** (rename the duplicate `"light"`; special cases become fields; bot combat model and `MetaRun.armory_stats` by rule; per-item `price`) | `core/item_logic.gd`, `core/content/items.gd`, `core/meta/meta_run.gd`, `core/bot.gd`, `core/bot_meta.gd` | 5–7 d |
-  | 2.3b | Passives by rule + params | `combat.gd`, `game_flow.gd`, `run_state.gd`, `bot.gd` | 2–3 d |
-  | 2.3c | Runes by declared trigger + effect | `combat.gd`, `runes.gd`, `class_logic.gd` | 2 d |
-  | 2.3d | Potions by effect list (unknown op = validation error, not heal) | `game_flow.gd`, `potions.gd` | 1 d |
-  | 2.3e | Pets by fire/perk/L5/L10 rule ids | `pet_logic.gd`, `game_flow.gd`, `combat.gd` | 2–3 d |
-  | 2.3f | Biomes: old twists → parameterised twist ids; generic per-biome counters | `game_flow.gd`, `biomes.gd`, `profile.gd`, `unlocks.gd` | 2–3 d |
-  | 2.3g | Enemies: tags (e.g. `skeleton`), boss `mechanic` + params, DB-driven unlockables | `enemies.gd`, `combat.gd`, `unlocks.gd` | 1–2 d |
-  | 2.3h | Classes: `mechanic_params` in data | `class_logic.gd`, `heroes.gd` | 1–2 d |
-  | 2.3i | Events by kind + weighted, optionally biome-scoped pools | `game_flow.gd`, `events.gd`, `event_modal.gd` | 2 d |
-  | 2.3j | Affixes: the 5 id-wired affixes become parameterised kinds | `affixes.gd`, `combat.gd` | 1–2 d |
-  | 2.3k | Minigame variants: numbers, props and rewards of existing minigames as data (new minigame kinds stay code) | `core/content/minigames.gd`, `core/minigames/*`, `game/minigames/props/*` | 1–2 d |
+  | Id | Step | Main files | Size | Depends | Done when |
+  |---|---|---|---|---|---|
+  | R0 | Engine core: hook catalogue, compiler, condition/value nodes, effect ops v1 (+ the ~10 small additions), selectors, limits, chance, resources, priority bands, per-hook dispatch tables, trace buffer, legacy-RNG mode; `content_api.gd` capabilities | new `core/rules/*`, `core/content/content_api.gd`, `tests/test_rules_engine.gd` | 6–8 d | 1.1, 2.1 | engine tests green; compiles the prototype's 41 rules ([rules-prototype](../research/distribution-2026-09/rules-prototype/README.md)) |
+  | R1 | Hook points wired at every site (~60), native owners untouched | `core/combat.gd`, `game_flow.gd`, `run_state.gd`, `board.gd` | 3–4 d | R0 | goldens identical; empty-listener cost ≤ 1 % |
+  | R2 | Relics (32 passives) as data; `has_passive` sites gone | `combat.gd`, `game_flow.gd`, `run_state.gd`, `passives.gd` | 2.5–3.5 d | R1 | goldens identical; no `has_passive(` outside the bot |
+  | R3 | Runes (12) as data: `when`, caps, effects, re-fire | `combat.gd`, `runes.gd`, `pet_logic.gd`, `class_logic.gd` | 1.5–2 d | R1 | goldens identical |
+  | R4 | Armory as data: 51 rules, 51 variants, 13 back items; special cases become fields; per-item prices (lanes: weapons + off-hands, armor + trinkets) | `item_logic.gd`, `items.gd`, `meta_run.gd`, `combat.gd` | 7–9 d | R1, R3 | goldens identical; no `ItemLogic.has/sec(` outside the bot |
+  | R5 | Potions, affixes, ascension, events (choice trees), shop/draft/reward/signature tables and minigame reward data | `game_flow.gd`, `affixes.gd`, `unlocks.gd`, `combat.gd` | 4–6 d | R1 | goldens identical; an unknown potion is a validation error |
+  | R6 | Pets as data: charge resource, fire, perks, levels | `pet_logic.gd`, `game_flow.gd`, `combat.gd`, `pets.gd` | 3–4 d | R1, R3 | goldens identical; no `has_pet(` |
+  | R7 | Maps: twists as biome rules, a tile-kind registry (`tile.land`/`tile.pass`), phases, board-generation parameters, keyed counters | `game_flow.gd`, `board.gd`, `biomes.gd`, `profile.gd`, `unlocks.gd` | 4.5–6 d | R1 | goldens identical; a fixture biome with a **new tile kind** plays |
+  | R8 | Enemies: traits and affixes as enemy rules, intents as op compositions, the **status framework**, boss meters as resources, tags | `combat.gd`, `enemies.gd`, `affixes.gd`, `unlocks.gd` | 3.5–5 d | R1 | goldens identical; a fixture enemy with a new intent composition plays |
+  | R9 | Classes: the 7 mechanics as resources + rules, per-class `mechanic_params`, side dice (Turret), the ★ face native | `class_logic.gd`, `heroes.gd`, `run_state.gd`, `die.gd` | 4.5–6 d | R1, R3, R6 | goldens identical; a fixture class with a **new mechanic from resources + rules** plays |
+  | R10 | AUTO bot: calls the same queries, a model compiler for pipeline shapes, `ai` hints, calibration tool; id tables removed | `bot.gd`, `bot_meta.gd`, new `tools/ai_calibrate.gd` | 5–8 d | R2–R9 (incremental) | realistic sim unchanged on base content; fixture owners valued within ±10 % of calibration |
+  | R11 | CI: generated schemas, semantic validator, cycle analysis, capability computation, grammar and owner fuzzing, per-set sim guard, the **primitive backlog** process | `tools/content_validate.gd`, `tools/ci/*`, `ci.yml` | 4–5 d | R0 (grows with each domain) | fixture sets with each error class fail with a clear message |
+  | R12 | Presentation: generic `rule_triggered` beat with `fx` hints, one resource meter/badge/pips widget, Developer menu rule trace and "explain last attack" | `game/flow/event_player.gd`, `game/classes/class_beats.gd`, `ui/hud/*`, `ui/modals/dev_menu.gd` | 3–5 d | R1 | screenshot matrix unchanged; an owner with an unknown `fx` shows the generic beat |
+  | R13 | Normalisation: named RNG streams, canonical event shapes, generic limit/resource keys, save migration; **one** deliberate golden re-baseline | `core/rng.gd`, `core/rules/*`, `run_state.gd`, `profile.gd` | 2–3 d | R2–R9 | adding a relic to a fixture leaves existing seeds unchanged |
 
-- **Done when (each):** goldens unchanged (item ids equal their rule owners today); a fixture set adds
-  a new entry of that kind using only existing rules, and a test plays it.
-- **Depends on:** 2.1 (2.2 for constants used by the rule). **Size:** 20–29 d total.
+- **Lanes after R1:** A: R2 → R3 → R4 (weapons, off-hands); B: R4 (armor, trinkets) → R5; C: R6 → R9;
+  D: R7 → R8. R11 grows with each lane; R10 and R12 start once two domains are converted; R13 last.
+- **Depends on:** 1.1, 1.3, 2.1. **Size:** 54–75 d total.
 
-### 2.4 Capabilities, set manifests and CI validation
+### 2.4 Set manifests and the content check
 
-- **Goal:** CI refuses any set the core can't run, and the client hides sets it can't support.
-- **Deliverables:** `core/content/content_api.gd` (`FORMAT`, `CAPS`); `set.json` schema; JSON Schemas
-  per kind; `tools/content_validate.gd` (semantic pass) + a Python `jsonschema` step;
-  automatic `requires_caps`; ids-ledger check; `content-check` job in `ci.yml` with a PR size diff.
-- **Done when:** fixture sets with an unknown rule, a reused id, a missing look path or a bad schema
-  each fail CI with a clear message.
-- **Depends on:** 2.1, 2.3a. **Size:** 3–4 d.
+- **Goal:** every content PR is checked, and the client hides sets it can't support.
+- **Deliverables:** `set.json` schema and `requires_*` fields; the `content-check` job in `ci.yml`
+  (schemas, semantic validator and cycle analysis from R11, ids ledger, look paths, a PR size diff).
+- **Done when:** a PR adding a fixture set shows its checks and size diff; a set requiring an unknown
+  capability is hidden by an older core.
+- **Depends on:** 2.1, R11. **Size:** 1 d.
 
 ### 2.5 Runs pin their content set
 
@@ -239,13 +251,14 @@ later needs no client change).
 
 ### 2.6 Looks as data
 
-- **Goal:** a new weapon, enemy or skin gets its visuals from JSON.
+- **Goal:** a new weapon, class, pet, enemy, tile kind or skin gets its visuals from JSON.
 - **Deliverables:** `looks.json` per base set for items (`ItemMounts`), characters (`Character.MODELS`,
-  parts, kits, skin textures), enemies (`EnemyRoster.LOOKS`), biomes (`Biome.LOOKS`, terrain, palette),
-  music map, icons, encounter texts; builders registered as `look.*` capabilities; fallback looks.
-- **Done when:** screenshot matrix unchanged for the affected scenarios; a fixture set adds a weapon
-  with a mount from JSON and it renders in the Armory and in combat.
-- **Depends on:** 2.1. **Size:** 5–8 d (items first: 2 d on the minimal path). Needs assets.
+  parts, kits, skin textures), enemies (`EnemyRoster.LOOKS`), pets (existing builders + props), tile
+  kinds (style, icon, prop), biomes (`Biome.LOOKS`, terrain, palette), music map, icons, encounter
+  texts; builders registered as `look.*` capabilities; `fx` hints on rules; fallback looks.
+- **Done when:** screenshot matrix unchanged for the affected scenarios; fixture sets add a weapon, a
+  class, a pet and a tile kind from JSON and each renders.
+- **Depends on:** 2.1, R12 (generic beat and meter). **Size:** 5–8 d. Needs assets.
 
 ### 2.7 Declarative biome dressing
 
@@ -254,28 +267,41 @@ later needs no client change).
   interpreter over the `Dressing` API (scatter, placements, set pieces, lights), proven by porting one
   biome.
 - **Done when:** a fixture biome set using a kit renders; the ported biome's screenshots match.
-- **Depends on:** 2.6, 2.3f. **Size:** 6–10 d. Needs assets.
+- **Depends on:** 2.6, R7. **Size:** 6–10 d (the kit part, 2–3 d, is on the minimal path). Needs assets.
 
 ### 2.8 Strings and localisation groundwork
 
 - **Goal:** pack text uses keys from day one.
 - **Deliverables:** `strings/<locale>.json` per set; a `Translation` built from them; `tr()` on the UI
-  paths that show content text; CI requires keys for new sets.
+  paths that show content text; rules text generated from rule data through templates; CI requires
+  keys for new sets.
 - **Done when:** a fixture set's text shows through keys in the Armory, class select and encounter
   cards; CI rejects a new set with literal display text.
-- **Depends on:** 2.1. **Size:** 2–4 d. Can come after M7.
+- **Depends on:** 2.1. **Size:** 2–4 d (key-only "lite" version, 1–2 d, is on the minimal path).
 
 ### 2.9 Tests for packs
 
 - **Goal:** the test suite stops fighting new content.
 - **Deliverables:** split pinned-count tests (`test_armory.gd`) into fixture-based engine tests plus base
-  snapshots; per-set sim smoke; load-order shuffle test for the merge.
+  snapshots; one fixture owner per kind (item, relic, rune, pet, potion, affix, class, enemy, biome,
+  tile kind, event, modifier); per-set sim smoke; load-order shuffle test for the merge.
 - **Done when:** adding a fixture set changes no existing test; shuffling set order changes no `fp`.
 - **Depends on:** 2.1. **Size:** 3–5 d, spread across 2.1–2.6.
 
+### 2.10 Minigame templates (after M7, not counted in the totals)
+
+- **Goal:** new minigames in the four template families (grid reveal, push-your-luck, spin-stop, drop
+  board) ship as data plus a prop skin.
+- **Deliverables:** one template engine per family with its board UI, prop builder and bot play
+  function; today's members (Fossil Hunter, Scratch-off, Memory Match; High-Low; Lucky Wheel; Plinko)
+  re-expressed as template data.
+- **Done when:** a fixture minigame in each family plays from data; today's games' calibration is
+  unchanged.
+- **Depends on:** R5, 2.6. **Size:** 6–10 d.
+
 ---
 
-## M3 Packs and trust (32–45 days)
+## M3 Packs, trust and fast updates (35–50 days)
 
 ### 3.1 Library packs, lean presets, embedded everywhere
 
@@ -386,9 +412,25 @@ later needs no client change).
   fails the job when a set can't load.
 - **Depends on:** 3.5. **Size:** 1–2 d.
 
+### 3.10 Fast-update client
+
+- **Goal:** a switch or data fix reaches players in minutes, and a crash-causing pack can't brick the
+  game (design §12).
+- **Deliverables:** check cadence (launch before mounting downloaded content, resume/title with a
+  5-minute floor, every 15 minutes with jitter, the timestamp's `pollSeconds` clamped to 120–3600 s,
+  `If-None-Match`); `core/kill_switches.gd` registry with both states tested in CI and a lint that a
+  switch can only disable or pick a reviewed behaviour; timestamp `kill`, `hotfix` (disable, replace,
+  remap art to fallback, clamp) applied at safe points and recorded in run saves, `gate`
+  (notice/soft/hard), `web.minBuild`; crash-loop safe mode (two failed boots → embedded content only,
+  timestamp first); Developer menu rows for the current switches and gates.
+- **Done when:** a test timestamp kills a feature, hotfixes a fixture set mid-run at the next safe
+  point, and gates an old core, each within one check; a deliberately crashing pack triggers safe mode
+  on the second boot.
+- **Depends on:** 3.3, 3.5. **Size:** 3–5 d.
+
 ---
 
-## M4 Direct desktop core updates (10.5–14 days)
+## M4 Direct desktop core updates (11.5–16 days)
 
 ### 4.1 Velopack GDExtension
 
@@ -426,6 +468,18 @@ later needs no client change).
 - **Done when:** an rc.3 install sees the prompt and the v2 installer takes over; the key is gone from
   GitHub.
 - **Depends on:** 4.2. **Size:** 0.5–1 d.
+
+### 4.4 Core hotfix workflow and runbooks
+
+- **Goal:** a code fix leaves through every store's fastest lane with one dispatch.
+- **Deliverables:** `core-hotfix.yml` from `release/*` (design §12.5): build and smoke-test every
+  target, TestFlight internal, App Store version with phased release off and a pre-filled expedite
+  request, Play production with In-App Update priority 5, Steam set live, itch push, Velopack with
+  `urgency: required` (release document on the YubiKey), Web pointer flip, a Flathub PR draft;
+  `docs/runbooks/hotfix.md` (R1–R4, expedite template, the standing review-notes line); a CI check
+  that `minSupported` never exceeds the build being submitted.
+- **Done when:** a dry run on a `release/` branch reaches every beta or test track in one dispatch.
+- **Depends on:** 4.2, 5.1, 5.2, 5.3. **Size:** 1–2 d.
 
 ---
 
@@ -500,7 +554,7 @@ later needs no client change).
 
 ---
 
-## M6 Polaris Distribution service (15–22 days, parallel) [Polaris]
+## M6 Polaris Distribution service (18–26 days, parallel) [Polaris]
 
 ### 6.1 Wire profile DIST-1
 
@@ -540,23 +594,40 @@ later needs no client change).
 - **Done when:** a content release goes through Polaris end to end; old keys retired.
 - **Depends on:** 6.2, 3.7. **Size:** 1–2 d.
 
+### 6.5 Incident tools and store watchers
+
+- **Goal:** incidents are handled from a phone in minutes, and update gates never fire before the
+  store offers the fix.
+- **Deliverables:** `pkey dist incident start | end`, `kill`, `disable`, `hotfix`, `gate`, `notice`
+  (timestamp key only; re-sign, purge the CDN URL, canary-verify from two regions); store watchers
+  every 15 minutes (App Store Connect version state, Play track state, Steam live build, Flathub build
+  status) that set `gate.after` and post to an incident issue; hourly Play crash rate per
+  `versionCode` with alerts.
+- **Done when:** a drill takes a fixture set from live to disabled in under 5 minutes from a phone, and
+  a gate waits until a watcher sees the fixed build available.
+- **Depends on:** 6.2, 3.10. **Size:** 3–4 d.
+
 ---
 
-## M7 First live drop (3–5 days)
+## M7 First live drop (4–6 days)
 
 M7 runs on each channel's **test track** (TestFlight external, Play closed testing, the Steam `beta`
 branch, itch, direct and Web). Public launches follow each store's own lead times and are not part of
 this milestone.
 
-### 7.1 Data-only set
+### 7.1 Multi-domain drop, data only
 
-- **Goal:** prove "a new weapons set without a core update" on every channel.
-- **Deliverables:** `weapons-<yyyy-mm>` set reusing existing rules and `lib-armory` art; beta → stable
-  ramp; Steam/itch builds with the new snapshot; notes.
+- **Goal:** prove that practically anything ships without a core update: a new class, a map with a new
+  tile kind, a pet, relics and weapons, all at once, on every channel.
+- **Deliverables:** sets `class-<name>` (a mechanic built from resources + rules), `biome-<name>` (new
+  tile kind, twist, pools, dressing from a kit), `pets-<yyyy-mm>`, `relics-<yyyy-mm>`,
+  `weapons-<yyyy-mm>`, reusing library art; beta → stable ramp; Steam/itch builds with the new
+  snapshot; notes; an incident drill (disable one set, then re-enable it).
 - **Done when:** testers on direct, Web, Android (Play closed testing and the GitHub APK), iOS
-  (TestFlight and sideload), the Steam `beta` branch and itch see the set in new runs without
-  installing a new core.
-- **Depends on:** 2.3a, 2.6 (items), 3.7, and the channels' M5 steps. **Size:** 1–2 d.
+  (TestFlight and sideload), the Steam `beta` branch and itch play the new class, map, pet, relics and
+  weapons in new runs without installing a new core; the drill disables and restores a set within
+  minutes.
+- **Depends on:** R2–R4, R6, R7, R9, 2.6, 3.7, 3.10, and the channels' M5 steps. **Size:** 2–3 d.
 
 ### 7.2 Set with new art
 
@@ -574,20 +645,24 @@ this milestone.
 |---|---|
 | M0 Stabilize | 3.5–4.5 |
 | M1 Safety net | 4–6 |
-| M2 Content as data | 47–70 |
-| M3 Packs and trust | 32–45 |
-| M4 Direct desktop core updates | 10.5–14 |
+| M2 Content as data (rules engine, every domain) | 79–113 |
+| M3 Packs, trust and fast updates | 35–50 |
+| M4 Direct desktop core updates | 11.5–16 |
 | M5 Native delivery per store | 20–30 |
-| M6 Polaris Distribution | 15–22 |
-| M7 First live drop | 3–5 |
-| **Total** | **~135–197** (27–39 agent-weeks; roughly 4–6 calendar months with 2–3 lanes) |
+| M6 Polaris Distribution | 18–26 |
+| M7 First live drop | 4–6 |
+| **Total** | **~175–250** (35–50 agent-weeks; roughly 5–7 calendar months with 3–4 lanes) |
+| *Later:* 2.10 minigame templates | 6–10 |
 
 ## Definition of done for v2
 
 - Every channel with a step in this plan (App Store/TestFlight, direct Windows/macOS/Linux, Steam,
   itch, Flathub, Play, GitHub APK, iOS sideload, Web) ships from CI with the right distribution profile.
   GOG, Epic, the Mac App Store, AltStore PAL and the Microsoft Store are later additions.
-- A data-only set and an art set have gone through M7 on every channel's test track.
+- A multi-domain data-only drop (class, map with a new tile kind, pet, relics, weapons) and an art set
+  have gone through M7 on every channel's test track.
+- The incident drill (kill, disable, hotfix, gate) works from a phone in minutes.
+- The share of content releases that needed no core change is tracked (target ≥ 90 %).
 - No shipped build can stage or mount anything that isn't in a signed document or its own snapshot.
 - Rollout, halt and rollback have been exercised on the beta channel.
 - `docs/RELEASE.md`, `docs/KEYS.md` (public policy) and `docs/ASSETS.md` describe the system as

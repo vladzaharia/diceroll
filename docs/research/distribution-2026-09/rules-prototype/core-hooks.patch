@@ -1,0 +1,457 @@
+diff -ruN '--exclude=*.uid' '--exclude=rules' core/combat.gd core/combat.gd
+--- core/combat.gd	2026-09-30 04:45:51.655773031 +0000
++++ core/combat.gd	2026-09-30 05:09:49.000802399 +0000
+@@ -258,14 +258,8 @@
+ 	pet_thorns = 0
+ 	pet_block_turn = 0
+ 	var pev: Array[Dictionary] = []
+-	if run.has_passive("loaded_hands") and turn == 1:
+-		rerolls_left += 1
+-		pev.append(_passive("loaded_hands", 1))
+-	if run.has_passive("iron_skin"):
+-		run.block = Balance.PASSIVE_IRON_SKIN
+-		run.stats.block_gained = int(run.stats.get("block_gained", 0)) + run.block
+-		pev.append(_passive("iron_skin", run.block))
+-		pev.append({"type": "block_gained", "target": "hero", "amount": run.block, "total": run.block})
++	if Rules.listens(run, "turn.setup"):
++		Rules.fire("turn.setup", Rules.Ctx.new(run, self, pev))
+ 	if not run.meta.is_empty():
+ 		var extra := 0
+ 		if stoneskin > 0:
+@@ -347,10 +341,11 @@
+ 		marked[i] = false
+ 	var ev: Array[Dictionary] = []
+ 	var refunded := false
+-	if run.has_passive("encore") and float(current_combo(run).mult) > before_mult:
+-		rerolls_left += 1
+-		refunded = true
+-		ev.append(_passive("encore", 1))
++	if Rules.listens(run, "reroll.after"):
++		var rx := Rules.Ctx.new(run, self, ev)
++		rx.vars["mult_before"] = before_mult
++		Rules.fire("reroll.after", rx)
++		refunded = bool(rx.vars.get("refunded", false))
+ 	ev.append_array(ClassLogic.on_reroll(run, self, idx, refunded))
+ 	ev.append_array(ItemLogic.on_reroll(run, self, idx))
+ 	ev.append_array(PetLogic.on_reroll(run))
+@@ -409,23 +404,20 @@
+ 	var pd := pool_dice(run)
+ 	var out: Array[bool] = []
+ 	var used := {}
++	var wx: Rules.Ctx = null
+ 	for i in pd.size():
+ 		var r := pd[i].rune
+ 		var ok := false
+-		match r:
+-			"blade", "venom", "vampire", "echo", "heavy", "gilded":
+-				ok = group.has(i)
+-			"ember":
+-				ok = int(eff[i]) == 6 and dice_values[i] != Die.PRETEND
+-			"frost":
+-				ok = int(eff[i]) == 1 and dice_values[i] != Die.PRETEND
+-			"thunder":
+-				ok = rerolled[i]
+-			"lucky":
+-				ok = not rerolled[i]
+-			"guard":
+-				ok = true
+-		if ok and int(used.get(r, 0)) < Balance.rune_cap(r):
++		var rd: Dictionary = Rules.def_of("rune", r) if r != "" else Rules._EMPTY
++		if not rd.is_empty():
++			if wx == null:
++				wx = Rules.Ctx.new(run, self, [] as Array[Dictionary])
++			wx.vars["die.in_group"] = group.has(i)
++			wx.vars["die.eff"] = int(eff[i])
++			wx.vars["die.pretend"] = dice_values[i] == Die.PRETEND
++			wx.vars["die.rerolled"] = rerolled[i]
++			ok = bool((rd.when as Rules.N).ev(wx))
++		if ok and int(used.get(r, 0)) < int(rd.get("cap", 2)):
+ 			used[r] = int(used.get(r, 0)) + 1
+ 		else:
+ 			ok = false
+@@ -444,14 +436,12 @@
+ 	var eff: Array = combo.values
+ 	var group: Array = combo.group
+ 	var cid := String(combo.id)
+-	var mult := passive_mult(run, cid, float(combo.mult)) + pet_mult
++	var ax := Rules.Ctx.new(run, self, ev)
++	ax.vars = {"combo.id": cid, "eff": eff, "group": group, "pd": pd}
++	ax.acc = {"mult": float(combo.mult)}
++	Rules.fire("attack.combo_mult", ax)
++	var mult := float(ax.acc.mult) + pet_mult
+ 	pet_mult = 0.0
+-	if cid == "pair" and run.has_passive("crowd_pleaser"):
+-		ev.append(_passive("crowd_pleaser", 0))
+-	if (cid == "pair" or cid == "two_pair") and run.has_passive("pair_master"):
+-		ev.append(_passive("pair_master", 0))
+-	if cid in ["three_kind", "four_kind", "five_kind", "six_kind"] and run.has_passive("triple_threat"):
+-		ev.append(_passive("triple_threat", 0))
+ 	# Class combo bonus (Paladin Oath): [mult added once, pips added before the multiplier]
+ 	var cls_bonus := ClassLogic.combo_bonus(run, self, combo, ev)
+ 	mult += float(cls_bonus[0])
+@@ -460,12 +450,12 @@
+ 	for i in pd.size():
+ 		var t := 1
+ 		# anti-stacking: the multiplier runes (Heavy, Echo) never trigger twice
+-		if pd[i].rune != "" and group.has(i) and not Balance.NO_DOUBLE_TRIGGER.has(pd[i].rune):
+-			if run.has_passive("resonance"):
+-				t = 2
+-			elif run.has_passive("rune_echo") and run.rng.chance(Balance.PASSIVE_RUNE_ECHO_CHANCE):
+-				t = 2
+-				ev.append(_passive("rune_echo", i))
++		if pd[i].rune != "" and group.has(i) and not bool(Rules.def_of("rune", pd[i].rune).get("no_double", false)):
++			if Rules.listens(run, "rune.times"):
++				ax.die = i
++				ax.times = 1
++				Rules.fire("rune.times", ax)
++				t = ax.times
+ 		times.append(t)
+ 	var sum := 0
+ 	var bonus := int(cls_bonus[1])
+@@ -498,36 +488,19 @@
+ 			bonus += pips * times[i]
+ 			for k in times[i]:
+ 				ev.append(_rune(i, rune, "bonus_damage", pips))
+-		if rune == "echo" and act[i]:
+-			mult += 0.5 * times[i]
+-			for k in times[i]:
+-				ev.append(_rune(i, rune, "mult", 0))
++		if act[i] and rune != "":
++			ax.die = i
++			ax.times = times[i]
++			ax.acc = {"mult": mult}
++			if Rules.fire_rune("rune.score", rune, ax):
++				mult = float(ax.acc.mult)
+ 		if rune == "wild" and wild_left > 0:
+ 			wild_left -= 1
+ 			ev.append(_rune(i, rune, "wild", pips))
+-		if run.has_passive("steady_hand") and not rerolled[i]:
+-			steady += 1
+-		if run.has_passive("boxcars") and in_group and pips == 6:
+-			boxcars += Balance.PASSIVE_BOXCARS
+-		if run.has_passive("snake_eyes") and pips == 1:
+-			snakes += Balance.PASSIVE_SNAKE_EYES
+-	if steady > 0:
+-		bonus += steady
+-		ev.append(_passive("steady_hand", steady))
+-	if boxcars > 0:
+-		bonus += boxcars
+-		ev.append(_passive("boxcars", boxcars))
+-	if snakes > 0:
+-		flat += snakes
+-		ev.append(_passive("snake_eyes", snakes))
+-	if run.has_passive("straight_shooter") and (cid == "straight" or cid == "small_straight"):
+-		flat += Balance.PASSIVE_STRAIGHT_DAMAGE
+-		ev.append(_passive("straight_shooter", Balance.PASSIVE_STRAIGHT_DAMAGE))
+-	if run.has_passive("midas_fist"):
+-		var m := mini(Balance.PASSIVE_MIDAS_MAX, run.gold / Balance.PASSIVE_MIDAS_GOLD)
+-		if m > 0:
+-			flat += m
+-			ev.append(_passive("midas_fist", m))
++	ax.acc = {"bonus": bonus, "flat": flat}
++	Rules.fire("attack.pips", ax)
++	bonus = int(ax.acc.bonus)
++	flat = int(ax.acc.flat)
+ 	var factor := 1.0
+ 	if not run.meta.is_empty():
+ 		var im := ItemLogic.attack_mods(run, self, cid, pd, eff, group, act, mult, ev)
+@@ -542,12 +515,9 @@
+ 				run.stats.kept_dice = int(run.stats.get("kept_dice", 0)) + 1
+ 		if cid == "straight" or cid == "small_straight":
+ 			run.stats.straights = int(run.stats.get("straights", 0)) + 1
+-	if run.has_passive("glass_cannon"):
+-		factor *= Balance.PASSIVE_GLASS_MULT
+-		ev.append(_passive("glass_cannon", 0))
+-	if run.has_passive("opening_salvo") and turn == 1:
+-		factor *= Balance.PASSIVE_DAMAGE_MULT
+-		ev.append(_passive("opening_salvo", 0))
++	ax.acc = {"factor": factor}
++	Rules.fire("attack.factor", ax)
++	factor = float(ax.acc.factor)
+ 	factor *= ClassLogic.attack_factor(run, self, ev)
+ 	var total :=int(floor(((sum + bonus) * mult + flat) * factor)) + run.atk
+ 	last_combo = {"id": combo.id, "name": combo.name, "mult": mult, "base_mult": float(combo.mult), "group": group.duplicate(), "total": total, "values": eff.duplicate()}
+@@ -580,13 +550,10 @@
+ 			ev.append({"type": "damage", "target": "hero", "amount": th, "blocked": 0, "source": "thorns", "attacker": target, "lethal": false, "hp": run.hp, "max_hp": run.max_hp, "block": run.block})
+ 	# Ember (SIX): 6 to all
+ 	for i in pd.size():
+-		if pd[i].rune == "ember" and act[i]:
+-			for k in times[i]:
+-				var emb := 6 + ItemLogic.rune_dmg(run)
+-				ev.append(_rune(i, "ember", "damage_all", emb))
+-				for j in enemies.size():
+-					if alive(j):
+-						ev.append_array(damage_enemy(j, emb, "ember", run))
++		if act[i] and pd[i].rune != "":
++			ax.die = i
++			ax.times = times[i]
++			Rules.fire_rune("rune.after_hit", pd[i].rune, ax)
+ 	# Thunder (REROLLED): pips to a random enemy
+ 	for i in pd.size():
+ 		if pd[i].rune == "thunder" and act[i]:
+@@ -598,20 +565,7 @@
+ 				var thd := int(eff[i]) + (ItemLogic.thunder_dmg(run) if int(eff[i]) > 0 else 0)
+ 				ev.append(_rune(i, "thunder", "damage_random", thd))
+ 				ev.append_array(damage_enemy(j, thd, "thunder", run))
+-	if run.has_passive("gold_tooth"):
+-		var sixes := 0
+-		for i in pd.size():
+-			if int(eff[i]) == 6:
+-				sixes += 1
+-		if sixes > 0:
+-			run.gold += sixes
+-			run.stats.gold_earned = int(run.stats.get("gold_earned", 0)) + sixes
+-			ev.append(_passive("gold_tooth", sixes))
+-			ev.append({"type": "gold_changed", "amount": sixes, "total": run.gold, "source": "gold_tooth"})
+-	if run.has_passive("full_house_party") and cid == "full_house":
+-		var fh := run.heal(Balance.PASSIVE_FULL_HOUSE_HEAL)
+-		ev.append(_passive("full_house_party", Balance.PASSIVE_FULL_HOUSE_HEAL))
+-		ev.append({"type": "hp_changed", "amount": fh, "total": run.hp, "source": "full_house_party", "max_hp": run.max_hp})
++	Rules.fire("attack.after_runes", ax)
+ 	var killed := alive_before - alive_indices().size()
+ 	_fix_target()
+ 	for i in pd.size():
+@@ -641,12 +595,6 @@
+ 					ev.append({"type": "block_gained", "target": "hero", "amount": pips, "total": run.block})
+ 					if pips > 0:
+ 						ev.append_array(ItemLogic.steadfast(run, self))
+-				"vampire":
+-					# lifesteal on a kill: only when this attack killed an enemy
+-					if killed > 0:
+-						var healed := run.heal(pips)
+-						ev.append(_rune(i, rune, "heal", healed))
+-						ev.append({"type": "hp_changed", "amount": healed, "total": run.hp, "source": "vampire"})
+ 				"gilded":
+ 					run.gold += 2
+ 					run.stats.gold_earned = int(run.stats.get("gold_earned", 0)) + 2
+@@ -656,9 +604,13 @@
+ 					if run.banked_rerolls < Balance.MAX_BANKED_REROLLS:
+ 						run.banked_rerolls += 1
+ 						ev.append(_rune(i, rune, "bank_reroll", 1))
++				_:
++					ax.die = i
++					ax.vars["killed"] = killed
++					Rules.fire_rune("rune.after_attack", rune, ax)
+ 	ev.append_array(ClassLogic.after_attack(run, self))
+ 	ev.append_array(PetLogic.on_attack_resolved(run, self, cid, eff))
+-	ev.append_array(_moon_clouds(run))
++	Rules.fire_enemies("attack.end", Rules.Ctx.new(run, self, ev))
+ 	if all_dead():
+ 		ev.append_array(_win(run))
+ 		return ev
+@@ -708,10 +660,10 @@
+ 				if not gc.is_empty():
+ 					ev.append({"type": "affix_triggered", "enemy_idx": i, "affix": "gilded", "value": AffixDefs.GILDED_PET_CHARGE})
+ 					ev.append_array(gc)
+-		if run.has_passive("bloodthirst"):
+-			var h := run.heal(Balance.PASSIVE_BLOODTHIRST)
+-			ev.append(_passive("bloodthirst", Balance.PASSIVE_BLOODTHIRST))
+-			ev.append({"type": "hp_changed", "amount": h, "total": run.hp, "source": "bloodthirst", "max_hp": run.max_hp})
++		if Rules.listens(run, "enemy.killed"):
++			var kx := Rules.Ctx.new(run, self, ev)
++			kx.vars = {"enemy": i, "source": source}
++			Rules.fire("enemy.killed", kx)
+ 		var ok := last_overkill
+ 		ev.append_array(ClassLogic.on_enemy_killed(run, self, i, source))
+ 		ev.append_array(ItemLogic.on_kill(run, self, i))
+@@ -829,7 +781,7 @@
+ 		ev.append({"type": "enemy_intent", "enemy_idx": i, "intent": e.intent.duplicate()})
+ 	ev.append_array(_tick_burn(run))
+ 	if result == "":
+-		ev.append_array(_moon_tide(run))
++		Rules.fire_enemies("enemy_phase.end", Rules.Ctx.new(run, self, ev))
+ 	if result == "":
+ 		ev.append_array(ClassLogic.on_enemy_phase_end(run, self))
+ 	return ev
+@@ -883,9 +835,10 @@
+ 		ev.append(_passive(saved, 1))
+ 	if run.hp <= 0:
+ 		result = "lost"
+-	elif dealt > 0 and run.has_passive("thorns"):
+-		ev.append(_passive("thorns", Balance.PASSIVE_THORNS))
+-		ev.append_array(damage_enemy(i, Balance.PASSIVE_THORNS, "thorns", run))
++	elif dealt > 0 and Rules.listens(run, "hero.damaged"):
++		var hx := Rules.Ctx.new(run, self, ev)
++		hx.vars = {"attacker": i, "dealt": dealt, "blocked": blocked}
++		Rules.fire("hero.damaged", hx)
+ 	if result == "" and not run.meta.is_empty():
+ 		ev.append_array(ItemLogic.after_enemy_hit(run, self, i, blocked, dealt, block_before))
+ 	if result == "" and pet_thorns > 0 and alive(i) and (dealt > 0 or run.pet_level() >= 5):
+@@ -1041,8 +994,11 @@
+ 		g += float(def.gold) * m * (1.0 if e.boss else gold_mult) * float(am[0]) * (ClassLogic.FLEE_GOLD if fled else 1.0)
+ 		if not fled:
+ 			x += float(def.xp) * m * float(am[1])
+-	if run.has_passive("scholar"):
+-		x *= Balance.PASSIVE_SCHOLAR
++	if Rules.listens(run, "query.fight_xp"):
++		var qx := Rules.Ctx.new(run, self, [] as Array[Dictionary])
++		qx.value = x
++		Rules.fire("query.fight_xp", qx)
++		x = float(qx.value)
+ 	if moon_full:
+ 		g *= BiomeDefs.MOON_FULL_GOLD
+ 	gold_reward = int(round(g * Balance.tune_gold))
+@@ -1123,17 +1079,7 @@
+ 			if not out.is_empty():
+ 				ev.append({"type": "rally", "source": "drum", "value": v, "drums": drums})
+ 				ev.append_array(out)
+-	for i in enemies.size():
+-		if String(enemies[i].id) == "boss_moon_king":
+-			moon = 0
+-			if run.has_asc("boss_phase") and int(run.stats.get("boss_stage", 0)) == 0:
+-				moon = EnemyDefs.MOON_A9_START
+-			if run.route.has("hollow") and run.route.has("moonlit") and (run.stats.get("minibosses_killed", []) as Array).has("mini_moonfang"):
+-				moon += EnemyDefs.MOON_FANG_START
+-				ev.append({"type": "moon_meter", "value": moon, "delta": 0, "source": "moonfang", "max": EnemyDefs.MOON_MAX})
+-			else:
+-				ev.append({"type": "moon_meter", "value": moon, "delta": 0, "source": "start", "max": EnemyDefs.MOON_MAX})
+-			break
++	Rules.fire_enemies("fight.start", Rules.Ctx.new(run, self, ev))
+ 	return ev
+ 
+ ## Index of the living Moon King, or -1.
+diff -ruN '--exclude=*.uid' '--exclude=rules' core/game_flow.gd core/game_flow.gd
+--- core/game_flow.gd	2026-09-30 04:45:51.657025787 +0000
++++ core/game_flow.gd	2026-09-30 04:54:03.202612831 +0000
+@@ -385,11 +385,8 @@
+ 			changes.append_array(run.place_minigames([dest]))
+ 			ev.append({"type": "board_mutated", "changes": changes})
+ 		_moon_event(ev)
+-		if run.has_passive("piggy_bank"):
+-			var interest := mini(Balance.PASSIVE_PIGGY_MAX, int(run.gold * Balance.PASSIVE_PIGGY_PCT))
+-			if interest > 0:
+-				ev.append(_passive_ev("piggy_bank", interest))
+-				_gold(ev, interest, "piggy_bank")
++		if Rules.listens(run, "lap.completed"):
++			Rules.fire("lap.completed", Rules.Ctx.new(run, null, ev))
+ 		if run.is_shop_lap(completed):
+ 			pending.push_back({"kind": "shop"})
+ 	if dest != 0:
+@@ -476,9 +473,11 @@
+ 				if run.has_pet("coin_mimic") and run.pet_level() >= 10:
+ 					roll = maxi(roll, run.rng.randi_range(Balance.CHEST_GOLD_MIN, Balance.CHEST_GOLD_MAX))
+ 				var g := run.gold_bonus(int(round(roll * Balance.gold_scale(run.eff_lap()) * ItemLogic.chest_gold_mult(run))))
+-				if run.has_passive("treasure_sense"):
+-					g = int(round(g * Balance.PASSIVE_TREASURE_MULT))
+-					ev.append(_passive_ev("treasure_sense", g))
++				if Rules.listens(run, "query.chest_gold"):
++					var qx := Rules.Ctx.new(run, null, ev)
++					qx.value = g
++					Rules.fire("query.chest_gold", qx)
++					g = int(qx.value)
+ 				_gold(ev, g, "chest")
+ 		"event":
+ 			_consume(idx, ev)
+@@ -1092,10 +1091,11 @@
+ 			item.price = int(Balance.PASSIVE_PRICE[pd.rarity])
+ 	if id == "die" and ItemLogic.appraise(run) < 1.0:
+ 		item.price = int(round(item.price * ItemLogic.appraise(run)))
+-	if run.has_passive("haggler"):
+-		item.price = int(round(item.price * Balance.PASSIVE_HAGGLE))
+-	if run.has_asc("shop_tax"):
+-		item.price = int(round(item.price * UnlockDefs.ASC_SHOP_TAX))
++	if Rules.listens(run, "query.shop_price"):
++		var qx := Rules.Ctx.new(run, null, [] as Array[Dictionary])
++		qx.value = item.price
++		Rules.fire("query.shop_price", qx)
++		item.price = int(qx.value)
+ 	return item
+ 
+ func shop_buy(i: int, die_idx := -1) -> Array[Dictionary]:
+diff -ruN '--exclude=*.uid' '--exclude=rules' core/item_logic.gd core/item_logic.gd
+--- core/item_logic.gd	2026-09-30 04:45:51.657217356 +0000
++++ core/item_logic.gd	2026-09-30 04:54:03.201842692 +0000
+@@ -402,16 +402,10 @@
+ 		else:
+ 			kept += 1
+ 	# weapon
+-	if has(run, "sword") and use_left(run, c, "sword"):
+-		var f := 0
+-		if PAIRISH.has(cid):
+-			f = ni(run, "sword", "flat")
+-		elif cid == "high_roller" and sec(run, "sword_rapier"):
+-			f = maxi(1, int(floor(n(run, "sword", "flat") * ItemDefs.sec_num("sword_rapier", "share"))))
+-		if f > 0:
+-			use(c, "sword")
+-			r.flat += f
+-			out.append(ev(run, "sword", "twin_edge", f))
++	var ix := Rules.Ctx.new(run, c, out)
++	ix.vars = {"combo.id": cid, "eff": eff, "group": group, "pd": pd, "target": t}
++	ix.acc = r
++	Rules.fire("attack.item_mods", ix)
+ 	if has(run, "greatsword") and SETS3.has(cid):
+ 		var m := maxf(0.0, n(run, "greatsword", "mult") + (ItemDefs.sec_num("greatsword_plain", "mult") if sec(run, "greatsword_plain") else 0.0))
+ 		if m > 0.0:
+@@ -591,12 +585,9 @@
+ 	# splashes: Saber (Pairs), Zweihander (3 of a kind+), Halberd (First Strike)
+ 	var splash := 0.0
+ 	var why := ""
+-	if sec(run, "sword_saber") and cid == "pair":
+-		var o := _next_alive(c, tgt0)
+-		if o >= 0:
+-			var d := int(floor(total * ItemDefs.sec_num("sword_saber", "pct")))
+-			out.append(ev(run, "sword", "slash", d, {"enemy_idx": o}))
+-			out.append_array(c.damage_enemy(o, d, "item", run))
++	var hx := Rules.Ctx.new(run, c, out)
++	hx.vars = {"combo.id": cid, "eff": eff, "group": group, "pd": pd, "target": tgt0, "total": total, "soak": soak}
++	Rules.fire("attack.after_hit", hx, 200, 299)
+ 	if sec(run, "greatsword_zwei") and SETS3.has(cid):
+ 		splash = ItemDefs.sec_num("greatsword_zwei", "pct")
+ 		why = "reach"
+@@ -624,24 +615,7 @@
+ 		if sec(run, "hammer_club"):
+ 			out.append_array(poison(run, c, tgt0, int(ItemDefs.sec_num("hammer_club", "poison")), "warhammer", "rend"))
+ 	# sword secondaries
+-	if sec(run, "sword_flame") and PAIRISH.has(cid):
+-		var sixes := 0
+-		for i in group:
+-			if int(eff[int(i)]) == 6:
+-				sixes += 1
+-		if sixes > 0:
+-			var d3 := sixes * int(ItemDefs.sec_num("sword_flame", "dmg"))
+-			out.append(ev(run, "sword", "burning", d3))
+-			for j in c.enemies.size():
+-				if c.alive(j):
+-					out.append_array(c.damage_enemy(j, d3, "item", run))
+-	if sec(run, "sword_frost") and cid == "pair" and int(c.item_state.get("chill", 0)) == 0 and c.alive(tgt0):
+-		var pv := set_value(eff, group)
+-		if pv == 1 or pv == 2:
+-			c.item_state["chill"] = 1
+-			out.append_array(freeze(run, c, tgt0, "sword", "chill"))
+-	if sec(run, "sword_knight") and cid == "pair":
+-		out.append_array(gain_block(run, c, int(ItemDefs.sec_num("sword_knight", "block")), "sword", "guarded"))
++	Rules.fire("attack.after_hit", hx, 500, 599)
+ 	# staff secondaries
+ 	if sec(run, "staff_frost") and int(c.item_state.get("rime", 0)) == 0 and c.alive(tgt0):
+ 		for i in pd.size():
+diff -ruN '--exclude=*.uid' '--exclude=rules' core/run_state.gd core/run_state.gd
+--- core/run_state.gd	2026-09-30 04:45:51.658455450 +0000
++++ core/run_state.gd	2026-09-30 04:53:14.626375262 +0000
+@@ -66,6 +66,9 @@
+ ## Armory item state across fights (ItemLogic): ambush (primed), dominion (stacks), soul (bonus),
+ ## key_act (Skeleton Key's first chest), last_stand (used). All ints.
+ var item_state: Dictionary = {}
++## Rules prototype: the per-run dispatch table and its stamp (not serialised).
++var rules_idx: Dictionary = {}
++var rules_stamp: int = -1
+ 
+ ## opts (all optional, for scenarios/tests): route:[tier1, tier2, tier3], miniboss:id, boss:id.
+ ## opts.mode: "standard" (default) | "short".
+@@ -382,14 +385,9 @@
+ ## only if HP before the hit was above 50%: pass it as `hp_before`). Returns the passive or
+ ## trait that saved them, or "".
+ func survive_lethal(hp_before := -1) -> String:
+-	if has_passive("phoenix") and int(passive_state.get("phoenix_act", 0)) != act:
+-		passive_state["phoenix_act"] = act
+-		hp = 1
+-		return "phoenix"
+-	if has_passive("second_wind") and not bool(passive_state.get("second_wind_used", false)):
+-		passive_state["second_wind_used"] = true
+-		hp = 1
+-		return "second_wind"
++	var saved := Rules.first_saved(self, "hero.lethal")
++	if saved != "":
++		return saved
+ 	if ItemLogic.last_stand(self) and int(pet_state.get("last_stand", 0)) == 0 and hp_before * 2 > max_hp:
+ 		pet_state["last_stand"] = 1
+ 		hp = 1

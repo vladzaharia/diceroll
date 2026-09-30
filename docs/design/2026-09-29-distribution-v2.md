@@ -20,8 +20,9 @@ releases it; and what Polaris Key needs to run it.
 
 ## 0. Summary
 
-**The short version:** the game becomes a **core** (engine + code + rules + a built-in copy of all
-content) plus **content** (a small signed definitions catalog + data-only asset packs). They ship on
+**The short version:** the game becomes a **core** (engine, code, the rules engine and its primitives,
+a built-in copy of all content) plus **content** (a small signed definitions catalog that describes
+practically everything in the game, *including how it behaves*, plus data-only asset packs). They ship on
 two independent release trains. Each platform gets its best native channel for the core, and a
 per-platform `ContentDelivery` backend for content. One trust chain (offline roots, scoped online keys,
 Polaris Key as the publishing gateway and timestamp signer) covers every byte the game mounts, no
@@ -35,7 +36,7 @@ where a build came from (App Store, Play, Steam, the direct installer, the Web�
 | # | Decision | Why |
 |---|---|---|
 | D1 | **Two release trains.** *Core* (binary: engine, GDScript, rule registry, base content snapshot) goes through stores and installers. *Content* (definitions catalog + asset packs) ships on its own cadence, without store review wherever the platform allows | New weapons, maps and enemies are data; new mechanics are code. Separating them is what lets content ship without a core update |
-| D2 | **Content definitions become JSON** (+ JSON Schema), authored per *content set*, compiled into one signed **defs catalog** (~40 KB gz). Rules dispatch on declared rule ids, not on item/enemy/biome ids | Today a pack can't add even a copy of an existing weapon: `core/item_logic.gd` branches on 51 item ids. JSON is the only Godot format that can't execute code (`.tres`, `.tscn`, `ConfigFile`, `str_to_var` all run embedded scripts, tested on 4.7.2) |
+| D2 | **Practically everything is content, including behaviour.** Weapons, classes, maps and tile kinds, pets, relics, runes, potions, enemies, bosses, events, modifiers and more are JSON content sets compiled into one signed **defs catalog**. Each entity owns declarative **rules** (trigger → condition → effects, resources, limits) run by one **rules engine** in core over a closed, versioned library of primitives | Today a pack can't add even a copy of an existing weapon (`core/item_logic.gd` branches on 51 item ids). A prototype engine reproduced today's behaviour exactly and can express 98.5 % of the game's 271 behavioural entries as data. JSON is the only Godot format that can't execute code (`.tres`, `.tscn`, `ConfigFile`, `str_to_var` all run embedded scripts, tested on 4.7.2) |
 | D3 | **Asset packs are data-only PCKs**, grouped as ~8 *library* packs (shared art by source and co-usage) plus append-only *set* packs for new art. 1–25 MB each; tens of packs, not hundreds. New content lands in **new** packs; old packs rarely change | Small, cacheable, delta-friendly on every store patcher (Apple-hosted packs re-download whole, one more reason new art goes into new packs); KayKit meshes are shared across domains so per-domain asset packs would duplicate them |
 | D4 | **The game sits behind `ContentDelivery`**, with backends: Embedded, CDN, Apple Background Assets, Steam/installed files, (optional) Play Asset Delivery. Every pack is hash-verified against a trusted list before its first mount, whatever delivered it | One code path for mounting and trust; the platform decides only *where bytes come from* |
 | D5 | **Desktop direct builds update the core with Velopack** (Windows installer, macOS pkg, Linux AppImage; per-file zstd deltas), wrapped in a small GDExtension that only applies packages our signed release document lists. **The `--main-pack` code-pack updater is retired** | Official 4.6+ export templates refuse `--main-pack` (verified on our shipped rc.3 binary), so today's desktop code updates can't work. Velopack gives small binary+code deltas with one integration on three OSes |
@@ -46,6 +47,7 @@ where a build came from (App Store, Play, Steam, the direct installer, the Web�
 | D10 | **Key custody by blast radius.** The *release* key on a YubiKey signs release documents (binaries) **and pack documents** approving each new asset-pack revision: one touch per core release or art drop. The *content* key, held by Polaris Key, signs catalogs (JSON definitions plus references to approved packs) after verifying the CI job's GitHub OIDC token and policy. The *timestamp* key runs in a Polaris cron. Roots stay offline | Balance changes and data-only sets (the common case) ship with no human in the loop. JSON can't execute code; binary resources could in principle embed a script, so every new pack is approved on hardware **and** scanned in CI and on the device before its first mount |
 | D11 | **Hosting: Cloudflare R2** behind a custom domain. Immutable, content-addressed objects with bucket locks; one short-cached `timestamp` file. GitHub Releases keeps human downloads, checksums and attestations | $0–7/month at 100k installs; zero egress; Range requests for resume; no Worker on the hot path, so the game never depends on the Worker being up |
 | D12 | **Polaris Key gains a Distribution service** (separate Worker from the same monorepo) and a **Godot SDK**: OIDC publish gateway, content signer, release-document intake, timestamp cron + halt switch, rollouts, GC, console and `pkey dist` CLI. Serving stays static on R2 | Keeps long-lived Cloudflare and signing secrets out of GitHub; gives one place for rollouts, kill switches and audit; reusable by other products |
+| D13 | **Updatable in minutes, fixable fast.** Clients check a tiny signed timestamp on launch, on resume and every 15 minutes (faster during incidents). It carries kill switches for code paths (from a registry in code; they only disable or choose reviewed behaviour), data hotfixes applied at safe points, and update gates. Code fixes take each platform's fastest lane | A data fix reaches players in minutes everywhere; code is slow only on the App Store (hours to days), which is why behaviour-as-data and switches matter |
 
 ### 0.2 Per-platform at a glance
 
@@ -70,11 +72,12 @@ where a build came from (App Store, Play, Steam, the direct installer, the Web�
 
 - **Money:** Apple Developer Program $99/yr (already needed), Steam $100 once, Azure Artifact Signing
   $9.99/month (if eligible), three YubiKeys (~$165 once), Cloudflare R2 + Workers ≈ $0–7/month.
-- **Work:** about **27–39 agent-weeks** in total (135–197 agent-days), much of it parallel. About a
-  third is the content-as-data refactor, which is also what makes packs able to add content at all.
-  The plan orders it so every step ships on its own (plan doc, milestones M0–M7). With two or three
-  lanes in parallel and review time, that's roughly 4–6 calendar months to the first live drop on
-  test tracks, plus store lead times for public launches.
+- **Work:** about **35–50 agent-weeks** in total (175–250 agent-days), much of it parallel. Close to
+  half is making the game's content and behaviour data (the rules engine and the per-domain
+  conversions), which is what lets practically everything ship without a core update. The plan orders
+  it so every step ships on its own (plan doc, milestones M0–M7). With three or four lanes in parallel
+  and review time, that's roughly 5–7 calendar months to the first multi-domain live drop on test
+  tracks, plus store lead times for public launches.
 
 ---
 
@@ -134,11 +137,16 @@ Each fact below was verified this session against a primary source or an experim
     exactly 1, so the "additive schema 2" of the previous proposal can't reuse the same URL.
 11. **The update signing key is a code-signing key** (the pack carries all GDScript) held as an
     ungated repository secret, with no key id, expiry, freshness or rollback floor.
-12. **Web and CDN:** GitHub Releases downloads carry no CORS headers, so the Web build can't fetch
+12. **Behaviour can be data without losing anything.** The engine already runs content at ~60 hook
+    points that emit event dictionaries. A prototype rules engine re-expressed 41 existing rules
+    (relics, rune triggers, a weapon and its variants, an ascension key, the Moon King's meter) and
+    reproduced 220 bot runs and the real simulator bit for bit, at ~3.5 % end-to-end cost; 98.5 % of
+    the game's 271 behavioural entries fit its vocabulary.
+13. **Web and CDN:** GitHub Releases downloads carry no CORS headers, so the Web build can't fetch
     from them; Cloudflare Workers static assets and Pages cap files at 25 MiB (our `index.wasm` is
     39.5 MB); `HTTPRequest.download_file` is broken on Web in 4.7.2; `user://` on Web is copied into
     memory on every page load. Between rc.1 and rc.3 no asset file changed, only 0.5–1.2 MB of code.
-13. **GitHub:** immutable releases (GA Oct 2025) conflict with the rolling `channels` release;
+14. **GitHub:** immutable releases (GA Oct 2025) conflict with the rolling `channels` release;
     scheduled workflows in public repos are disabled after 60 days of inactivity (so a daily
     freshness re-sign can't rely on them); Cloudflare's API has no GitHub OIDC federation, so a
     Worker must bridge it.
@@ -149,22 +157,30 @@ Each fact below was verified this session against a primary source or an experim
 
 **Goals**
 
-1. New weapons, armor, trinkets ("tools"), enemies, bosses, heroes (from existing mechanics), biomes
-   (maps) and events ship **as data**, without a core update, on every platform that allows it.
-2. Updates are small: a balance change is kilobytes; a new weapons set is its defs plus only its new
-   art; fixing one pack re-downloads one pack (or a delta).
-3. Each platform uses its best native system for the core and, where it pays, for content.
-4. Every byte the game mounts is verified against a signed or compiled-in list.
-5. One maintainer can run it: one command or one approval per release, automated promotion,
+1. **Practically everything in the game is content that ships as data**, without a core update, on
+   every platform: weapons, armor, trinkets ("tools"), classes/heroes and their mechanics, maps
+   (biomes, board mixes, tile kinds, twists), pets, relics (passives), runes and dice, potions,
+   enemies, mini-bosses and bosses, affixes, events, shops and rewards, ascension and daily/seasonal
+   modifiers, minigame variants, unlocks, milestones and skins, text, music and art. Content defines
+   its **behaviour** as well as its numbers (§4.4).
+2. **The game can be changed quickly when needed**: a switch or data fix reaches players in minutes on
+   every platform, and code fixes take each platform's fastest lane (§12).
+3. Updates are small: a balance change is kilobytes; new content is its defs plus only its new art;
+   fixing one pack re-downloads one pack (or a delta).
+4. Each platform uses its best native system for the core and, where it pays, for content.
+5. Every byte the game mounts is verified against a signed or compiled-in list.
+6. One maintainer can run it: one command or one approval per release, automated promotion,
    instant halt and rollback.
 
 **Non-goals**
 
-- Downloading code on any channel (store policy and safety). New mechanics always need a core release.
+- Downloading code on any channel (store policy and safety). Data composes the primitives the core
+  ships; a genuinely new *primitive* (a new kind of hook, effect, status behaviour, UI flow or
+  minigame template) needs a core release, and the plan keeps that list shrinking (§4.9).
 - Accounts, telemetry or per-user remote config. Everyone on a ruleset sees identical data.
 - A launcher/bootstrapper that downloads the whole game on first run (rejected in the previous
   proposal; still rejected).
-- Paid content packs (the design leaves room; see §12.4).
+- Paid content packs (the design leaves room; see §12.6).
 
 **Principles**
 
@@ -301,9 +317,9 @@ hand. A set with new art would also list its pack (`"art-weapons-2026-10": 1`).
   where the schema says so (Godot parses all JSON numbers as floats). Canonical serialisation (sorted
   keys) keeps hashes reproducible.
 - **Never** use `.tres`/`.tscn`, `ConfigFile`, `str_to_var`, `bytes_to_var_with_objects` or
-  `Expression` on anything that came from content. The DSL stays declarative: enumerated rule ids with
-  numeric parameters and closed condition enums, no formula strings. That keeps packs clearly "data"
-  for Apple 2.5.2 and Play's Device and Network Abuse policy.
+  `Expression` on anything that came from content. Behaviour is expressed as rule trees over a closed,
+  versioned vocabulary (§4.4), never as formula strings. That keeps packs clearly "data" for Apple
+  2.5.2 and Play's Device and Network Abuse policy.
 - **Operations** a set may contain:
 
   | Op | Meaning | Example |
@@ -325,40 +341,87 @@ hand. A set with new art would also list its pack (`"art-weapons-2026-10": 1`).
   call sites, the sim and the tests use them) and read from `ContentDB`. `const` tables become static
   vars filled by `ContentDB.ensure()`, which also works in headless tests without autoloads.
 
-### 4.4 Rule registry and capabilities
+### 4.4 Behaviour as data: the rules engine
 
-The core publishes what it can execute, as `{kind: {primitive: version}}`
-(`core/content/content_api.gd`):
+Numbers alone aren't enough: a new relic, pet, class, map or weapon usually *does* something. So
+every content entity is an **owner** of **rules**, and one engine in core runs the rules of every
+domain at the game's existing hook points. Data composes a closed, versioned library of primitives;
+code owns the primitives. This is the pattern shipped games converge on (Hearthstone's tags and
+scripted powers, MTG Arena's rules engine, League's ability blocks, Overwatch's Statescript, Monster
+Train's effect classes, Luck be a Landlord's effect dictionaries in Godot): engineers ship primitives,
+designers compose them, and a native escape hatch covers the rest.
 
-```gdscript
-const FORMAT := 1
-const CAPS := {
-  "effect": {"twin_edge": 1, "cleave": 1, "thorns": 1},   # item rules (51 today)
-  "sec": {"slash": 1, "precision": 1},                      # variant secondaries (50 today)
-  "intent": {"attack": 1, "drain": 1, "bury": 1},           # enemy intents (15)
-  "trait": {"armor": 1, "thorns": 1},                       # enemy traits (6)
-  "twist": {"ore": 1, "drums": 1, "campfire_bonus": 1},     # biome twists
-  "passive": {}, "rune_trigger": {}, "rune_effect": {}, "pet_fire": {}, "pet_perk": {},
-  "potion_op": {}, "event_kind": {}, "tile": {}, "mechanic": {}, "boss_mech": {"moon_meter": 1},
-  "look.model": {}, "look.mount": {}, "look.dressing": {},
+**Proven on our code.** A prototype engine (`core/rules/*`, ~41 rules re-expressed as JSON: 25
+relics, every rune trigger, the Arming Sword and its five variants, an ascension key and the Moon
+King's moon meter) reproduced today's behaviour **exactly**: 220 bot runs (72,695 commands, 90,078
+rule evaluations) and the real `tools/sim.gd` gave identical event streams and final-state hashes.
+A firing rule costs ~7 µs; engine time rises 15–20 %, a whole simulated run ~3.5 %; 615 rules compile
+in ~43 ms. The prototype and its A/B harness are kept in
+[`docs/research/distribution-2026-09/rules-prototype/`](../research/distribution-2026-09/rules-prototype/README.md).
+
+**Rule shape** (JsonLogic-shaped JSON trees, never strings):
+
+```jsonc
+{
+  "id": "snake_eyes",
+  "on": "attack.dice",                         // one of ~60 hooks (below)
+  "if": {"eq": [{"var": "die.eff"}, 1]},       // closed operators over ~90 read-only variables
+  "do": [{"op": "bonus_add", "value": {"param": "per_one"}}],   // closed effect ops
+  "limit": {"per": "fight", "max": 0},         // turn | fight | lap | biome | act | run, shared groups
+  "chance": null, "prio": 20,                  // chance from the owner's seeded stream; total order
+  "announce": {"effect": "snake_eyes", "value": "$result"}
 }
 ```
 
-- A set's `requires_caps` is computed by CI by walking every rule, intent, trait, twist and look
-  reference.
-- A primitive's version is bumped only on an incompatible change; prefer adding a new primitive so
-  old sets keep working.
-- The client drops sets it can't run (before downloading their packs), shows "Update the game to get
-  *Set X*" for content the player already owns, and keeps saves that reference it dormant.
-- New primitives ship in a core release with at least one base use and a release-notes line, then
-  data enables new combinations. Don't dark-ship whole modes that data switches on later (Apple 2.3.1).
+| Part | What data can use |
+|---|---|
+| **Owners** | items and variants, relics (passives), runes, dice kinds, pets (charge, fire, perks, levels), potions, affixes, classes and their mechanics, enemies, intents, bosses, biomes and their twists, tile kinds, events (choice trees), shop/draft/reward tables, ascension keys, daily and seasonal modifiers, camp upgrades, minigame variants. Each carries `params` (numbers, tier arrays `[I, II, III]`, level arrays), `resources`, `rules`, `look`, `text`, `ai` |
+| **Hooks** (~60) | run, biome and lap events; board roll, move, tile pass and land (dispatched to the tile kind's rules); fight setup/start/end; turn phases; reroll; the attack pipeline in its real stages (combo multiplier → per-die → pips → mods → factor), hits, kills, HP thresholds, boss phases; enemy turn, intents, incoming damage, lethal (first-wins); statuses; shop, chest, campfire, reward and offer queries; potions; events; pet fire |
+| **Conditions and values** | `all/any/not/if`, comparisons, arithmetic with explicit int casts, `min/max`, list `sum/count`, bounded aggregates (`count_dice`, `sum_dice`, `count_enemies`, `board_count`), variables (combo, dice, enemy, hero, run, board), params, resources |
+| **Effects** (closed set) | damage-pipeline accumulators; hero heal/block/max-HP/gold/XP/status; enemy damage, status, block strip, buffs, traits, intents, transform, summon, flee; dice reroll, set/raise face, temporary dice, add/reforge die, assign rune; rerolls; board tile conversion and placement; offers (draft, relics, forge, inline choice, shop, minigame, potion); resources; pet charge; stat counters; `emit`/`show`; `native` |
+| **Targets** | enemy selectors (target, all, next alive, random, by HP or intent), dice selectors (filters + pick lowest/highest/random), face and tile selectors |
+| **Resources** | named counters scoped to turn, fight, lap, biome or run, with thresholds and a generic meter/badge UI. They express class mechanics (Oath, Bone Harvest), boss meters (the moon meter), pet charge, item stacks and twist state |
+| **Native primitives** | named, parameterised algorithms data can call: combo evaluation with wild dice, move selection, board generation and mutation, damage resolution and the lethal chain, status behaviours, intent execution, offer and UI flows, minigame state machines, presentation builders, and a few named values/effects (the Oath face, Grimoire's rune re-fire) |
+
+**Bounded by construction**, so it stays clearly data (Apple 2.5.2 and DPLA 3.3.1(B), Play's Device
+and Network Abuse policy): no loops except bounded iteration over fixed collections (≤ 7 dice, a few
+enemies, ≤ 32 tiles), no recursion, no user-defined functions, no strings evaluated as code, no
+Godot `Expression`, no method calls or file loads by name; expression depth ≤ 8, `repeat` ≤ 8,
+re-entrancy depth ≤ 6; CI proves triggers can't cycle. Randomness comes only from named seeded
+streams; rules run in a total order (hook, stage, priority band per domain, owner order, rule index).
+
+**Queries vs events.** Queries (`query.campfire_heal`, `damage.enemy`, `hero.incoming`, rewards…)
+are pure value pipelines, so the AUTO bot calls the same queries instead of duplicating rules;
+events change state and emit the same event dictionaries the presentation already plays.
+
+**Capabilities.** The core publishes every hook, variable, operator, effect op, selector and native
+primitive with a version (`content_api.gd`: `{"effect": {"bonus_add": 1, …}, "hook": {…}, …}`). CI
+computes each set's `requires_caps`; the client drops sets it can't run and shows "Update the game to
+get *Set X*" for content the player already owns. A primitive's version is bumped only on an
+incompatible change; new power comes as new primitives.
+
+**Validation and tooling.** Generated JSON Schemas plus a semantic validator (types, legal ops per
+hook kind, cycle analysis, budgets), grammar and owner fuzzing (random valid rules and item
+combinations looking for infinite loops or crashes), a per-set sim balance band, golden replays; in
+the game, a rule trace and "explain last attack" in the Developer menu; rules text generated from the
+same data. Authoring stays ergonomic through archetype macros (compile-time templates such as
+`{"archetype": "combo_mult_bonus", "combos": ["pair"], "bonus": 0.5}`).
+
+**Store policy line.** Clearly data: rule trees as JSON structures, closed operations, read-only
+variables, arithmetic and comparisons, bounded aggregates, signed and validated. Grey (avoided):
+formulas as strings, general state machines or macros defined in downloaded data, custom events, and
+switching on undisclosed dormant mechanics. Clearly code (never downloaded): GDScript, Godot resource
+files, `Expression` on downloaded strings, embedded script runtimes. New primitives ship in core
+releases with at least one base-game use and a review-notes line (guideline 2.3.1).
 
 ### 4.5 Looks: presentation as data
 
 Presentation tables that are data written as code today (`EnemyRoster.LOOKS`, `ItemMounts.*`,
 `Character.MODELS`/`PART_MAP`, `Biome.LOOKS`, palettes, music map, encounter texts) move into each
 set's `looks.json`. Code keeps only the *builders* (procedural extras, pet bodies, dressing kits,
-overlays), registered as `look.*` capabilities.
+overlays), registered as `look.*` capabilities. Rules carry `fx` hints so the engine's generic
+`rule_triggered` beat can play any new owner's effect, and resources carry a `ui` block that drives
+one generic meter/badge/pips widget, so a new class mechanic or boss meter needs no HUD code.
 
 - Look paths must lie under the prefixes of packs listed in `requires_packs`; CI checks they
   resolve. Paths are only ever loaded through the existing chokepoints (`Props`, character, audio);
@@ -436,37 +499,84 @@ v1 packs (sizes from the measured units; the full PCK is now 85 MB):
 
 ### 4.9 What can be data, what needs code
 
-| Domain | Data-only (content train) | Needs a core release |
+**Today's content, re-expressed through the rules engine** (the prototype study, counting every
+behavioural entry):
+
+| Domain | Entries | As data with the core vocabulary | With ~10 small generic additions | Stays native |
+|---|---|---|---|---|
+| Relics (passives) | 32 | 31 | **32** | 0 |
+| Armory item rules / variants / back items | 51 / 51 / 13 | 50 / 51 / 13 | **51 / 51 / 13** | 0 |
+| Runes | 12 | 11 | 11 | 1 (Wild) |
+| Dice kinds | 11 | 10 | 10 | 1 (the ★ Pretend face) |
+| Pets | 12 | 7 | **11** | 1 (Grimoire's rune re-fire) |
+| Potions | 4 | 3 | **4** | 0 |
+| Affixes | 10 | **10** | 10 | 0 |
+| Class mechanics (11 classes) | 7 | 4 | **6** | 1 (Monster Kid's BOO!) |
+| Enemies, mini-bosses, bosses (incl. the Moon King) | 36 | **36** | 36 | 0 |
+| Biome rules (twists, pools, phases) | 10 | 9 | **10** | 0 |
+| Tile kinds | 18 | **18** | 18 | 0 |
+| Events | 7 | **7** | 7 | 0 |
+| Ascension keys | 10 | 9 | **10** | 0 |
+| **Behavioural total** | **271** | **256 (94.5 %)** | **267 (98.5 %)** | **4** |
+| Shops, drafts, reward tiers, minigame signatures; milestones, feats, skin conditions; camp upgrades | all | all | all | the offer *flows* are native |
+| Minigames (11) | — | numbers, rewards, signatures | new games in 4 template families (grid reveal, push-your-luck, spin-stop, drop board) | each game's state machine |
+
+The ~10 small additions (delayed effects, a bonus move, a status-tick query, a free reroll, side dice,
+a fallback placement selector, starting a second combat, per-die rune counts, face-count selectors,
+same-owner sub-rules) ship with the engine.
+
+**So, per domain, once the engine is in:**
+
+| Domain | Ships as data | Still needs a core release |
 |---|---|---|
-| Weapons, off-hands, armor, trinkets ("tools"), back items, variants, prices | new items from existing effect rules and secondaries, new numbers, new models | a new effect rule or trigger |
-| Heroes / classes, skins | new skins; a new hero built from an existing class mechanic and passives | a new class mechanic |
-| Enemies, mini-bosses, bosses | new enemies from existing intents, traits and phases; stats, pools; new meshes | new AI behaviour or boss mechanic |
-| Biomes / maps | new biome from existing tile kinds and twists; enemy pools; dressing from a kit or spec; new art | a new tile kind or board rule |
-| Affixes, runes, dice kinds, potions, pets | combinations of existing ops with parameters | a new op or pet behaviour |
-| Events | compositions of existing outcome kinds | a new outcome kind |
-| Minigames | variants (parameters, props, rewards) of an existing minigame | a new minigame |
-| Unlocks, economy, shop, ascension numbers, balance | all of it | new condition kinds |
+| Weapons, off-hands, armor, trinkets ("tools"), back items, variants, prices | new items with new rule compositions, numbers, models | a new hook or effect op |
+| Classes / heroes, skins | new classes with mechanics built from resources + rules (or an existing mechanic with new params), starting dice and runes, skins | a mechanic that needs a new primitive or a new HUD widget beyond meter/badge/pips |
+| Maps: biomes, board mixes, tile kinds, twists, dressing | new biomes, **new tile kinds**, twists, phases, enemy pools, dressing from a kit or spec, new art | new board topology (branches, non-ring boards) or a new dressing builder |
+| Pets | new pets: charge rules, fire, perks, level bonuses | a new procedural pet-body builder (new art in a pack is data) |
+| Relics, runes, dice kinds, potions, affixes | new entries composed from the vocabulary | a new status behaviour or effect op |
+| Enemies, mini-bosses, bosses | new enemies, intents as op compositions, phases, traits, boss meters as resources | a genuinely new enemy action primitive |
+| Events | new choice trees from existing effects and offers | a new UI flow (e.g. picking a tile on the board) |
+| Shops, rewards, drafts, ascension, daily/seasonal modifiers, unlocks, milestones, economy | all of it | a new modifier *kind* or unlock kind |
+| Minigames | variants of the 11 games; new games in the four template families | a new template or a bespoke game |
+| Text, music, art | all of it (strings per set, audio and art packs) | — |
 
-After the refactor, packs can recombine today's 51 item rules and 50 secondaries, 15 intents, 6
-traits and the twists. Widening what data can express later means adding generic, composable
-primitives (trigger × condition × effect with caps) in core releases, deliberately and with tests.
+**What still needs code, and how the list keeps shrinking.** New hook points, effect ops, selectors,
+status behaviours, UI flows and screens, minigame templates, presentation builders, board topology,
+combo types, run modes and meta systems. The policy that keeps this list short:
 
-### 4.10 Example: a new weapons set, end to end
+1. **Primitive backlog.** Every content idea that fails validation, or whose PR needs core code, is
+   logged with the missing primitive. Each core release (every 2–6 weeks) ships the top items, each
+   generalised beyond the idea that prompted it and with at least one base-game use.
+2. **Widest-impact first:** observer hooks on emitted events (turning every existing event into a
+   trigger), a status framework (a status = a resource + rules + a badge), a choice-offer framework,
+   then minigame templates.
+3. **Measure:** the share of content releases that needed no core change (target ≥ 90 % once the
+   engine and the first backlog round are in), idea-to-live time, primitives per release. Industry
+   precedent: early on 40–60 % of genuinely novel ideas need a new primitive, falling to 10–25 %
+   within a year; rebalances and variants never do.
 
-1. Author `content/sets/weapons-2026-10/` (four items and eight variants reusing existing rules, looks
-   pointing at `lib-armory` meshes, strings). No new art, so no pack.
-2. PR → CI: schema, ids ledger, `requires_caps`, every look path resolves, sim balance band, a
-   screenshot scenario per new item, compat smoke against every supported core.
-3. Merge → content train publishes a new defs catalog to `dev`; tag `content/2026.10.1` → `beta`
-   (switchable in the Developer menu); approve → `stable` with a staged rollout.
-4. Players on every channel fetch the ~40 KB catalog on their next check; the set joins new runs; a
-   "New in the Armory" card appears. On Steam/itch the next depot/build also carries the catalog, so
-   offline installs get it with their next patch.
-5. With new art: the same, plus `art-weapons-2026-10.pck`, uploaded to R2, added to the Steam/itch
-   builds and (for the App Store) uploaded as an Apple-hosted asset pack and submitted for review. The
-   set stays hidden on a platform until its pack is present and verified there.
+### 4.10 Example: a new content drop, end to end
 
----
+A drop can mix domains; this one adds a class, a map, a pet, relics and weapons.
+
+1. Author the sets: `class-alchemist` (a mechanic built from a `brew` resource and three rules, its
+   starting dice and runes, skins), `biome-sunken` (tile mix, a new `whirlpool` tile kind whose
+   `tile.land` rule moves the hero and grants a reroll, a twist, enemy pools, dressing from the
+   `glade` kit with a new palette), `pets-2026-11` (one pet: charge on pairs, fires a poison volley,
+   level bonuses), `relics-2026-11` (four relics), `weapons-2026-11` (four weapons and eight variants).
+   Looks point at library meshes; one new mesh set goes into `art-2026q4`.
+2. PR → CI: schemas, semantic validation and cycle analysis, ids ledger, `requires_caps`, every look
+   path resolves, fuzzing, the sim balance band per set, a screenshot scenario per new entity, compat
+   smoke against every supported core.
+3. Merge → content train publishes to `dev`; the new art pack gets its pack document on the YubiKey
+   (one touch); tag `content/2026.11.1` → `beta` (switchable in the Developer menu); approve →
+   `stable` with a staged rollout.
+4. Players on every channel fetch the new catalog within minutes and the new art in the background;
+   the sets join new runs; "New" cards appear in the Camp and class select. Steam and itch builds carry
+   the same files with their next patch; on the App Store the art pack goes through review as an
+   Apple-hosted pack and the sets that need it appear once it's there.
+5. If something goes wrong: `disable` a set or `kill` a primitive in minutes (§12.3); fix forward as
+   data; a code fix only if a primitive itself is broken.
 
 ## 5. The delivery layer in the game
 
@@ -1473,15 +1583,15 @@ Milestones:
 |---|---|---|
 | **M0 Stabilize** | §13 done (except #8, which is plan step 1.2); no broken updates in the field; secrets gated | 3.5–4.5 d |
 | **M1 Safety net** | golden fingerprints; saves never drop content; stable seeds | 4–6 d |
-| **M2 Content as data** | ContentDB, JSON base sets, rules dispatch on rule ids, caps, run content sets, looks as data; **a weapons set ships as data** | 47–70 d (minimal path to the first data-only weapons set: ~22–29 d including M1) |
-| **M3 Packs and trust** | library packs built and embedded everywhere; data-only validation and the on-device scan; Godot SDK + DIST-1 client; roots ceremony; R2; `ContentDelivery` with Embedded + CDN; BootShell; smoke entry point; content train to `dev`/`beta`; delta patches | 32–45 d |
-| **M4 Direct desktop core updates** | Velopack GDExtension with signed-release gating and boot-failure rollback, signed installers (Artifact Signing, notarization), release documents + YubiKey signing, legacy feed frozen | 10.5–14 d |
+| **M2 Content as data** | ContentDB, JSON base sets, **the rules engine** and every domain converted onto it (relics, runes, armory, potions, affixes, events, ascension, pets, biomes and tiles, enemies, classes), bot and CI support, run content sets, looks as data; **a new class, map, pet, relics and weapons all ship as data** | 79–113 d (minimal path to that: ~62–83 d including M1, 26–35 working days elapsed with four lanes) |
+| **M3 Packs and trust** | library packs built and embedded everywhere; data-only validation and the on-device scan; Godot SDK + DIST-1 client; roots ceremony; R2; `ContentDelivery` with Embedded + CDN; BootShell; smoke entry point; content train to `dev`/`beta`; delta patches; the fast-update client (check cadence, kill-switch registry, hotfix ops, gates, safe mode) | 35–50 d |
+| **M4 Direct desktop core updates** | Velopack GDExtension with signed-release gating and boot-failure rollback, signed installers (Artifact Signing, notarization), release documents + YubiKey signing, legacy feed frozen; `core-hotfix.yml` and the hotfix runbooks | 11.5–16 d |
 | **M5 Native delivery per store** | Apple Background Assets backend + CI; Android plugin + Play signing + GitHub APK from Play; Steam depots + GodotSteam + SLR 4.0; itch; Flathub; lean Web on R2 | 20–30 d |
-| **M6 Polaris Distribution** (parallel, Polaris repo; optional for M7, which can use the static signer) | OIDC gateway, content signer, release intake, timestamp cron + halt, rollouts, console, CLI; CI switched from the static signer | 15–22 d |
-| **M7 First live drop** | a data-only set, then a set with a new art pack, through every channel's **test track** (TestFlight external with an Apple-reviewed pack, Play closed testing, Steam `beta` branch, itch, direct, Web). Public launches follow each store's own lead times (Steam: 30 days + two weeks Coming Soon) | 3–5 d |
+| **M6 Polaris Distribution** (parallel, Polaris repo; optional for M7, which can use the static signer) | OIDC gateway, content signer, release intake, timestamp cron + halt, rollouts, console, CLI, incident tools and store watchers; CI switched from the static signer | 18–26 d |
+| **M7 First live drop** | a multi-domain drop (a class, a map with a new tile kind, a pet, relics, weapons), data-only first, then with a new art pack, through every channel's **test track** (TestFlight external with an Apple-reviewed pack, Play closed testing, Steam `beta` branch, itch, direct, Web). Public launches follow each store's own lead times (Steam: 30 days + two weeks Coming Soon) | 4–6 d |
 
-Total ≈ **135–197 agent-days** (27–39 agent-weeks), with M2, M3 and M6 largely parallel; roughly 4–6
-calendar months to M7 with two or three lanes and review time. The previous
+Total ≈ **175–250 agent-days** (35–50 agent-weeks), with M2, M3 and M6 largely parallel; roughly 5–7
+calendar months to M7 with three or four lanes and review time. The previous
 proposal's Phase 4 items stay optional: pack encryption (deterrence only, custom templates),
 PAD fast-follow/on-demand, per-biome original-art packs as they're authored.
 
@@ -1491,7 +1601,10 @@ PAD fast-follow/on-demand, per-biome original-art packs as they're authored.
 
 | # | Question | Recommendation |
 |---|---|---|
-| 1 | Adopt v2: two trains, JSON content sets, rules by rule id, retire the `--main-pack` updater | **Yes** |
+| 1 | Adopt v2: two trains, JSON content sets, retire the `--main-pack` updater | **Yes** |
+| 1a | Make **the rules engine** M2's target (every domain's behaviour as data; ~+31–42 agent-days over converting each domain to rule-id dispatch) | **Yes**: it's what makes classes, maps, pets and relics shippable as data, not just weapons |
+| 1b | Minigame templates (grid reveal, push-your-luck, spin-stop, drop board) so new minigames in those families ship as data | **Later** (after M7) |
+| 1c | Expressiveness line: JSON rule trees over a closed vocabulary (no string formulas, no downloaded state machines) | **Yes** |
 | 2 | Release-key custody: YubiKey touch per core release, or GCP Cloud KMS HSM via OIDC (fully automated) | **YubiKey** now; KMS if releases become frequent |
 | 3 | Content key held by Polaris (automated content releases), or content also signed on the YubiKey | **Polaris** (data-only blast radius) |
 | 4 | iOS/iPadOS minimum: 26.4, or 27.0 (one code path, `manifest` API) | **26.4** |
@@ -1533,7 +1646,12 @@ before the dependent work):
 | Review latency for Apple-hosted packs (up to ~24 h processing after approval) | most drops are defs-only (instant); art drops scheduled a few days ahead; self-hosted managed Background Assets as a fallback |
 | Solo maintainer, keys and ceremonies | three roots (2 of 3), a written ceremony and private runbook, a halt switch that needs no hardware |
 | Engine upgrades invalidate every pack | new revisions next to old ones; one full re-download per engine minor on self-updating channels, called out in notes |
-| Data can only recombine existing mechanics | plan generic primitives deliberately in core releases; ship rules before the seasons that need them |
+| Data can only recombine existing primitives | a broad vocabulary from day one (~60 hooks, 98.5 % of today's content); the primitive backlog; each core release (every 2–6 weeks) adds the top missing primitives with a base-game use |
+| The rules language grows into a programming language | closed catalogue, budgets, no loops or recursion, cycle analysis; new power only as named primitives reviewed in binaries |
+| Behaviour drift while converting every domain | golden replays with forced content on every step (the prototype's goldens caught a silently disabled rune on first run); one deliberate re-baseline at the end |
+| JSON rules are verbose to author | archetype macros, per-kind templates, validator suggestions, rule trace, generated rules text |
+| AUTO undervalues data-defined content | the bot calls the same queries; a model compiler for pipeline shapes; `ai` hints and calibration sims |
+| Rules cost on low-end phones and Web | measured ~3.5 % end to end on desktop; compile once, per-hook dispatch tables, parameters folded into constants; profile on a low-end phone early |
 | Flathub acceptance (prebuilt, proprietary art) and Artifact Signing eligibility | both have fallbacks (AppImage; OV certificate) |
 | Polaris Distribution not ready in time | the static signer path (§10.5) needs no client change to switch later |
 | App Store review tails (5–16-day waits seen in summer 2026; expedites rationed) | neutralise with switches and data in minutes; keep code fixes small; TestFlight for testers meanwhile |
@@ -1550,7 +1668,7 @@ before the dependent work):
 | Measurements (§2), experiments (appendix A) | kept (the full PCK is now 85 MB) |
 | Data-only packs built with PCKPacker, mounted with `replace_files=false`, no `uid://` into assets | kept, plus CI and runtime data-only checks and per-pack UID maps |
 | Pack taxonomy (base/ui/core3d/audio/foes/nature/extra) | refined into 8 library packs + append-only set packs |
-| Content definitions stay in code | **replaced**: JSON sets, ContentDB, rules by rule id, capabilities |
+| Content definitions stay in code | **replaced**: JSON sets, ContentDB, the rules engine (behaviour as data for every domain), capabilities |
 | Manifest schema 2 at the same URL | **replaced**: old clients reject `schema != 1`; new signed documents at new URLs |
 | RSA manifest signing; embedded packs trusted through the binary | **replaced**: DIST-1 (ES256, roots, scopes, timestamp, floors); every pack verified before mount |
 | Desktop code updates via `--main-pack` | **replaced**: impossible on 4.6+ templates; Velopack for the core |
@@ -1583,6 +1701,16 @@ verified or uncertain):
 - Velopack: deltas <https://docs.velopack.io/packaging/deltas>, C API
   <https://docs.velopack.io/reference/cpp/c-api>, hooks <https://docs.velopack.io/integrating/hooks>,
   channels <https://docs.velopack.io/packaging/channels>
+- Data-driven abilities in shipped games: MTG Arena (~80 % of new cards "just work"; the rest needs
+  engine or UI work), <https://magic.wizards.com/en/news/mtg-arena/on-whiteboards-naps-and-living-breakthrough>;
+  Overwatch Statescript (GDC 2017), <https://gdcvault.com/play/1024653/Networking-Scripted-Weapons-and-Abilities>;
+  Riot on data-heavy content and its tech debt, <https://www.riotgames.com/en/news/taxonomy-tech-debt>
+- Apple Developer Program License Agreement (§3.3.1(B), interpreted code):
+  <https://developer.apple.com/support/terms/apple-developer-program-license-agreement/>
+- Update speed: Apple expedited review, <https://developer.apple.com/contact/app-store/?topic=expedite>;
+  phased release, <https://developer.apple.com/help/app-store-connect/update-your-app/release-a-version-update-in-phases>;
+  Play vitals crash rate API, <https://developers.google.com/play/developer/reporting/reference/rest/v1beta1/vitals.crashrate/query>;
+  Steam updates, <https://partner.steamgames.com/doc/store/updates>
 - Godot delta-encoded patches (4.6): <https://github.com/godotengine/godot/pull/112011>
 - Cloudflare Workers limits (25 MiB static asset files): <https://developers.cloudflare.com/workers/platform/limits/>;
   R2 public buckets and CORS: <https://developers.cloudflare.com/r2/buckets/public-buckets/>,

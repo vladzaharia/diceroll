@@ -21,6 +21,9 @@ refuse `--main-pack`).
 | [09-godot-engine.md](09-godot-engine.md) | Pack mounting, script injection through resources, crypto, UIDs, delta patches, HTTP, platform bridges |
 | [11-content-patterns.md](11-content-patterns.md) | How shipped games structure packs and live content; granularity rules; store policy |
 | [12-ci-release.md](12-ci-release.md) | GitHub Actions facts, release trains, promotion, pack pipeline, workflows |
+| [13-rules-as-data.md](13-rules-as-data.md) | The rules engine: the game's execution model and hook points, the vocabulary, today's content re-expressed (coverage per domain), what still needs code, engineering, refactor plan; with a working prototype in [rules-prototype/](rules-prototype/README.md) |
+| [14-data-ability-precedents.md](14-data-ability-precedents.md) | How shipped games define abilities as data (Hearthstone, MTG Arena, Runeterra, League, Overwatch, Marvel Snap, Monster Train, Luck be a Landlord…), and where store policy draws the line |
+| [15-fast-updates.md](15-fast-updates.md) | Hotfix latency per platform (content, code, stopping a broken version), check cadence and cost, kill switches, mid-run fixes, the operating model and runbooks |
 
 Two further notes (the Polaris Key evaluation and the detailed signing-architecture study) describe
 the internals of a private repository and are kept with Polaris Key's own specs.
