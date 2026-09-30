@@ -164,7 +164,8 @@ static func glyph_for(action: String) -> String:
 	return g[0] if not g.is_empty() else ""
 
 
-## Human name of `action`'s first key ("Space", "Esc", "1"): minigame instruction copy.
+## Human name of `action`'s first key ("Space", "Esc", "1", "Left"): minigame instruction
+## copy (words, not arrow glyphs: the game fonts have no arrows).
 static func key_label(action: String) -> String:
 	var k := keys_for(action)
 	if k.is_empty():
@@ -173,13 +174,13 @@ static func key_label(action: String) -> String:
 		KEY_ESCAPE:
 			return "Esc"
 		KEY_LEFT:
-			return "←"
+			return "Left"
 		KEY_RIGHT:
-			return "→"
+			return "Right"
 		KEY_UP:
-			return "↑"
+			return "Up"
 		KEY_DOWN:
-			return "↓"
+			return "Down"
 	return OS.get_keycode_string(k[0])
 
 
@@ -215,3 +216,12 @@ static func groups() -> Array[String]:
 		if not out.has(String(row["group"])):
 			out.append(String(row["group"]))
 	return out
+
+
+## True while any UiModal is open and visible: screen-level menu keys (title, class select,
+## Camp) stand down, since the top modal owns Enter / Esc.
+static func modal_open() -> bool:
+	for m in UiModal._stack:
+		if is_instance_valid(m) and m.is_open() and (m.is_visible_in_tree() if m.is_inside_tree() else m.visible):
+			return true
+	return false

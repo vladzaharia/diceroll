@@ -652,33 +652,36 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		_tap(mb.position)
 		return
-	var k := event as InputEventKey
-	if k and k.pressed and not k.echo:
-		_key(k.keycode)
+	if event is InputEventKey:
+		_key(event)
 
 
-func _key(code: int) -> void:
-	if code == KEY_ESCAPE or code == KEY_P:
+## Run shortcuts, routed through the InputMap actions of ui/input/input_actions.gd
+## (pause = Esc / P, primary = Space / Enter, reroll = R, die_1..die_6 = 1-6).
+func _key(event: InputEvent) -> void:
+	if InputActions.pressed(event, InputActions.PAUSE):
 		pause()
 		return
 	if busy or ui.pause.visible or any_modal_open():
 		return
 	var ph := flow.phase
-	if code == KEY_SPACE or code == KEY_ENTER:
+	if InputActions.pressed(event, InputActions.PRIMARY):
 		if ph == GameFlow.Phase.BOARD_READY:
 			run_command("roll_board")
 		elif ph == GameFlow.Phase.BOARD_ROLLED:
 			run_command("confirm_move")
 		elif ph == GameFlow.Phase.COMBAT:
 			run_command("combat_attack")
-	elif code == KEY_R:
+	elif InputActions.pressed(event, InputActions.REROLL):
 		if ph == GameFlow.Phase.BOARD_ROLLED:
 			run_command("board_reroll")
 		elif ph == GameFlow.Phase.COMBAT:
 			run_command("combat_reroll")
-	elif code >= KEY_1 and code <= KEY_6 and ph == GameFlow.Phase.COMBAT:
+	elif ph == GameFlow.Phase.COMBAT:
 		# combat only: mark / unmark die N for a reroll (the board move is automatic)
-		run_command("combat_toggle", [code - KEY_1])
+		var n := InputActions.pressed_index(event, InputActions.DIE)
+		if n >= 0:
+			run_command("combat_toggle", [n])
 
 
 func _tap(pos: Vector2) -> void:
@@ -1019,6 +1022,9 @@ func _camp_reveal() -> void:
 
 
 func _camp_input(event: InputEvent) -> void:
+	if event is InputEventKey:
+		_camp_key(event)
+		return
 	var mb := event as InputEventMouseButton
 	if mb == null or not mb.pressed or mb.button_index != MOUSE_BUTTON_LEFT or camp_scene == null:
 		return
@@ -1030,3 +1036,23 @@ func _camp_input(event: InputEvent) -> void:
 	var id := camp_scene.pick_station(mb.position)
 	if id != "":
 		ui.camp.open_station(id)
+
+
+## Camp keys (no station or modal open): Enter = START RUN (opens run setup), Esc = home
+## (back to the title). Open stations and modals handle their own Enter / Esc (UiModal).
+func _camp_key(event: InputEvent) -> void:
+	if camp_scene == null or get_tree().paused or ui.camp.any_open():
+		return
+	if camp_scene.revealing:
+		if InputActions.pressed(event, InputActions.CONFIRM) or InputActions.pressed(event, InputActions.BACK):
+			camp_scene.skip_reveal()
+			get_viewport().set_input_as_handled()
+		return
+	if InputActions.pressed(event, InputActions.CONFIRM) and ui.camp.start_btn.is_visible_in_tree() \
+			and not ui.camp.start_btn.disabled:
+		get_viewport().set_input_as_handled()
+		ui.camp.start_btn.pressed.emit()
+	elif InputActions.pressed(event, InputActions.BACK) and ui.camp.home_btn.is_visible_in_tree():
+		get_viewport().set_input_as_handled()
+		ui.camp.home_btn.pressed.emit()
+
