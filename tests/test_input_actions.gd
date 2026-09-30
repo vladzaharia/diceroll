@@ -81,3 +81,18 @@ func test_list_shape() -> void:
 	assert_eq(InputActions.groups(), ["Run", "Combat", "Menus", "Minigames"] as Array[String], "groups")
 	var dice: Dictionary = rows.filter(func(r: Dictionary) -> bool: return r["action"] == "die_1")[0]
 	assert_eq((dice["glyphs"] as Array).size(), 6, "1-6 row carries six glyphs")
+
+
+func test_controls_list_builds_every_row() -> void:
+	var c := ControlsList.make()
+	var labels := 0
+	var glyphs := 0
+	for ch in c.get_children():
+		if ch is HBoxContainer:
+			labels += 1
+			glyphs += (ch.get_child(0) as Control).get_children().filter(func(n: Node) -> bool: return n is KeyGlyph).size()
+	assert_eq(labels, InputActions.list().size(), "one row per action row")
+	assert_true(glyphs >= labels, "every row shows a keycap")
+	var dice: Dictionary = InputActions.list().filter(func(r: Dictionary) -> bool: return r["action"] == "die_1")[0]
+	assert_eq(ControlsList.shown_glyphs(dice), ["key_1", "key_6"], "1-6 shows first and last")
+	c.free()
