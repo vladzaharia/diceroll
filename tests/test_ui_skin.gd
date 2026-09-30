@@ -241,3 +241,24 @@ func test_ui_audit_no_spillover() -> void:
 	poke.set_meta("audit_skip", true)
 	assert_eq("\n".join(UiAudit.run(host)), "", "audit_skip skips the subtree")
 	host.free()
+
+
+func test_rgba_transparent_rect_is_not_drawn() -> void:
+	# ThorVG ignores rgba() alpha: the pack's transparent helper rects rendered as black squares
+	var svg := "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><defs><style>.cls-1{fill: rgba(26, 26, 26, 0);}.cls-2{fill:#ff0000;}.cls-3{stroke: rgba(255, 0, 0, 0.5);}</style></defs>" \
+		+ "<rect class=\"cls-1\" width=\"64\" height=\"64\"/><circle class=\"cls-2\" cx=\"32\" cy=\"32\" r=\"10\"/><rect fill=\"rgba(0,0,0,0)\" width=\"1\" height=\"1\"/></svg>"
+	var fixed := UiSvg.fix_rgba(svg)
+	assert_true(not fixed.contains("rgba("), "no rgba left: " + fixed)
+	assert_true(fixed.contains("fill: none") and fixed.contains("fill=\"none\""), "transparent -> none")
+	assert_true(fixed.contains("stroke: #ff0000; stroke-opacity: 0.5"), "alpha -> opacity: " + fixed)
+	var img := Image.new()
+	assert_eq(img.load_svg_from_string(fixed, 1.0), OK)
+	assert_true(img.get_pixel(1, 1).a < 0.05, "corner transparent")
+	assert_true(img.get_pixel(32, 32).a > 0.9, "icon drawn")
+	# the real pack icon (when imported): star_gold_outline's corner is transparent
+	var real := "res://assets/ui/icons/vector-icon-pack-pro/general/star/star_gold_outline.svg"
+	UiSvg.roots = UiSvg.ROOTS.duplicate()
+	UiSvg.clear_cache()
+	if FileAccess.file_exists(real):
+		var t := UiSvg.raster(UiSvg.source(real), 64)
+		assert_true(t.get_image().get_pixel(1, 1).a < 0.05, "star icon corner transparent")

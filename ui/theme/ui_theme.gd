@@ -723,7 +723,16 @@ static func get_theme() -> Theme:
 	t.set_icon("tick", "HSlider", ImageTexture.new())
 	t.set_constant("center_grabber", "HSlider", 1)
 
-	# CheckBox (48 px yellow boxes) and CheckButton (pack toggle) icons.
+	# CheckBox (48 px yellow boxes) and CheckButton (pack toggle) icons, drawn bare on the
+	# panel (they would otherwise inherit the Button faces) with TEXT labels.
+	for type in ["CheckBox", "CheckButton"]:
+		for st in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
+			t.set_stylebox(st, type, pad(StyleBoxEmpty.new(), 6, 20))
+		for c in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_focus_color"]:
+			t.set_color(c, type, UiPalette.TEXT)
+		t.set_color("font_disabled_color", type, UiPalette.TEXT_MUTED)
+		t.set_font("font", type, body_font(600))
+		t.set_font_size("font_size", type, 24)
 	for pair in [["CheckBox", "checkbox", 48.0], ["CheckButton", "toggle", 88.0]]:
 		for st in ["checked", "unchecked", "checked_disabled", "unchecked_disabled"]:
 			var src: String = st if UiSkin.has(pair[1], st) else st.trim_suffix("_disabled")
