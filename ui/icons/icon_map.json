@@ -418,6 +418,42 @@
    "note": "Lava tile hazard.",
    "group": "status"
   },
+  "die_locked": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Lock/Lock Outline.svg",
+   "tint": null,
+   "note": "Locked/buried die overlay (DieFace): a padlock, distinct from curse (plan b).",
+   "group": "status"
+  },
+  "moon_new": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Moon Phases/Moon New Outline.svg",
+   "tint": null,
+   "note": "Moonlit twist chip by phase (replaces hud_top _MoonGlyph; plan b).",
+   "group": "status"
+  },
+  "moon_crescent": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Moon Phases/Moon Waxing Crescent Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "status"
+  },
+  "moon_half": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Moon Phases/Moon First Quarter Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "status"
+  },
+  "moon_gibbous": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Moon Phases/Moon Waxing Gibbous Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "status"
+  },
+  "moon_full": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Moon Phases/Moon Full Outline.svg",
+   "tint": null,
+   "note": "Also the moon_tex sample for the moon meter shader.",
+   "group": "status"
+  },
   "intent_attack": {
    "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Sword/Sword Outline.svg",
    "tint": null,
@@ -709,7 +745,7 @@
   "kind_standard": {
    "svg": "rhosgfx/vector-icon-pack-pro/Shapes/Gaming Dice/D6 Outline.svg",
    "tint": null,
-   "note": "Die kinds share the D6 art; kind = Flat White D6 tinted with the UiPalette.KIND accent (hex copied here because KIND entries are arrays) + the existing corner mark.",
+   "note": "Die kinds: Flat White D6 tinted with the UiPalette.KIND accent (hex copied here because KIND entries are arrays) and ALWAYS composited with the procedural corner mark (DieFace.draw_kind_mark) so kinds never differ by hue alone (colour-blind safe; plan b).",
    "group": "die_kind"
   },
   "kind_low": {
