@@ -584,7 +584,10 @@ Brazil) is optional later; a free game pays no Core Technology Commission under 
 effect 2026-10-01.
 
 **Core:** App Store auto-update. Stable releases use App Store phased release (7 days, pausable);
-betas go to TestFlight (10,000 external testers; builds expire after 90 days). There is still no Apple
+hotfixes turn phased release **off** and request expedited review (§12.5). Every submission's review
+notes carry a standing line that remote switches can only disable features or choose between
+behaviours shipped in reviewed builds, and describe any new rule primitives with at least one base-game
+use (guideline 2.3.1). Betas go to TestFlight (10,000 external testers; builds expire after 90 days). There is still no Apple
 API to check or force updates, so the game reads `minSupported` from the release document and shows a
 "please update" card linking to the App Store page. Minimum OS: **iOS/iPadOS 26.4** (managed
 Background Assets need 26; 26.4 adds the status APIs we use; the 27-only `manifest` API is used when
@@ -879,7 +882,7 @@ uses General JSON serialization so it can carry both root signatures.
 | `typ` | Signed by | Where | Key fields |
 |---|---|---|---|
 | `pkey-dist-root+jws` | roots | `root/<version>.jws` | `version`, `expiresAt`, `keys[{kid, alg, spki, status, notAfter, scopes}]`, `floorReset` |
-| `pkey-dist-timestamp+jws` | timestamp key | `timestamp.jws` | `seq`, `expiresAt` (+7 d), `rootVersion`, per channel `{release: {seq, sha256}, catalog: {seq, sha256}, candidate?: {seq, sha256, bp, salt}}`, `halt`, `disable: {sets, packs}` |
+| `pkey-dist-timestamp+jws` | timestamp key | `timestamp.jws` | `seq`, `expiresAt` (+7 d), `rootVersion`, per channel `{release: {seq, sha256}, catalog: {seq, sha256}, candidate?: {seq, sha256, bp, salt}}`, `halt`, `disable: {sets, packs}`, and for incidents (§12): `urgent`, `pollSeconds`, `kill[]` (code-path switches), `hotfix` (disable/replace/clamp ops), `gate` (update notice/soft/hard per distribution), `web.minBuild` |
 | `pkey-dist-release+jws` | release key | `release/<channel>/<seq>.jws` | per platform: `latest`, `minSupported`, `revoked[]`, `velopack: {full, deltas[]}` (sha256, size, key), store URLs, Play `versionCode` minimum |
 | `pkey-dist-catalog+jws` | content key | `catalog/<channel>/<seq>.jws` | `defs: {format major → {sha256, size, key}}`, `packs[{id, revs[{rev, sha256, size, key, engine, format, deltas[]}], prefixes, sources: {apple, steam, play}}]`, `revoked[]`, `schedule`, `flags` |
 | `pkey-dist-pack+jws` | release key | `packs/<sha256>.jws`, and inside store-delivered packs (Apple-hosted, PAD) | `id`, `kind`, `rev`, `sha256`, `size`, `engine`, `format`, `prefixes` (approves the revision; lets a store-delivered pack verify offline, before the catalog knows it) |
@@ -919,8 +922,11 @@ A trimmed catalog example:
 1. **Boot (reload path):** verify cached root, release and catalog against the pins and root keys
    (signature, scope, `aud`, floors, revocation; **not** expiry: installed content never expires).
    Anything invalid falls back to the build's snapshot.
-2. **Check** (at most every 6 h, and on the Developer menu's "Check now"): fetch `timestamp.jws`
-   (≤ 16 KiB), verify, require `seq ≥ floor` and `expiresAt > effectiveNow`, where
+2. **Check** on launch (before mounting downloaded content, ≤ 2 s timeout, then carry on with cached
+   documents), on resume/focus and on returning to the title if ≥ 5 min since the last check, every
+   15 min in the foreground (±20 % jitter), faster when the timestamp's `pollSeconds` asks (clamped to
+   120–3600 s, used during incidents), and on the Developer menu's "Check now". Fetch `timestamp.jws`
+   (≤ 16 KiB, `If-None-Match`), verify, require `seq ≥ floor` and `expiresAt > effectiveNow`, where
    `effectiveNow = max(system clock, highest verified issuedAt)`. If `rootVersion` is newer, fetch and
    verify root documents step by step. If `halt[channel]`, stop installing anything new.
 3. **Fetch** the release document and catalog the timestamp names (immutable URLs, size-capped),
@@ -1053,7 +1059,7 @@ credential can't overwrite or delete history.
 
 ```
 https://dl.<domain>/v2/
-  timestamp.jws                          the ONLY mutable object (max-age 60–300 s, stale-if-error)
+  timestamp.jws                          the ONLY mutable object (max-age 60 s, stale-if-error; purged on every publish)
   root/<version>.jws                     immutable
   release/<channel>/<seq>.jws            immutable
   catalog/<channel>/<seq>.jws            immutable
@@ -1173,6 +1179,8 @@ publishing, rollout changes and the daily timestamp pause (the timestamp is vali
 | **Release intake** | Accepts release documents already signed on the YubiKey; verifies the chain and policy (monotonic `seq`, no prerelease binaries on `stable`, packages present) and stores them; never holds the release key |
 | **Timestamp + halt** | Cron (daily) and on-publish re-signing of `timestamp.jws`; one-click **halt** and set/pack **disable** switches that can only stop things |
 | **Rollouts** | Candidate catalog + basis points + salt in the timestamp; scheduled ramp (e.g. 5 → 25 → 100 % over days) that halts on command; rollback = new catalog revoking the bad hashes |
+| **Incidents** | phone-friendly, no hardware key: `incident start | end`, `kill`, `disable`, `hotfix`, `gate`, `notice`; each re-signs the timestamp, purges its CDN URL and runs a canary fetch-and-verify from two regions |
+| **Store watchers** | every 15 min: App Store Connect version state, Play track state, Steam live build, Flathub build status; they set `gate.after` so gates wait for the fix to be available, and post to the incident issue; hourly Play crash rate per `versionCode` |
 | **Housekeeping** | GC planner (dry-run + approval), expiry monitors (root T−60 d, documents T−30 d), sequence anomaly and failed-OIDC alerts, audit log |
 | **Console + CLI** | A Distribution section (channels × documents, packs and revisions, rollout slider, halt, publish log with rollback) and `pkey dist upload | publish | promote | rollout | halt | rollback | verify | gc` |
 
@@ -1253,6 +1261,7 @@ vectors) is written as a Polaris Key spec and kept in that (private) repository.
 | `content-promote.yml` | dispatch (seq, %) | stable candidate with a ramp; Polaris advances it on schedule | env `content-stable` (reviewer) |
 | `content-rollback.yml` | dispatch | new catalog revoking the bad hashes / restoring the previous revision; or just halt | env `content-rollback` (no reviewer, speed) |
 | `content-gc.yml` | weekly + dispatch | dry-run GC plan; apply after approval | env `content-gc` (reviewer) |
+| `core-hotfix.yml` | dispatch from `release/*` | builds and smoke-tests every target, then the fastest lane per store (§12.5): TestFlight internal, App Store with phased release off and a pre-filled expedite request, Play production with priority 5, Steam set live (phone confirmation), itch push, Velopack with `urgency: required` (release document on the YubiKey), Web flip, a Flathub PR draft | envs as `core-promote` |
 | `pr-title.yml` | PR | Conventional Commit titles (unchanged) | — |
 
 Publishing workflows use `concurrency` groups with queuing (never cancel a publish); PR CI keeps
@@ -1339,39 +1348,93 @@ is reused).
 
 ---
 
-## 12. Live operations
+## 12. Live operations and update speed
 
 ### 12.1 Tiers
 
 | Tier | Artifact | Carries | Reaches players | Review |
 |---|---|---|---|---|
-| T0 | `timestamp.jws` | halt, disable a set or pack, rollout candidate | minutes (next check) | none |
-| T1 | defs catalog | balance patches, new sets from existing rules and art, schedule, flags, strings | next check; applies on the next title visit | none (self-hosted); Mac App Store via Apple-hosted `defs` pack |
-| T2 | asset packs | new art and audio | background download; set enabled once mounted | Apple-hosted packs reviewed per version; others none |
-| T3 | core release | new rules, format majors, engine upgrades, code fixes | store cadence | stores |
+| T0 | `timestamp.jws` | halt, disable a set or pack, kill switches for code paths, data hotfix ops, update gates, rollout candidate | ≤ 15 min in-session, immediately on launch | none |
+| T1 | defs catalog | everything in §4.9's data column: new classes, maps, pets, relics, weapons, enemies, events…, balance, schedule, flags, strings | 15–30 min; applies at the next safe point (title, new run) | none (self-hosted); Mac App Store via Apple-hosted `defs` pack |
+| T2 | asset packs | new art and audio | minutes on the CDN and Steam; background download; set enabled once mounted | Apple-hosted packs reviewed per version (hours to days); others none |
+| T3 | core release | new rule primitives, format majors, engine upgrades, code fixes | seconds (Web) to days (App Store), §12.5 | stores |
 
 ### 12.2 Rules
 
 - Every T1/T2 release goes to `beta` first (the Developer menu already switches channels), then to
-  `stable` through a ramp. Rollback is a signed revocation, not a deletion.
-- **Runs never change data mid-run.** New sets join new runs; balance patches apply from the next run.
-  The game tells players about balance changes on the first launch after they activate.
-- **Ship rules before the data that uses them** (a season that needs a new rule ships it in the
-  preceding core release), then enable the content by date with `schedule`.
+  `stable` through a ramp. Rollback is a signed revocation, not a deletion. **Urgent** content skips
+  the ramp but still passes a 5–10 minute beta canary.
+- **Runs never change data mid-run, with one exception.** New sets join new runs; balance patches apply
+  from the next run. A `hotfix` op for crash-causing or exploit content (disable, replace with a known
+  entry, remap art to its embedded fallback, clamp a number) applies at the next safe point (title,
+  between rooms, after a fight) even to a pinned run, and is recorded in the run save.
+- **Ship rules before the data that uses them**, then enable the content by date with `schedule`.
 - **No A/B tests and no per-user remote config**: one ruleset per channel, so seeds, dailies and any
   future leaderboards stay comparable.
-- **Rollout health:** ramps advance on a timer and stop on a human halt. There's no telemetry. An
-  optional anonymous boot-health beacon (pack set hash + "booted OK") could let Polaris halt a ramp
-  automatically; it would need privacy-label updates, so it's off unless decided otherwise (§15).
+- **Rollout health:** ramps advance on a timer and stop on a human halt. There's no telemetry; Play's
+  Developer Reporting API crash rate per `versionCode` and store diagnostics are watched instead. An
+  optional anonymous boot-health beacon stays off unless decided otherwise (§15).
 
-### 12.3 Kill switches
+### 12.3 Kill switches and safe mode
 
-`disable` in the timestamp hides a set or unmounts a pack on the next boot (runs using it can still
-finish); `halt` stops all installs on a channel; `revoked` in a catalog forces the previous revision;
-`minSupported` in a release document shows the "please update" card (store) or offers the Velopack
-update (direct).
+- **Registry in code.** Every feature and rule primitive that could need switching off has an id in a
+  kill-switch registry compiled into the core (`core/kill_switches.gd`); CI tests both states of every
+  entry. The timestamp's `kill[]` entries name a registry id, the core versions they apply to, an
+  optional distribution, an expiry and a player-facing message.
+- **Guardrails:** switches only **disable** or **choose between behaviours that shipped in reviewed
+  builds**; they never enable something new (Apple 2.3.1 and 2.5.2, Play's policy against remotely
+  activated hidden features). This is stated in every review submission.
+- **Other levers:** `disable` hides a set or unmounts a pack on the next safe point; `halt` stops all
+  installs on a channel; `revoked` in a catalog forces the previous revision; `minSupported` in a
+  release document shows a card (store) or offers the Velopack update (direct); `gate` escalates from
+  `notice` to `soft` (card at every launch, affected features killed) to `hard` (no new runs; continue
+  and export stay available), and only once the store actually offers the fix (Polaris's store watchers
+  set `gate.after`), so a gate never strands a player.
+- **Crash-loop safe mode:** two failed boots in a row start the game with embedded content only and
+  check the timestamp before mounting anything downloaded.
 
-### 12.4 Paid content (not planned, but not blocked)
+### 12.4 How fast each kind of fix reaches players
+
+"Best" is the fastest path to the first real players; "typical" is the majority of *active* players.
+
+| Platform | Data fix (T0/T1) | Code fix (T3) | Stop a broken version |
+|---|---|---|---|
+| iOS / iPadOS App Store | 2–5 min / ≤ 15 min in-session | 6–12 h with expedited review / 2–3 days; bad weeks 1–3 weeks | no store rollback or forced update: kill switch in minutes, pause phased release, `minSupported` gate once the fix is live |
+| Apple-hosted art pack | remap looks in defs in minutes; the new pack itself 4–8 h / 1–2 days | — | never archive a live pack |
+| Google Play | as iOS | 1–3 h / 12–48 h (priority-5 In-App Updates catch active players on launch) | halt the release (even a fully rolled-out one) in minutes |
+| Steam | as iOS, or a packs-depot build in 15–45 min | ~1 h; recently played games update before their next launch | set the previous build live: a true rollback in minutes |
+| itch app | as iOS | 30–60 min (the app checks every 30 min) | re-push the previous build |
+| Flathub | bundled content (CDN defs optional) | 2–3 h / 1–3 days | revert → new build (hours) |
+| Direct desktop (Velopack) | as iOS | ~1 h / ~50 % in a day | revoke in the release document; signed downgrade if needed |
+| Web | seconds (new page loads) | seconds (pointer flip) | point `index.html` at the previous build |
+
+**Only the App Store is slow for code**, which is why the rules engine (§4.4) and kill switches matter
+most there: most problems can be neutralised as data in minutes while the code fix waits for review.
+
+### 12.5 Hotfix lanes and runbooks
+
+| Lane | Mechanism | Latency |
+|---|---|---|
+| L0 switch | `pkey dist kill | disable | hotfix | gate` → re-sign the timestamp, purge the CDN URL, canary-verify from two regions | ≤ 15 min in-session |
+| L1 data | urgent defs catalog (ramp skipped, beta canary kept) | 15–30 min |
+| L2 art | new content-addressed pack (CDN, Steam packs depot); Apple-hosted pack through review | minutes; days on the App Store |
+| L3 code | `core-hotfix.yml` from a `release/x.y` branch: App Store with phased release off and a pre-filled expedite request, Play `completed` with In-App Update priority 5, Steam set live, itch push, Velopack with `urgency: required`, Web pointer flip, a Flathub PR draft for a human | seconds to days (§12.4) |
+
+Runbooks (full versions in `docs/runbooks/hotfix.md` during implementation): **R1** content causes a
+crash or exploit → incident mode (`pollSeconds` 180) → disable or hotfix op → fix the data → urgent T1.
+**R2** code bug behind a switch → kill + soft gate → core hotfix through every lane → gate once stores
+offer the fix → remove the kill when the fixed core passes 90 %. **R3** code bug with no switch (e.g. a
+boot crash) → roll back where possible (Steam, itch, GOG, Web), halt on Play, expedite on the App
+Store. **R4** bad core found during a ramp → pause phased release, halt Play, keep Steam on `beta`, pull
+from the release document.
+
+Silent push notifications to trigger checks were considered and rejected: iOS throttles them and drops
+them for force-quit apps, Android deprioritises silent high-priority messages, and they'd need tokens,
+a server and privacy-label changes to reach only backgrounded apps, which the resume check already
+covers. The incident operations (kill, disable, hotfix, gate, notice) need only the low-privilege
+timestamp key, so they work from a phone without the YubiKey.
+
+### 12.6 Paid content (not planned, but not blocked)
 
 If sets are ever sold: Apple non-consumable in-app purchases with restore (3.1.1) and 3.1.3(b) for
 purchases made elsewhere, Google Play Billing, Steam DLC (GodotSteam ownership checks); art stays
@@ -1473,6 +1536,10 @@ before the dependent work):
 | Data can only recombine existing mechanics | plan generic primitives deliberately in core releases; ship rules before the seasons that need them |
 | Flathub acceptance (prebuilt, proprietary art) and Artifact Signing eligibility | both have fallbacks (AppImage; OV certificate) |
 | Polaris Distribution not ready in time | the static signer path (§10.5) needs no client change to switch later |
+| App Store review tails (5–16-day waits seen in summer 2026; expedites rationed) | neutralise with switches and data in minutes; keep code fixes small; TestFlight for testers meanwhile |
+| A crash in core code with no switch (boot, save load) | crash-loop safe mode for pack-induced crashes; kill-switch coverage reviewed in every release; roll back where the store allows |
+| A gate that fires before the store offers the fix | gates wait for the store watchers (`gate.after`) |
+| Switches drifting into remotely enabling features | registry + CI lint: a switch can only disable or pick a reviewed behaviour |
 
 ---
 
