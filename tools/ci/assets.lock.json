@@ -1,5 +1,5 @@
 {
-  "lock_hash": "da33571ef6b790c3",
+  "lock_hash": "6c833a63af78c987",
   "schema": 1,
   "units": {
     "fonts": {
@@ -280,6 +280,33 @@
       "files": 103,
       "plain_bytes": 748978,
       "sha256": "07e092ff98330d8c03e70526eea8db2fd1f1baf121d2b30fb981bb73d4f34f1d"
+    },
+    "ui-icons-vector-icon-pack-pro": {
+      "bundle_bytes": 19205,
+      "bundle_sha256": "b871aed375654533b9d0dc7f1e3de56964026dc40310c4171d3f613e7e4b9e45",
+      "dest": "assets/ui/icons/vector-icon-pack-pro",
+      "file": "bundles/ui-icons-vector-icon-pack-pro/ui-icons-vector-icon-pack-pro-166f165e137b5ac0.tar.zst.age",
+      "files": 62,
+      "plain_bytes": 64690,
+      "sha256": "166f165e137b5ac00fd8c07712f05eeabed42fbbb2d0522cee80196777395d88"
+    },
+    "ui-icons-vector-keyboard-controls": {
+      "bundle_bytes": 737,
+      "bundle_sha256": "5d35e6e9b9b665f67bf23262654a9224911f5d47ca910105dae93da475fe4c51",
+      "dest": "assets/ui/icons/vector-keyboard-controls",
+      "file": "bundles/ui-icons-vector-keyboard-controls/ui-icons-vector-keyboard-controls-cd187f6f95bc03b0.tar.zst.age",
+      "files": 2,
+      "plain_bytes": 746,
+      "sha256": "cd187f6f95bc03b0de76bf6835f70f21dabab2d91645cfbbc98249f0a3659c78"
+    },
+    "ui-pack-cartoony-ui-pack-full": {
+      "bundle_bytes": 3325,
+      "bundle_sha256": "bc344c4ffdbef1c6ffba9339df08e93bf4740d26784a62be58d569892d873b29",
+      "dest": "assets/ui/pack/cartoony-ui-pack-full",
+      "file": "bundles/ui-pack-cartoony-ui-pack-full/ui-pack-cartoony-ui-pack-full-c82d150a9b7594c3.tar.zst.age",
+      "files": 64,
+      "plain_bytes": 25337,
+      "sha256": "c82d150a9b7594c39a7050237e2128a0612e3b907111ea80ff454614a904dfa0"
     }
   }
 }

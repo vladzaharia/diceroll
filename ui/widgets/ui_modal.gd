@@ -44,6 +44,8 @@ func _init() -> void:
 	_center.add_child(_frame)
 	ribbon = Ribbon.make(title, 38, ribbon_color)
 	ribbon.z_index = 1
+	# the title plaque straddles the panel's top edge on purpose (UiAudit frame check)
+	ribbon.set_meta(UiAudit.ALLOW, true)
 	_frame.add_child(ribbon)
 	panel = UiTheme.panel("main")
 	_frame.add_child(panel)

@@ -209,17 +209,24 @@ static func compose(parts: Array) -> String:
 		var k: float = float(p[2]) if (p as Array).size() > 2 else 1.0
 		lo = lo.min(o)
 		hi = hi.max(o + svg_size(String(p[0])) * k)
+	# ThorVG honours only the first <style> element: hoist every part's (prefixed) CSS into one.
+	var css := ""
 	var body := ""
+	var re_style := RegEx.create_from_string("<style[^>]*>([\\s\\S]*?)</style>")
 	for i in parts.size():
-		var src := String(parts[i][0])
+		var src := _prefix(String(parts[i][0]), "p%d-" % i)
+		for m in re_style.search_all(src):
+			css += m.get_string(1)
+		src = re_style.sub(src, "", true)
 		var o: Vector2 = parts[i][1] - lo
 		var k: float = float(parts[i][2]) if (parts[i] as Array).size() > 2 else 1.0
 		var vb := _viewbox_origin(src)
 		body += "<g transform=\"translate(%s %s) scale(%s) translate(%s %s)\">%s</g>" \
-			% [o.x, o.y, k, -vb.x, -vb.y, _inner(_prefix(src, "p%d-" % i))]
+			% [o.x, o.y, k, -vb.x, -vb.y, _inner(src)]
 	var sz := hi - lo
-	return "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"%s\" height=\"%s\" viewBox=\"0 0 %s %s\">%s</svg>" \
-		% [sz.x, sz.y, sz.x, sz.y, body]
+	var defs := "<defs><style>%s</style></defs>" % css if css != "" else ""
+	return "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"%s\" height=\"%s\" viewBox=\"0 0 %s %s\">%s%s</svg>" \
+		% [sz.x, sz.y, sz.x, sz.y, defs, body]
 
 
 ## `base` with `badge` composited in a corner ("br", "bl", "tr", "tl"), the badge's longer side

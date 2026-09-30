@@ -195,3 +195,49 @@ func test_badge_compact_and_entry_saturation() -> void:
 		assert_true(not big.get_source().contains("#1778ff") and big.get_source().contains("fill: #"), "entry saturation 0 applied (badge too)")
 	assert_true(Icons.texture("x", 64, {"saturation": 1.0}) != big, "caller saturation overrides the entry's")
 	_teardown()
+
+
+func test_ui_audit_no_spillover() -> void:
+	# outside a tree: UiAudit sums positions (the shot harness runs it on the live tree)
+	var host := Control.new()
+	host.size = Vector2(400, 400)
+	var card := Panel.new()
+	card.add_theme_stylebox_override("panel", UiTheme.panel_box("card"))
+	card.position = Vector2(50, 50)
+	card.size = Vector2(100, 100)
+	host.add_child(card)
+	var inside := Button.new()
+	inside.position = Vector2(10, 10)
+	inside.size = Vector2(40, 40)
+	card.add_child(inside)
+	var poke := Button.new()
+	poke.name = "Close"
+	poke.position = Vector2(80, -12)
+	poke.size = Vector2(40, 40)
+	card.add_child(poke)
+	var l := Label.new()
+	l.text = "a label far too long for its box"
+	l.clip_text = true
+	l.position = Vector2(10, 60)
+	l.size = Vector2(60, 20)
+	card.add_child(l)
+	var lines := UiAudit.run(host)
+	var joined := "\n".join(lines)
+	assert_true(joined.contains("AUDIT_OVERFLOW 20") and joined.contains("Close"), "close button poking out: " + joined)
+	assert_true(joined.contains("AUDIT_CLIP"), "clipped label reported: " + joined)
+	assert_eq(lines.size(), 2, joined)
+	poke.set_meta("allow_overflow", true)
+	l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	l.size = Vector2(60, 20)
+	assert_eq("\n".join(UiAudit.run(host)), "", "opt-out + ellipsis clean")
+	poke.text = "an exempt button whose own label is far too long"
+	poke.clip_text = true
+	var inner := Label.new()
+	inner.text = "clipped text inside an exempt node"
+	inner.clip_text = true
+	inner.size = Vector2(20, 20)
+	poke.add_child(inner)
+	assert_true("\n".join(UiAudit.run(host)).contains("AUDIT_CLIP"), "allow_overflow only exempts the frame check")
+	poke.set_meta("audit_skip", true)
+	assert_eq("\n".join(UiAudit.run(host)), "", "audit_skip skips the subtree")
+	host.free()

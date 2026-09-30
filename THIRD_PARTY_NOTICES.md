@@ -32,6 +32,28 @@ store: https://kaylousberg.itch.io
 The exact subsets the game uses are defined in `tools/import_assets.sh`; `assets/CREDITS.md`
 maps each runtime folder to its pack.
 
+## UI art: RhosGFX
+
+Vector UI and icon packs by RhosGFX, https://rhosgfx.itch.io. Credit is appreciated by the
+author, so here it is, with thanks. The game ships only the SVGs it references
+(`tools/import_ui_svgs.py`).
+
+| Pack | Licence | Where to get it |
+|---|---|---|
+| Cartoony UI Pack (Full) | RhosGFX licence: use and modify in projects; no resale or redistribution of the assets | https://rhosgfx.itch.io/cartoony-ui-pack |
+| Vector Icon Pack (Pro) | RhosGFX licence (same terms) | https://rhosgfx.itch.io |
+| Vector Hats | RhosGFX licence, https://rhosgfx.com/license | https://rhosgfx.itch.io |
+| Vector Keyboard Controls | CC0 1.0 | https://rhosgfx.itch.io |
+| Vector Emojis | CC0 1.0 | https://rhosgfx.itch.io |
+
+The paid packs are not in this repository. The licence's clause on AI use, and the owner's
+2026-09-30 decision about it, are recorded in `docs/ASSETS.md`.
+
+## 3D models: Quaternius (CC0 1.0)
+
+Ultimate Platformer Pack by Quaternius, https://quaternius.com. CC0 1.0 (public domain
+dedication). Not committed; kept with the other third-party packs.
+
 ## Sound effects: Kenney (CC0 1.0)
 
 https://kenney.nl · [Casino Audio](https://kenney.nl/assets/casino-audio),

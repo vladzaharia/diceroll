@@ -38,7 +38,7 @@
    "note": "foundation demo sample"
   },
   "chest": {
-   "svg": "rhosgfx/vector-icon-pack-pro/Items/Chest/Chest Flat Black.svg",
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Chest/Chest 1/Chest Medium 1 Outline.svg",
    "tint": null,
    "note": "foundation demo sample"
   },
@@ -53,8 +53,8 @@
    "note": "foundation demo sample"
   },
   "gear": {
-   "svg": "rhosgfx/vector-icon-pack-pro/General/Settings/Gear Flat Black.svg",
-   "tint": null,
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Settings/Gear Flat White.svg",
+   "tint": "palette:TEXT",
    "note": "foundation demo sample"
   },
   "home": {
@@ -146,6 +146,16 @@
    "svg": "rhosgfx/vector-icon-pack-pro/Currency/Crystal/Crystal Flat White.svg",
    "tint": "palette:auto",
    "note": "foundation demo sample"
+  },
+  "tile_moon_chest": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Chest/Chest 3/Chest Medium 3 Outline.svg",
+   "tint": null,
+   "note": "foundation demo sample: badge composite",
+   "badge": {
+    "svg": "rhosgfx/vector-icon-pack-pro/Nature/Moon 2/Moon 2 Outline.svg",
+    "corner": "br",
+    "scale": 0.45
+   }
   }
  },
  "input_glyphs": {

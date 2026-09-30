@@ -97,12 +97,26 @@ bed stays silent.
 | `cynicmusic/battleThemeB.mp3` | [Battle Theme B for RPG](https://opengameart.org/content/battle-theme-b-for-rpg) | magma |
 | `cynicmusic/battleThemeA.mp3` | [Battle Theme A](https://opengameart.org/content/battle-theme-a) | boss |
 
+UI art (the 2026-09-30 reskin): the RhosGFX vector packs go into `third_party/rhosgfx/<folder>`,
+unzipped as downloaded. The Quaternius pack goes into `third_party/quaternius/<folder>`.
+- The UI only copies the SVGs it references.
+- A missing RhosGFX pack is only a warning. Those controls and icons keep the built-in drawn look.
+
+| `third_party/` folder | Pack | Tier |
+|---|---|---|
+| `rhosgfx/cartoony-ui-pack-full` | [Cartoony UI Pack](https://rhosgfx.itch.io/cartoony-ui-pack) (Full) | paid |
+| `rhosgfx/vector-icon-pack-pro` | [Vector Icon Pack](https://rhosgfx.itch.io) (Pro) | paid |
+| `rhosgfx/vector-keyboard-controls` | [Vector Keyboard Controls](https://rhosgfx.itch.io) | free (CC0) |
+| `rhosgfx/vector-emojis` | [Vector Emojis](https://rhosgfx.itch.io) | free (CC0) |
+| `rhosgfx/vector-hats` | [Vector Hats](https://rhosgfx.itch.io) | RhosGFX licence |
+| `quaternius/ultimate-platformer-pack` | [Ultimate Platformer Pack](https://quaternius.com) by Quaternius | free (CC0) |
+
 Fonts (OFL) and Kenney sound effects (CC0) are downloaded for you by the import script.
 
 ### 3. Import, run, test
 
 ```sh
-tools/import_assets.sh --fetch       # third_party/ -> assets/kaykit, assets/audio, assets/fonts
+tools/import_assets.sh --fetch       # third_party/ -> assets/kaykit, assets/audio, assets/fonts, assets/ui
 godot --headless --path . --import   # first import (a few minutes)
 godot --path .                       # play (or open the project in the editor)
 ./tests/run.sh                       # headless test suite (fails on any SCRIPT ERROR)
