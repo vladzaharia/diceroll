@@ -58,7 +58,7 @@ static func rule(mech: String) -> String:
 		"turret":
 			return "After every attack your Clockwork Turret rolls and shoots. It grows stronger in each biome."
 		"boo":
-			return "Attack with the ★ face showing: BOO! The target cowers and skips its turn. Weak foes run away."
+			return "Attack with the star face showing: BOO! The target cowers and skips its turn. Weak foes run away."
 	return ""
 
 
