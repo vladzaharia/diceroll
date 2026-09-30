@@ -1319,7 +1319,7 @@
    "group": "potion"
   },
   "petg_pumpkin_sprite": {
-   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Pumpkin/Pumpkin Outline.svg",
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Pumpkin/Pumpkin outline.svg",
    "tint": null,
    "note": "Pack pet GLYPHS use petg_<id> so the existing pet_<id> portrait SVGs (meta_hud, meta_beats) keep their ids and art (plan d collision fix). CampInfo.PET_ICON -> petg_<id> for all 12 pets.",
    "group": "pet"
@@ -1421,7 +1421,7 @@
    "group": "passive"
   },
   "passive_snake_eyes": {
-   "svg": "rhosgfx/vector-icon-pack-pro/General/Eye/Eye Blue Outline.svg",
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Eye/eye Blue Outline.svg",
    "tint": null,
    "note": "Eye + die badge.",
    "group": "passive",
