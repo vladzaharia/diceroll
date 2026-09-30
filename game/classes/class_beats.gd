@@ -212,7 +212,7 @@ static func class_triggered(c: GameController, ev: Dictionary) -> void:
 			await _boo(c, int(ev.get("enemy_idx", -1)))
 		_:
 			if text != "":
-				c.overlay.popup(c.hero_screen(2.4), text, col, UiIcons.mechanic_icon(mech), 30)
+				c.overlay.popup(c.hero_screen(2.4), text, col, Icons.mechanic_icon(mech), 30)
 				await c.wait(0.3)
 
 
