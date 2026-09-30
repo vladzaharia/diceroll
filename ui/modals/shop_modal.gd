@@ -95,6 +95,7 @@ func refresh(flow: GameFlow) -> void:
 
 			c.set_icon(ICONS.get(id, "star"))
 			c.set_tag("", UiPalette.GOLD)
+			c.accent_rim = false
 		c.set_price(int(it.price), run.gold >= int(it.price))
 		if bool(it.sold):
 			c.set_sold(true)

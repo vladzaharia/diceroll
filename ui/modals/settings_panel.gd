@@ -181,7 +181,8 @@ func _update_row() -> Control:
 
 
 func _updater() -> Node:
-	return (Engine.get_main_loop() as SceneTree).root.get_node_or_null("Updater")
+	var tree := Engine.get_main_loop() as SceneTree
+	return tree.root.get_node_or_null("Updater") if tree != null and tree.root != null else null
 
 
 func refresh(_flow: GameFlow = null) -> void:

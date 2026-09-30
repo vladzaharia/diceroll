@@ -38,6 +38,9 @@ func refresh(flow: GameFlow) -> void:
 	var id := String(o.get("id", ""))
 	var rim: Color = RIM.get(id, Color("9a7ae0"))
 	set_title(String(o.get("title", "Event")).to_upper(), rim)
+	# a colour without a native plaque family (steel, silver...): the white plaque x colour
+	if not ribbon.skinned():
+		ribbon.family = "white"
 	UiTheme.clear(_art)
 	var art: Array = ART.get(id, ["star", UiPalette.GOLD])
 	_art.add_child(OptionCard.Medallion.make(art_icon(id, String(art[0])), 128, art[1], rim))

@@ -93,6 +93,7 @@ func _build() -> void:
 	var yes := GameButton.make("ABANDON", "flag", GameButton.Kind.DANGER, 28)
 	yes.pressed.connect(func() -> void: abandon_confirmed.emit())
 	row.add_child(yes)
+	_unask()
 
 
 func refresh(flow: GameFlow) -> void:

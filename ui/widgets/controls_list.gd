@@ -6,8 +6,8 @@ extends VBoxContainer
 ##
 ##   body.add_child(ControlsList.make())
 
-## Keycap height in the list (spec 6: KeyGlyph at 34 px).
-const KEY_PX := 34.0
+## Keycap height in the list (spec 6 says 34 px; 40 keeps the key labels legible on the 0.75 phone frame).
+const KEY_PX := 40.0
 
 
 static func make() -> ControlsList:

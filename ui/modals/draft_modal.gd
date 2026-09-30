@@ -53,6 +53,7 @@ func refresh(flow: GameFlow) -> void:
 		else:
 			c.set_icon(ICONS.get(id, "star"))
 			c.set_tag("BOON", UiPalette.GOLD)
+			c.accent_rim = false  # a gold rim would read as "selected"
 		c.pressed.connect(select.bind(i))
 		_list.add_child(c)
 		_cards.append(c)

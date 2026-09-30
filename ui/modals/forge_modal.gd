@@ -100,6 +100,9 @@ func refresh(flow: GameFlow) -> void:
 	_ops = flow.offer.get("ops", ["raise", "mirror"])
 	var draft := String(flow.offer.get("source", "tile")) == "draft"
 	set_title("FACE RAISE" if draft or not _ops.has("mirror") else "FORGE", Color("aab4c8"))
+	# a colour without a native plaque family (steel, silver...): the white plaque x colour
+	if not ribbon.skinned():
+		ribbon.family = "white"
 	_mirror_btn.visible = _ops.has("mirror")
 	UiTheme.clear(_dice_row)
 	_die_tabs.clear()

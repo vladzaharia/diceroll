@@ -29,6 +29,7 @@ var sold := false
 var premium := false:
 	set(v):
 		premium = v
+		_apply_margins()
 		queue_redraw()
 var _faces_row: HBoxContainer
 var _hover := false
@@ -63,10 +64,10 @@ static func skinned() -> bool:
 func _build(title: String, desc: String) -> void:
 	focus_mode = Control.FOCUS_NONE
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	var cm := _box().get_content_margin(SIDE_BOTTOM) if skinned() else 14.0
-	_margin = UiTheme.margin(null, 18, 14, 18, maxf(14.0, cm))
+	_margin = UiTheme.margin(null, 18, 14, 18, 14)
 	UiTheme.full_rect(_margin)
 	add_child(_margin)
+	_apply_margins()
 	var row := UiTheme.hbox(18)
 	_margin.add_child(row)
 	_medal_holder = CenterContainer.new()
@@ -121,6 +122,20 @@ func _build(title: String, desc: String) -> void:
 
 ## A bare full-colour icon on the left (spec 4.3); `tint` only reaches tinted (Flat White)
 ## map entries. Without the pack: the pre-reskin medallion.
+## Content inset: the card's own margins (its 3D lip at the bottom), wider inside the boss
+## tier's Ornate frame so nothing sits on the gold.
+func _apply_margins() -> void:
+	if _margin == null:
+		return
+	var m := [18.0, 14.0, 18.0, 14.0]
+	if skinned():
+		m[3] = maxf(14.0, UiTheme.card_box("normal").get_content_margin(SIDE_BOTTOM))
+		if premium:
+			m = [32.0, 28.0, 32.0, 32.0]
+	for i in 4:
+		_margin.add_theme_constant_override(["margin_left", "margin_top", "margin_right", "margin_bottom"][i], int(m[i]))
+
+
 func set_icon(icon: String, tint: Variant = null) -> void:
 	UiTheme.clear(_medal_holder)
 	_medal_holder.visible = true
@@ -249,7 +264,8 @@ func _box() -> StyleBox:
 	var st := "hover" if _hover and not disabled else "normal"
 	if disabled and not sold:
 		st = "dim"
-	return UiTheme.card_box(st, accent if accent_rim and st != "dim" else null)
+	# the boss tier's Ornate overlay is its rim: no second accent frame under it
+	return UiTheme.card_box(st, accent if accent_rim and st != "dim" and not premium else null)
 
 
 func _draw() -> void:

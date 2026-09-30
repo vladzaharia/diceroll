@@ -52,6 +52,9 @@ func refresh(flow: GameFlow) -> void:
 	var tier := String(offer.get("tier", "silver"))
 	var col: Color = MgLogic.TIER_COLORS.get(tier, UiPalette.GOLD)
 	set_title("%s PRIZE" % tier.to_upper(), col.darkened(0.1) if tier != "silver" else Color("8e9bb8"))
+	# a colour without a native plaque family (steel, silver...): the white plaque x colour
+	if not ribbon.skinned():
+		ribbon.family = "white"
 	_medal.tier = tier
 	_sub.text = "%s\nChoose one reward" % MinigameDefs.name_of(String(offer.get("id", "")))
 	UiTheme.clear(_list)
