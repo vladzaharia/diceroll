@@ -2,7 +2,7 @@
 """Copies the RhosGFX SVGs the game references from third_party/ into the runtime folders
 (called by tools/import_assets.sh; see docs/design/2026-09-30-svg-ui-pipeline.md).
 
-  referenced = every "svg" (at any depth: "icons", "input_glyphs", ...) in
+  referenced = every "svg" / "*_svg" (at any depth: "icons", "input_glyphs", badges, ...) in
                ui/icons/icon_map.json + ui/icons/icon_map.demo.json                   -> assets/ui/icons/
              + every "svg" (at any depth) in ui/theme/ui_pack.json                    -> assets/ui/pack/
 
@@ -26,12 +26,14 @@ import json
 import os
 import re
 import sys
+import unicodedata
 from pathlib import Path
 
 IMPORT_KEEP = '[remap]\n\nimporter="keep"\n'
 ROOTS = {"icons": "assets/ui/icons", "pack": "assets/ui/pack"}
 ICON_MAPS = ["ui/icons/icon_map.json", "ui/icons/icon_map.demo.json"]
 PACK_MANIFEST = "ui/theme/ui_pack.json"
+DOC_SECTIONS = {"schema", "missing", "note", "notes", "version", "root", "default_variant"}
 _SEG = re.compile(r"[^a-z0-9-]+")
 
 
@@ -52,15 +54,20 @@ def sanitize(tp_path: str) -> str:
     return "/".join(out)
 
 
+def _is_svg_key(k: str) -> bool:
+    return k == "svg" or k.endswith("_svg")  # "svg", "compact_svg", ...
+
+
 def _svgs(node) -> list[tuple[str, bool]]:
-    """Every (svg path, strip_text) in a JSON tree: dicts with a string "svg" value."""
+    """Every (svg path, strip_text) in a JSON tree: string values of "svg" / "*_svg" keys at any
+    depth (entries, badges, layers), with the strip_text flag of the dict that holds them."""
     out = []
     if isinstance(node, dict):
-        v = node.get("svg")
-        if isinstance(v, str) and v.strip():
-            out.append((v, bool(node.get("strip_text", False))))
+        strip = bool(node.get("strip_text", False))
         for k, v in node.items():
-            if k != "svg":
+            if _is_svg_key(k) and isinstance(v, str) and v.strip():
+                out.append((v, strip))
+            elif not _is_svg_key(k):
                 out.extend(_svgs(v))
     elif isinstance(node, list):
         for v in node:
@@ -89,14 +96,35 @@ def _load(path: Path):
 def referenced(root: Path) -> dict[str, dict[str, bool]]:
     """kind -> {svg path: strip_text} (strip wins when a file is listed both ways)."""
     refs: dict[str, dict[str, bool]] = {"icons": {}, "pack": {}}
-    sources = [(rel, "icons", None) for rel in ICON_MAPS] + [(PACK_MANIFEST, "pack", "pieces")]
-    for rel, kind, section in sources:
+    sources = [(rel, "icons") for rel in ICON_MAPS] + [(PACK_MANIFEST, "pack")]
+    for rel, kind in sources:
         data = _load(root / rel)
         if not isinstance(data, dict):
             continue
-        for svg, strip in _svgs(data.get(section, {}) if section else data):
-            refs[kind][svg] = refs[kind].get(svg, False) or strip
+        # every top-level section except the documentation ones ("schema" describes the keys)
+        for section, body in data.items():
+            if section in DOC_SECTIONS:
+                continue
+            for svg, strip in _svgs(body):
+                refs[kind][svg] = refs[kind].get(svg, False) or strip
     return refs
+
+
+def _case_exact(tp: Path, rel: str) -> bool:
+    """True when every component of `rel` exists under `tp` with exactly this spelling
+    (Unicode-normalised: macOS may store NFD names for NFC manifest strings)."""
+    here = tp
+    for part in rel.split("/"):
+        if not part:
+            continue
+        try:
+            names = {unicodedata.normalize("NFC", n) for n in os.listdir(here)}
+        except OSError:
+            return False
+        if unicodedata.normalize("NFC", part) not in names:
+            return False
+        here = here / part
+    return True
 
 
 def _write_if_changed(dst: Path, data: bytes) -> bool:
@@ -121,6 +149,9 @@ def run(root: Path, tp: Path, quiet: bool = False) -> int:
                 continue
             keep[dst] = src_rel
             src = tp / src_rel
+            if src.is_file() and not _case_exact(tp, src_rel):
+                print(f"   warning: {src_rel} only matches on a case-insensitive file system; "
+                      f"fix its case in the manifest (Linux imports would miss it)", file=sys.stderr)
             if not src.is_file():
                 missing += 1
                 print(f"   warning: missing {src} (that {kind[:-1] if kind == 'icons' else 'piece'} keeps its current look)",

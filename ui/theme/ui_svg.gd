@@ -176,30 +176,61 @@ static func strip_text(svg: String) -> String:
 	return RegEx.create_from_string("<text\\b[^>]*/>|<text\\b[\\s\\S]*?</text\\s*>").sub(svg, "", true)
 
 
+## The SVG turned `deg` clockwise (multiples of 90): vertical scroll tracks from horizontal
+## bar art. The viewBox swaps for 90 / 270.
+static func rotate(svg: String, deg: int) -> String:
+	var d := posmod(deg, 360)
+	if d == 0 or d % 90 != 0:
+		return svg
+	var sz := svg_size(svg)
+	var o := _viewbox_origin(svg)
+	var out := sz if d == 180 else Vector2(sz.y, sz.x)
+	# rotate about the origin, then shift the rotated box back into positive space
+	var shift := {90: Vector2(sz.y, 0), 180: sz, 270: Vector2(0, sz.x)}[d] as Vector2
+	var g := "<g transform=\"translate(%s %s) rotate(%d) translate(%s %s)\">%s</g>" \
+		% [shift.x, shift.y, d, -o.x, -o.y, _inner(svg)]
+	return "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"%s\" height=\"%s\" viewBox=\"0 0 %s %s\">%s</svg>" \
+		% [out.x, out.y, out.x, out.y, g]
+
+
 # ---------------------------------------------------------------- composition
 
-## One SVG from several (bottom first), each [svg_text, offset Vector2 in SVG units]; the
-## result's viewBox is the union of the parts (shifted to start at 0,0). Class names and ids
-## are prefixed per part, so the pack's shared ".cls-1" CSS classes don't collide.
-## (Toggle = container + handle, badge = frame + icon, ...)
+## One SVG from several (bottom first), each [svg_text, offset Vector2 in SVG units] or
+## [svg_text, offset, scale]; the result's viewBox is the union of the parts (shifted to start
+## at 0,0). Class names and ids are prefixed per part, so the pack's shared ".cls-1" CSS
+## classes don't collide. (Toggle = container + handle, icon + corner badge, ...)
 static func compose(parts: Array) -> String:
+	if parts.is_empty():
+		return ""
 	var lo := Vector2(INF, INF)
 	var hi := Vector2(-INF, -INF)
 	for p in parts:
 		var o: Vector2 = p[1]
+		var k: float = float(p[2]) if (p as Array).size() > 2 else 1.0
 		lo = lo.min(o)
-		hi = hi.max(o + svg_size(String(p[0])))
-	if parts.is_empty():
-		return ""
+		hi = hi.max(o + svg_size(String(p[0])) * k)
 	var body := ""
 	for i in parts.size():
 		var src := String(parts[i][0])
 		var o: Vector2 = parts[i][1] - lo
+		var k: float = float(parts[i][2]) if (parts[i] as Array).size() > 2 else 1.0
 		var vb := _viewbox_origin(src)
-		body += "<g transform=\"translate(%s %s)\">%s</g>" % [o.x - vb.x, o.y - vb.y, _inner(_prefix(src, "p%d-" % i))]
+		body += "<g transform=\"translate(%s %s) scale(%s) translate(%s %s)\">%s</g>" \
+			% [o.x, o.y, k, -vb.x, -vb.y, _inner(_prefix(src, "p%d-" % i))]
 	var sz := hi - lo
 	return "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"%s\" height=\"%s\" viewBox=\"0 0 %s %s\">%s</svg>" \
 		% [sz.x, sz.y, sz.x, sz.y, body]
+
+
+## `base` with `badge` composited in a corner ("br", "bl", "tr", "tl"), the badge's longer side
+## = `scale` x the base's longer side (icon_map "badge": {"svg", "corner", "scale"}).
+static func with_badge(base: String, badge: String, corner: String = "br", scale: float = 0.45) -> String:
+	var bs := svg_size(base)
+	var gs := svg_size(badge)
+	var k := scale * maxf(bs.x, bs.y) / maxf(gs.x, gs.y)
+	var g := gs * k
+	var off := Vector2(bs.x - g.x if corner.ends_with("r") else 0.0, bs.y - g.y if corner.begins_with("b") else 0.0)
+	return compose([[base, Vector2.ZERO], [badge, off, k]])
 
 
 ## Contents of the root <svg> element (XML prolog, root tag and <title> dropped).

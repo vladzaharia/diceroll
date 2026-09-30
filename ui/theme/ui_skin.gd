@@ -14,6 +14,8 @@ extends RefCounted
 ##   draw_style_box(UiSkin.stylebox("chip", "normal"), rect)       # custom-drawn widgets
 ##   UiSkin.texture("checkbox", "checked", 32)             # a piece as a plain texture/icon
 ##   UiSkin.has("button_primary")                          # art present?
+##   UiSkin.stylebox("plaque", "normal", {"tint": UiPalette.class_color("mage")})  # per-use tint
+##   UiSkin.stylebox("chip", "normal", {"saturation": 0.0, "fallback": my_flat_box})
 ##
 ## Manifest (ui/theme/ui_pack.json; `svg` paths relative to third_party/):
 ##   {"version": 1, "pieces": {"<piece>": {
@@ -27,6 +29,9 @@ extends RefCounted
 ##       "modulate": null | "#hex[aa]" | "palette:NAME", StyleBoxTexture.modulate_color (alpha ok)
 ##       "saturation": 1.0,          < 1 desaturates (disabled states)
 ##       "axis": "stretch" | "tile" | "tile_fit" | [h, v],   "draw_center": true,
+##       "rotate": 0 | 90 | 180 | 270   (clockwise; e.g. horizontal bar art as a vertical scroll
+##                                       track: slice / scale then refer to the rotated art),
+##       "runtime_tint": true           (false = per-use opts tints skip this layer),
 ##       "states": {"normal": {...}, "hover": {...}, "pressed": {...}, "disabled": {...},
 ##                  "focus": {...}, "background": {...}, "fill": {...}, "checked": {...}, ...}
 ##   }}}
@@ -78,7 +83,7 @@ static func clear_cache() -> void:
 
 ## The resolved layers of piece/state: an array of merged key dictionaries (bottom first),
 ## [] when the piece is unknown. `state` falls back to "normal".
-static func layers(piece: String, state: String = "normal") -> Array:
+static func layers(piece: String, state: String = "normal", opts: Dictionary = {}) -> Array:
 	var p: Variant = pieces().get(piece, null)
 	if not p is Dictionary:
 		return []
@@ -102,6 +107,13 @@ static func layers(piece: String, state: String = "normal") -> Array:
 			out.append(m)
 	elif String(base.get("svg", "")) != "":
 		out.append(base)
+	if not opts.is_empty():
+		for l in out:
+			if l.get("runtime_tint", true) == false:
+				continue
+			for k in ["tint", "modulate", "saturation"]:
+				if opts.has(k) and opts[k] != null:
+					l[k] = opts[k]
 	return out
 
 
@@ -119,22 +131,50 @@ static func has(piece: String, state: String = "normal") -> bool:
 # ---------------------------------------------------------------- style boxes
 
 ## StyleBox for piece/state: a StyleBoxTexture (9-slice DPITexture), a UiLayeredStyleBox for
-## layered states, or - when the art is missing - `fallback`, else the manifest's "fallback"
-## (the current flat look), else StyleBoxEmpty. Returns a fresh copy: safe to edit.
-static func stylebox(piece: String, state: String = "normal", fallback: StyleBox = null) -> StyleBox:
-	var key := piece + "|" + state
+## layered states, or - when the art is missing - the fallback: opts.fallback, else the
+## manifest's "fallback" (the current flat look), else StyleBoxEmpty. Returns a fresh copy.
+## `opts` (optional): a StyleBox (= fallback) or a Dictionary:
+##   {"fallback": StyleBox, "tint": Color, "modulate": Color, "saturation": float}
+## tint / modulate / saturation are per-use overrides applied to every layer that doesn't set
+## "runtime_tint": false in the manifest (e.g. tint a white plaque to a ribbon colour, an
+## accent per pet / class, without a piece per colour).
+static func stylebox(piece: String, state: String = "normal", opts: Variant = null) -> StyleBox:
+	var o := _opts(opts)
+	var key := "%s|%s|%s" % [piece, state, _opts_key(o)]
 	if not _cache.has(key):
-		_cache[key] = _build(piece, state)
+		_cache[key] = _build(piece, state, o)
 	var sb: StyleBox = _cache[key]
 	if sb == null:
-		return _fallback(piece, state, fallback)
+		return _fallback(piece, state, o.get("fallback", null))
 	return sb.duplicate()
 
 
-static func _build(piece: String, state: String) -> StyleBox:
+static func _opts(opts: Variant) -> Dictionary:
+	if opts is StyleBox:
+		return {"fallback": opts}
+	if opts is Dictionary:
+		var o := (opts as Dictionary).duplicate()
+		for k in ["tint", "modulate"]:
+			if o.has(k) and not o[k] is Color:
+				o[k] = UiSvg.color(o[k])
+		return o
+	return {}
+
+
+static func _opts_key(o: Dictionary) -> String:
+	var parts := PackedStringArray()
+	for k in ["tint", "modulate", "saturation"]:
+		var v: Variant = o.get(k, null)
+		parts.append((v as Color).to_html() if v is Color else str(v))
+	return ",".join(parts)
+
+
+static func _build(piece: String, state: String, o: Dictionary = {}) -> StyleBox:
 	if not has(piece, state):
 		return null
-	var ls := layers(piece, state)
+	var run := o.duplicate()
+	run.erase("fallback")
+	var ls := layers(piece, state, run)
 	var boxes: Array[StyleBox] = []
 	for l in ls:
 		var b := _layer_box(l)
@@ -229,13 +269,15 @@ static func _fallback(piece: String, state: String, fallback: StyleBox) -> Style
 ## manifest scale), for CheckBox / CheckButton / slider icons and badges. Layered states are
 ## composed into one SVG, each layer placed at its "offset" [x, y] (SVG units), e.g. a toggle
 ## = container + handle. null when the art is missing.
-static func texture(piece: String, state: String = "normal", size_px: float = 0.0) -> Texture2D:
-	var key := "tex|%s|%s|%s" % [piece, state, size_px]
+static func texture(piece: String, state: String = "normal", size_px: float = 0.0, opts: Variant = null) -> Texture2D:
+	var o := _opts(opts)
+	o.erase("fallback")
+	var key := "tex|%s|%s|%s|%s" % [piece, state, size_px, _opts_key(o)]
 	if _cache.has(key):
 		return _cache[key]
 	var t: Texture2D = null
 	if has(piece, state):
-		var ls := layers(piece, state)
+		var ls := layers(piece, state, o)
 		var parts := []
 		for l in ls:
 			var src := _layer_svg(l)
@@ -261,7 +303,8 @@ static func _layer_svg(l: Dictionary) -> String:
 	var src := UiSvg.source(UiSvg.runtime_path("pack", String(l.get("svg", ""))))
 	if src == "":
 		return ""
-	return UiSvg.recolor(src, UiSvg.color(l.get("tint", null)), float(l.get("saturation", 1.0)))
+	src = UiSvg.recolor(src, UiSvg.color(l.get("tint", null)), float(l.get("saturation", 1.0)))
+	return UiSvg.rotate(src, int(l.get("rotate", 0))) if int(l.get("rotate", 0)) % 360 != 0 else src
 
 
 static func _scale(l: Dictionary) -> float:
@@ -280,20 +323,20 @@ static func _rect4(v: Variant) -> Array:
 
 ## Button-like controls: normal / hover / pressed / disabled / focus / hover_pressed from the
 ## piece's states (hover_pressed defaults to pressed; missing states fall back to normal).
-static func apply_button(c: Control, piece: String) -> void:
+static func apply_button(c: Control, piece: String, opts: Variant = null) -> void:
 	for st in BUTTON_STATES:
 		var s: String = "pressed" if st == "hover_pressed" and not _has_state(piece, st) else st
-		c.add_theme_stylebox_override(st, stylebox(piece, s))
+		c.add_theme_stylebox_override(st, stylebox(piece, s, opts))
 
 
-static func apply_panel(c: Control, piece: String, state: String = "normal") -> void:
-	c.add_theme_stylebox_override("panel", stylebox(piece, state))
+static func apply_panel(c: Control, piece: String, state: String = "normal", opts: Variant = null) -> void:
+	c.add_theme_stylebox_override("panel", stylebox(piece, state, opts))
 
 
 ## ProgressBar (or anything with "background" / "fill" boxes).
-static func apply_progress(c: Control, piece: String) -> void:
+static func apply_progress(c: Control, piece: String, fill_opts: Variant = null) -> void:
 	c.add_theme_stylebox_override("background", stylebox(piece, "background"))
-	c.add_theme_stylebox_override("fill", stylebox(piece, "fill"))
+	c.add_theme_stylebox_override("fill", stylebox(piece, "fill", fill_opts))
 
 
 ## HSlider / VSlider: "track" -> slider, "fill" -> grabber_area(_highlight), "grabber" art

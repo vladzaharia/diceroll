@@ -146,3 +146,52 @@ func test_strip_text_and_input_glyphs() -> void:
 	var m := Icons.load_map_file(path)
 	assert_true(m.has("key_r"), "input_glyphs merged into the id space")
 	assert_eq(String(m["a"]["svg"]), "x/a.svg", "icons win a clash")
+
+
+func test_opts_rotate_and_3d_override() -> void:
+	_setup()
+	var r := UiSvg.rotate(BTN.replace("0 0 64 64", "0 0 64 16"), 90)
+	assert_eq(UiSvg.svg_size(r), Vector2(16, 64), "rotated viewBox")
+	var img := Image.new()
+	assert_eq(img.load_svg_from_string(r, 1.0), OK)
+	assert_eq(img.get_size(), Vector2i(16, 64))
+	assert_true(img.get_pixel(8, 60).a > 0.5, "art still inside the rotated box")
+	UiSkin.set_manifest({"plaque": {"slice": 9, "states": {"normal": {"layers": [
+		{"svg": "rhosgfx/ui/Buttons/3. Yellow/btn_standard.svg"},
+		{"svg": "rhosgfx/ui/Buttons/3. Yellow/btn_standard.svg", "runtime_tint": false}]}}}})
+	var a := UiSkin.stylebox("plaque", "normal", {"tint": Color.RED}) as UiLayeredStyleBox
+	var b := UiSkin.stylebox("plaque") as UiLayeredStyleBox
+	assert_true(a != null and b != null)
+	var ta := (a.layers[0] as StyleBoxTexture).texture as DPITexture
+	var tb := (b.layers[0] as StyleBoxTexture).texture as DPITexture
+	if ta != null and tb != null:
+		assert_true(ta.get_source().contains("#ff0000") and not tb.get_source().contains("#ff0000"), "per-use tint")
+		var t1 := (a.layers[1] as StyleBoxTexture).texture as DPITexture
+		assert_true(not t1.get_source().contains("#ff0000"), "runtime_tint: false layer untouched")
+	assert_true(UiSkin.stylebox("nope", "normal", {"fallback": StyleBoxEmpty.new()}) is StyleBoxEmpty)
+	Icons.set_map({"3d:coins": {"svg": "rhosgfx/pack/Coin 2/Coin Flat White.svg", "tint": null}})
+	var t := Icons.texture("3d:coins", 40)
+	assert_true(t != null and t.get_size().is_equal_approx(Vector2(40, 40)), "map overrides a 3d: id")
+	var g := Icons.texture("3d:coins", 40, {"saturation": 0.0})
+	assert_true(g != t, "saturation variant cached separately")
+	_teardown()
+
+
+func test_badge_compact_and_entry_saturation() -> void:
+	_setup()
+	var comp := UiSvg.with_badge(ICON, BTN, "br", 0.5)
+	assert_eq(UiSvg.svg_size(comp), Vector2(128, 128), "badge inside the base box")
+	var img := Image.new()
+	assert_eq(img.load_svg_from_string(comp, 1.0), OK)
+	assert_true(img.get_pixel(120, 120).b > 0.9 and img.get_pixel(120, 120).r < 0.2, "badge drawn bottom-right")
+	_put("icons/" + UiSvg.sanitize("rhosgfx/pack/small.svg"), BTN)
+	Icons.set_map({"x": {"svg": "rhosgfx/pack/Coin 2/Coin Flat White.svg", "compact_svg": "rhosgfx/pack/small.svg",
+		"saturation": 0.0, "badge": {"svg": "rhosgfx/pack/small.svg", "corner": "br", "scale": 0.45}}})
+	var big := Icons.texture("x", 64) as DPITexture
+	var small := Icons.texture("x", 20) as DPITexture
+	if big != null and small != null:
+		assert_true(big.get_source().contains("p1-"), "badge composited")
+		assert_true(small.get_source().contains("rx=\"9\""), "compact art at small size")
+		assert_true(not big.get_source().contains("#1778ff") and big.get_source().contains("fill: #"), "entry saturation 0 applied (badge too)")
+	assert_true(Icons.texture("x", 64, {"saturation": 1.0}) != big, "caller saturation overrides the entry's")
+	_teardown()
