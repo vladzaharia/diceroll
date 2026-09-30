@@ -33,7 +33,7 @@ const BAR_SIZE := Vector2(1.3, 0.2)
 ## Status pips under the HP bar (style B), in this order: data key -> [icon id, colour].
 const STATUSES := {"poison": ["poison", Color("7ad35a")], "frozen": ["frozen", Color("6ab8ee")],
 	"weakened": ["weakened", Color(0.36, 0.62, 0.24)], "frenzy": ["frenzy", Color(0.93, 0.36, 0.2)]}
-const STATUS_SIZE := 0.26
+const STATUS_SIZE := 0.3
 ## Badge style by on-screen disc size (base 720-canvas px): style C at STYLE_C_PX and up,
 ## style B at STYLE_B_PX and below (the spec's 40 px / 28 px on screen), blended between.
 const STYLE_C_PX := 46.0
