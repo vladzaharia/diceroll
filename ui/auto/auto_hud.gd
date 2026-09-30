@@ -54,7 +54,7 @@ func _init() -> void:
 	auto_btn.toggled_by_user.connect(func(on: bool) -> void: auto_toggled.emit(on))
 	auto_btn.settings_requested.connect(func() -> void: settings_requested.emit())
 	cluster.add_child(auto_btn)
-	gear_btn = GameButton.round_icon("gear", 64)
+	gear_btn = GameButton.round_icon("gear", 74)
 	gear_btn.kind = GameButton.Kind.GHOST
 	gear_btn.icon_px = 40
 	gear_btn.icon_tint = Color(AutoButton.ACCENT, 0.95)

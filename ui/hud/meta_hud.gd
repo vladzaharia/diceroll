@@ -210,7 +210,11 @@ func _place() -> void:
 		var at := Vector2(r.end.x - s.x, r.end.y + 8.0) - global_position
 		strip.position = at
 		for t in tops:
-			(t as HudTop).reserve_right = s.x + 16.0
+			# the strip right-aligns to the chips, which can end short of the HUD row: reserve
+			# from the row's end so the passives bar wraps before the strip (it hid a 4th badge)
+			var ht := t as HudTop
+			var row_end := ht.global_position.x + ht.row_rect().end.x
+			ht.reserve_right = maxf(s.x, row_end - (r.end.x - s.x)) + 16.0
 			(t as HudTop).extra_bottom = strip.get_global_rect().end.y - (t as HudTop).global_position.y
 
 

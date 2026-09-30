@@ -72,7 +72,7 @@ func _stop(b: Dictionary, tier: int) -> Control:
 	var first := int(Balance.BIOME_LAPS[clampi(tier - 1, 0, Balance.BIOME_LAPS.size() - 1)])
 	var last := first + Balance.LAPS_PER_ACT - 1
 	var cap := UiTheme.label("TIER %s  ·  LAPS %d–%d" % [["I", "II", "III"][clampi(tier - 1, 0, 2)], first, last] if not compact
-		else "LAPS %d–%d" % [first, last], 14 if compact else 16, bc.lightened(0.25) if here or current == 0 else UiPalette.TEXT_MUTED, false, 0, false, 800)
+		else "LAPS %d–%d" % [first, last], 16 if compact else 18, bc.lightened(0.25) if here or current == 0 else UiPalette.TEXT_MUTED, false, 0, false, 800)
 	cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(cap)
 	var nm := UiTheme.label(String(b.get("name", id)).to_upper(), 20 if compact else 28,
@@ -107,8 +107,8 @@ func _boss_chip(icon: String, caption: String, name: String, color: Color, done:
 	var row := UiTheme.hbox(10)
 	p.add_child(row)
 	row.add_child(UiIcons.rect("check" if done else icon, 34 if compact else 44, UiPalette.HEAL if done else color))
-	var col := UiTheme.vbox(-4)
+	var col := UiTheme.vbox(-2)
 	row.add_child(col)
-	col.add_child(UiTheme.label(caption, 13 if compact else 15, color.lightened(0.2), false, 0, false, 800))
+	col.add_child(UiTheme.label(caption, 16 if compact else 17, color.lightened(0.2), false, 0, false, 800))
 	col.add_child(UiTheme.label(name.to_upper(), 20 if compact else 26, UiPalette.TEXT, true, 5))
 	return p

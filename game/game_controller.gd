@@ -26,6 +26,8 @@ signal manual_command(cmd: String)
 
 const SAVE_PATH := "user://save.json"
 const LIGHT_EVENTS := ["die_marked", "target_changed"]
+## Screen-height fraction of Camp toasts (see _camp_toast).
+const CAMP_TOAST_Y := 0.84
 
 var flow: GameFlow
 var world: Node3D
@@ -345,7 +347,7 @@ func run_command(cmd: String, args: Array = []) -> void:
 	var evs: Array = flow.callv(cmd, args)
 	if evs.size() == 1 and String(evs[0].get("type", "")) == "error":
 		Audio.play_sfx("error")
-		overlay.toast(String(evs[0].get("msg", "Not now")).capitalize(), "", UiPalette.HP_BRIGHT, 0.5)
+		overlay.toast(String(evs[0].get("msg", "Not now")).capitalize(), "", UiPalette.HP_BRIGHT)
 		print("CMD_ERROR %s %s: %s" % [cmd, str(args), String(evs[0].msg)])
 		return
 	await play_events(evs)
@@ -860,32 +862,38 @@ func show_camp() -> void:
 			ui.camp.show_welcome()
 
 
+## A Camp toast: low on the screen, so it never lands on the station heading or the row the
+## player just tapped (the rank-up toast sat on the Ranks heading at mid-screen).
+func _camp_toast(text: String, icon := "", color: Color = UiPalette.TEXT) -> void:
+	overlay.toast(text, icon, color, CAMP_TOAST_Y)
+
+
 ## Applies a Camp command (Camp.apply format), saves the profile and refreshes the hub.
 func camp_command(cmd: Array) -> void:
 	ensure_profile()
 	var evs := camp.apply(cmd)
 	if evs.size() == 1 and String(evs[0].get("type", "")) == "error":
 		Audio.play_sfx("error")
-		overlay.toast(String(evs[0].get("msg", "Not now")).capitalize(), "", UiPalette.HP_BRIGHT, 0.5)
+		_camp_toast(String(evs[0].get("msg", "Not now")).capitalize(), "", UiPalette.HP_BRIGHT)
 		return
 	save_profile()
 	for e: Dictionary in evs:
 		match String(e.get("type", "")):
 			"upgrade_bought":
 				Audio.play_sfx("levelup")
-				overlay.toast(_upgrade_text(e), "up", UiPalette.HEAL)
+				_camp_toast(_upgrade_text(e), "up", UiPalette.HEAL)
 			"unlocked":
 				Audio.play_sfx("fanfare")
-				overlay.toast("Unlocked: %s" % CampInfo.name_of(String(e.kind), String(e.id)),
+				_camp_toast("Unlocked: %s" % CampInfo.name_of(String(e.kind), String(e.id)),
 					CampInfo.icon_of(String(e.kind), String(e.id)), UiPalette.GOLD_BRIGHT)
 			"pool_toggled", "starter_kind_set", "ascension_changed", "loadout_changed":
 				Audio.play_sfx("dice_select")
 			"item_unlocked":
 				Audio.play_sfx("fanfare")
-				overlay.toast("New item: %s" % ItemDefs.name_of(String(e.id)), CampInfo.icon_of("items", String(e.id)), UiPalette.GOLD_BRIGHT)
+				_camp_toast("New item: %s" % ItemDefs.name_of(String(e.id)), CampInfo.icon_of("items", String(e.id)), UiPalette.GOLD_BRIGHT)
 			"variant_crafted":
 				Audio.play_sfx("levelup")
-				overlay.toast("Crafted: %s" % ItemDefs.name_of(String(e.variant)), "anvil", UiPalette.GOLD_BRIGHT)
+				_camp_toast("Crafted: %s" % ItemDefs.name_of(String(e.variant)), "anvil", UiPalette.GOLD_BRIGHT)
 			"item_equipped":
 				Audio.play_sfx("buff")
 			"appearance_set":
@@ -894,7 +902,7 @@ func camp_command(cmd: Array) -> void:
 				Audio.play_sfx("buff")
 			"skin_unlocked":
 				Audio.play_sfx("fanfare")
-				overlay.toast("New skin: %s, %s" % [CampInfo.name_of("classes", String(e["class"])), String(SkinDefs.NAMES.get(String(e.skin), e.skin))],
+				_camp_toast("New skin: %s, %s" % [CampInfo.name_of("classes", String(e["class"])), String(SkinDefs.NAMES.get(String(e.skin), e.skin))],
 					"wardrobe", Color("c79bff"))
 	if camp_scene:
 		camp_scene.apply_profile(profile)

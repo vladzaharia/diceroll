@@ -448,7 +448,7 @@ func _text_tip(title: String, tag: String, text: String, rc: Color, anchor: Cont
 	var head := UiTheme.hbox(8)
 	col.add_child(head)
 	head.add_child(UiTheme.label(title, 26, rc.lightened(0.3), true, 5))
-	head.add_child(UiTheme.label(tag, 15, rc, false, 0, false, 800))
+	head.add_child(UiTheme.label(tag, 16, rc, false, 0, false, 800))
 	var desc := UiTheme.para(text, 21, UiPalette.TEXT_DIM, 500)
 	desc.custom_minimum_size.x = minf(380.0, size.x - 60.0)
 	col.add_child(desc)

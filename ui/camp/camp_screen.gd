@@ -120,12 +120,12 @@ func _init() -> void:
 	var sg := CampUi.sigils(0, 30)
 	_sigils_l = sg.get_child(1)
 	hrow.add_child(sg)
-	home_btn = GameButton.round_icon("home", 76)
+	home_btn = GameButton.round_icon("home", 84)
 	home_btn.kind = GameButton.Kind.GHOST
 	home_btn.icon_tint = UiPalette.TEXT
 	home_btn.pressed.connect(func() -> void: home_pressed.emit())
 	add_child(home_btn)
-	settings_btn = GameButton.round_icon("gear", 76)
+	settings_btn = GameButton.round_icon("gear", 84)
 	settings_btn.kind = GameButton.Kind.GHOST
 	settings_btn.icon_tint = UiPalette.GOLD
 	settings_btn.pressed.connect(func() -> void: settings_pressed.emit())
@@ -286,10 +286,10 @@ func _build_loadout(p: Profile) -> void:
 ## The Wardrobe button (hanger), with a red dot while skins wait unseen.
 func _wardrobe_entry(p: Profile) -> Control:
 	var holder := Control.new()
-	holder.custom_minimum_size = Vector2(72, 72)
+	holder.custom_minimum_size = Vector2(80, 80)
 	holder.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	holder.mouse_filter = Control.MOUSE_FILTER_PASS
-	wardrobe_btn = GameButton.round_icon("wardrobe", 72)
+	wardrobe_btn = GameButton.round_icon("wardrobe", 80)
 	wardrobe_btn.kind = GameButton.Kind.SECONDARY
 	wardrobe_btn.icon_tint = Color("c79bff")
 	wardrobe_btn.tooltip_text = "Wardrobe"
@@ -297,7 +297,7 @@ func _wardrobe_entry(p: Profile) -> Control:
 	holder.add_child(wardrobe_btn)
 	_wardrobe_dot = WardrobeModal._Dot.new()
 	_wardrobe_dot.size = Vector2(22, 22)
-	_wardrobe_dot.position = Vector2(52, -2)
+	_wardrobe_dot.position = Vector2(60, -2)
 	_wardrobe_dot.visible = not (p.cosmetics.get("unseen", []) as Array).is_empty()
 	holder.add_child(_wardrobe_dot)
 	return holder
@@ -311,8 +311,8 @@ func _badge(icon: String, color: Color, text: String) -> Control:
 	var m := OptionCard.Medallion.make(icon, 52, color, color)
 	holder.add_child(m)
 	if text != "":
-		var l := UiTheme.label(text, 15, UiPalette.TEXT, true, 4)
-		l.position = Vector2(26, 32)
+		var l := UiTheme.label(text, 18, UiPalette.TEXT, true, 4)
+		l.position = Vector2(26, 30)
 		holder.add_child(l)
 	return holder
 

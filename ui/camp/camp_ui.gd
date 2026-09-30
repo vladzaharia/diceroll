@@ -67,11 +67,13 @@ static func buy_button(verb: String, cost: Dictionary, affordable: bool, font :=
 ## Small rounded label chip ("EQUIPPED", "L4", "NEW").
 static func chip(text: String, bg: Color, fg: Color = UiPalette.TEXT, size := 17) -> PanelContainer:
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(bg, 12, 0), 10, 3))
+	# never under 16 canvas px (about 9 pt on a phone): the old 12-15 px chips were unreadable
+	var fs := maxi(size, 16)
+	p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(bg, 12, 0), 8 if size < 16 else 10, 2 if size < 16 else 3))
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	p.add_child(UiTheme.label(text, size, fg, false, 0, false, 700))
+	p.add_child(UiTheme.label(text, fs, fg, false, 0, false, 700))
 	return p
 
 

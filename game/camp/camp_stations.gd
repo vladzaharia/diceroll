@@ -175,7 +175,7 @@ static func _armory(b: Node3D, st: Dictionary, tier: int) -> void:
 		if w == null:
 			continue
 		var wb := ItemMounts.local_bounds(w).size
-		var s := clampf(minf(1.35 / maxf(wb.y, 0.01), step * 2.6 / maxf(wb.x, 0.01)), 0.5, 1.0)
+		var s := clampf(minf(1.45 / maxf(wb.y, 0.01), step * 2.8 / maxf(wb.x, 0.01)), 0.5, 1.1)
 		w.scale = Vector3.ONE * s
 		# centred on the rack, so a young armory's few pieces sit in the middle
 		# standing a little proud of the board, leaning back onto it (never through it)
