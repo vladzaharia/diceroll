@@ -91,9 +91,6 @@ func _init() -> void:
 	_view.stretch_mode = TextureRect.STRETCH_SCALE
 	_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_view.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	# the felt is the tray's 3D surface (a background under the home indicator on phones, like
-	# the board), not UI content: the no-spillover audit skips it; the dice sit well inside
-	_view.set_meta("audit_skip", true)
 	add_child(_view)
 	_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var fm := ShaderMaterial.new()
@@ -632,7 +629,9 @@ func _slot_pos(i: int) -> Vector3:
 
 
 func _layout() -> void:
-	var sz := size
+	# the tray band may reach under a home indicator (UiTheme.tray_rect): the frame and felt
+	# stop at the safe line, so the dice and the tray's art stay inside the safe area
+	var sz := size - Vector2(0.0, _safe_cut())
 	if sz.x < 8.0 or sz.y < 8.0:
 		return
 	var fm := _frame.material as ShaderMaterial
@@ -701,6 +700,18 @@ func _layout() -> void:
 	_felt_mat.set_shader_parameter("falloff", maxf(vis_w * 0.55, 4.0))
 	_update_labels()
 	_place_turret_label.call_deferred()
+
+
+## How far the tray's rect reaches under the device's bottom inset (px; 0 on desktops).
+func _safe_cut() -> float:
+	if not is_inside_tree():
+		return 0.0
+	var safe := UiTheme.safe_margins(self)
+	var b := safe.bottom if safe.bottom > UiTheme.EDGE else 0.0
+	if b <= 0.0:
+		return 0.0
+	var limit := get_viewport_rect().size.y - b
+	return clampf(get_global_rect().end.y - limit, 0.0, size.y * 0.3)
 
 
 ## Short screens (portrait under 1.6:1, e.g. the iPhone Duo outer, or phones in landscape)

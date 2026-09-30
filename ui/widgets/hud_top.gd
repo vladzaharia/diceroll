@@ -41,7 +41,7 @@ var _lap := 1
 var route: Array = []
 var _block_label: Label
 var _row: HBoxContainer
-var _scrim: TextureRect
+var _scrim: _Scrim
 var _hp_wrap: Control
 var _block := 0
 ## Burn stacks on the hero (Magma): a flame badge with the count, left of the block shield.
@@ -70,13 +70,11 @@ var reserve_right := 0.0:
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	UiTheme.full_rect(self)
-	_scrim = TextureRect.new()
+	# a full-bleed backdrop drawn behind the HUD (under the notch too): decoration, not an icon,
+	# so it is drawn, not a TextureRect
+	_scrim = _Scrim.new()
 	_scrim.texture = UiTheme.vgradient(Color(0.02, 0.02, 0.07, 0.6), Color(0.02, 0.02, 0.07, 0.0))
-	_scrim.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_scrim.stretch_mode = TextureRect.STRETCH_SCALE
 	_scrim.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# a full-bleed background behind the notch, not content (no-spillover audit exemption)
-	_scrim.set_meta("audit_skip", true)
 	add_child(_scrim)
 	_row = UiTheme.hbox(14)
 	add_child(_row)
@@ -665,6 +663,19 @@ class _MoonGlyph:
 		if fill > 0.02:
 			draw_colored_polygon(pts, Color("eef2ff"))
 		draw_circle(c + Vector2(mr * 0.3, -mr * 0.25), mr * 0.14, Color(0.6, 0.66, 0.85, 0.5 if fill > 0.5 else 0.0))
+
+
+## The HUD's top gradient: a stretched texture drawn over the whole rect.
+class _Scrim:
+	extends Control
+	var texture: Texture2D
+
+	func _init() -> void:
+		resized.connect(queue_redraw)
+
+	func _draw() -> void:
+		if texture:
+			draw_texture_rect(texture, Rect2(Vector2.ZERO, size), false)
 
 
 class _Pip:
