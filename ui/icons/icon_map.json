@@ -6,6 +6,7 @@
   "svg": "path relative to third_party/",
   "tint": "null = authored colours (caller tint ignored) | #hex | palette:NAME[.key] | palette:auto (legacy per-id colour); baked multiply, caller Color overrides",
   "saturation": "optional 0..1, applied after tint (locked states pass 0 at call time; plan e)",
+  "badge": "optional {svg, corner:\"br\", scale}: a second pack icon composited at the corner (combined icons); registries that ignore it show the base icon",
   "group": "category for review sheets",
   "note": "free text"
  },
@@ -742,6 +743,78 @@
    "note": "Rare rune reward.",
    "group": "rune"
   },
+  "rune_face_blade": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Sword/Sword Flat White.svg",
+   "tint": "#e04848",
+   "note": "Die-face rune glyph: Flat White x Runes.DEFS colour.",
+   "group": "rune"
+  },
+  "rune_face_guard": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Shield/Shield Flat White.svg",
+   "tint": "#4a8be0",
+   "note": "Die-face rune glyph: Flat White x Runes.DEFS colour.",
+   "group": "rune"
+  },
+  "rune_face_venom": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Poison/Poison Flat White.svg",
+   "tint": "#58c060",
+   "note": "Die-face rune glyph: Flat White x Runes.DEFS colour.",
+   "group": "rune"
+  },
+  "rune_face_gilded": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Currency/Coin/Coin Flat White.svg",
+   "tint": "#e0a030",
+   "note": "Die-face rune glyph: Flat White x Runes.DEFS colour.",
+   "group": "rune"
+  },
+  "rune_face_heavy": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Sports/Kettlebell/Kettlebell Flat White.svg",
+   "tint": "#8a8a90",
+   "note": "Die-face rune glyph: Flat White x Runes.DEFS colour.",
+   "group": "rune"
+  },
+  "rune_face_ember": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Fire/Fire Flat White.svg",
+   "tint": "#f08030",
+   "note": "Die-face rune glyph: Flat White x Runes.DEFS colour.",
+   "group": "rune"
+  },
+  "rune_face_vampire": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Holiday/Bat/Bat Flat White.svg",
+   "tint": "#a01830",
+   "note": "Die-face rune glyph: Flat White x Runes.DEFS colour.",
+   "group": "rune"
+  },
+  "rune_face_lucky": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Luck/Luck Flat White.svg",
+   "tint": "#f0d040",
+   "note": "Die-face rune glyph: Flat White x Runes.DEFS colour.",
+   "group": "rune"
+  },
+  "rune_face_frost": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Snowflake 2/Snowflake 2 Flat White.svg",
+   "tint": "#9ad8f0",
+   "note": "Die-face rune glyph: Flat White x Runes.DEFS colour.",
+   "group": "rune"
+  },
+  "rune_face_thunder": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Lightning Bolt/Lightning Bolt Flat White.svg",
+   "tint": "#f0e040",
+   "note": "Die-face rune glyph: Flat White x Runes.DEFS colour.",
+   "group": "rune"
+  },
+  "rune_face_echo": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Music/Tuning Fork/Tuning Fork Flat White.svg",
+   "tint": "#9a60e0",
+   "note": "Die-face rune glyph: Flat White x Runes.DEFS colour.",
+   "group": "rune"
+  },
+  "rune_face_wild": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Sparkle/Sparkle Flat White.svg",
+   "tint": "#f2b84b",
+   "note": "Die-face rune glyph (~20 px on the die body): Flat White tinted with the Runes.DEFS colour (lead call on plan c). Wild uses GOLD because its white would vanish on the ivory die.",
+   "group": "rune"
+  },
   "kind_standard": {
    "svg": "rhosgfx/vector-icon-pack-pro/Shapes/Gaming Dice/D6 Outline.svg",
    "tint": null,
@@ -1081,8 +1154,13 @@
   "tile_moon_chest": {
    "svg": "rhosgfx/vector-icon-pack-pro/Items/Chest/Chest 3/Chest Medium 3 Outline.svg",
    "tint": null,
-   "note": "Moonlit rune chest; add moon pip badge (see missing).",
-   "group": "tile"
+   "note": "Moonlit rune chest; add moon pip badge (see missing). Chest + moon badge.",
+   "group": "tile",
+   "badge": {
+    "svg": "rhosgfx/vector-icon-pack-pro/Nature/Moon 2/Moon 2 Outline.svg",
+    "corner": "br",
+    "scale": 0.45
+   }
   },
   "tile_event": {
    "svg": "rhosgfx/vector-icon-pack-pro/UI/Question Mark/Question Mark Outline.svg",
@@ -1345,8 +1423,13 @@
   "passive_snake_eyes": {
    "svg": "rhosgfx/vector-icon-pack-pro/General/Eye/Eye Blue Outline.svg",
    "tint": null,
-   "note": "",
-   "group": "passive"
+   "note": "Eye + die badge.",
+   "group": "passive",
+   "badge": {
+    "svg": "rhosgfx/vector-icon-pack-pro/Items/Dice/Dice Outline.svg",
+    "corner": "br",
+    "scale": 0.45
+   }
   },
   "passive_boxcars": {
    "svg": "rhosgfx/vector-icon-pack-pro/Items/Dice/Dice Outline.svg",
@@ -1397,7 +1480,7 @@
    "group": "passive"
   },
   "passive_treasure_sense": {
-   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Map/Map Outline.svg",
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Magnifying Glass/Magnifying Glass Outline.svg",
    "tint": null,
    "note": "",
    "group": "passive"
@@ -1487,7 +1570,7 @@
    "group": "passive"
   },
   "passive_fast_feet": {
-   "svg": "rhosgfx/vector-icon-pack-pro/Items/Wing/Wing Outline.svg",
+   "svg": "rhosgfx/vector-icon-pack-pro/Player/Run/Run Outline.svg",
    "tint": null,
    "note": "",
    "group": "passive"
@@ -2041,8 +2124,13 @@
   "mg_plinko": {
    "svg": "rhosgfx/vector-icon-pack-pro/Sports/Pétanque Boule/Pétanque Boule Outline.svg",
    "tint": null,
-   "note": "Weak (ball); see missing.",
-   "group": "minigame"
+   "note": "Pétanque ball dropping (lead: combine for a stronger read).",
+   "group": "minigame",
+   "badge": {
+    "svg": "rhosgfx/vector-icon-pack-pro/UI/Chevrons Down/Chevrons Down Outline.svg",
+    "corner": "br",
+    "scale": 0.45
+   }
   },
   "mg_shell_game": {
    "svg": "rhosgfx/vector-icon-pack-pro/Items/Plastic Cup/Plastic Cup Outline.svg",
@@ -2071,8 +2159,13 @@
   "mg_high_low": {
    "svg": "rhosgfx/vector-icon-pack-pro/Tools/Ladder/Ladder Outline.svg",
    "tint": null,
-   "note": "",
-   "group": "minigame"
+   "note": "Ladder + up arrow = higher/lower climb.",
+   "group": "minigame",
+   "badge": {
+    "svg": "rhosgfx/vector-icon-pack-pro/UI/Arrow 2/Arrow 2 Up Outline.svg",
+    "corner": "br",
+    "scale": 0.45
+   }
   },
   "mg_fish": {
    "svg": "rhosgfx/vector-icon-pack-pro/Items/Fish/Fish Outline.svg",
@@ -2531,21 +2624,6 @@
    "id": "mech_turret",
    "note": "No turret/cannon. Mapped to Satellite Dish (weak). Alternative: keep current mech_turret.svg.",
    "fallback": "ui/icons/mech_turret.svg"
-  },
-  {
-   "id": "tile_moon_chest",
-   "note": "No moon chest. Combine Chest Medium 3 + Nature/Moon 2 badge (bottom-right, 45%).",
-   "fallback": "combine"
-  },
-  {
-   "id": "passive_snake_eyes",
-   "note": "No snake. Mapped Eye Blue; better: combine Items/Dice + Eye badge.",
-   "fallback": "combine"
-  },
-  {
-   "id": "mg_plinko",
-   "note": "No peg board. Mapped a ball; better: combine Sports/Pétanque Boule + UI/Chevrons Down.",
-   "fallback": "combine"
   },
   {
    "id": "cape",
