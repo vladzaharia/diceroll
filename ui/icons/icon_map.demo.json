@@ -1,0 +1,159 @@
+{
+ "version": 1,
+ "note": "Sample map for the ui_skin_demo scenario and the pipeline tests (WP UI foundation). The real map is ui/icons/icon_map.json (UI designer).",
+ "icons": {
+  "heart": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Heart/Heart Outline.svg",
+   "tint": null,
+   "note": "foundation demo sample"
+  },
+  "coin": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Currency/Coin/Coin Outline.svg",
+   "tint": null,
+   "note": "foundation demo sample"
+  },
+  "shield": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Shield/Shield Outline.svg",
+   "tint": null,
+   "note": "foundation demo sample"
+  },
+  "sword": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Sword/Sword Outline.svg",
+   "tint": null,
+   "note": "foundation demo sample"
+  },
+  "skull": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Skull/Skull Outline.svg",
+   "tint": null,
+   "note": "foundation demo sample"
+  },
+  "star": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Star/Star Outline.svg",
+   "tint": null,
+   "note": "foundation demo sample"
+  },
+  "potion": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Potion 1/Potion 1 Blue Outline.svg",
+   "tint": null,
+   "note": "foundation demo sample"
+  },
+  "chest": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Chest/Chest Flat Black.svg",
+   "tint": null,
+   "note": "foundation demo sample"
+  },
+  "crown": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Clothing/Crown/Crown Outline.svg",
+   "tint": null,
+   "note": "foundation demo sample"
+  },
+  "trophy": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Trophy/Trophy Outline.svg",
+   "tint": null,
+   "note": "foundation demo sample"
+  },
+  "gear": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Settings/Gear Flat Black.svg",
+   "tint": null,
+   "note": "foundation demo sample"
+  },
+  "home": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Home/Home Outline.svg",
+   "tint": null,
+   "note": "foundation demo sample"
+  },
+  "close": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/X/X Outline.svg",
+   "tint": null,
+   "note": "foundation demo sample"
+  },
+  "check": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Check Mark/Check Mark Outline.svg",
+   "tint": null,
+   "note": "foundation demo sample"
+  },
+  "pause": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Pause/Pause Flat White.svg",
+   "tint": "palette:GOLD",
+   "note": "foundation demo sample"
+  },
+  "music": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Music/Music Flat White.svg",
+   "tint": "palette:TEXT",
+   "note": "foundation demo sample"
+  },
+  "speaker": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Sound/Sound Flat White.svg",
+   "tint": "palette:TEXT",
+   "note": "foundation demo sample"
+  },
+  "dice": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Dice/Dice Outline.svg",
+   "tint": null,
+   "note": "foundation demo sample"
+  },
+  "bolt": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Lightning Bolt/Lightning Bolt Outline.svg",
+   "tint": null,
+   "note": "foundation demo sample"
+  },
+  "poison": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Poison/Poison Outline.svg",
+   "tint": null,
+   "note": "foundation demo sample"
+  },
+  "snowflake": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Snowflake 2/Snowflake 2 Flat White.svg",
+   "tint": "palette:FROST",
+   "note": "foundation demo sample"
+  },
+  "xp": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/XP/XP Black Outline.svg",
+   "tint": null,
+   "note": "foundation demo sample"
+  },
+  "anvil": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Anvil/Anvil Outline.svg",
+   "tint": null,
+   "note": "foundation demo sample"
+  },
+  "axe": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Axe/Axe Outline.svg",
+   "tint": null,
+   "note": "foundation demo sample"
+  },
+  "dagger": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Dagger/Dagger Outline.svg",
+   "tint": null,
+   "note": "foundation demo sample"
+  },
+  "staff": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Wizard Staff/Wizard Staff Outline.svg",
+   "tint": null,
+   "note": "foundation demo sample"
+  },
+  "pouch": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Pouch/Pouch Outline.svg",
+   "tint": null,
+   "note": "foundation demo sample"
+  },
+  "flag": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Flag/Flag Outline.svg",
+   "tint": null,
+   "note": "foundation demo sample"
+  },
+  "rune_frost": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Currency/Crystal/Crystal Flat White.svg",
+   "tint": "palette:auto",
+   "note": "foundation demo sample"
+  }
+ },
+ "input_glyphs": {
+  "key_space": {
+   "svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/Outline/SVG/space_md.svg",
+   "tint": null,
+   "strip_text": true,
+   "note": "demo: keycap with its <text> label stripped at import (ThorVG drops <text>); draw the label with a Label on top"
+  }
+ }
+}

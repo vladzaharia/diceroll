@@ -17,7 +17,7 @@ fail=0
 bad() { echo "check_repo: $*" >&2; fail=1; }
 
 # 1. Third-party assets live in the private asset store only (docs/ASSETS.md).
-forbidden='^(third_party/|assets/kaykit/|assets/audio/|assets/fonts/|ui/icons/rendered/.*\.png|\.ci-cache/|android/|build/)'
+forbidden='^(third_party/|assets/kaykit/|assets/audio/|assets/fonts/|assets/ui/icons/|assets/ui/pack/|ui/icons/rendered/.*\.png|\.ci-cache/|android/|build/)'
 while IFS= read -r f; do
 	[ -n "$f" ] && bad "third-party asset / build output must not be committed: $f"
 done < <(grep -E "$forbidden" <<<"$files" || true)

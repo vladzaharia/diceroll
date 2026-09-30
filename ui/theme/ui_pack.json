@@ -1,0 +1,446 @@
+{
+ "version": 1,
+ "note": "RhosGFX Cartoony UI pack pieces -> Godot StyleBoxes (UiSkin, ui/theme/ui_skin.gd). Paths are relative to third_party/; slice = 9-slice margins in SVG units; scale = logical px per SVG unit; content/expand in logical px. Format: docs/design/2026-09-30-svg-ui-pipeline.md. Starter set by the UI foundation WP; the designer's component map (docs/design/2026-09-30-ui-reskin.md) supersedes these choices.",
+ "pieces": {
+  "button_primary": {
+   "note": "Main call to action (ROLL, GO, Confirm). 3D square button, 2.5:1 art (160x64); 9-slice 9/9/9/19 (the lip is the bottom 19 units), pressed 9/15/9/13 (6-unit sink).",
+   "fallback": "button",
+   "slice": [
+    9,
+    9,
+    9,
+    19
+   ],
+   "scale": 1.25,
+   "content": [
+    24,
+    12,
+    24,
+    26
+   ],
+   "states": {
+    "normal": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/3. Yellow/button-square-3d-2.5-yellow-regular_standard.svg"
+    },
+    "hover": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/3. Yellow/button-square-3d-2.5-yellow-regular_hover.svg"
+    },
+    "pressed": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/3. Yellow/button-square-3d-2.5-yellow-regular_pressed.svg",
+     "slice": [
+      9,
+      15,
+      9,
+      13
+     ],
+     "content": [
+      24,
+      20,
+      24,
+      18
+     ]
+    },
+    "disabled": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/3. Yellow/button-square-3d-2.5-yellow-regular_standard.svg",
+     "saturation": 0.15,
+     "modulate": "#b8b8c8"
+    },
+    "focus": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/3. Yellow/button-square-3d-2.5-yellow-regular_focus.svg"
+    }
+   }
+  },
+  "button_secondary": {
+   "note": "Secondary actions (Back, Skip, Settings).",
+   "fallback": "button",
+   "slice": [
+    9,
+    9,
+    9,
+    19
+   ],
+   "scale": 1.25,
+   "content": [
+    24,
+    12,
+    24,
+    26
+   ],
+   "states": {
+    "normal": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/7. Purple/button-square-3d-2.5-purple-dark_standard.svg"
+    },
+    "hover": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/7. Purple/button-square-3d-2.5-purple-dark_hover.svg"
+    },
+    "pressed": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/7. Purple/button-square-3d-2.5-purple-dark_pressed.svg",
+     "slice": [
+      9,
+      15,
+      9,
+      13
+     ],
+     "content": [
+      24,
+      20,
+      24,
+      18
+     ]
+    },
+    "disabled": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/7. Purple/button-square-3d-2.5-purple-dark_standard.svg",
+     "saturation": 0.15,
+     "modulate": "#b8b8c8"
+    },
+    "focus": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/7. Purple/button-square-3d-2.5-purple-dark_focus.svg"
+    }
+   }
+  },
+  "button_danger": {
+   "note": "Destructive / combat actions (Attack, Abandon run).",
+   "fallback": "button",
+   "slice": [
+    9,
+    9,
+    9,
+    19
+   ],
+   "scale": 1.25,
+   "content": [
+    24,
+    12,
+    24,
+    26
+   ],
+   "states": {
+    "normal": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/2. Red/button-square-3d-2.5-red-regular_standard.svg"
+    },
+    "hover": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/2. Red/button-square-3d-2.5-red-regular_hover.svg"
+    },
+    "pressed": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/2. Red/button-square-3d-2.5-red-regular_pressed.svg",
+     "slice": [
+      9,
+      15,
+      9,
+      13
+     ],
+     "content": [
+      24,
+      20,
+      24,
+      18
+     ]
+    },
+    "disabled": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/2. Red/button-square-3d-2.5-red-regular_standard.svg",
+     "saturation": 0.15,
+     "modulate": "#b8b8c8"
+    },
+    "focus": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/2. Red/button-square-3d-2.5-red-regular_focus.svg"
+    }
+   }
+  },
+  "button_success": {
+   "note": "Confirm / buy.",
+   "fallback": "button",
+   "slice": [
+    9,
+    9,
+    9,
+    19
+   ],
+   "scale": 1.25,
+   "content": [
+    24,
+    12,
+    24,
+    26
+   ],
+   "states": {
+    "normal": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/4. Green/button-square-3d-2.5-green-regular_standard.svg"
+    },
+    "hover": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/4. Green/button-square-3d-2.5-green-regular_hover.svg"
+    },
+    "pressed": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/4. Green/button-square-3d-2.5-green-regular_pressed.svg",
+     "slice": [
+      9,
+      15,
+      9,
+      13
+     ],
+     "content": [
+      24,
+      20,
+      24,
+      18
+     ]
+    },
+    "disabled": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/4. Green/button-square-3d-2.5-green-regular_standard.svg",
+     "saturation": 0.15,
+     "modulate": "#b8b8c8"
+    },
+    "focus": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/4. Green/button-square-3d-2.5-green-regular_focus.svg"
+    }
+   }
+  },
+  "panel_main": {
+   "note": "Modal panel: 3D container tinted navy under a thin gold frame (two layers, one StyleBox).",
+   "fallback": "panel:main",
+   "scale": 1.0,
+   "content": [
+    34,
+    30,
+    34,
+    38
+   ],
+   "states": {
+    "normal": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/3D/0. White/container-3d-white.svg",
+       "slice": [
+        15,
+        15,
+        15,
+        25
+       ],
+       "tint": "palette:NAVY_2"
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Frames/Thin/3. Yellow/frame-thin-yellow.svg",
+       "slice": [
+        22,
+        22,
+        22,
+        22
+       ]
+      }
+     ]
+    }
+   }
+  },
+  "panel_card": {
+   "note": "Card / list row: flat container tinted navy.",
+   "fallback": "panel:card",
+   "slice": [
+    10,
+    10,
+    10,
+    10
+   ],
+   "scale": 1.0,
+   "content": [
+    20,
+    18,
+    20,
+    18
+   ],
+   "states": {
+    "normal": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+     "tint": "palette:NAVY_3"
+    },
+    "selected": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Containers/3D/3. Yellow/container-3d-yellow-regular.svg",
+     "slice": [
+      15,
+      15,
+      15,
+      25
+     ],
+     "content": [
+      20,
+      16,
+      20,
+      24
+     ]
+    }
+   }
+  },
+  "bar_hp": {
+   "note": "HP bar (ProgressBar): dark red container + red fill inset by the container's 4-unit rim.",
+   "fallback": "theme:ProgressBar",
+   "scale": 2.0,
+   "states": {
+    "background": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Bars/Regular/2. Red/progress-container-regular-red-darker.svg",
+     "slice": [
+      8,
+      8,
+      8,
+      8
+     ],
+     "content": [
+      0,
+      0,
+      0,
+      0
+     ]
+    },
+    "fill": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Bars/Regular/2. Red/progress-bar-regular-red-regular.svg",
+     "slice": [
+      4,
+      4,
+      4,
+      4
+     ],
+     "expand": [
+      -8,
+      -8,
+      -8,
+      -8
+     ],
+     "content": [
+      10,
+      0,
+      10,
+      0
+     ]
+    }
+   }
+  },
+  "bar_xp": {
+   "note": "XP bar: purple.",
+   "fallback": "theme:ProgressBar",
+   "scale": 2.0,
+   "states": {
+    "background": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Bars/Regular/7. Purple/progress-container-regular-purple-darker.svg",
+     "slice": [
+      8,
+      8,
+      8,
+      8
+     ],
+     "content": [
+      0,
+      0,
+      0,
+      0
+     ]
+    },
+    "fill": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Bars/Regular/7. Purple/progress-bar-regular-purple-light.svg",
+     "slice": [
+      4,
+      4,
+      4,
+      4
+     ],
+     "expand": [
+      -8,
+      -8,
+      -8,
+      -8
+     ],
+     "content": [
+      10,
+      0,
+      10,
+      0
+     ]
+    }
+   }
+  },
+  "slider": {
+   "note": "Settings slider (HSlider): thin container track, thin gold fill, round handle.",
+   "fallback": "theme:HSlider",
+   "scale": 1.5,
+   "states": {
+    "track": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Bars/Thin/3. Yellow/progress-container-thin-yellow-darker.svg",
+     "slice": [
+      8,
+      7,
+      8,
+      8
+     ]
+    },
+    "fill": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Bars/Thin/3. Yellow/progress-bar-thin-yellow-regular.svg",
+     "slice": [
+      4,
+      3,
+      4,
+      4
+     ],
+     "content": [
+      6,
+      6,
+      6,
+      6
+     ]
+    },
+    "grabber": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Bars/Handles/handle-round.svg"
+    }
+   }
+  },
+  "toggle": {
+   "note": "On/off switch (CheckButton icons): container + round handle, composed by UiSkin.texture().",
+   "scale": 2.0,
+   "states": {
+    "checked": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Widgets/Toggles/4. Green/toggle-container-round-green.svg",
+       "offset": [
+        0,
+        2
+       ]
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Widgets/Handles/handle-round.svg",
+       "offset": [
+        20,
+        0
+       ]
+      }
+     ]
+    },
+    "unchecked": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Widgets/Toggles/1. Grey/toggle-round-grey.svg",
+       "offset": [
+        0,
+        2
+       ]
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Widgets/Handles/handle-round.svg",
+       "offset": [
+        0,
+        0
+       ]
+      }
+     ]
+    }
+   }
+  },
+  "checkbox": {
+   "note": "CheckBox icons.",
+   "scale": 2.0,
+   "states": {
+    "checked": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Widgets/Checkboxes/3. Yellow/checkbox-tick-yellow.svg"
+    },
+    "unchecked": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Widgets/Checkboxes/3. Yellow/checkbox-empty-yellow.svg"
+    }
+   }
+  }
+ }
+}

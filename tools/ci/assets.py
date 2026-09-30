@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Per-unit encrypted asset bundles for CI (see docs/ASSETS.md, "CI asset bundles").
 
-Third-party assets (KayKit FREE + paid EXTRA packs, Kenney SFX, CC0 music (OpenGameArt), fonts) are never
+Third-party assets (KayKit FREE + paid EXTRA packs, RhosGFX UI SVGs, Kenney SFX, CC0 music (OpenGameArt), fonts) are never
 committed to the public game repo. CI gets them from a PRIVATE store as individually encrypted,
 content-addressed bundles, one per "unit" (a runtime asset folder such as assets/kaykit/forest),
 so a changed pack only re-uploads and re-downloads its own unit.
@@ -65,6 +65,10 @@ UNIT_ROOTS = [
     ("fonts", "assets/fonts", False, None),
     # Rendered UI icons derive from paid models (tools/render_icons.sh); only the PNGs are ignored.
     ("rendered-icons", "ui/icons/rendered", False, (".png", ".png.import")),
+    # RhosGFX SVGs referenced by ui/icons/icon_map.json / ui/theme/ui_pack.json (paid packs;
+    # tools/import_ui_svgs.py): one unit per source pack, e.g. ui-icons-vector-icon-pack-pro.
+    ("ui-icons", "assets/ui/icons", True, None),
+    ("ui-pack", "assets/ui/pack", True, None),
 ]
 
 

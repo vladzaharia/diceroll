@@ -17,6 +17,9 @@
 /assets/kaykit/
 /assets/audio/
 /assets/fonts/
+# RhosGFX SVGs the manifests reference (paid packs; tools/import_ui_svgs.py)
+/assets/ui/icons/
+/assets/ui/pack/
 
 # CI / release outputs
 /android/
