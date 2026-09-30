@@ -12,6 +12,10 @@ uniform float pulse = 0.0;
 uniform float opacity = 1.0;
 uniform vec4 rim_color : source_color = vec4(0.1, 0.06, 0.08, 1.0);
 uniform vec4 bg_color : source_color = vec4(0.05, 0.06, 0.16, 1.0);
+// The pack's full moon (Icons.tex "moon_full") as the lit side's art; use_tex = 0 keeps the
+// procedural disc (no pack). The terminator still sweeps continuously over it.
+uniform sampler2D moon_tex : source_color, filter_linear_mipmap_anisotropic;
+uniform float use_tex = 0.0;
 
 void fragment() {
 	vec2 p = (UV - 0.5) * 2.0;
@@ -33,6 +37,16 @@ void fragment() {
 	float term = mr * cos(3.14159 * clamp(fill, 0.0, 1.0)) * sqrt(max(1.0 - yy * yy, 0.0));
 	float lit_side = smoothstep(term - aa, term + aa, m.x);
 	vec3 moon = mix(moon_dark, moon_lit, lit_side);
+	if (use_tex > 0.5) {
+		// the icon square spans the moon's diameter plus its outline
+		vec2 tuv = vec2(m.x, -m.y) / (mr * 2.1) + 0.5;
+		vec4 art = texture(moon_tex, tuv);
+		vec3 art_rgb = mix(art.rgb, art.rgb * vec3(1.25, 0.45, 0.4), blood);
+		vec3 lit_art = mix(moon_lit, art_rgb, art.a);
+		float lum = dot(lit_art, vec3(0.3, 0.55, 0.15));
+		vec3 dark_art = mix(vec3(lum), lit_art, 0.25) * mix(vec3(0.24, 0.27, 0.46), vec3(0.34, 0.12, 0.16), blood);
+		moon = mix(dark_art, lit_art, lit_side);
+	}
 	// soft craters
 	float cr = smoothstep(0.1, 0.07, length(m - vec2(0.18, 0.2))) + smoothstep(0.08, 0.05, length(m - vec2(-0.1, -0.22)));
 	moon *= 1.0 - 0.14 * cr;

@@ -31,19 +31,22 @@ static func damage_number(parent: Node3D, pos: Vector3, amount: int, crit := fal
 		color := Color(0, 0, 0, 0), rise := 1.0) -> Label3D:
 	var col := color if color.a > 0.0 else (CRIT_COLOR if crit else DAMAGE_COLOR)
 	var text := str(amount) + ("!" if crit else "")
-	return popup_text(parent, pos, text, col, 1.3 if crit else 1.0, crit, rise)
+	# spec 4.2: only crits (and heals) get an icon prefix, so plain hits stay clean
+	return popup_text(parent, pos, text, col, 1.3 if crit else 1.0, crit, rise, "crit" if crit else "")
 
 
-## Floating label ("BLOCK", "+12", "MISS"...). size 1.0 ~ 0.55 world units tall.
+## Floating label ("BLOCK", "+12", "MISS"...). size 1.0 ~ 0.55 world units tall; scaled by the
+## world HUD's share of the UI size (UnitHud.world_ui_scale). `icon`: an optional pack icon
+## (Icons.tex fixed raster) left of the text, only when the pack maps it.
 static func popup_text(parent: Node3D, pos: Vector3, text: String, color: Color, size := 1.0,
-		shake := false, rise := 1.0) -> Label3D:
+		shake := false, rise := 1.0, icon := "") -> Label3D:
 	var l := Label3D.new()
 	l.text = text
 	l.font = Props.font(true)
 	l.font_size = 128
-	l.pixel_size = 0.005 * size
+	l.pixel_size = 0.005 * size * UnitHud.world_ui_scale(parent)
 	l.outline_size = 30
-	l.outline_modulate = Color(0.12, 0.05, 0.08, 0.95)
+	l.outline_modulate = Color(UnitHud.OUTLINE_COL, 0.95)
 	l.modulate = color
 	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	l.no_depth_test = true
@@ -53,6 +56,22 @@ static func popup_text(parent: Node3D, pos: Vector3, text: String, color: Color,
 	l.position = pos
 	l.scale = Vector3.ONE * 0.2
 	parent.add_child(l)
+	if icon != "" and Icons.is_mapped(icon):
+		var sp := Sprite3D.new()
+		sp.texture = Icons.tex(icon, 192)
+		var h := 128.0 * l.pixel_size * 0.9
+		sp.pixel_size = h / 192.0
+		sp.no_depth_test = true
+		sp.render_priority = 21
+		sp.double_sided = true
+		sp.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+		var w := l.font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, l.font_size).x * l.pixel_size
+		# billboarded like the label; the offset (sprite px) is in the screen-aligned plane
+		sp.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		sp.offset = Vector2(-(w * 0.5 + h * 0.6), h * 0.05) / sp.pixel_size
+		l.add_child(sp)
+		var fade := sp.create_tween()
+		fade.tween_property(sp, "modulate:a", 0.0, 0.3).set_delay(0.25 + 0.25)
 	var drift := Vector3(randf_range(-0.35, 0.35), 0.0, randf_range(-0.1, 0.1)) * minf(rise, 1.0)
 	var t := l.create_tween()
 	t.tween_property(l, "scale", Vector3.ONE * 1.3, 0.11).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
