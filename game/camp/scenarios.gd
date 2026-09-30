@@ -118,14 +118,6 @@ class _Driver extends Node:
 						"error":
 							c._camp_toast("Not enough Crowns", "", UiPalette.HP_BRIGHT)
 					await get_tree().create_timer(0.08).timeout
-				# settle them for the shot (popped in, not yet rising)
-				await get_tree().create_timer(0.1).timeout
-				for ch in c.ui.camp.get_children():
-					if ch.has_meta(Toast.META):
-						for tw in get_tree().get_processed_tweens():
-							tw.kill()
-						ch.modulate.a = 1.0
-						ch.scale = Vector2.ONE
 			"camp_life":
 				c.profile = _preset(String(args.get("profile", "stage_3")))
 				c.show_camp()

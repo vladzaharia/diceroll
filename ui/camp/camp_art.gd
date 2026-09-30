@@ -77,7 +77,13 @@ static func icon(id: String, px: int, tint: Variant = null, locked := false) -> 
 		return lk
 	var rect: TextureRect
 	if is_pack(r):
-		rect = Icons.rect(r, px, {"saturation": 0.0} if locked else null)
+		var o := {}
+		# Flat White action glyphs (plus, skip, ...) take the caller's tint; full-colour art never
+		if tint is Color and (Icons.entries().get(r, {}) as Dictionary).get("tint", null) != null:
+			o["tint"] = tint
+		if locked:
+			o["saturation"] = 0.0
+		rect = Icons.rect(r, px, o if not o.is_empty() else null)
 		if locked:
 			rect.modulate = Color(1, 1, 1, 0.85)
 	else:
