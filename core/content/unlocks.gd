@@ -21,7 +21,7 @@ const MAJOR_KINDS := ["classes", "pets"]
 ## Per-id Sigil price overrides (the late classes cost more).
 ## The four 2026-09-29 biomes cost 8 Sigils (not 5): with the 11-class Sigil prices the campaign bot
 ## bought the Deep Mines at run 4 (target 8).
-const SIGIL_PRICE_BY_ID := {"classes": {"paladin": 12, "ninja": 10, "druid": 10, "engineer": 12, "necromancer": 12},
+const SIGIL_PRICE_BY_ID := {"classes": {"paladin": 12, "mage": 11, "ninja": 10, "druid": 10, "engineer": 12, "necromancer": 12},
 	"biomes": {"mines": 8, "warcamp": 8, "moonlit": 8, "ruins": 8}}
 ## Sigils can buy only the next SIGIL_NEXT_CLASSES locked classes in HeroDefs.IDS order.
 const SIGIL_NEXT_CLASSES := 2
