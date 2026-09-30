@@ -326,9 +326,12 @@ func _layout() -> void:
 	var avail_h := view.y - safe.top - safe.bottom - _close_headroom()
 	var chrome := chrome_height()
 	var natural := _inner.get_combined_minimum_size().y
-	# a little too tall (short landscape, big UI size): shrink up to ~20% before scrolling
-	var k := minf(w / lw, clampf(avail_h / maxf(natural + chrome, 1.0), 0.8, 1.0))
+	# a little too tall (short landscape, big UI size): shrink up to ~20% when that avoids
+	# scrolling; content that would scroll anyway scrolls at full size instead of shrinking too
+	var kh := avail_h / maxf(natural + chrome, 1.0)
+	var k := minf(w / lw, kh if kh >= 0.8 and kh < 1.0 else 1.0)
 	_scroll.custom_minimum_size.y = minf(natural, avail_h / k - chrome)
+	_update_gutter(natural > _scroll.custom_minimum_size.y + 0.5)
 	_frame.reset_size()
 	_frame.size.x = lw
 	# content wider than the screen allows: shrink the whole panel
@@ -427,3 +430,14 @@ static func section_label(text: String) -> Label:
 	var l := UiTheme.label(text.to_upper(), 20, UiPalette.GOLD, false, 0, false, 700)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	return l
+
+
+## While the body scrolls, keep content clear of the vertical scrollbar (right-aligned values
+## would otherwise sit under it); no gutter when everything fits.
+func _update_gutter(scrolls: bool) -> void:
+	var bar := _scroll.get_v_scroll_bar()
+	var gutter := 0
+	if scrolls and bar != null:
+		gutter = int(ceil(bar.get_combined_minimum_size().x)) + 8
+	if _inner.get_theme_constant("margin_right") != gutter:
+		_inner.add_theme_constant_override("margin_right", gutter)

@@ -2436,6 +2436,36 @@
    "tint": null,
    "note": "Crit damage-pop prefix (slice b). Explosion stays scorch / intent_scorch and Volcano is magma / lava, so crit takes the unused red Exclamation Mark (one meaning per icon).",
    "group": "status"
+  },
+  "mg_face_gold": {
+   "svg": "rhosgfx/vector-emojis/SVG/Outline/Star-struck.svg",
+   "tint": null,
+   "group": "emoji",
+   "note": "minigame result-beat face (spec §5 rule 8)"
+  },
+  "mg_face_silver": {
+   "svg": "rhosgfx/vector-emojis/SVG/Outline/Smiling face with sunglasses.svg",
+   "tint": null,
+   "group": "emoji",
+   "note": "minigame result-beat face (spec §5 rule 8)"
+  },
+  "mg_face_bronze": {
+   "svg": "rhosgfx/vector-emojis/SVG/Outline/Grinning face.svg",
+   "tint": null,
+   "group": "emoji",
+   "note": "minigame result-beat face (spec §5 rule 8)"
+  },
+  "mg_face_bust": {
+   "svg": "rhosgfx/vector-emojis/SVG/Outline/Face with spiral eyes.svg",
+   "tint": null,
+   "group": "emoji",
+   "note": "minigame result-beat face (spec §5 rule 8)"
+  },
+  "mg_face_jackpot": {
+   "svg": "rhosgfx/vector-emojis/SVG/Outline/Money mouth face.svg",
+   "tint": null,
+   "group": "emoji",
+   "note": "minigame result-beat face (spec §5 rule 8)"
   }
  },
  "input_glyphs": {
