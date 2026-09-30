@@ -82,6 +82,7 @@ static func _check_frame(c: Control, r: Rect2, out: PackedStringArray) -> void:
 
 ## Nearest frame of `c` (see header), or null (none / a clipping ancestor comes first).
 static func frame_of(c: Control) -> Control:
+	# a modal's own chrome (centring holder, frame column) holds its panel: not content
 	var p := c.get_parent()
 	var child: Node = c
 	while p != null:
@@ -89,6 +90,8 @@ static func frame_of(c: Control) -> Control:
 			var pc := p as Control
 			var modal_panel: Variant = pc.get("panel") if "scrim" in pc else null
 			if modal_panel is Control and modal_panel != child and child != pc.get("scrim"):
+				if (child as Node).is_ancestor_of(modal_panel) or c.is_ancestor_of(modal_panel):
+					return null
 				return modal_panel
 			if pc.clip_contents or pc is ScrollContainer:
 				return null

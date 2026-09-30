@@ -12,11 +12,7 @@ const CROWN_COLOR := UiPalette.GOLD_BRIGHT
 ## A card panel; `hi` = the selected / equipped look.
 static func card(hi := false, accent: Variant = null) -> PanelContainer:
 	var p := PanelContainer.new()
-	var sb := UiTheme.panel_box("card_hi" if hi else "card")
-	if accent is Color and not hi:
-		sb.border_color = Color(accent as Color, 0.55)
-		sb.set_border_width_all(2)
-	p.add_theme_stylebox_override("panel", sb)
+	p.add_theme_stylebox_override("panel", UiTheme.card_box("selected" if hi else "normal", accent))
 	p.mouse_filter = Control.MOUSE_FILTER_PASS
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return p

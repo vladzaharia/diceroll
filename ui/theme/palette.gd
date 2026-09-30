@@ -39,14 +39,32 @@ const COIN := Color("ffc93d")
 const POISON := Color("7ad35a")
 const FROST := Color("9ad8f0")
 const CURSE := Color("b060e8")
-const DANGER := Color("e8484f")
+## Pack red (RhosGFX `red-regular` face); was e8484f before the reskin.
+const DANGER := Color("f5535c")
 const DANGER_DARK := Color("8a1f2a")
-const PRIMARY := Color("ffab32")
+## Pack yellow (RhosGFX `yellow-regular` face); was ffab32 before the reskin.
+const PRIMARY := Color("fdaf18")
 const PRIMARY_DARK := Color("b85a14")
 const SECONDARY := Color("2f3470")
 const SECONDARY_DARK := Color("161a42")
 const DISABLED := Color("3a3b52")
 const DISABLED_DARK := Color("22233a")
+
+# RhosGFX pack tokens (UI reskin, docs/design/2026-09-30-ui-reskin.md 1.4): the native face
+# colours of the pack families, for builders and `palette:` tints in icon_map.json.
+const WOOD := Color("6e1e0d")
+const WOOD_DARK := Color("420b04")
+const WOOD_LIGHT := Color("9c3d29")
+const PACK_YELLOW := Color("fdaf18")
+const PACK_YELLOW_HOVER := Color("fec92b")
+const PACK_BLUE := Color("37b9ff")
+const PACK_RED := Color("f5535c")
+const PACK_GREEN := Color("8cc936")
+const PACK_PURPLE := Color("c442ff")
+const SLATE := Color("324652")
+const SLATE_2 := Color("476475")
+## Label ink on every bright pack face (WCAG >= 4.5:1 on yellow / blue / red / green / grey).
+const INK_LABEL := TEXT_DARK
 
 # Rarity frames
 const COMMON := Color("aab4c8")

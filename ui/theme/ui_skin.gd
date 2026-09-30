@@ -31,6 +31,8 @@ extends RefCounted
 ##       "axis": "stretch" | "tile" | "tile_fit" | [h, v],   "draw_center": true,
 ##       "rotate": 0 | 90 | 180 | 270   (clockwise; e.g. horizontal bar art as a vertical scroll
 ##                                       track: slice / scale then refer to the rotated art),
+##       "fit": false                  (true = shrink the whole box uniformly when the draw rect
+##                                       is smaller than its slices: UiFitStyleBox),
 ##       "runtime_tint": true           (false = per-use opts tints skip this layer),
 ##       "states": {"normal": {...}, "hover": {...}, "pressed": {...}, "disabled": {...},
 ##                  "focus": {...}, "background": {...}, "fill": {...}, "checked": {...}, ...}
@@ -47,6 +49,7 @@ static var _pieces: Dictionary = {}
 static var _loaded := false
 static var _cache: Dictionary = {}
 static var _warned: Dictionary = {}
+static var _has_cache: Dictionary = {}
 
 
 # ---------------------------------------------------------------- manifest
@@ -75,10 +78,12 @@ static func set_manifest(m: Variant) -> void:
 	_pieces = m if m is Dictionary else {}
 	_cache.clear()
 	_warned.clear()
+	_has_cache.clear()
 
 
 static func clear_cache() -> void:
 	_cache.clear()
+	_has_cache.clear()
 
 
 ## The resolved layers of piece/state: an array of merged key dictionaries (bottom first),
@@ -119,13 +124,18 @@ static func layers(piece: String, state: String = "normal", opts: Dictionary = {
 
 ## True when piece/state is in the manifest and every one of its SVGs is imported.
 static func has(piece: String, state: String = "normal") -> bool:
+	var key := piece + "|" + state
+	if _has_cache.has(key):
+		return _has_cache[key]
+	var ok := true
 	var ls := layers(piece, state)
 	if ls.is_empty():
-		return false
+		ok = false
 	for l in ls:
 		if not UiSvg.exists(UiSvg.runtime_path("pack", String(l.get("svg", "")))):
-			return false
-	return true
+			ok = false
+	_has_cache[key] = ok
+	return ok
 
 
 # ---------------------------------------------------------------- style boxes
@@ -192,11 +202,28 @@ static func _build(piece: String, state: String, o: Dictionary = {}) -> StyleBox
 		var s := _scale(first)
 		var sl := _rect4(first.get("slice", null))
 		cm = [0.0, 0.0, 0.0, 0.0] if sl.is_empty() else [sl[0] * s, sl[1] * s, sl[2] * s, sl[3] * s]
+	if bool(first.get("fit", false)):
+		sb = _fit(sb, boxes)
 	sb.content_margin_left = cm[0]
 	sb.content_margin_top = cm[1]
 	sb.content_margin_right = cm[2]
 	sb.content_margin_bottom = cm[3]
 	return sb
+
+
+## "fit": true pieces: one art scale serves every size. The box shrinks uniformly when the
+## draw rect is smaller than its borders (UiFitStyleBox), instead of overlapping them.
+static func _fit(sb: StyleBox, boxes: Array[StyleBox]) -> StyleBox:
+	var m := Vector2.ZERO
+	for b in boxes:
+		if b is StyleBoxTexture:
+			var t := b as StyleBoxTexture
+			m.x = maxf(m.x, t.texture_margin_left + t.texture_margin_right + 1.0 - t.expand_margin_left - t.expand_margin_right)
+			m.y = maxf(m.y, t.texture_margin_top + t.texture_margin_bottom + 1.0 - t.expand_margin_top - t.expand_margin_bottom)
+	var f := UiFitStyleBox.new()
+	f.inner = sb
+	f.min_rect = m
+	return f
 
 
 static func _layer_box(l: Dictionary) -> StyleBoxTexture:
@@ -247,7 +274,7 @@ static func _fallback(piece: String, state: String, fallback: StyleBox) -> Style
 	if fb == "button":
 		fb = "theme:Button"
 	if fb.begins_with("panel:"):
-		return UiTheme.panel_box(fb.substr(6))
+		return UiTheme.flat_box(fb.substr(6))
 	if fb.begins_with("theme:"):
 		var th := UiTheme.get_theme()
 		var type := fb.substr(6)
