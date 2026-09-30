@@ -95,9 +95,10 @@ static func show(host: Node, text: String, icon := "", color: Color = UiPalette.
 	t.tween_property(p, "scale", Vector2.ONE, d.call(0.25)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	t.tween_property(p, "modulate:a", 1.0, d.call(0.15))
 	t.chain().tween_interval(d.call(float(opts.get("hold", 1.3))))
-	t.chain().set_parallel(true)
-	t.tween_property(p, "position:y", y - rise, d.call(0.4))
-	t.tween_property(p, "modulate:a", 0.0, d.call(0.4))
+	# rise + fade together, only after the hold (chain() then parallel(): re-enabling
+	# set_parallel here would run them alongside the hold and drop the toast after ~0.25 s)
+	t.chain().tween_property(p, "position:y", y - rise, d.call(0.4))
+	t.parallel().tween_property(p, "modulate:a", 0.0, d.call(0.4))
 	t.chain().tween_callback(func() -> void:
 		p.remove_meta(META)
 		p.queue_free()

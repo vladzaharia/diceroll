@@ -1,5 +1,5 @@
 {
-  "lock_hash": "fdd5b6b1394f0ff1",
+  "lock_hash": "d369af502a57c895",
   "schema": 1,
   "units": {
     "fonts": {
@@ -282,13 +282,13 @@
       "sha256": "07e092ff98330d8c03e70526eea8db2fd1f1baf121d2b30fb981bb73d4f34f1d"
     },
     "ui-icons-vector-emojis": {
-      "bundle_bytes": 1459,
-      "bundle_sha256": "362d638987787a010cdffcad4870d1dd56f0c96fc36e0a720b937482ee85334f",
+      "bundle_bytes": 4751,
+      "bundle_sha256": "28ad842d8eb40dc380ebd2c159fc3e590d9d69b014223028706a66325f21555c",
       "dest": "assets/ui/icons/vector-emojis",
-      "file": "bundles/ui-icons-vector-emojis/ui-icons-vector-emojis-c105655a16d4dc41.tar.zst.age",
-      "files": 2,
-      "plain_bytes": 2764,
-      "sha256": "c105655a16d4dc417c13162590a851e3dcae63972db544daf81e6e39a2086314"
+      "file": "bundles/ui-icons-vector-emojis/ui-icons-vector-emojis-676f8d01965540f6.tar.zst.age",
+      "files": 12,
+      "plain_bytes": 19697,
+      "sha256": "676f8d01965540f641ed1adb43448e2af735d3b1ba24d655f513a928e274f868"
     },
     "ui-icons-vector-hats": {
       "bundle_bytes": 1598,
