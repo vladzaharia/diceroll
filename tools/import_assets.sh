@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Populates the game's runtime asset folders (assets/kaykit, assets/audio, assets/fonts)
+# Populates the game's runtime asset folders (assets/kaykit, assets/audio, assets/fonts, assets/ui)
 # from the central, git-ignored third-party store in third_party/ (see docs/ASSETS.md).
 # Nothing third-party is committed; a fresh clone needs third_party/ filled in first.
 # Idempotent: rsync only copies what changed; music is transcoded once.
@@ -386,5 +386,12 @@ fi
 echo "== Fonts and Kenney SFX (third_party -> assets)"
 sync "$TP/fonts" "$DST/fonts"
 sync "$TP/kenney" "$DST/audio/sfx"
+
+echo "== RhosGFX UI (paid: never committed): referenced SVGs only -> assets/ui/icons, assets/ui/pack"
+# Referenced = ui/icons/icon_map.json (+ the demo map) and ui/theme/ui_pack.json; the rest of the
+# ~6,000 pack SVGs stay in third_party/. Stale copies are deleted; a missing source only warns
+# (that icon / control keeps its current look). See docs/design/2026-09-30-svg-ui-pipeline.md.
+[ -d "$TP/rhosgfx" ] || echo "   (no $TP/rhosgfx: RhosGFX packs absent, the UI keeps its drawn look)"
+python3 "$ROOT/tools/import_ui_svgs.py" --root "$ROOT" --third-party "$TP"
 
 du -sh "$DST"

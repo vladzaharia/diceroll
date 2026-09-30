@@ -40,6 +40,8 @@ const PROVIDERS := [
 	"res://ui/camp/wardrobe_scenarios.gd",
 	# the Armory: screen, picker, craft, rank-up, appearance, camp racks, item callouts, results
 	"res://ui/camp/armory_ui_scenarios.gd",
+	# RhosGFX skin machinery: ui_skin_demo (UiSkin / Icons showcase), ui_skin_bench (SVG timings)
+	"res://ui/theme/ui_skin_scenarios.gd",
 ]
 
 
