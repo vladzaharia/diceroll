@@ -57,8 +57,10 @@ const POUCH_RANK := 5
 const COMPASS_REROLL_RANK := 6
 ## Mastery: fights won with the base item equipped; blueprint thresholds and their craft costs.
 const MASTERY := [15, 45, 90]
-const CRAFT_COSTS := [60, 90, 120]
-const FEAT_CRAFT := 120
+## Whole-game balance pass: 60 / 90 / 120 and feats 120 -> a third (variants are sidegrades, a
+## collection sink; docs/plans/balance.md).
+const CRAFT_COSTS := [20, 30, 40]
+const FEAT_CRAFT := 40
 const CRAFT_SIGILS := 2
 ## Shop prices (Crowns) and the Sigil alternative.
 const ITEM_SIGILS := 4
@@ -241,7 +243,7 @@ const ITEMS := {
 			"n": {"max": [1, 2, 2]}, "scale": ["max"]}},
 	# ---------------------------------------------------------------- body (§4.2, §4.3; one mesh each, no variants)
 	"knight_plate": {"name": "Knight Plate", "slot": "body", "model": "Knight_Body", "affinity": ["knight"], "std": "",
-		"effect": {"rule": "plated", "name": "Plated", "desc": "Block {block} at the start of combat {turns|turns1}.",
+		"effect": {"rule": "plated", "name": "Plated", "desc": "Elite and boss fights: Block {block} at the start of combat {turns|turns1}.",
 			"n": {"block": [1, 1, 1], "turns": [1, 1, 1]}, "scale": []}},
 	"paladin_cuirass": {"name": "Paladin Cuirass", "slot": "body", "model": "Paladin_Body", "affinity": ["paladin"], "std": "",
 		"effect": {"rule": "blessed", "name": "Blessed", "desc": "Two Pair or better heals {heal}, {uses|times} per fight.",
@@ -689,7 +691,7 @@ static func unlock_text(variant: String) -> String:
 			int(u.get("or_mastery", 90)), name_of(String(VARIANTS[variant].item))]
 	return ""
 
-## Crowns to craft an unlocked blueprint: mastery blueprints 60 / 90 / 120 by threshold, feats 120.
+## Crowns to craft an unlocked blueprint: mastery blueprints 20 / 30 / 40 by threshold, feats 40.
 static func craft_cost(variant: String, sigils := false) -> Dictionary:
 	if not VARIANTS.has(variant):
 		return {}

@@ -390,8 +390,17 @@ func test_twin_edge_and_standard_bonus() -> void:
 	assert_eq(int(combo.total), int(floor((5 + 5 + 2) * float(combo.mult))) + int(te[0].value) + run.atk)
 
 func test_bulwark_plated_and_steadfast() -> void:
-	var ev := _fight("knight", {"offhand": ["round_shield", "round_shield", 3], "body": ["knight_plate", "knight_plate", 3],
+	var reg := _fight("knight", {"offhand": ["round_shield", "round_shield", 3], "body": ["knight_plate", "knight_plate", 3],
 		"head": ["knight_helm", "knight_helm", 3]})
+	assert_eq(_all(reg, "item_triggered", "plated").size(), 0, "Plated: not in a regular fight")
+	run = _run("knight", {"offhand": ["round_shield", "round_shield", 3], "body": ["knight_plate", "knight_plate", 3],
+		"head": ["knight_helm", "knight_helm", 3]})
+	c = CombatState.new()
+	var ev := c.begin(run, ["skeleton_minion"], true, false, 3)
+	for e in c.enemies:
+		e.hp = 100
+		e.max_hp = 100
+		e.intent = {"kind": "aim", "value": 0}
 	var bw := int(ItemDefs.num("round_shield", "block", 3, "round_shield"))
 	var pl := int(ItemDefs.num("knight_plate", "block", 3))
 	var sf := int(ItemDefs.num("knight_helm", "extra", 3, "knight_helm"))

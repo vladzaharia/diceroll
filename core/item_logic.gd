@@ -290,7 +290,9 @@ static func turn_start(run: RunState, c: CombatState, prev_block: int) -> Array[
 		if not sb.is_empty():
 			# count-based Standards don't stack: one Block on turn 1 however many are equipped
 			out.append_array(gain_block(run, c, ItemDefs.STD_BLOCK, String(sb[0]), "standard"))
-	if has(run, "knight_plate") and t <= ni(run, "knight_plate", "turns"):
+	# Plated: elite, mini-boss and boss fights only (whole-game balance pass: every fight read
+	# +2.6 pp as a generic body and put the Knight +6 pp over the max average)
+	if has(run, "knight_plate") and t <= ni(run, "knight_plate", "turns") and (c.elite or c.boss or c.miniboss):
 		out.append_array(gain_block(run, c, ni(run, "knight_plate", "block"), "knight_plate", "plated"))
 	if has(run, "dino_suit") and t <= ni(run, "dino_suit", "turns"):
 		out.append_array(gain_block(run, c, ni(run, "dino_suit", "block"), "dino_suit", "thick_hide"))

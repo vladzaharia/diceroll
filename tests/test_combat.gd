@@ -62,8 +62,8 @@ func test_enemy_scaling() -> void:
 	run.lap = 3
 	c = CombatState.new()
 	c.begin(run, ["skeleton_warrior"], false, false, 3)
-	# warrior base 20 scaled by lap 3
-	assert_eq(c.enemies[0].hp, int(round(20 * Balance.enemy_scale(3))))
+	# warrior base 20 scaled by lap 3, then by the biome's enemy HP
+	assert_eq(c.enemies[0].hp, int(round(int(round(20 * Balance.enemy_scale(3))) * BiomeDefs.enemy_hp(run.biome()))))
 	assert_near(Balance.enemy_scale(1), Balance.ENEMY_BASE_SCALE)
 	assert_true(Balance.enemy_scale(15) > Balance.enemy_scale(7), "scales smoothly by lap")
 

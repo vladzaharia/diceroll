@@ -22,7 +22,7 @@ func _stats(victory: bool, extra := {}) -> Dictionary:
 func test_next_two_rule_and_prices() -> void:
 	assert_eq(UnlockDefs.buyable_classes(["knight"]), ["barbarian", "paladin"])
 	assert_eq(UnlockDefs.sigil_cost("classes", "mage", ["knight"]), {}, "third in line")
-	assert_eq(UnlockDefs.sigil_cost("classes", "mage"), {"sigils": 8}, "price label without the rule")
+	assert_eq(UnlockDefs.sigil_cost("classes", "mage"), {"sigils": 11}, "price label without the rule")
 	var owned := ["knight", "barbarian", "paladin", "mage", "ranger", "rogue"]
 	assert_eq(UnlockDefs.buyable_classes(owned), ["ninja", "druid"])
 	assert_eq(UnlockDefs.sigil_cost("classes", "ninja", owned), {"sigils": 10})

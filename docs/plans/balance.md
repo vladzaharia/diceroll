@@ -6,8 +6,327 @@ Numbers live in `core/content/` (`balance.gd`, `heroes.gd`, `enemies.gd`, `biome
 `potions.gd`, `minigames.gd`, `unlocks.gd`), `core/runes.gd`, `core/combo.gd`,
 `core/item_logic.gd` and the profile presets in `core/meta/presets.gd`.
 
+## Whole-game balance pass (2026-09-29, `wp-balance`)
+
+This section is authoritative. It re-measures every target on `main` with the Armory, the 11
+classes, 12 pets, 10 affixes, 10 biomes, 6 final bosses, the Short Road, Ascension and the 11
+minigames in, then changes the fewest levers it could. The sections below are history where they
+disagree with this one.
+
+### How this was measured
+
+- Realistic policy (the reference), A0, standard mode, 28-tile board unless a row says otherwise.
+  "Before" is `main` at the start of the pass (1308a07; the UX pass merged since changed no
+  numbers). Every before/after pair uses the same seeds, so the rows are paired.
+- **Class rows:** 600 runs per class (seeds 1001, 2001, …, 6001 × 100): standard error ±2.0 pp
+  per row, ±0.6 pp on the 11-class average. The "after" mid and max rows are pooled over 1,200
+  runs per class (seeds up to 12001: ±1.4 pp per row, ±0.4 pp average); the table under them
+  gives the 600-run rows on the before seeds. A10: 300 runs per class (±2.5 pp per row).
+- **Skill rows:** greedy fresh 300 (before) and 600 (after) runs per class, expert max 200 per
+  class (±1 pp at 97%), expert fresh 100 per class.
+- **Route sweep:** max, `--class=all --runs=28` at seeds 50001 and 100001 for each of the 36
+  routes: 616 runs per route (±1.9 pp), 22,176 runs. Biome marginals: 5,544–7,392 runs each
+  (±0.6 pp). Boss-win%: 2,400–4,600 fights reached per boss (±0.7–0.9 pp).
+- **Short Road sweep:** the same seeds over the 21 routes (12,936 runs). Short Road class cells:
+  300 runs (before) and 600 (after: ±2 pp).
+- **Campaign:** `--campaign=100 --campaigns=1 --seed=1+k·104729`, 16 fresh profiles before and 32
+  after (runs 1–100).
+- Sim dials added for this pass: `--biome-hp=<biome>:<mult>` (the new biome lever, below). The
+  analysis dials used for the rejected levers (boss attack, a lap cap on enemy scaling, the
+  Blade/Heavy pip share and stack cap, the per-build-decision lapse rate) were kept out of the
+  shipped code; their numbers are recorded below.
+
+### Levers changed (and why)
+
+| lever | was | now | target it fixes |
+|---|---|---|---|
+| **Biome enemy HP** (new `BiomeDefs` field `enemy_hp`, regular and elite enemies only; mini-bosses and final bosses keep theirs) | 1.0 everywhere | Crypt 1.03, **Mines 0.92**, **Hollow 1.05**, **Warcamp 0.92**, Ruins 0.97, Moonlit 1.02 | Standard routes: the tier-1 and tier-2 spreads (Mines −2.3, Hollow +2.6, Warcamp −2.6) added up across a route. One number per biome moves only the routes through it. |
+| The Lich | HP 1650 | **1720** | Bosses: the Lich was +3.4 pp boss-win, the only boss outside ±3. |
+| Magma Golem | HP 960 | **935** | Bosses: the lowest boss (−2.0, then −2.6 after the Lich change). |
+| Knight Plate (Plated) | Block 1 on turn 1 of every fight | **elite and boss fights only** | Classes: the Knight was +6.3 at max (over ±6), +3.3 at mid and +10.8 on the Short Road max. Turn-1 Block in every fight is worth about 2 pp per point (the Plate or the Helm's Steadfast off: Knight −4.3 max, −4.4 mid). The Plate also read +2.6 as a generic body, above the 2 pp body cap. |
+| Rogue | HP 54 | **55** | Greedy fresh: the Rogue was 9.3% (floor 10%). |
+| Druid | HP 56 | **58** | Classes: the Druid was −4.4 at mid before the pass and fell to −5.9 once the Hollow got harder. |
+| Warcamp Short Road finale | ×0.75 | **×0.80** (`short_boss_hp`) | Short Road: the easier Warcamp put its finales +2 to +6 pp over the Short Road mean. |
+| **Crowns payouts** (`Economy`) | lap 2 (cap 30), biome 5, mini-boss 12, win 30, minigames 2/3/4, leftover gold cap 5 | **×1.5:** lap 3 (cap 45), biome 8, mini-boss 18, win 45, minigames 3/5/6, gold cap 8 | Campaign: the Armory raised the Crowns sink to 14,170, about 183 runs at 77 Crowns a run. |
+| Variant crafts (`ItemDefs.CRAFT_COSTS`, `FEAT_CRAFT`) | 60 / 90 / 120, feats 120 | **20 / 30 / 40, feats 40** | Campaign: variants are sidegrades (within ±3 pp of their Standard), so this is a collection sink, not power. |
+| Pet levels 6–10 (`PetDefs.LEVEL_COSTS`) | 40 / 60 / 80 / 100 / 120 | **20 / 30 / 40 / 50 / 60** | Campaign: 12 pets × 400 was a third of the sink, for pets a player equips one at a time. |
+| `trick_or_treat` (Monster Kid) | 36 Hollow events | **30** | Unlock pacing: the Monster Kid arrived at run 27.5 (target 20–25). |
+| Mage Sigil price (`SIGIL_PRICE_BY_ID`) | 8 | **11** | Unlock pacing: with the richer early Crowns the campaign reached mini-bosses and firsts sooner, and bought the Mage at run 6.5 (target 10). |
+
+The whole Crowns sink is now **8,850** (ranks 2,920, Belt Pouch 400, items 1,060, crafts 1,460,
+Camp upgrades 610, pet levels 2,400).
+
+### Class bands (realistic)
+
+| class | fresh | mid | max | max A10 |
+|---|---|---|---|---|
+| Knight | 37.2 → **36.2** | 51.2 → **44.5** | 69.0 → **61.6** | 23.7 → **25.7** |
+| Barbarian | 39.8 → **35.3** | 44.0 → **46.1** | 61.2 → **62.4** | 22.3 → **22.0** |
+| Paladin | 40.7 → **34.5** | 52.3 → **50.3** | 59.7 → **60.8** | 21.0 → **18.3** |
+| Mage | 40.5 → **36.0** | 52.8 → **48.9** | 63.3 → **67.4** | 23.0 → **22.7** |
+| Ranger | 36.2 → **34.3** | 46.7 → **45.7** | 67.0 → **66.0** | 21.7 → **27.0** |
+| Rogue | 37.2 → **38.5** | 47.7 → **48.8** | 64.7 → **65.7** | 28.7 → **27.0** |
+| Ninja | 38.5 → **36.3** | 47.7 → **45.3** | 66.7 → **66.8** | 30.0 → **30.3** |
+| Druid | 38.2 → **38.2** | 43.5 → **48.9** | 61.3 → **61.8** | 16.3 → **20.3** |
+| Engineer | 41.2 → **38.0** | 46.7 → **47.3** | 59.7 → **61.2** | 26.3 → **24.7** |
+| Necromancer | 38.0 → **33.5** | 47.5 → **43.7** | 59.5 → **61.1** | 22.7 → **18.7** |
+| Monster Kid | 42.2 → **38.5** | 46.5 → **45.7** | 57.8 → **58.4** | 18.7 → **21.0** |
+| **average** | 39.0 → **36.3** | 47.9 → **46.8** | 62.7 → **63.0** | 23.1 → **23.4** |
+| target | 30–40 | 45–50 | 55–65 | 20–30 |
+| spread (target ±5 / ±5 / ±6) | −2.9 / +3.1 → **−2.8 / +2.2** | −4.4 / +5.0 → **−3.2 / +3.5** | −4.9 / +6.3 → **−4.6 / +4.4** | −6.8 / +6.9 → **−5.1 / +6.9** |
+
+On the before seeds alone (600 runs per class), the after rows read mid **47.1** (−3.3 / +3.6) and
+max **62.6** (−4.6 / +5.7; the Ranger 68.3 and the Mage 67.0 are the top, both within ±6).
+
+- **Every band and every class target is met.** The only class that missed before, the Knight at
+  max (+6.3), is now −1.4. Mid no longer has a class at the ±5 edge (the Mage was +5.0).
+- **Fresh fell 2.7 pp** to 36.3, the middle of its band. The fresh route runs through the Hollow
+  and ends on the Throne, so the Hollow's HP and the Lich's HP land there. It was 0.1 pp from the
+  top of the band before.
+- **A10** has no class rule; its spread is −5.1 / +6.9 (the Ninja 30.3).
+
+### Skill floor and ceiling
+
+| policy | before | after | target |
+|---|---|---|---|
+| greedy fresh (lowest class) | 14.7 (Rogue **9.3**) | 14.2 (Ninja 10.5, Paladin 10.7) | every class ≥ 10 |
+| expert max | **97.4** (94.5–99.0) | **97.1** (94.5–99.0) | about 80, at most 85 |
+| expert fresh | 86.3 (77–91) | 86.7 (79–96) | ≤ 80 (spec §16) |
+| realistic → expert at max | **+34.7** | **+34.1** | +15 to +25 |
+
+- **The greedy floor is met** (the Rogue's +1 HP). The Ninja at 10.5 is within noise (±1.2 pp)
+  of the floor.
+- **The expert ceiling and the skill gap are not met, and no lever tested could meet them without
+  breaking the bands.** The gap belongs to the bot policies more than to the game. Removing the
+  realistic bot's lapses one scope at a time (max, seeds 1001, 1,100 runs each, realistic 63.4):
+
+| lapses removed | win% | Δ |
+|---|---|---|
+| none (realistic) | 63.4 | |
+| combat | 74.2 | +10.8 |
+| board | 69.5 | +6.1 |
+| build (drafts, rune assignment, shop, Forge, events) | 82.4 | **+19.0** |
+| – drafts only | 68.9 | +5.5 |
+| – rune assignment only | 64.7 | +1.3 |
+| – shop only | 71.8 | +8.4 |
+| – Forge only | 66.6 | +3.2 |
+| – events only | 69.0 | +5.6 |
+| all three | 92.4 | +29.0 |
+| expert | 97.4 | +34 |
+
+  The build rule of thumb (the greedy bot's static tastes, taken 62% of the time) is half the
+  gap. The expert's builds are Blade and Heavy (1.58 and 1.44 per run vs the realistic bot's 1.02
+  and 0.95), and it almost never takes Ember, Venom or Vampire, which the realistic bot takes in
+  40–44% of runs. Game levers tried against the ceiling (realistic / expert at max, 1,100 runs
+  each; base 63.4 / 97.4):
+
+| lever (sim dial, not shipped) | realistic | expert | why rejected |
+|---|---|---|---|
+| final bosses ×0.6 HP, ×1.5 attack (shorter, spikier boss fights) | 69.6 | 97.6 | no compression |
+| enemy HP step 0.35 → 0.25, attack step 0.125 → 0.18 per lap | 66.3 | 95.0 | compresses a little (expert −2.4, realistic +2.9); pushing it further trades the "long late fights" curve Vlad chose for one-shots and raises the lap-14/15 deaths |
+| Blade and Heavy at half their pips | 43.7 | 81.1 | the whole game gets harder, not the expert |
+| same + enemy HP ×0.82 | 68.8 | 93.3 | gap +24.5, but the ceiling is still 93 |
+| Blade and Heavy at ¾ + enemy HP ×0.92 | 64.6 | 92.2 | gap +27.6 |
+| Blade and Heavy act on 1 die each (stack cap 2 → 1) | 61.4 | 96.4 | no compression |
+
+  Even halving the two core runes and easing every enemy to compensate leaves the expert at 93.
+  Reaching 80–85 would need either a design change to the build economy (fewer, flatter build
+  choices) or a different reference: the realistic bot's build tastes are what separate the two
+  policies. That is a decision for Vlad, so nothing here ships for it.
+
+### Final bosses (max, route sweep; boss-win% = won / reached)
+
+| boss | HP | before | after |
+|---|---|---|---|
+| The Lich | 1650 → **1720** | 77.8 (+3.4) | 77.6 (+1.9) |
+| Bone Warden | 1000 | 75.0 (+0.6) | 75.6 (−0.1) |
+| Cinder King | 1800 | 73.3 (−1.1) | 77.4 (+1.7) |
+| Magma Golem | 960 → **935** | 72.4 (−2.0) | 73.1 (−2.6) |
+| Sand Colossus | 1180 | 73.9 (−0.5) | 75.4 (−0.3) |
+| The Moon King | 860 | 73.9 (−0.5) | 75.2 (−0.5) |
+| **spread around the mean** | | −2.0 / **+3.4** | **−2.6 / +1.9** |
+
+Every boss is now within ±3 pp of the mean (range 4.5 pp). The Cinder King's +4.1 is unchanged
+content: runs reach it stronger through the easier Mines and Warcamp. It stays inside ±3.
+
+### Standard routes (max)
+
+Overall 63.2% → **64.8%**. Win% per route after (delta from the route mean):
+
+| tier 1 / tier 2 | throne | magma | ruins | moonlit |
+|---|---|---|---|---|
+| glade / hollow | 70.0 (+5.2) | 67.5 (+2.8) | 63.1 (−1.6) | 69.2 (+4.4) |
+| glade / frost | 62.5 (−2.3) | 66.7 (+1.9) | 64.0 (−0.8) | 65.4 (+0.6) |
+| glade / warcamp | 64.4 (−0.3) | 65.4 (+0.6) | 65.6 (+0.8) | 65.9 (+1.1) |
+| crypt / hollow | 62.7 (−2.1) | 64.0 (−0.8) | 62.7 (−2.1) | 66.7 (+1.9) |
+| crypt / frost | 62.0 (−2.8) | 62.7 (−2.1) | 62.7 (−2.1) | 64.4 (−0.3) |
+| crypt / warcamp | 62.3 (−2.4) | 64.3 (−0.5) | 66.9 (+2.1) | 64.4 (−0.3) |
+| mines / hollow | 66.9 (+2.1) | 68.2 (+3.4) | 66.2 (+1.5) | 68.8 (+4.0) |
+| mines / frost | 62.3 (−2.4) | 64.4 (−0.3) | 63.1 (−1.6) | 63.6 (−1.1) |
+| mines / warcamp | 63.0 (−1.8) | 62.5 (−2.3) | 64.3 (−0.5) | 63.1 (−1.6) |
+
+**32 of 36 routes are within ±3 pp** (before: 22 of 36), and the range is −2.8 / +5.2 (before:
+−8.4 / +5.1). The four misses are Hollow routes at +3.4 to +5.2. With a route's standard error of
+1.9 pp, about 2 of 36 routes land outside ±3 by noise alone.
+
+| tier | biome | enemy HP | win% before → after | Δ tier before → after |
+|---|---|---|---|---|
+| 1 | glade | 1.00 | 64.2 → 65.8 | +0.9 → **+1.0** |
+| 1 | crypt | 1.03 | 64.6 → 63.8 | +1.4 → **−1.0** |
+| 1 | mines | 0.92 | 60.9 → 64.7 | −2.3 → **−0.1** |
+| 2 | hollow | 1.05 | 65.8 → 66.3 | +2.6 → **+1.5** |
+| 2 | frost | 1.00 | 63.2 → 63.7 | −0.0 → **−1.1** |
+| 2 | warcamp | 0.92 | 60.7 → 64.4 | −2.6 → **−0.4** |
+| 3 | throne | 1.00 | 63.1 → 64.0 | −0.1 → **−0.8** |
+| 3 | magma | 1.00 | 62.9 → 65.1 | −0.3 → **+0.3** |
+| 3 | ruins | 0.97 | 61.6 → 64.3 | −1.6 → **−0.5** |
+| 3 | moonlit | 1.02 | 65.3 → 65.7 | +2.1 → **+1.0** |
+
+- Every biome is now within ±1.5 pp of its tier (before: −2.6 to +2.6).
+- **The Hollow is the remaining edge.** A first try at ×1.08 read +1.0 and put 35 of 36 routes
+  inside ±3, but it cost the fresh profile (the Hollow is on the fresh route) and three classes
+  fell under the greedy 10% floor (Knight 8.7, Ranger 9.3, Ninja 9.7 at 300 runs). ×1.05 keeps
+  the floor.
+- Sensitivity, for the next pass: every enemy at ×1.1 HP is −11 pp at max (52.1 vs 63.4). One
+  biome at ×0.92 moved the routes through it by +3.7 pp (Warcamp, Mines), against +1.6 overall.
+
+### Short Road (max)
+
+- **Tier-2 vs tier-3 finales: 60.3% vs 61.2%, 0.9 pp apart** (target ≤ 3; before 60.7 vs 59.5).
+- Routes within ±3 pp of the Short Road mean: 16 of 21 (before: 12 of 21).
+- Overall 60.0% → 60.8%. Bosses (boss-win%): Cinder King 72.1, Sand Colossus 73.1, Magma Golem
+  70.1, Bone Warden 70.3, Moon King 69.5, Lich 68.0.
+
+Per class (before 300 runs per cell, after 600):
+
+| class | fresh | mid | max |
+|---|---|---|---|
+| Knight | 45.7 → **42.8** | 57.3 → **57.7** | 73.3 → **66.8** |
+| Barbarian | 47.0 → **37.5** | 53.3 → **49.8** | 69.0 → **60.3** |
+| Paladin | 36.3 → **30.7** | 51.0 → **47.0** | 59.0 → **57.7** |
+| Mage | 40.7 → **36.2** | 54.3 → **51.0** | 61.3 → **61.3** |
+| Ranger | 36.7 → **29.0** | 49.0 → **45.3** | 58.7 → **62.3** |
+| Rogue | 37.7 → **34.5** | 53.7 → **49.0** | 62.7 → **60.8** |
+| Ninja | 38.7 → **34.3** | 49.7 → **47.3** | 64.7 → **62.0** |
+| Druid | 41.7 → **36.7** | 47.3 → **46.2** | 58.3 → **59.8** |
+| Engineer | 42.3 → **38.0** | 49.0 → **49.0** | 58.3 → **61.5** |
+| Necromancer | 41.0 → **31.3** | 51.0 → **48.8** | 66.0 → **58.2** |
+| Monster Kid | 48.7 → **39.7** | 49.0 → **45.7** | 57.0 → **57.0** |
+| **average** | 41.5 → **35.5** | 51.3 → **48.8** | 62.6 → **60.7** |
+| spread | −5.2 / +7.2 → **−6.5 / +7.3** | −4.0 / +6.0 → **−3.5 / +8.9** | −5.6 / +10.8 → **−3.7 / +6.1** |
+
+- **4 of 33 cells miss ±5 (before: 7 of 33):** the Knight in all three columns (+7.3, +8.9,
+  +6.1) and the Ranger at fresh (−6.5).
+- **The Knight is a Short Road class, not an Armory one.** It is +7.3 even at fresh, where every
+  rank is R0 and the kit does nothing, while its standard rows are all within 2.3 pp of the
+  average. A Knight nerf big enough for the Short Road would push its standard mid row to about
+  −5. Fixing it needs a Short Road-only Knight number, like the Druid's ×1.5 seed growth. That was
+  left as a design call.
+- The Ranger's fresh Short Road cell is its low HP (52) meeting the harder Hollow and Lich of the
+  fresh route: its standard fresh row is −2.0.
+- The fresh Short Road average fell 6 pp. The fresh Short Road ends on the Lich or the Bone Warden
+  after the Hollow or the Throne, so it takes the full Hollow and Lich changes. The Short Road has
+  no band of its own.
+
+### Deaths by lap (max) — not met
+
+| lap | L3 | L5 | L12 | L13 | L14 | L15 |
+|---|---|---|---|---|---|---|
+| before (× the average lap death rate) | 1.20 | 1.67 | 0.85 | 1.34 | **2.87** | **4.50** |
+| after | 0.94 | 1.88 | 0.80 | 1.33 | **3.04** | **4.68** |
+
+(Route sweep, 22,176 runs; deaths in laps 1–15 are 15% of runs and the final boss another 21%.)
+
+The spike is the same on every tier-3 biome (L15: Throne 5.7% of runs, Ruins 5.0, Magma 4.2,
+Moonlit 3.7) and follows the enemy curve: HP ×5.9 and attack ×2.75 at lap 15, with no shop after
+lap 14. Laps 1, 2 and 6 have almost no deaths (the start, and the 30% heal at the biome change),
+so a ratio of 1.5 would mean moving about 1,250 of the 3,450 lap deaths (over a third) out of
+laps 14–15.
+Measured without shipping:
+
+| lever | max win% | L14 | L15 |
+|---|---|---|---|
+| none (seeds 1001–2001) | 62.0 | 2.8× | 4.6× |
+| enemy scaling capped at lap 13 | 68.5 | 2.0× | 2.9× |
+| enemy scaling capped at lap 12 | 72.4 | 2.1× | 2.4× |
+
+Even the lap-12 cap, which adds 10 pp at max, leaves both laps over 2×, because late deaths are
+attrition built up over the tier-3 biome as well as the lap's own fights. Meeting 1.5× would need
+a different late-run structure (for example a shop or heal before lap 15, and the difficulty
+moved into the final boss). That is a design change, so it was left.
+
+### Minigames and the economy
+
+| | before | after |
+|---|---|---|
+| in-run reward EV per play (gold equivalents, `MinigameDefs.CALIBRATION`) | 28.6 | 28.6 (unchanged) |
+| plays per run (fresh / mid / max) | 2.94 / 2.75 / 3.69 | 2.94 / 2.74 / 3.69 |
+| gold earned per run (max) | 871 | 869 |
+| minigame share of in-run gold (max) | ~12% | ~12% |
+| Crowns per play (tier mix 33/36/31) | 2.98 | 4.65 |
+| minigame share of a run's Crowns (max) | 14.1% | 14.5% |
+| Crowns per run (fresh / mid / max class sims) | 66.8 / 69.4 / 77.9 | 100.3 / 104.6 / 118.5 |
+
+The minigames stay in line. Their in-run value is unchanged, and the Armory changed no shop
+price. Their Crowns scale with the other payouts, so they keep the same share, and one play is
+now 0.05% of the sink (was 0.02% of 14,170).
+
+### Campaign pacing (realistic campaign; before 16 profiles, after 32)
+
+| unlock | target | median before | median after |
+|---|---|---|---|
+| Deep Mines | 8 | 7 | 6 |
+| Orc Warcamp | 12 | 12 | 12 |
+| Moonlit Woods | 17 | 17 | 17 |
+| Sunscorched Ruins | 21 | 22 | 22 |
+| Paladin / Mage / Ranger / Rogue | 6 / 10 / 13 / 15 | 8 / 10 / 12 / 15 | 8 / **9** / 11.5 / 15 |
+| Ninja / Druid / Engineer / Necromancer | 19 / 23 / 27 / ≤ 32 | 20 / 25 / 26 / 29 | 20 / 24.5 / 26 / 29 |
+| Monster Kid | 20–25 | **27.5** | **22.5** |
+| items: wanderer / gate_crasher / boss_seen / bone_collector | 2 / 4 / 6 / 20 | 2 / 3 / 7 / 21 | 2 / 3 / 7 / 21.5 |
+
+- Every class, biome and item unlock is within ±2 runs of its target. The Paladin (+2) and the
+  Druid (+1.5) are the closest to the edge. No run unlocks two classes (0 of 3,200).
+- Before the Mage Sigil price change, the richer early Crowns had moved the Mage to run 6.5.
+- **Outside this pass's scope** (packs, pets and bosses, all but one already off before the
+  pass): `straight_talk` (Numerology) 7.5 vs 11, `plague` (Lantern Ghost) 18 vs 14, `archmage`
+  (Pyromancy, usually bought with Sigils first) 48 vs 20, `rune_lord` (Resonance) 16 vs 24, and
+  `throne_breaker` (the Bone Warden) 20.5 vs 17 (was 16.5; a Throne win now needs the tougher
+  Lich or the Bone Warden).
+
+| Crowns | before | after |
+|---|---|---|
+| Crowns per run (campaign average, runs 1–100) | 77.4 | 121 |
+| sink | 14,170 | **8,850** |
+| run at which a profile has earned the whole sink | none within 100 runs (about 183) | **median 73** (p10 69, p90 79) |
+
+- **The Crowns side now finishes around run 73** (target 60–80). An A-level player earns 8% more
+  per level.
+- The campaign bot itself never "buys everything". It equips one pet and one kit per class, so
+  most pets never reach level 5 (the Crowns levels start there) and many variant blueprints never
+  unlock (mastery). At run 90 it holds about 4,500 unspent Crowns. That is gating by play style,
+  not Crowns.
+- **Sigils:** every Sigil unlock is done by run ~32 (the last class at 29, the last pet at 31);
+  Sigils pace unlocks, not a late sink.
+- **Power pacing:** by run 10 the campaign has earned about 1,100 Crowns (was 700) and holds R3–R4
+  in every rank (4 snapshots; was R3). The mid preset's R4 had been a rank ahead of the campaign;
+  now it matches the upper half.
+
+### Rejected or measured levers (not shipped)
+
+- **Knight Last Stand off** (`--item=round_shield.last_stand=0/0/0`): 69.0 → 69.0 at max. It
+  never fires in the sim, so it was not the Knight's edge.
+- **Knight Plate Block 0 or Knight Helm Steadfast 0:** each −4.3 at max and −4.4 at mid (the same
+  number, since each removes one turn-1 Block). Removing a whole rule was more than needed. The
+  shipped version keeps the Plate for elite and boss fights.
+- **Hollow ×1.08:** routes 35/36 within ±3, but the fresh profile fell and three greedy rows went
+  under 10% (above).
+- **The expert-ceiling and lap-death levers:** the tables above.
+- **Crowns alone ×1.8 with the sink untouched:** not run. At 77 × 1.8 = 139 a run, 14,170 is still
+  run 102, and early ranks would come twice as fast.
+
 ## Armory (2026-09-29: the real-item Armory, `wp-armory-core`)
 
+*Superseded where the whole-game pass above differs (the bands, the Knight Plate, crafting prices).*
 This section is authoritative for the Armory and for the profile bands: the four abstract gear
 pieces and their traits are gone, so the band table of the combined section below describes
 the old gear. Design: `docs/design/2026-09-29-armory-items.md`. Code: `core/content/items.gd`

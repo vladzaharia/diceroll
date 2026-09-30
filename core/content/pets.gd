@@ -31,7 +31,8 @@ const XP_LEVEL_MAX := 5
 ## Cumulative fights won with the pet equipped to reach level 2, 3, 4 and 5.
 const XP_LEVELS := [15, 45, 90, 150]
 ## Crowns to buy levels 6, 7, 8, 9 and 10.
-const LEVEL_COSTS := [40, 60, 80, 100, 120]
+## (Whole-game balance pass: was 40 / 60 / 80 / 100 / 120.)
+const LEVEL_COSTS := [20, 30, 40, 50, 60]
 
 const DEFS := {
 	"pumpkin_sprite": {"name": "Pumpkin Sprite", "role": "heal", "charge_on": "pair_plus", "size": 6, "model": "pumpkin",

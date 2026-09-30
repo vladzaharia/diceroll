@@ -87,6 +87,26 @@ func test_tiers_and_routes() -> void:
 	assert_eq(BiomeDefs.final_boss_candidates("warcamp"), ["boss_cinder_king", "boss_magma_golem"])
 	assert_eq(BiomeDefs.final_boss_candidates("hollow"), ["boss_lich", "boss_bone_warden"])
 
+func test_biome_enemy_hp() -> void:
+	# whole-game balance pass: the route-spread lever (regular and elite enemies only)
+	assert_true(BiomeDefs.enemy_hp("hollow") > 1.0 and BiomeDefs.enemy_hp("warcamp") < 1.0)
+	assert_eq(BiomeDefs.enemy_hp("glade"), 1.0)
+	assert_eq(BiomeDefs.enemy_hp("nowhere"), 1.0)
+	for biome in ["hollow", "warcamp"]:
+		var r := RunState.create("knight", 3, Balance.BOARD_SIZE, {"route": ["glade", biome, "throne"]})
+		r.act = 2
+		r.lap = 7
+		var c := CombatState.new()
+		c.begin(r, ["bandit"], false, false, 3)
+		var plain := CombatState.make_enemy(Rng.new(1), "bandit", 2, 7, false)
+		assert_eq(int(c.enemies[0].max_hp), int(round(int(plain.max_hp) * BiomeDefs.enemy_hp(biome))), biome)
+		var b := CombatState.new()
+		b.begin(r, ["boss_lich"], false, true, 0)
+		assert_eq(int(b.enemies[0].max_hp), int(EnemyDefs.def("boss_lich").hp), "final bosses keep their HP")
+	BiomeDefs.tune_enemy_hp["hollow"] = 1.0
+	assert_eq(BiomeDefs.enemy_hp("hollow"), 1.0, "the sim dial overrides it")
+	BiomeDefs.tune_enemy_hp.clear()
+
 func test_new_tile_mixes() -> void:
 	var l := Board.layout_for(28, "mines")
 	assert_eq([l.ore, l.chest, l.trap], [3, 4, 2])

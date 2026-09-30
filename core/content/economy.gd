@@ -12,18 +12,20 @@ const CURRENCIES := ["crowns", "sigils"]
 
 # ------------------------------------------------------------------ Crowns payout (review §3.4)
 
-const CROWNS_PER_LAP := 2
-const CROWNS_LAP_CAP := 30
+## Whole-game balance pass (2026-09-29): every payout x1.5 (was 2 / 30 / 5 / 12 / 30 / 2-3-4 / 5) so
+## the Armory-era sinks finish around runs 60-80 (docs/plans/balance.md).
+const CROWNS_PER_LAP := 3
+const CROWNS_LAP_CAP := 45
 ## Per biome reached beyond the first (tier 2 and tier 3).
-const CROWNS_PER_BIOME := 5
-const CROWNS_MINIBOSS := 12
-const CROWNS_WIN := 30
+const CROWNS_PER_BIOME := 8
+const CROWNS_MINIBOSS := 18
+const CROWNS_WIN := 45
 ## Per minigame played, by reward tier.
-const CROWNS_MINIGAME := {"bronze": 2, "silver": 3, "gold": 4}
+const CROWNS_MINIGAME := {"bronze": 3, "silver": 5, "gold": 6}
 ## Leftover gold: 1 Crown per GOLD_PER_CROWN gold, at most GOLD_CROWN_CAP (so spending in-run
 ## is never punished).
 const GOLD_PER_CROWN := 25
-const GOLD_CROWN_CAP := 5
+const GOLD_CROWN_CAP := 8
 ## +8% of the whole payout per ascension level.
 const ASC_CROWN_BONUS := 0.08
 ## Catch-up: after CATCHUP_AFTER losses in a row the next run pays +CATCHUP_STEP per extra

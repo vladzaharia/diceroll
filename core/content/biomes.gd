@@ -16,6 +16,7 @@ extends RefCounted
 ## older biomes, whose twists are hard-wired by biome id). refill: {tile: n} Empty tiles turned
 ## back into that tile at each lap mutation (up to n on the board). look: presentation key.
 ## short_bosses (tier 2): final-boss candidates when the biome is the Short Road's second biome.
+## enemy_hp: HP multiplier for the biome's regular and elite enemies (default 1.0; enemy_hp()).
 
 const TIERS := [["glade", "crypt", "mines"], ["hollow", "frost", "warcamp"], ["throne", "magma", "ruins", "moonlit"]]
 ## Used for old saves and for boards generated without a route.
@@ -32,7 +33,7 @@ const DEFS := {
 		"minibosses": ["mini_briar_beast"], "bosses": [],
 	},
 	"crypt": {
-		"name": "The Crypt", "tier": 1,
+		"name": "The Crypt", "tier": 1, "enemy_hp": 1.03,
 		"desc": "Spike traps line the halls, but every trap you dodge drops a few coins.",
 		"mix": {"trap": 2},
 		"pools": [["skeleton_minion", "skeleton_minion", "skeleton_archer"],
@@ -41,7 +42,7 @@ const DEFS := {
 		"minibosses": ["mini_bone_champion"], "bosses": [],
 	},
 	"hollow": {
-		"name": "The Hollow", "tier": 2,
+		"name": "The Hollow", "tier": 2, "enemy_hp": 1.05,
 		"desc": "Restless spirits: events are twice as common, and finishing one heals 3% of your max HP.",
 		"mix": {"event": 2},
 		"pools": [["werewolf", "cultist", "hollow_wisp", "bandit"],
@@ -81,7 +82,7 @@ const DEFS := {
 	},
 	# --- 2026-09-29 new biomes (docs/design/2026-09-29-new-biomes.md)
 	"mines": {
-		"name": "Deep Mines", "tier": 1, "twist": "ore", "look": "mines",
+		"name": "Deep Mines", "tier": 1, "twist": "ore", "look": "mines", "enemy_hp": 0.92,
 		"desc": "Ore veins pay out gold or a Face Raise, but each vein you mine caves in and becomes a trap.",
 		"mix": {"ore": 3}, "refill": {"ore": 3},
 		"pools": [["skeleton_minion", "skeleton_minion", "skeleton_archer", "bone_cutthroat"],
@@ -90,17 +91,17 @@ const DEFS := {
 		"minibosses": ["mini_bone_champion"], "bosses": [],
 	},
 	"warcamp": {
-		"name": "Orc Warcamp", "tier": 2, "twist": "drums", "look": "warcamp",
+		"name": "Orc Warcamp", "tier": 2, "twist": "drums", "look": "warcamp", "enemy_hp": 0.92,
 		"desc": "War drums rally every orc in earshot: enemies gain +1 attack per standing drum. Land on a drum to smash it.",
 		"mix": {"drum": 1}, # drum count = WARCAMP_DRUMS (Board.layout_for)
 		"pools": [["orc_raider", "wolf_bandit", "bandit", "skeleton_archer"],
 			["orc_raider", "orc_drummer", "wolf_bandit", "skeleton_warrior"]],
 		"elite": "orc_raider",
 		"minibosses": ["mini_orc_warchief", "mini_cinder_brute"], "bosses": [],
-		"short_bosses": ["boss_cinder_king", "boss_magma_golem"], "short_boss_hp": 0.75,
+		"short_bosses": ["boss_cinder_king", "boss_magma_golem"], "short_boss_hp": 0.80,
 	},
 	"ruins": {
-		"name": "Sunscorched Ruins", "tier": 3, "twist": "heat", "look": "ruins",
+		"name": "Sunscorched Ruins", "tier": 3, "twist": "heat", "look": "ruins", "enemy_hp": 0.97,
 		"desc": "The heat costs 8% of your max HP at the end of every lap unless you landed on an oasis during it. Oases heal 5%.",
 		"mix": {"oasis": 3, "campfire": -1},
 		"pools": [["bone_cutthroat", "skeleton_warrior", "bone_knight", "cultist"],
@@ -109,7 +110,7 @@ const DEFS := {
 		"minibosses": ["mini_bone_champion"], "bosses": ["boss_sand_colossus", "boss_bone_warden"],
 	},
 	"moonlit": {
-		"name": "Moonlit Woods", "tier": 3, "twist": "moon", "look": "moonlit",
+		"name": "Moonlit Woods", "tier": 3, "twist": "moon", "look": "moonlit", "enemy_hp": 1.02,
 		"desc": "The moon grows each lap. Under the full moon, werewolves are already changed, twice as many elites stalk the woods, fights pay 1.5x gold, and a moonlit rune chest appears.",
 		"mix": {"event": 1, "trap": -1},
 		"pools": [["werewolf", "wolf_bandit", "hollow_wisp", "orc_raider"],
@@ -150,6 +151,8 @@ const MOON_CHEST_AHEAD := [3, 8]
 ## = every new biome). A switched-off twist does nothing and its tiles (ore, drum, oasis) become
 ## Empty. The game never sets it.
 static var twist_off: Array = []
+## Sim-only dial (tools/sim.gd --biome-hp=<biome>:<mult>,...): overrides enemy_hp(). The game never sets it.
+static var tune_enemy_hp := {}
 
 static func has(id: String) -> bool:
 	return DEFS.has(id)
@@ -229,6 +232,14 @@ static func final_boss_candidates(biome: String) -> Array:
 ## Short Road final-boss HP multiplier when `biome` ends the run: the biome's short_boss_hp (tier 2:
 ## the finale comes after easier tier-2 laps, so the boss keeps more HP), else SHORT_T3_BOSS_HP.
 const SHORT_T3_BOSS_HP := 0.65
+
+## Regular and elite enemies in the biome (not mini-bosses, not final bosses) have x this HP
+## (DEFS "enemy_hp", default 1.0): the whole-game balance pass's route-spread lever
+## (docs/plans/balance.md). tools/sim.gd --biome-hp=<biome>:<mult> overrides it (tune_enemy_hp).
+static func enemy_hp(biome: String) -> float:
+	if tune_enemy_hp.has(biome):
+		return float(tune_enemy_hp[biome])
+	return float(DEFS[biome].get("enemy_hp", 1.0)) if DEFS.has(biome) else 1.0
 
 static func short_boss_hp(biome: String) -> float:
 	if not DEFS.has(biome):

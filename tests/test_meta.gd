@@ -241,7 +241,7 @@ func test_crowns_payout_table() -> void:
 		parts[x[0]] = int(x[1])
 	assert_eq(parts.laps, 7 * Economy.CROWNS_PER_LAP)
 	assert_eq(parts.biomes, Economy.CROWNS_PER_BIOME)
-	assert_eq(parts.gold, Economy.GOLD_CROWN_CAP, "leftover gold capped at 5")
+	assert_eq(parts.gold, Economy.GOLD_CROWN_CAP, "leftover gold capped")
 	assert_eq(parts.victory, 0)
 	r.lap = 15
 	r.act = 3

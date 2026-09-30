@@ -21,7 +21,7 @@ const MAJOR_KINDS := ["classes", "pets"]
 ## Per-id Sigil price overrides (the late classes cost more).
 ## The four 2026-09-29 biomes cost 8 Sigils (not 5): with the 11-class Sigil prices the campaign bot
 ## bought the Deep Mines at run 4 (target 8).
-const SIGIL_PRICE_BY_ID := {"classes": {"paladin": 12, "ninja": 10, "druid": 10, "engineer": 12, "necromancer": 12},
+const SIGIL_PRICE_BY_ID := {"classes": {"paladin": 12, "mage": 11, "ninja": 10, "druid": 10, "engineer": 12, "necromancer": 12},
 	"biomes": {"mines": 8, "warcamp": 8, "moonlit": 8, "ruins": 8}}
 ## Sigils can buy only the next SIGIL_NEXT_CLASSES locked classes in HeroDefs.IDS order.
 const SIGIL_NEXT_CLASSES := 2
@@ -216,8 +216,8 @@ const MILESTONES := [
 		"cond": {"any": [{"boss_kills": "boss_bone_warden", "min": 2}, {"stat": "kills", "min": 1000}, {"stat": "runs", "min": 36}]},
 		"unlocks": [["classes", "necromancer"]]},
 	{"id": "trick_or_treat", "run": 23, "hidden": true, "hint": "Something in the Hollow wants to play dress-up.",
-		"desc": "Finish 36 events in The Hollow while owning 6 classes, or play 40 runs.",
-		"cond": {"any": [{"all": [{"stat": "hollow_events", "min": 36}, {"stat": "classes_owned", "min": 6}]}, {"stat": "runs", "min": 40}]},
+		"desc": "Finish 30 events in The Hollow while owning 6 classes, or play 40 runs.",
+		"cond": {"any": [{"all": [{"stat": "hollow_events", "min": 30}, {"stat": "classes_owned", "min": 6}]}, {"stat": "runs", "min": 40}]},
 		"unlocks": [["classes", "monster_kid"]]},
 	# Minigames 2.0 (minor unlocks, spread between the class/biome majors)
 	{"id": "arcade_newbie", "run": 2, "desc": "Play 6 minigames.", "cond": {"stat": "minigames", "min": 6},
