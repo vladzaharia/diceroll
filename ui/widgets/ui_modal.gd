@@ -256,20 +256,33 @@ func _request_dismiss() -> void:
 func _input(event: InputEvent) -> void:
 	if not _is_open or not visible or not is_top():
 		return
-	var k := event as InputEventKey
-	if k == null or not k.pressed or k.echo:
-		return
-	if k.keycode == KEY_ESCAPE:
+	if _is_back(event):
 		if dismissible:
 			_handled()
 			_request_dismiss()
 		elif cancel_action != null and _usable(cancel_action):
 			_handled()
 			cancel_action.emit_signal("pressed")
-	elif k.keycode == KEY_ENTER or k.keycode == KEY_KP_ENTER:
+	elif _is_confirm(event):
 		if primary_action != null and _usable(primary_action):
 			_handled()
 			primary_action.emit_signal("pressed")
+
+
+## Esc / the rebindable "menu_back" action (defined by the boot code when present).
+static func _is_back(e: InputEvent) -> bool:
+	if InputMap.has_action("menu_back"):
+		return e.is_action_pressed("menu_back", false, true)
+	var k := e as InputEventKey
+	return k != null and k.pressed and not k.echo and k.keycode == KEY_ESCAPE
+
+
+## Enter / keypad Enter / the rebindable "menu_confirm" action.
+static func _is_confirm(e: InputEvent) -> bool:
+	if InputMap.has_action("menu_confirm"):
+		return e.is_action_pressed("menu_confirm", false, true)
+	var k := e as InputEventKey
+	return k != null and k.pressed and not k.echo and (k.keycode == KEY_ENTER or k.keycode == KEY_KP_ENTER)
 
 
 static func _usable(b: BaseButton) -> bool:

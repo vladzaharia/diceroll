@@ -3,8 +3,9 @@ extends RefCounted
 ## Small builders shared by the Camp screens and the results screen (same look as the rest of
 ## the UI: navy cards, gold rims, Lilita headings, Fredoka body).
 
-## Sigils are drawn as a violet star next to the gold Crown.
-const SIGIL_ICON := "star"
+## Sigils: the pack's purple Star Gem (icon_map "sigil"; its own colours, no tint). Without
+## the pack the legacy violet star is drawn (sigil_icon()).
+const SIGIL_ICON := "sigil"
 const SIGIL_COLOR := Color("c79bff")
 const CROWN_COLOR := UiPalette.GOLD_BRIGHT
 
@@ -31,7 +32,7 @@ static func locked_card() -> PanelContainer:
 static func amount(icon: String, value: int, color: Color, size := 26) -> HBoxContainer:
 	var row := UiTheme.hbox(6)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_child(UiIcons.rect(icon, int(size * 1.15), color))
+	row.add_child(Icons.rect(_icon_id(icon), int(size * 1.15), color))
 	row.add_child(UiTheme.label(_num(value), size, UiPalette.TEXT, true, 5))
 	return row
 
@@ -49,7 +50,7 @@ static func sigils(value: int, size := 26) -> HBoxContainer:
 static func buy_button(verb: String, cost: Dictionary, affordable: bool, font := 26) -> GameButton:
 	var is_sigil := cost.has("sigils")
 	var price := int(cost.get("sigils", cost.get("crowns", 0)))
-	var b := GameButton.make("%s  %d" % [verb, price] if verb != "" else str(price), SIGIL_ICON if is_sigil else "crown",
+	var b := GameButton.make("%s  %d" % [verb, price] if verb != "" else str(price), sigil_icon() if is_sigil else "crown",
 		GameButton.Kind.PRIMARY if affordable else GameButton.Kind.SECONDARY, font)
 	b.icon_tint = (SIGIL_COLOR if is_sigil else UiPalette.TEXT_DARK) if affordable else (SIGIL_COLOR if is_sigil else UiPalette.GOLD)
 	b.min_height = 72
@@ -136,6 +137,15 @@ static func title_row(icon: String, color: Color, title: String, sub := "", px :
 	return row
 
 
+## Icon id for Sigils: the pack gem when mapped, else the legacy star glyph.
+static func sigil_icon() -> String:
+	return SIGIL_ICON if Icons.is_mapped(SIGIL_ICON) or UiIcons.exists(SIGIL_ICON) else "star"
+
+
+static func _icon_id(id: String) -> String:
+	return sigil_icon() if id == SIGIL_ICON else id
+
+
 static func _num(n: int) -> String:
 	if absi(n) >= 1000:
 		return "%d,%03d" % [n / 1000, absi(n) % 1000]
@@ -180,14 +190,14 @@ class Tile:
 		var row := UiTheme.hbox(8)
 		col.add_child(row)
 		if icon != "":
-			row.add_child(UiIcons.rect(icon, 26, accent if en else UiPalette.TEXT_MUTED))
+			row.add_child(Icons.rect(CampUi._icon_id(icon), 26, accent if en else UiPalette.TEXT_MUTED))
 		var tl := UiTheme.label(title, 23, (UiPalette.GOLD_BRIGHT if sel else UiPalette.TEXT) if en else UiPalette.TEXT_MUTED, true, 4)
 		tl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		tl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		tl.custom_minimum_size.x = 40
 		row.add_child(tl)
 		if sel:
-			row.add_child(UiIcons.rect("check", 24, UiPalette.GOLD_BRIGHT))
+			row.add_child(Icons.rect("check", 24, UiPalette.GOLD_BRIGHT))
 		if desc != "":
 			var d := UiTheme.para(desc, 18, UiPalette.TEXT_DIM if en else UiPalette.TEXT_MUTED, 500)
 			col.add_child(d)
@@ -262,6 +272,19 @@ class LevelPips:
 		var step := size.x / float(max_level)
 		var cy := size.y * 0.5
 		var rad := minf(step * 0.34, size.y * 0.42)
+		if Icons.is_mapped("star"):
+			# spec 2.12: gold star pips (filled), greyed stars (empty), the gold tier star at
+			# trait tiers; each star fits its slot, so nothing spills.
+			var px := minf(step * 0.92, size.y)
+			for i in max_level:
+				var on := i < level
+				var id := "tier_3" if marks.has(i + 1) and Icons.is_mapped("tier_3") else "star"
+				var k := 1.0 if marks.has(i + 1) else 0.86
+				var sz := px * k
+				var t := Icons.texture(id, int(ceil(sz)), null if on else {"saturation": 0.0})
+				var r := Rect2(Vector2(step * (i + 0.5), cy) - Vector2(sz, sz) * 0.5, Vector2(sz, sz))
+				draw_texture_rect(t, r, false, Color.WHITE if on else Color(1, 1, 1, 0.35))
+			return
 		for i in max_level:
 			var c := Vector2(step * (i + 0.5), cy)
 			var on := i < level
