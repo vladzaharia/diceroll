@@ -27,10 +27,12 @@ static func make(id: String, height := 26.0) -> KeyGlyph:
 
 
 ## Short label of a glyph id ("key_space" -> "SPACE"), from the map, else derived from the id.
+## A mapped glyph whose label is null (arrows, blank key, mouse) is pure art: no label.
 static func label_of(id: String) -> String:
 	var e: Variant = Icons.entries().get(id, null)
-	if e is Dictionary and String(e.get("label", "")) != "":
-		return String(e["label"])
+	if e is Dictionary and e.has("label"):
+		var lab: Variant = e["label"]
+		return lab if lab is String else ""
 	return id.trim_prefix("key_").trim_prefix("mouse_").to_upper()
 
 
