@@ -24,9 +24,18 @@ static func mechanic_badge(id: String, font := 20) -> PanelContainer:
 	row.add_child(c)
 	var name := ClassInfo.mechanic_name(mech) if mech != "" else "Starting runes"
 	c.add_child(UiTheme.label(name.to_upper(), font + 4, col.lightened(0.3), true, 5))
-	var rule := ClassInfo.rule(mech) if mech != "" else ClassInfo.tagline(id)
+	var rule := ClassInfo.rule(mech) if mech != "" else _runes_line(id)
 	c.add_child(UiTheme.para(rule, font, UiPalette.TEXT, 500))
 	return p
+
+
+## "Guard: Gain Block equal to pips." per starting rune (the tagline above already says the rest).
+static func _runes_line(id: String) -> String:
+	var parts: Array = []
+	for r in (HeroDefs.DATA[id].get("runes", []) as Array):
+		if String(r) != "" and Runes.DEFS.has(String(r)):
+			parts.append("%s: %s" % [String(Runes.DEFS[r].name), String(Runes.DEFS[r].desc)])
+	return " ".join(parts) if not parts.is_empty() else ClassInfo.tagline(id)
 
 
 ## HP / ATK / rerolls chips in one row.
@@ -53,7 +62,7 @@ static func _stat(icon: String, value: String, label: String, col: Color, font: 
 	v.add_child(r)
 	r.add_child(UiIcons.rect(icon, int(font * 1.0)))
 	r.add_child(UiTheme.label(value, font, col, true, 0))
-	var l := UiTheme.label(label, 14, UiPalette.TEXT_MUTED, false, 0, false, 700)
+	var l := UiTheme.label(label, 16, UiPalette.TEXT_DIM, false, 0, false, 700)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(l)

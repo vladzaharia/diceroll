@@ -149,8 +149,13 @@ func _apply_silhouette() -> void:
 		return
 	if silhouette:
 		hero.set_tint(Color(0.02, 0.015, 0.05), 1.0, Color(0.1, 0.06, 0.2))
-	else:
-		hero.set_tint(Color.WHITE, 0.0)
+		hero.set_meta("silhouetted", true)
+	elif hero.has_meta("silhouetted"):
+		# set_tint(WHITE, 0) would also wipe HeroLook's own washes (the Necromancer's violet
+		# robe, prestige gold), so an un-locked hero is rebuilt instead of un-tinted
+		var id := class_id
+		class_id = ""
+		set_hero(id, skin, prestige, false, look)
 
 
 func _frame() -> void:

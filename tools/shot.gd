@@ -7,6 +7,8 @@ extends Node
 ## --shot=<png>       after --wait seconds saves the viewport, prints "SHOT_SAVED <path>", quits
 ## --frames=N         additionally saves N more shots 0.25 s apart as <png>_1.._N
 ## --ui-scale=F       multiplies the window's content_scale_factor (UI zoom / OS scaling tests)
+## --audit           after the shot, prints AUDIT_TEXT lines for visible text under 16 canvas px
+##                   and AUDIT_TAP lines for buttons under 80 canvas px tall (44 pt on a phone)
 ## Without --shot the scenario just runs (handy for manual poking).
 ## --timeout=S      safety timer: force-quits S seconds after start (default wait + frames*0.25 + 10;
 ##                   CI software rendering (lavapipe) compiles shaders slowly, so tools/ci/shoot_ci.sh raises it)
@@ -70,6 +72,9 @@ func _run(name: String, wait: float, frames: int) -> void:
 	var path := String(args["shot"])
 	await tree.create_timer(wait, true, false, true).timeout
 	await _save(path)
+	if args.has("audit"):
+		print("AUDIT_BEGIN")
+		_audit(tree.root)
 	for i in frames:
 		await tree.create_timer(FRAME_GAP, true, false, true).timeout
 		await _save("%s_%d.%s" % [path.get_basename(), i + 1, path.get_extension()])
@@ -101,3 +106,34 @@ func _save(path: String) -> void:
 		push_error("Shot: could not save %s (%s)" % [path, error_string(err)])
 		return
 	print("SHOT_SAVED ", path)
+
+
+## Text-size and tap-target audit of what is on screen (canvas px, Control scale included).
+func _audit(n: Node) -> void:
+	if n is CanvasItem and not (n as CanvasItem).is_visible_in_tree():
+		return
+	if n is Control:
+		var c := n as Control
+		var k := c.get_global_transform().get_scale().y
+		var r := c.get_global_rect()
+		var on_screen := r.intersects(Rect2(Vector2.ZERO, c.get_viewport_rect().size)) and c.modulate.a > 0.05
+		if on_screen and n is Label and String((n as Label).text).strip_edges() != "":
+			var l := n as Label
+			var fs := l.label_settings.font_size if l.label_settings else l.get_theme_font_size("font_size")
+			if fs * k < 16.0 - 0.01:
+				print("AUDIT_TEXT %.1f \"%s\" %s" % [fs * k, l.text.left(40).replace("\n", " "), _short(l)])
+		if on_screen and (n is BaseButton or n.get_class() == "Control" and n.has_signal("pressed")) and r.size.y < 80.0 - 0.01:
+			print("AUDIT_TAP %.0fx%.0f %s" % [r.size.x, r.size.y, _short(c)])
+	for ch in n.get_children():
+		_audit(ch)
+
+
+func _short(n: Node) -> String:
+	var parts := []
+	var p := n
+	for i in 4:
+		if p == null:
+			break
+		parts.push_front(String(p.name) if not String(p.name).begins_with("@") else p.get_class())
+		p = p.get_parent()
+	return "/".join(parts)

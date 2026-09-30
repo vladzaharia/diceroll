@@ -243,7 +243,7 @@ func _slot_tile(p: Profile, slot: String, px: int) -> Control:
 		holder.add_child(th)
 		var tier := _tier(p, id, slot)
 		if tier > 0:
-			var badge := _tier_badge(tier, 15)
+			var badge := _tier_badge(tier, 16)
 			badge.position = Vector2(px - 30, px - 26)
 			holder.add_child(badge)
 		if slot in ["head", "body"] and not ItemDefs.LOCKED_ARMOR.has(view_class):
@@ -270,7 +270,7 @@ func _slot_tile(p: Profile, slot: String, px: int) -> Control:
 		dot.size = Vector2(18, 18)
 		dot.position = Vector2(px - 16, -4)
 		holder.add_child(dot)
-	var cap := UiTheme.label(String(SLOT_NAMES[slot]).to_upper(), 15, UiPalette.GOLD_BRIGHT if sel else UiPalette.TEXT_DIM, false, 0, false, 800)
+	var cap := UiTheme.label(String(SLOT_NAMES[slot]).to_upper(), 16, UiPalette.GOLD_BRIGHT if sel else UiPalette.TEXT_DIM, false, 0, false, 800)
 	cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	cap.custom_minimum_size.x = px
 	v.add_child(cap)
@@ -300,48 +300,7 @@ func _tier(p: Profile, id: String, slot: String) -> int:
 	return ItemDefs.tier_for(id, sl, view_class, p.rank(String(ItemDefs.GROUP_OF.get(sl, "weapon"))))
 
 
-## ItemDefs.rule_text, read naturally: "tier II: / tier III:" clauses carry that tier's own
-## numbers (not the current tier's zero), and tier-I edge cases read as prose ("turns 1-1" ->
-## "turn 1", "1 time(s)" -> "once", "1 dice" -> "1 die").
-static func rule_text(id: String, tier: int, variant := "") -> String:
-	var eff: Dictionary = ItemDefs.def(id).get("effect", {})
-	if eff.is_empty():
-		return "Style"
-	var desc := String(eff.get("desc", ""))
-	var re := RegEx.create_from_string("tier (III|II):")
-	var out := ""
-	var at := 0
-	var t := maxi(1, tier)
-	for m in re.search_all(desc):
-		out += _fill(id, desc.substr(at, m.get_start() - at), t, variant)
-		var mt := 3 if m.get_string(1) == "III" else 2
-		var nxt := re.search(desc, m.get_end())
-		var end := nxt.get_start() if nxt else desc.length()
-		out += _fill(id, desc.substr(m.get_start(), end - m.get_start()), mt, variant)
-		at = end
-	out += _fill(id, desc.substr(at), t, variant)
-	out = out.replace("turns 1-1", "turn 1").replace(" of 1 dice", " of 1 die").replace(", 1 dice", ", 1 die")
-	out = RegEx.create_from_string("\\b1 dice\\b").sub(out, "1 die", true)
-	out = RegEx.create_from_string("\\b1 time\\(s\\)").sub(out, "once", true)
-	out = RegEx.create_from_string("\\b1 (\\w+)\\(s\\)").sub(out, "1 $1", true)
-	out = RegEx.create_from_string("\\b(\\d+) (\\w+)\\(s\\)").sub(out, "$1 $2s", true)
-	return out
-
-
-## One clause of a rule with `tier`'s numbers (ItemDefs.rule_text's placeholders).
-static func _fill(id: String, text: String, tier: int, variant: String) -> String:
-	var eff: Dictionary = ItemDefs.def(id).get("effect", {})
-	var s := text
-	for key in (eff.get("n", {}) as Dictionary):
-		var v := ItemDefs.num(id, String(key), tier, variant)
-		s = s.replace("{%s%%}" % key, "%s%%" % ItemDefs._fmt(snappedf(v * 100.0, 0.1)))
-		s = s.replace("{%s}" % key, ItemDefs._fmt(v))
-	if id == "spear":
-		s = s.replace("{boss_factor}", ItemDefs._fmt(ItemDefs.num(id, "factor", tier, variant) + ItemDefs.num(id, "boss", tier, variant)))
-	return s
-
-
-static func _tier_badge(tier: int, font := 15) -> Control:
+static func _tier_badge(tier: int, font := 16) -> Control:
 	var p := PanelContainer.new()
 	var col: Color = TIER_COLORS[clampi(tier, 0, 3)]
 	p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(0.05, 0.05, 0.12, 0.95), 10, 2, col), 6, 0))
@@ -531,7 +490,7 @@ func _item_card(p: Profile, id: String) -> Control:
 	else:
 		var eff: Dictionary = ItemDefs.def(id).get("effect", {})
 		var v_rule := String(eq[1]) if is_eq else id
-		var rl := UiTheme.para("%s: %s" % [String(eff.get("name", "")), rule_text(id, maxi(tier, 1), v_rule)], 18,
+		var rl := UiTheme.para("%s: %s" % [String(eff.get("name", "")), ItemDefs.rule_text(id, maxi(tier, 1), v_rule)], 18,
 			UiPalette.TEXT if owned else UiPalette.TEXT_DIM, 600)
 		col.add_child(rl)
 		if tier <= 0 and owned:
@@ -740,7 +699,7 @@ func _variant_chip(p: Profile, item: String, ch: Dictionary, worn: bool) -> Cont
 		_:
 			var ms: Array = ch.get("mastery", [0, 0])
 			line = "%d / %d fights" % [int(ms[0]), int(ms[1])] if int(ms[1]) > 0 else "FEAT"
-	var ll := UiTheme.label(line, 15, lc, false, 0, false, 800)
+	var ll := UiTheme.label(line, 17, lc, false, 0, false, 800)
 	ll.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(ll)
 	if st == "locked" and int((ch.get("mastery", [0, 0]) as Array)[1]) > 0:
@@ -906,15 +865,19 @@ func _look_chip(slot: String, value: String, on: bool, is_eq: bool, bad: bool) -
 		m.position = Vector2(8, 2)
 		m.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		holder.add_child(m)
-		var l := UiTheme.label("OWN", 13, UiPalette.TEXT, false, 3, false, 800)
-		l.position = Vector2(18, 46)
+		var l := UiTheme.label("OWN", 16, UiPalette.TEXT, false, 3, false, 800)
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		l.position = Vector2(0, 42)
+		l.size = Vector2(64, 22)
 		holder.add_child(l)
 	elif value == "hidden":
 		var g := UiIcons.rect("close", 34, UiPalette.TEXT_MUTED)
 		g.position = Vector2(15, 8)
 		holder.add_child(g)
-		var l2 := UiTheme.label("HIDE", 13, UiPalette.TEXT_DIM, false, 3, false, 800)
-		l2.position = Vector2(17, 46)
+		var l2 := UiTheme.label("HIDE", 16, UiPalette.TEXT_DIM, false, 3, false, 800)
+		l2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		l2.position = Vector2(0, 42)
+		l2.size = Vector2(64, 22)
 		holder.add_child(l2)
 	else:
 		var th := ItemThumb.make(value, 64, slot)

@@ -744,11 +744,13 @@ func _camp_furniture() -> void:
 	# the seats camp life uses: right, back and back-right of the fire
 	for seat in [[Vector3(2.25, 0, 0.55), -28.0], [Vector3(0.15, 0, -2.3), 90.0], [Vector3(1.75, 0, -1.65), 45.0]]:
 		Props.put(self, RES + "Wood_Log_B.gltf", FIRE_POS + (seat[0] as Vector3) + Vector3(0, 0, 0), float(seat[1]), 0.95)
-	Props.put(self, RES + "Wood_Log_Stack.gltf", FIRE_POS + Vector3(-4.7, 0, -1.9), -30.0, 0.8)
+	# the woodpile and chopping block sit in the front-left supplies corner, clear of the Armory
+	# (in landscape its anvil stands at about fire + (-5.3, 0, -2.0); a pile there hid it)
+	Props.put(self, RES + "Wood_Log_Stack.gltf", FIRE_POS + Vector3(-3.6, 0, 2.5), -20.0, 0.8)
 	Props.put(self, Props.DUN + "barrel_small.gltf", FIRE_POS + Vector3(-4.4, 0, 0.3), 20.0, 0.9)
 	Props.put(self, Props.TOOLS + "bucket_metal.gltf", FIRE_POS + Vector3(-4.2, 0, 1.3), 0.0, 1.1)
-	CampProps.opt(self, CampProps.MM + "werewolf/log_split.gltf", FIRE_POS + Vector3(-4.0, 0, -3.3), 30.0, 0.9)
-	CampProps.opt(self, CampProps.MM + "werewolf/axe.gltf", FIRE_POS + Vector3(-4.0, 0.35, -3.3), 30.0, 0.9)
+	CampProps.opt(self, CampProps.MM + "werewolf/log_split.gltf", FIRE_POS + Vector3(-5.0, 0, 1.9), 30.0, 0.9)
+	CampProps.opt(self, CampProps.MM + "werewolf/axe.gltf", FIRE_POS + Vector3(-5.0, 0.35, 1.9), 30.0, 0.9)
 	_dummy(self, FIRE_POS + Vector3(-6.9, 0, 4.2))
 
 
@@ -819,9 +821,15 @@ func _frame(instant := false) -> void:
 	if rig == null:
 		return
 	var pts := PackedVector3Array()
+	# a tall free area (phone portrait) is width-bound: framing the side stations' full depth
+	# left a dead band under the fire and kept the Armory rack tiny, so tall views frame the
+	# side stations tighter (their outer edge may crop) and come closer
+	var vs := get_viewport().get_visible_rect().size
+	var fr := rig.safe_rect_portrait
+	var tall := portrait and fr.size.x * vs.x < fr.size.y * vs.y * 0.8
 	for id in stations:
 		var base: Vector3 = LAYOUT["portrait" if portrait else "landscape"][id]
-		var side := 2.7 if id in ["armory", "arcade"] else 0.0
+		var side := (1.5 if tall else 2.7) if id in ["armory", "arcade"] else 0.0
 		pts.append(base + Vector3(-side if base.x < 0 else side, 0, 1.4))
 		pts.append(base + Vector3.UP * 3.6)
 	pts.append(FIRE_POS + Vector3(0, 0, 2.2))

@@ -20,7 +20,9 @@ extends Node3D
 enum Mode { OVERVIEW, FOLLOW, COMBAT, POINTS }
 
 ## Normalised (0..1, top-left origin) screen rects the framed content must fit into.
-@export var safe_rect_portrait := Rect2(0.035, 0.05, 0.93, 0.62)
+## Portrait default (no HUD: title, menus, board-only views) uses most of the height; the old
+## top-62% rect left an empty band under the board on phones.
+@export var safe_rect_portrait := Rect2(0.035, 0.08, 0.93, 0.8)
 @export var safe_rect_landscape := Rect2(0.14, 0.045, 0.72, 0.70)
 @export var fov := 34.0
 ## Seconds-ish to settle after a mode change (exponential damping).
