@@ -460,6 +460,24 @@ static func full_rect(c: Control) -> Control:
 	return c
 
 
+## Phone-landscape UI boost (plan d proposal, verified by slice a's iPhone-landscape shots):
+## a wide phone screen (aspect above 1.9, e.g. 874x402 pt) lays the 720x1280-based canvas
+## out ~2780 logical px wide, so every label is tiny; multiplying the content scale by this
+## factor (1.4) makes modals, the HUD and the camp readable without breaking layouts.
+## `window_size` = the window in screen px. Desktops (even ultrawide) and tablets get 1.0:
+## only touch platforms, or screenshot runs emulating a phone (--safe=), qualify.
+const LANDSCAPE_BOOST := 1.4
+const LANDSCAPE_ASPECT := 1.9
+
+
+static func landscape_ui_boost(window_size: Vector2) -> float:
+	if window_size.y <= 0.0 or window_size.x / window_size.y <= LANDSCAPE_ASPECT:
+		return 1.0
+	var phone := OS.has_feature("mobile") or OS.has_feature("web_ios") or OS.has_feature("web_android") \
+		or not _emulated_safe().is_empty()
+	return LANDSCAPE_BOOST if phone else 1.0
+
+
 ## True when the canvas is taller than wide (phone portrait).
 static func is_portrait(size: Vector2) -> bool:
 	return size.y >= size.x * 0.9
