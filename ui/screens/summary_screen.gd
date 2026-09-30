@@ -134,8 +134,9 @@ func _layout() -> void:
 	_frame.custom_minimum_size.x = w
 	_frame.size = Vector2(w, 0)
 	var avail_h := view.y - safe.top - safe.bottom
-	var sb := panel.get_theme_stylebox("panel")
-	var chrome := sb.content_margin_top + sb.content_margin_bottom + (ribbon.get_combined_minimum_size().y - 26.0 if ribbon.visible else 0.0)
+	_apply_scale(view)
+	_fit_plaque(w)
+	var chrome := chrome_height()
 	chrome += _footer.get_combined_minimum_size().y - 26.0
 	var natural := _inner.get_combined_minimum_size().y
 	_scroll.custom_minimum_size.y = maxf(120.0, minf(natural, avail_h - chrome))

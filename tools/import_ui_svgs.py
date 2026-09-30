@@ -139,6 +139,7 @@ def run(root: Path, tp: Path, quiet: bool = False) -> int:
     refs = referenced(root)
     missing = copied = removed = 0
     texty: list[str] = []
+    rgba: list[str] = []
     for kind, base_rel in ROOTS.items():
         base = root / base_rel
         keep: dict[Path, str] = {}
@@ -158,6 +159,8 @@ def run(root: Path, tp: Path, quiet: bool = False) -> int:
                       file=sys.stderr)
                 continue
             data = src.read_bytes()
+            if b"rgba(" in data:
+                rgba.append(src_rel)
             if _TEXT.search(data):
                 if refs[kind][src_rel]:
                     data = strip_text(data)
@@ -173,6 +176,9 @@ def run(root: Path, tp: Path, quiet: bool = False) -> int:
                     removed += 1
                 elif p.is_dir() and not any(p.iterdir()):
                     p.rmdir()
+    for t in rgba:
+        print(f"   note: {t} uses CSS rgba() colours; ThorVG ignores their alpha, so UiSvg.fix_rgba() "
+              f"rewrites them at load (transparent -> none)", file=sys.stderr)
     for t in texty:
         print(f"   warning: {t} draws <text>, which Godot's SVG rasteriser drops (it renders blank); "
               f'add "strip_text": true to use it as a blank background', file=sys.stderr)
@@ -180,7 +186,7 @@ def run(root: Path, tp: Path, quiet: bool = False) -> int:
         n = len(refs["icons"]) + len(refs["pack"])
         print(f"   {len(refs['icons'])} icons + {len(refs['pack'])} pack pieces referenced: "
               f"{copied} copied, {removed} stale files removed, {missing} missing (of {n}), "
-              f"{len(texty)} with <text>")
+              f"{len(texty)} with <text>, {len(rgba)} with rgba()")
     return 0
 
 

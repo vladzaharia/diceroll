@@ -21,6 +21,10 @@ var ghost: float = 1.0
 var shown: float = 1.0
 var _tween: Tween
 var _text_value: int = 0
+## Pack bar kind (UiTheme.bar_boxes: "hp", "block", "xp", "mastery", "loading", "enemy",
+## "par"); "" = from fill_color (HP red -> hp, BLOCK -> block, XP -> xp, else mastery).
+var bar_kind := ""
+var _boxes: Dictionary = {}
 
 
 static func make(color: Color, height := 36.0, text := true) -> StatBar:
@@ -76,7 +80,25 @@ func _set_text(x: float) -> void:
 	queue_redraw()
 
 
+func kind() -> String:
+	if bar_kind != "":
+		return bar_kind
+	if fill_color == UiPalette.HP:
+		return "hp"
+	if fill_color == UiPalette.BLOCK:
+		return "block"
+	if fill_color == UiPalette.XP:
+		return "xp"
+	return "mastery"
+
+
 func _draw() -> void:
+	if _boxes.get("kind", "") != kind():
+		_boxes = UiTheme.bar_boxes(kind())
+		_boxes["kind"] = kind()
+	if bool(_boxes.get("skinned", false)):
+		_draw_skinned()
+		return
 	var h := size.y
 	var r := int(h * 0.5)
 	var full := Rect2(Vector2.ZERO, size)
@@ -101,3 +123,23 @@ func _draw() -> void:
 		var pos := Vector2((size.x - w) * 0.5, size.y * 0.5 + text_size * 0.36)
 		draw_string_outline(f, pos, t, HORIZONTAL_ALIGNMENT_LEFT, -1, text_size, 7, UiPalette.OUTLINE)
 		draw_string(f, pos, t, HORIZONTAL_ALIGNMENT_LEFT, -1, text_size, UiPalette.TEXT)
+
+
+## Pack art: grey-darker track, coloured fill (inset by the art), ghost segment behind it;
+## the value in white Lilita with a 4 px outline (it sits on mixed red / slate).
+func _draw_skinned() -> void:
+	var full := Rect2(Vector2.ZERO, size)
+	draw_style_box(_boxes.bg, full)
+	var gw := size.x * ghost
+	var fw := size.x * shown
+	if gw > 1.0 and gw > fw:
+		draw_style_box(_boxes.ghost, Rect2(Vector2.ZERO, Vector2(gw, size.y)))
+	if fw > 0.5:
+		draw_style_box(_boxes.fill, Rect2(Vector2.ZERO, Vector2(fw, size.y)))
+	if show_text:
+		var f := UiTheme.display_font()
+		var t := text_format % [_text_value, int(max_value)] if text_format.count("%d") == 2 else text_format % _text_value
+		var w := f.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, text_size).x
+		var pos := Vector2((size.x - w) * 0.5, size.y * 0.5 + (f.get_ascent(text_size) - f.get_descent(text_size)) * 0.5)
+		draw_string_outline(f, pos, t, HORIZONTAL_ALIGNMENT_LEFT, -1, text_size, 4, UiPalette.OUTLINE)
+		draw_string(f, pos, t, HORIZONTAL_ALIGNMENT_LEFT, -1, text_size, Color.WHITE)

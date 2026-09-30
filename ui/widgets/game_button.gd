@@ -1,18 +1,37 @@
 class_name GameButton
 extends BaseButton
-## Chunky mobile button with a 3D "depth" lip, gloss, press sink + bounce, hover glow and
-## click sfx. Draws itself (no Godot grey anywhere).
+## Chunky button: RhosGFX 3D Square art per kind (ink labels), 3D Round art for icon-only
+## buttons, press squash + bounce, click sfx, and the desktop hover keycap. Falls back to the
+## pre-reskin drawn look (face, lip, gloss) when the pack isn't imported.
 ##
 ##   var b := GameButton.make("ROLL", "dice", GameButton.Kind.PRIMARY, 44)
 ##   b.pressed.connect(...)
 ##   b.set_enabled(false)
 ##   b.sub_text = "2 left"
+##   b.shortcut_hint = "key_space"      # faded keycap in the top-right corner while hovered
+##
+## Sizing (spec 2.1 / 3): the art is 1.25 px per unit at 80 px and taller, 1.0 at 72 px and
+## shorter (`_sm` pieces). `min_height` is the drawn height; a control drawn under 88 px keeps
+## an 88 px hit rect (the Control grows, the art is drawn centred inside it).
 
 enum Kind { PRIMARY, SECONDARY, DANGER, SUCCESS, ROUND, GHOST }
 
+## Lip of the pre-reskin drawn look (fallback only).
 const DEPTH := 8.0
+## Drawn heights at or under this use the 1.0-scale `_sm` art.
+const SMALL_H := 72.0
+## Round art: the face is a circle 54 units wide on 64 tall (10-unit lip).
+const ROUND_W := 55.0 / 64.0
+const ROUND_FACE := 54.0 / 64.0
+## Hover keycap: fade in / out, opacity, inset from the face edge.
+const KEYCAP_ALPHA := 0.6
+const KEYCAP_IN := 0.12
+const KEYCAP_OUT := 0.08
 
-var kind: Kind = Kind.PRIMARY
+var kind: Kind = Kind.PRIMARY:
+	set(v):
+		kind = v
+		_refresh_if_ready()
 var font_size: int = 34
 var min_height: float = UiTheme.TOUCH
 var pad_x: float = 28.0
@@ -35,10 +54,28 @@ var icon_name: String = "":
 		icon_name = v
 		_apply_icon()
 var icon_px: int = 0
-var icon_tint: Variant = null
-## Toggle buttons draw as PRIMARY while pressed.
+var icon_tint: Variant = null:
+	set(v):
+		icon_tint = v
+		_apply_icon()
+## Toggle buttons draw as PRIMARY while pressed (GHOST art / SECONDARY look when off).
 var toggle_primary := false
 var sfx_id := "click"
+## Icon-only buttons: pack family of the round face ("red" close, "grey" utility, "yellow"
+## hero, "blue", "green", "purple"); "" = from the kind (close icon -> red).
+var round_family := "":
+	set(v):
+		round_family = v
+		_refresh_if_ready()
+## Input glyph id of this button's keyboard shortcut ("key_space", "key_r", "key_esc", ...).
+## Text buttons show it as a faded keycap inside the top-right corner while the mouse hovers
+## (keyboard / mouse mode only); round buttons add it to their tooltip instead ("Pause (ESC)").
+var shortcut_hint := "":
+	set(v):
+		shortcut_hint = v
+		if _keycap and is_instance_valid(_keycap):
+			_keycap.queue_free()
+			_keycap = null
 
 var _content: HBoxContainer
 ## The icon sits in a holder sized to its visible glyph (the SVGs carry transparent margins),
@@ -51,6 +88,8 @@ var _label: Label
 var _sub: Label
 var _hover := false
 var _tween: Tween
+var _keycap: KeyGlyph
+var _keycap_tween: Tween
 
 
 static func make(p_text: String, p_icon := "", p_kind := Kind.PRIMARY, p_font := 34) -> GameButton:
@@ -91,7 +130,7 @@ func _ready() -> void:
 	var col := UiTheme.vbox(-4)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	_content.add_child(col)
-	_label = UiTheme.label(text, font_size, _text_color(), true, 0, true)
+	_label = UiTheme.label(text, font_size, _text_color(), true, 0, not skinned())
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_label.visible = text != ""
 	col.add_child(_label)
@@ -106,11 +145,17 @@ func _ready() -> void:
 	toggled.connect(func(_on: bool) -> void: _refresh())
 	mouse_entered.connect(func() -> void:
 		_hover = true
+		_show_keycap(true)
 		_refresh())
 	mouse_exited.connect(func() -> void:
 		_hover = false
+		_show_keycap(false)
 		_refresh())
+	focus_entered.connect(_refresh)
+	focus_exited.connect(_refresh)
 	resized.connect(_layout)
+	if is_inside_tree():
+		InputMode.instance(get_tree())
 	_refresh()
 	_layout()
 
@@ -121,6 +166,72 @@ func set_enabled(on: bool) -> void:
 	_refresh()
 
 
+# ---------------------------------------------------------------- art selection
+
+## True when the RhosGFX art for this button is imported (else the drawn fallback).
+func skinned() -> bool:
+	return UiSkin.has(piece())
+
+
+## Icon-only (no label) buttons use the round art.
+func is_round() -> bool:
+	return kind == Kind.ROUND or (text == "" and sub_text == "" and icon_name != "")
+
+
+## ui_pack.json piece for the current kind / toggle state / size.
+func piece() -> String:
+	if is_round():
+		return "round_" + _round_fam()
+	var k := _effective_kind()
+	var n: String = {Kind.PRIMARY: "primary", Kind.DANGER: "danger", Kind.SUCCESS: "success", Kind.GHOST: "ghost"}.get(k, "secondary")
+	if toggle_mode and toggle_primary and not button_pressed:
+		n = "ghost"
+	return "button_%s%s" % [n, "_sm" if min_height <= SMALL_H else ""]
+
+
+func _round_fam() -> String:
+	if round_family != "":
+		return round_family
+	if icon_name == "close":
+		return "red"
+	match kind:
+		Kind.PRIMARY:
+			return "yellow"
+		Kind.DANGER:
+			return "red"
+		Kind.SUCCESS:
+			return "green"
+	return "grey"
+
+
+## Art state: disabled / pressed / hover (desktop) / focus (keyboard, desktop) / normal.
+func art_state() -> String:
+	if disabled:
+		return "disabled"
+	if _is_down():
+		return "pressed"
+	if _hover and InputMode.is_kbm():
+		return "hover"
+	if has_focus() and InputMode.is_kbm():
+		return "focus"
+	return "normal"
+
+
+## Face family is light enough for ink labels (every pack face but ghost / grey).
+func _ink_face() -> bool:
+	if is_round():
+		return _round_fam() != "grey"
+	return not piece().begins_with("button_ghost")
+
+
+func _refresh_if_ready() -> void:
+	if _content:
+		_apply_icon()
+		_refresh()
+
+
+# ---------------------------------------------------------------- icon
+
 func _apply_icon() -> void:
 	if _icon == null:
 		return
@@ -130,11 +241,17 @@ func _apply_icon() -> void:
 		return
 	var px := icon_px if icon_px > 0 else int(font_size * 1.15)
 	var tint: Variant = icon_tint
-	if tint == null and kind in [Kind.ROUND, Kind.SECONDARY, Kind.GHOST]:
-		tint = null
-	_icon.texture = UiIcons.tex(icon_name, px * 2, tint)
+	var o := {}
+	if skinned():
+		if tint == null and not _ink_face():
+			tint = UiPalette.TEXT
+		if disabled:
+			o["saturation"] = 0.0
+	if tint != null:
+		o["tint"] = tint
+	_icon.texture = Icons.texture(icon_name, px, o if not o.is_empty() else null)
 	_icon.size = Vector2(px, px)
-	var g := _glyph_rect(_icon.texture)
+	var g := _glyph_rect_of(icon_name, tint)
 	_icon_box.custom_minimum_size = Vector2(maxf(px * g.size.x, 1.0), px)
 	_icon_box.visible = true
 	update_minimum_size()
@@ -144,7 +261,16 @@ func _apply_icon() -> void:
 static var _glyph_cache: Dictionary = {}
 
 
-## The visible (non-transparent) part of an icon texture, as fractions of its size.
+## The visible (non-transparent) part of an icon, as fractions of its square, measured once
+## on a fixed raster.
+static func _glyph_rect_of(id: String, tint: Variant = null) -> Rect2:
+	var key := "%s|%s" % [id, str(tint)]
+	if not _glyph_cache.has(key):
+		_glyph_cache[key] = _glyph_rect(Icons.tex(id, 128, tint))
+	return _glyph_cache[key]
+
+
+## The visible (non-transparent) part of a raster texture, as fractions of its size.
 static func _glyph_rect(t: Texture2D) -> Rect2:
 	if t == null:
 		return Rect2(0, 0, 1, 1)
@@ -170,7 +296,7 @@ func _align_icon() -> void:
 	if _icon == null or not _icon_box.visible:
 		return
 	var px := _icon.size.x
-	var g := _glyph_rect(_icon.texture)
+	var g := _glyph_rect_of(icon_name, icon_tint)
 	_icon.position.x = -g.position.x * px
 	var glyph_mid := (g.position.y + g.size.y * 0.5) * px
 	var target := _icon_box.size.y * 0.5
@@ -188,15 +314,45 @@ func _align_icon() -> void:
 	_icon.position.y = target - glyph_mid
 
 
+# ---------------------------------------------------------------- layout
+
+## Drawn height (min_height, or taller when the content needs it).
+func visual_height() -> float:
+	if _content == null:
+		return min_height
+	if not skinned():
+		return maxf(min_height, _content.get_combined_minimum_size().y + 22.0 + DEPTH)
+	var sb := UiSkin.stylebox(piece(), "normal")
+	var c := _content.get_combined_minimum_size()
+	if is_round():
+		return maxf(min_height, c.y / ROUND_FACE)
+	return maxf(min_height, c.y + sb.content_margin_top + sb.content_margin_bottom)
+
+
 func _get_minimum_size() -> Vector2:
 	if _content == null:
 		return Vector2(min_height, min_height)
 	var c := _content.get_combined_minimum_size()
+	var h := visual_height()
+	if skinned():
+		var hit := maxf(h, UiTheme.TOUCH)
+		if is_round():
+			return Vector2(hit, hit)
+		return Vector2(maxf(c.x + pad_x * 2.0, maxf(h, UiTheme.TOUCH)), hit)
 	var w := c.x + pad_x * 2.0
-	var h := maxf(min_height, c.y + 22.0 + DEPTH)
 	if kind == Kind.ROUND:
 		return Vector2(h, h)
 	return Vector2(maxf(w, h), h)
+
+
+## Where the art is drawn: the full rect, or centred inside the 88 px hit rect when the
+## button is drawn smaller; round art is a circle-faced box (55 x 64 units) in the middle.
+func box_rect() -> Rect2:
+	var h := minf(size.y, visual_height()) if skinned() else size.y
+	if is_round() and skinned():
+		var w := minf(size.x, h * ROUND_W)
+		return Rect2((size.x - w) * 0.5, (size.y - h) * 0.5, w, h)
+	return Rect2(0.0, (size.y - h) * 0.5, size.x, h)
 
 
 func _layout() -> void:
@@ -207,9 +363,20 @@ func _layout() -> void:
 func _place_content() -> void:
 	if _content == null:
 		return
-	var sink := _sink()
-	_content.position = Vector2(0, sink)
-	_content.size = Vector2(size.x, size.y - DEPTH)
+	if not skinned():
+		_content.position = Vector2(0, _sink())
+		_content.size = Vector2(size.x, size.y - DEPTH)
+		return
+	var b := box_rect()
+	if is_round():
+		# the glyph centres on the face (27/64 of the height), which sinks when pressed
+		var sink := b.size.y * 6.0 / 64.0 if art_state() == "pressed" else 0.0
+		_content.position = Vector2(0, b.position.y + sink)
+		_content.size = Vector2(size.x, b.size.y * ROUND_FACE)
+		return
+	var sb := UiSkin.stylebox(piece(), art_state())
+	_content.position = Vector2(0, b.position.y + sb.content_margin_top)
+	_content.size = Vector2(size.x, maxf(0.0, b.size.y - sb.content_margin_top - sb.content_margin_bottom))
 
 
 func _sink() -> float:
@@ -243,11 +410,16 @@ func _on_up() -> void:
 func _refresh() -> void:
 	if _label:
 		var tc := _text_color()
-		_label.label_settings = UiTheme.label_settings(font_size, tc, true, 0, UiPalette.OUTLINE, not disabled)
+		var skin := skinned()
+		_label.label_settings = UiTheme.label_settings(font_size, tc, true, 0, UiPalette.OUTLINE, not disabled and not skin)
 		_sub.label_settings = UiTheme.label_settings(maxi(18, int(font_size * 0.52)), Color(tc, 0.85), false, 0, UiPalette.OUTLINE, false, 600)
-		_icon.modulate = Color(1, 1, 1, 0.45) if disabled else Color.WHITE
+		if skin:
+			_icon.modulate = Color(1, 1, 1, 0.8) if disabled else Color.WHITE
+		else:
+			_icon.modulate = Color(1, 1, 1, 0.45) if disabled else Color.WHITE
 	_place_content()
 	_align_icon.call_deferred()
+	update_minimum_size()
 	queue_redraw()
 
 
@@ -258,14 +430,14 @@ func _effective_kind() -> Kind:
 
 
 func _colors() -> Array[Color]:
-	# [face, lip (depth), rim]
+	# pre-reskin fallback look: [face, lip (depth), rim]
 	if disabled:
 		return [UiPalette.DISABLED, UiPalette.DISABLED_DARK, Color(1, 1, 1, 0.06)]
 	match _effective_kind():
 		Kind.PRIMARY:
-			return [UiPalette.PRIMARY, UiPalette.PRIMARY_DARK, Color("ffe08a")]
+			return [Color("ffab32"), UiPalette.PRIMARY_DARK, Color("ffe08a")]
 		Kind.DANGER:
-			return [UiPalette.DANGER, UiPalette.DANGER_DARK, Color("ff9a9a")]
+			return [Color("e8484f"), UiPalette.DANGER_DARK, Color("ff9a9a")]
 		Kind.SUCCESS:
 			return [Color("4cc26a"), Color("1f7a3c"), Color("a8f0b0")]
 		Kind.GHOST:
@@ -275,6 +447,10 @@ func _colors() -> Array[Color]:
 
 
 func _text_color() -> Color:
+	if skinned():
+		if disabled:
+			return UiPalette.INK_LABEL
+		return UiPalette.INK_LABEL if _ink_face() else UiPalette.TEXT
 	if disabled:
 		return UiPalette.TEXT_MUTED
 	match _effective_kind():
@@ -284,7 +460,81 @@ func _text_color() -> Color:
 			return UiPalette.TEXT
 
 
+# ---------------------------------------------------------------- hover keycap / tooltip
+
+## Round buttons carry their shortcut in the tooltip ("Pause (ESC)").
+func _get_tooltip(_at: Vector2) -> String:
+	if shortcut_hint != "" and is_round() and tooltip_text != "":
+		return "%s (%s)" % [tooltip_text, KeyGlyph.label_of(shortcut_hint)]
+	return tooltip_text
+
+
+## Whether the hover keycap may show now: a text button with a shortcut, hovered, in
+## keyboard / mouse mode (never after touch input, never on mobile).
+func keycap_allowed() -> bool:
+	return shortcut_hint != "" and not is_round() and not disabled and InputMode.is_kbm()
+
+
+## Keycap rect inside the face's top-right corner, inset 6 px from the face edge
+## (26 px tall on buttons of 80 px and up, 22 px on smaller ones).
+func keycap_rect(glyph_w_over_h: float = 1.0) -> Rect2:
+	var b := box_rect()
+	var kh := 26.0 if b.size.y >= 80.0 else 22.0
+	var edge := 6.0 + (4.0 * (1.25 if b.size.y >= 80.0 else 1.0))
+	var kw := kh * glyph_w_over_h
+	return Rect2(b.end.x - edge - kw, b.position.y + edge, kw, kh)
+
+
+func _show_keycap(on: bool) -> void:
+	if on and not keycap_allowed():
+		on = false
+	if not on and _keycap == null:
+		return
+	if _keycap == null:
+		_keycap = KeyGlyph.make(shortcut_hint, 26.0)
+		_keycap.set_meta(UiAudit.SKIP, true)
+		add_child(_keycap)
+	var r := keycap_rect(_keycap.size.x / maxf(_keycap.size.y, 1.0))
+	_keycap.set_glyph(shortcut_hint, r.size.y)
+	_keycap.position = r.position
+	if on and _label and _label.visible:
+		# never over the label: hide instead
+		var lr := Rect2(_label.global_position - global_position, _label.size)
+		if lr.size.x > 4.0 and lr.size.y > 4.0 and lr.grow(-2.0).intersects(Rect2(r.position, _keycap.size)):
+			on = false
+	if _keycap_tween and _keycap_tween.is_valid():
+		_keycap_tween.kill()
+	if not is_inside_tree():
+		_keycap.visible = on
+		_keycap.modulate.a = KEYCAP_ALPHA if on else 0.0
+		return
+	if on:
+		_keycap.visible = true
+		_keycap_tween = create_tween()
+		_keycap_tween.tween_property(_keycap, "modulate:a", KEYCAP_ALPHA, KEYCAP_IN)
+	else:
+		_keycap_tween = create_tween()
+		_keycap_tween.tween_property(_keycap, "modulate:a", 0.0, KEYCAP_OUT)
+		_keycap_tween.tween_callback(func() -> void:
+			if _keycap:
+				_keycap.visible = false)
+
+
+## True while the hover keycap is showing (tests).
+func keycap_visible() -> bool:
+	return _keycap != null and _keycap.visible and _keycap.modulate.a > 0.0
+
+
+# ---------------------------------------------------------------- draw
+
 func _draw() -> void:
+	if skinned():
+		draw_style_box(UiSkin.stylebox(piece(), art_state()), box_rect())
+		return
+	_draw_fallback()
+
+
+func _draw_fallback() -> void:
 	var cols := _colors()
 	var face: Color = cols[0]
 	var lip: Color = cols[1]

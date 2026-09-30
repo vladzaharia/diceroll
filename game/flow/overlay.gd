@@ -17,7 +17,6 @@ var _announce: VBoxContainer
 var _ann_title: Label
 var _ann_sub: Label
 var _ann_tween: Tween
-var _toast_count := 0
 var _dissolve: ColorRect
 var _vignette: TextureRect
 var _vig_tween: Tween
@@ -210,8 +209,7 @@ func passive_card(id: String, hold := 1.7) -> void:
 	var rar := String(d.rarity)
 	var rc := UiPalette.passive_color(rar)
 	var p := PanelContainer.new()
-	var sb := UiTheme.pad(UiTheme.box(Color(0.06, 0.06, 0.14, 0.95), 26, 3, rc, 18, Color(rc, 0.35), Vector2.ZERO), 22, 14)
-	p.add_theme_stylebox_override("panel", sb)
+	p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.callout_box(rc), 22, 14))
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(p)
 	move_child(p, _fade.get_index())
@@ -321,9 +319,9 @@ func passive_pop(at: Vector2, id: String, text := "") -> void:
 ## sideways off them.
 func item_pop(at: Vector2, item_id: String, text: String, color: Color, top := 0.0, floor_y := 0.0, avoid: Array = []) -> void:
 	var p := PanelContainer.new()
-	var sb := UiTheme.box(Color(0.06, 0.05, 0.14, 0.93), 22, 2, Color(color, 0.9), 10, Color(color, 0.3), Vector2.ZERO)
-	UiTheme.pad(sb, 6, 2)
-	sb.content_margin_right = 14
+	var sb := UiTheme.callout_box(color)
+	UiTheme.pad(sb, 8, 4)
+	sb.content_margin_right = 16
 	p.add_theme_stylebox_override("panel", sb)
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var row := UiTheme.hbox(6)
@@ -397,39 +395,13 @@ func announce(title: String, subtitle := "", color: Color = UiPalette.GOLD_BRIGH
 
 # --- toasts --------------------------------------------------------------------------------
 
-## Pill message above the bottom HUD that rises and fades. `y_ratio` is the screen height
-## fraction it appears at.
+## Toast (the shared Toast helper: callout box with a rim in `color`) above the bottom HUD
+## that rises and fades. `y_ratio` is the screen height fraction it appears at; up to 3 stack
+## upwards.
 func toast(text: String, icon := "", color: Color = UiPalette.TEXT, y_ratio := 0.47) -> void:
 	if modal_check.is_valid() and bool(modal_check.call()):
 		return
-	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.panel_box("pill"), 24, 12))
-	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var row := UiTheme.hbox(10)
-	p.add_child(row)
-	if icon != "" and UiIcons.exists(icon):
-		row.add_child(UiIcons.rect(icon, 36))
-	row.add_child(UiTheme.label(text, 28, color, true, 0, true))
-	_toasts.add_child(p)
-	p.reset_size()
-	var slot := _toast_count % 3
-	_toast_count += 1
-	var y := size.y * y_ratio - slot * 66.0
-	p.position = Vector2((size.x - p.size.x) * 0.5, y)
-	p.pivot_offset = p.size * 0.5
-	p.scale = Vector2(0.6, 0.6)
-	p.modulate.a = 0.0
-	var t := create_tween()
-	t.set_parallel(true)
-	t.tween_property(p, "scale", Vector2.ONE, _d(0.25)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	t.tween_property(p, "modulate:a", 1.0, _d(0.15))
-	t.chain().tween_interval(_d(1.3))
-	t.chain().set_parallel(true)
-	t.tween_property(p, "position:y", y - 50.0, _d(0.4))
-	t.tween_property(p, "modulate:a", 0.0, _d(0.4))
-	t.chain().tween_callback(func() -> void:
-		p.queue_free()
-		_toast_count = maxi(_toast_count - 1, 0))
+	Toast.show(_toasts, text, icon, color, {"y": size.y * y_ratio, "step": -66.0, "time_scale": _d})
 
 
 # --- popups --------------------------------------------------------------------------------
@@ -500,7 +472,10 @@ func _stack(p: Vector2, s: Vector2) -> Vector2:
 ## `caption` is shown above; `result` (with `result_color`) below once they settle.
 func mini_dice(caption: String, groups: Array, result: String, result_color: Color) -> void:
 	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.panel_box("main"), 30, 20))
+	var msb := UiTheme.panel_box("main")
+	if not UiTheme.skinned("panel_main"):
+		UiTheme.pad(msb, 30, 20)
+	panel.add_theme_stylebox_override("panel", msb)
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(panel)
 	var col := UiTheme.vbox(12)

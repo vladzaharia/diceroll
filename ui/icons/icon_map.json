@@ -2430,6 +2430,12 @@
    "tint": null,
    "note": "Results breakdown.",
    "group": "ui"
+  },
+  "crit": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Exclamation Mark/Exclamation Mark Outline.svg",
+   "tint": null,
+   "note": "Crit damage-pop prefix (slice b). Explosion stays scorch / intent_scorch and Volcano is magma / lava, so crit takes the unused red Exclamation Mark (one meaning per icon).",
+   "group": "status"
   }
  },
  "input_glyphs": {

@@ -52,6 +52,19 @@ func _draw() -> void:
 	if _shown > 0.001:
 		draw_arc(c, ring_r, -PI * 0.5, -PI * 0.5 + TAU * _shown, 48, UiPalette.XP, ring_w, true)
 	var inner := r - 16.0
+	if UiSkin.has("round_purple"):
+		# pack 3D round purple disc, ink number on the face (27/64 of the height)
+		var dh := inner * 2.0 + 6.0
+		var dw := dh * 55.0 / 64.0
+		var box := Rect2(c.x - dw * 0.5, c.y - dh * 0.5 + 2.0, dw, dh)
+		draw_style_box(UiSkin.stylebox("round_purple", "normal"), box)
+		var fc := UiTheme.display_font()
+		var fs := int(s * (0.34 if level < 10 else 0.28))
+		var tl := str(level)
+		var tw := fc.get_string_size(tl, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		var fy := box.position.y + dh * 27.0 / 64.0 + (fc.get_ascent(fs) - fc.get_descent(fs)) * 0.5
+		draw_string(fc, Vector2(c.x - tw * 0.5, fy), tl, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UiPalette.INK_LABEL)
+		return
 	draw_circle(c, inner, UiPalette.GOLD_DEEP)
 	draw_circle(c, inner - 3, UiPalette.NAVY_2)
 	draw_circle(c - Vector2(0, inner * 0.3), inner * 0.7, Color(1, 1, 1, 0.05))
