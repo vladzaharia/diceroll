@@ -13,18 +13,13 @@ signal open_station(id: String)
 ## Space kept free above the panel for the currency header.
 var top_inset := 96.0
 var profile: Profile
-var _close_btn: GameButton
 
 
 func _init() -> void:
 	super._init()
 	max_width = 720.0
-	_close_btn = GameButton.round_icon("close", 72)
-	_close_btn.kind = GameButton.Kind.SECONDARY
-	_close_btn.icon_tint = UiPalette.TEXT
-	_close_btn.z_index = 2
-	_close_btn.pressed.connect(func() -> void: close())
-	add_child(_close_btn)
+	# one exit: UiModal's corner close button, Esc and the backdrop
+	dismissible = true
 
 
 ## Rebuilds the screen for `p` (after every command). Keeps the scroll position.
@@ -49,15 +44,6 @@ func cmd(c: Array) -> void:
 	camp_command.emit(c)
 
 
-## Tapping the dimmed backdrop closes the screen.
-func _gui_input(event: InputEvent) -> void:
-	var mb := event as InputEventMouseButton
-	if mb and mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT and _is_open:
-		if not panel.get_global_rect().has_point(mb.global_position):
-			close()
-			accept_event()
-
-
 func _layout() -> void:
 	if _frame == null:
 		return
@@ -70,31 +56,16 @@ func _layout() -> void:
 	_frame.size = Vector2(w, 0)
 	var top := safe.top + top_inset
 	var avail_h := view.y - top - safe.bottom
-	var sb := panel.get_theme_stylebox("panel")
-	var chrome := sb.content_margin_top + sb.content_margin_bottom + (ribbon.get_combined_minimum_size().y - 26.0 if ribbon.visible else 0.0)
+	_apply_scale(view)
+	_fit_plaque(w)
+	var chrome := chrome_height()
 	var natural := _inner.get_combined_minimum_size().y
 	_scroll.custom_minimum_size.y = maxf(120.0, minf(natural, avail_h - chrome))
 	_frame.reset_size()
 	_frame.size.x = w
 	_frame.position = Vector2((view.x - w) * 0.5, maxf(top, top + (avail_h - _frame.size.y) * 0.5))
 	_frame.pivot_offset = _frame.size * 0.5
-	if _close_btn:
-		_close_btn.reset_size()
-		var cs := _close_btn.get_combined_minimum_size()
-		_close_btn.size = cs
-		_close_btn.position = Vector2(_frame.position.x + w - cs.x * 0.7, _frame.position.y + ribbon.size.y * 0.2)
-
-
-func open() -> void:
-	_close_btn.visible = true
-	await super.open()
-
-
-func _process(_dt: float) -> void:
-	# the close button follows the panel's entrance tween
-	if _close_btn and visible:
-		_close_btn.modulate.a = _frame.modulate.a
-		_close_btn.position.y = _frame.position.y + ribbon.size.y * 0.2
+	_place_close()
 
 
 # ---------------------------------------------------------------- shared rows
