@@ -75,9 +75,61 @@ static func source(path: String) -> String:
 		return _src[path]
 	var s := ""
 	if FileAccess.file_exists(path):
-		s = FileAccess.get_file_as_string(path)
+		s = fix_rgba(FileAccess.get_file_as_string(path))
 	_src[path] = s
 	return s
+
+
+## ThorVG ignores the alpha of CSS rgba() colours, so a transparent helper rect such as
+## `fill: rgba(26, 26, 26, 0)` renders as an opaque black square behind the icon. Rewrites
+## `fill` / `stroke: rgba(r,g,b,0)` to `none` and other alphas to `#rrggbb` plus a matching
+## `fill-opacity` / `stroke-opacity`, in <style> CSS, style="" and presentation attributes;
+## any other rgba() (stop-color, ...) becomes its opaque hex.
+static func fix_rgba(svg: String) -> String:
+	if not svg.contains("rgba("):
+		return svg
+	var num := "\\s*([0-9.]+)\\s*"
+	var rgba := "rgba\\(%s,%s,%s,%s\\)" % [num, num, num, num]
+	# CSS declarations (in <style> and style="")
+	var css := RegEx.create_from_string("(fill|stroke)\\s*:\\s*" + rgba)
+	svg = _sub_each(svg, css, func(m: RegExMatch) -> String:
+		var prop := m.get_string(1)
+		var a := float(m.get_string(5))
+		if a <= 0.001:
+			return prop + ": none"
+		return "%s: %s; %s-opacity: %s" % [prop, _rgba_hex(m), prop, _trim_num(a)])
+	# presentation attributes: fill="rgba(...)"
+	var attr := RegEx.create_from_string("(fill|stroke)=\"" + rgba + "\"")
+	svg = _sub_each(svg, attr, func(m: RegExMatch) -> String:
+		var prop := m.get_string(1)
+		var a := float(m.get_string(5))
+		if a <= 0.001:
+			return prop + "=\"none\""
+		return "%s=\"%s\" %s-opacity=\"%s\"" % [prop, _rgba_hex(m), prop, _trim_num(a)])
+	var rest := RegEx.create_from_string(rgba)
+	return _sub_each(svg, rest, func(m: RegExMatch) -> String: return _rgba_hex(m))
+
+
+static func _rgba_hex(m: RegExMatch) -> String:
+	var n := m.get_group_count()
+	var r := clampi(int(float(m.get_string(n - 3))), 0, 255)
+	var g := clampi(int(float(m.get_string(n - 2))), 0, 255)
+	var b := clampi(int(float(m.get_string(n - 1))), 0, 255)
+	return "#%02x%02x%02x" % [r, g, b]
+
+
+static func _trim_num(x: float) -> String:
+	return String.num(x, 3)
+
+
+## Replaces every match of `re` in `text` with `f.call(match)`.
+static func _sub_each(text: String, re: RegEx, f: Callable) -> String:
+	var out := ""
+	var at := 0
+	for m in re.search_all(text):
+		out += text.substr(at, m.get_start() - at) + String(f.call(m))
+		at = m.get_end()
+	return out + text.substr(at)
 
 
 static func exists(path: String) -> bool:
