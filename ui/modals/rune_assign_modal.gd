@@ -16,6 +16,7 @@ var _choice := -1
 
 
 func _build() -> void:
+	ScrollFade.attach(self, _scroll, UiPalette.NAVY_2, _frame)
 	_hero = PanelContainer.new()
 	_hero.add_theme_stylebox_override("panel", UiTheme.panel_box("inset"))
 	_hero.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -36,6 +37,9 @@ func _build() -> void:
 		if _choice >= 0:
 			rune_assign.emit(_choice))
 	body.add_child(_bind)
+	# forced (spec 3.2): the core has no "discard the rune" command, so there is no close /
+	# Esc; BIND RUNE is the decision (Enter)
+	primary_action = _bind
 
 
 func refresh(flow: GameFlow) -> void:

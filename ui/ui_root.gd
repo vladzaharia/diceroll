@@ -113,6 +113,7 @@ func _init() -> void:
 		pause.close()
 		menu.emit("resume", null))
 	pause.settings_pressed.connect(open_settings)
+	pause.controls_pressed.connect(open_controls)
 	pause.abandon_confirmed.connect(func() -> void:
 		pause.close()
 		menu.emit("abandon", null))
@@ -204,6 +205,22 @@ func show_route(flow: GameFlow, auto_close := 0.0) -> void:
 func open_settings() -> void:
 	settings.refresh()
 	settings.open()
+
+
+## Settings scrolled to the Controls list (pause CONTROLS, F1; desktop only).
+func open_controls() -> void:
+	open_settings()
+	settings.scroll_to_controls()
+
+
+## F1 opens Settings -> Controls anywhere (silently: no badge teaches it, spec 6).
+func _unhandled_input(event: InputEvent) -> void:
+	if not InputMode.platform_default_kbm() or not InputActions.pressed(event, InputActions.CONTROLS):
+		return
+	if settings.is_open():
+		return
+	get_viewport().set_input_as_handled()
+	open_controls()
 
 
 func open_auto_settings() -> void:

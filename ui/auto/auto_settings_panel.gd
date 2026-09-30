@@ -34,8 +34,13 @@ var _wide := true
 
 
 func _build() -> void:
+	ScrollFade.attach(self, _scroll, UiPalette.NAVY_2, _frame)
 	set_title("AUTO", AutoButton.ACCENT.darkened(0.15))
 	max_width = 1120.0
+	# one exit (spec 3.2): the header close button (back to Settings), Esc and the backdrop;
+	# every change saves at once, so there is no DONE
+	dismissible = true
+	close_tooltip = "Back"
 	rules = AutoConfig.load_rules()
 	var intro := UiTheme.para("AUTO plays for you, one visible step at a time. Tap any game control to take over.", 22, UiPalette.TEXT_DIM, 500)
 	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -86,7 +91,7 @@ func _build() -> void:
 	_right.add_child(hp)
 	var head := UiTheme.hbox(12)
 	hp.add_child(head)
-	head.add_child(UiIcons.rect("heart", 32))
+	head.add_child(Icons.rect("heart", 32))
 	var hl := UiTheme.label("HP drops below", 25, UiPalette.TEXT, true, 0)
 	hl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(hl)
@@ -113,38 +118,29 @@ func _build() -> void:
 		_stop_rows[s[0]] = row
 
 	body.add_child(UiTheme.spacer(4))
-	var foot := UiTheme.hbox(14)
-	body.add_child(foot)
-	var reset := GameButton.make("DEFAULTS", "reroll", GameButton.Kind.SECONDARY, 26)
-	reset.icon_tint = UiPalette.GOLD_BRIGHT
-	reset.min_height = 88
+	# a normal-width ghost: resetting is a real (if rare) choice, not the way out
+	var reset := GameButton.make("Reset to defaults", "reroll", GameButton.Kind.GHOST, 24)
+	reset.name = "Reset"
+	reset.min_height = 80
+	reset.pad_x = 22
+	reset.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	reset.pressed.connect(func() -> void:
 		rules = AutoRules.new()
 		_commit())
-	foot.add_child(reset)
-	var done := GameButton.make("DONE", "check", GameButton.Kind.PRIMARY, 34)
-	done.icon_tint = UiPalette.TEXT_DARK
-	done.min_height = 88
-	done.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	done.pressed.connect(func() -> void: close())
-	foot.add_child(done)
+	body.add_child(reset)
 	resized.connect(_arrange)
 	refresh()
 
 
+## Segmented control (spec 2.3, shared with Settings).
 func _segmented(ids: Array, labels: Dictionary, store: Dictionary, cb: Callable) -> Control:
-	var row := UiTheme.hbox(8)
+	var names: Array[String] = []
 	for id in ids:
-		var b := GameButton.make(String(labels[id]), "", GameButton.Kind.SECONDARY, 23)
-		b.toggle_mode = true
-		b.toggle_primary = true
-		b.min_height = 58
-		b.pad_x = 10
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.pressed.connect(cb.bind(String(id)))
-		row.add_child(b)
-		store[id] = b
-	return row
+		names.append(String(labels[id]))
+	var sg := SettingsPanel.Segmented.make(names, func(i: int) -> void: cb.call(String(ids[i])), 23)
+	for i in ids.size():
+		store[ids[i]] = sg.buttons[i]
+	return sg
 
 
 ## Portrait: one column; landscape (wide panel): scope/focus left, stop conditions right.
@@ -181,18 +177,15 @@ func refresh(_flow: GameFlow = null) -> void:
 	var shop_stop: _SwitchRow = _stop_rows["stop_on_shop"]
 	shop_stop.set_dimmed(rules.shop)
 	for k in _focus_btns:
-		(_focus_btns[k] as GameButton).set_pressed_no_signal(k == rules.focus)
-		(_focus_btns[k] as GameButton).call("_refresh")
+		(_focus_btns[k] as Button).set_pressed_no_signal(k == rules.focus)
 	for k in _mb_btns:
-		(_mb_btns[k] as GameButton).set_pressed_no_signal(k == rules.fight_miniboss)
-		(_mb_btns[k] as GameButton).call("_refresh")
+		(_mb_btns[k] as Button).set_pressed_no_signal(k == rules.fight_miniboss)
 	var has_skill := "skill" in rules
 	_skill_box.visible = has_skill
 	if has_skill:
 		var sk := String(rules.get("skill"))
 		for k in _skill_btns:
-			(_skill_btns[k] as GameButton).set_pressed_no_signal(k == sk)
-			(_skill_btns[k] as GameButton).call("_refresh")
+			(_skill_btns[k] as Button).set_pressed_no_signal(k == sk)
 	_hp_slider.set_value_no_signal(rules.stop_hp_below)
 	_hp_value.text = _hp_text(rules.stop_hp_below)
 	relayout()
@@ -203,7 +196,8 @@ static func _hp_text(v: float) -> String:
 
 
 func _tint_chip(b: GameButton) -> void:
-	b.icon_tint = UiPalette.TEXT_DARK if b.button_pressed else UiPalette.TEXT_DIM
+	# action glyphs: ink on the yellow (on) face, TEXT on the ghost (off) face
+	b.icon_tint = UiPalette.TEXT_DARK if b.button_pressed else UiPalette.TEXT
 	b.icon_name = b.icon_name
 
 
@@ -267,7 +261,7 @@ class _SwitchRow:
 		r.focus_mode = Control.FOCUS_NONE
 		r.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		r.custom_minimum_size = Vector2(300, 54)
-		r._icon = UiIcons.rect(icon, 30)
+		r._icon = Icons.rect(icon, 30)
 		r._icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		r.add_child(r._icon)
 		r._label = UiTheme.label(text, 24, UiPalette.TEXT, false, 0, false, 600)
@@ -317,6 +311,16 @@ class _SwitchRow:
 		var tw := 70.0
 		var th := 38.0
 		var tr := Rect2(size.x - tw - 12.0, (size.y - th) * 0.5, tw, th)
+		# the pack toggle (ToggleSwitch art: green on, grey off; spec 2.9)
+		var st := "checked" if on else "unchecked"
+		if UiSkin.has("toggle_track", st):
+			draw_style_box(UiSkin.stylebox("toggle_track", st), tr)
+			var kt := UiSkin.texture("toggle_knob", "normal", th * 28.0 / 24.0)
+			if kt != null:
+				var ks := kt.get_size()
+				var kx := tr.position.x + (tw - th) * _knob
+				draw_texture_rect(kt, Rect2(kx + (th - ks.x) * 0.5, tr.position.y + (th - ks.y) * 0.5 - 2.0, ks.x, ks.y), false)
+			return
 		var off := Color(0.12, 0.13, 0.26)
 		var col := off.lerp(AutoButton.ACCENT, _knob)
 		draw_style_box(UiTheme.box(UiPalette.OUTLINE, int(th * 0.5) + 2), tr.grow(2))

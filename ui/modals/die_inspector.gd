@@ -2,7 +2,8 @@ class_name DieInspector
 extends UiModal
 ## Die inspector (not a GameFlow phase; opened by tapping a die on the board): the die's kind
 ## (name, corner mark, description, raise cap), its rune, and all six faces laid out as an
-## unfolded die. Arrows page through the pool. Closes on CLOSE or a tap outside the panel.
+## unfolded die. Arrows page through the pool. One exit (spec 3.2): the header close button,
+## Esc or a tap on the backdrop; there is no CLOSE button.
 ##
 ##   inspector.show_die(flow, 2)
 
@@ -19,13 +20,17 @@ var _notes: VBoxContainer
 
 
 func _build() -> void:
+	ScrollFade.attach(self, _scroll, UiPalette.NAVY_2, _frame)
 	max_width = 600.0
+	dismissible = true
 	var nav := UiTheme.hbox(12)
 	nav.alignment = BoxContainer.ALIGNMENT_CENTER
 	body.add_child(nav)
+	# 64 px round buttons with an 88 px hit rect (spec 4.3)
 	_prev = GameButton.round_icon("arrow_left", 64)
-	_prev.kind = GameButton.Kind.GHOST
-	_prev.icon_tint = UiPalette.GOLD
+	_prev.round_family = "grey"
+	_prev.icon_tint = UiPalette.TEXT
+	_prev.tooltip_text = "Previous die"
 	_prev.pressed.connect(func() -> void: _page(-1))
 	nav.add_child(_prev)
 	_nav_label = UiTheme.label("", 22, UiPalette.TEXT_MUTED, false, 0, false, 700)
@@ -33,8 +38,9 @@ func _build() -> void:
 	_nav_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	nav.add_child(_nav_label)
 	_next = GameButton.round_icon("arrow_right", 64)
-	_next.kind = GameButton.Kind.GHOST
-	_next.icon_tint = UiPalette.GOLD
+	_next.round_family = "grey"
+	_next.icon_tint = UiPalette.TEXT
+	_next.tooltip_text = "Next die"
 	_next.pressed.connect(func() -> void: _page(1))
 	nav.add_child(_next)
 	_head = UiTheme.hbox(18)
@@ -51,21 +57,11 @@ func _build() -> void:
 	cc.add_child(_net)
 	_notes = UiTheme.vbox(4)
 	body.add_child(_notes)
-	var close := GameButton.make("CLOSE", "close", GameButton.Kind.SECONDARY, 30)
-	close.icon_tint = UiPalette.TEXT
-	close.pressed.connect(func() -> void:
-		close()
-		closed_by_player.emit())
-	body.add_child(close)
 
 
-func _gui_input(event: InputEvent) -> void:
-	var mb := event as InputEventMouseButton
-	if mb and mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT and is_open():
-		if not panel.get_global_rect().has_point(mb.global_position):
-			accept_event()
-			close()
-			closed_by_player.emit()
+func dismiss() -> void:
+	close()
+	closed_by_player.emit()
 
 
 func show_die(flow: GameFlow, idx: int) -> void:
@@ -107,10 +103,11 @@ func _fill() -> void:
 	kr.add_child(UiTheme.label(DiceKinds.label(die.kind), 34, kc.lightened(0.3) if die.kind != "standard" else UiPalette.TEXT, true, 6))
 	var rar := String(kd.rarity)
 	var tag := PanelContainer.new()
-	tag.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(kc, 0.16), 10, 2, Color(kc, 0.55)), 10, 2))
 	tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	tag.add_child(UiTheme.label(rar.to_upper(), 16, kc.lightened(0.3), false, 0, false, 800))
+	var tl := UiTheme.label(rar.to_upper(), 16, UiPalette.TEXT, false, 0, false, 800)
+	tag.add_child(tl)
+	OptionCard.style_tag(tag, tl, kc)
 	kr.add_child(tag)
 	col.add_child(UiTheme.para(String(kd.desc), 21, UiPalette.TEXT_DIM, 500))
 	var rr := UiTheme.hbox(10)
