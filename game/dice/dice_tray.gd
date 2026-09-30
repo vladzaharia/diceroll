@@ -1,7 +1,9 @@
 class_name DiceTray
 extends Control
-## Bottom-of-screen dice tray: a 3D felt tray rendered in a SubViewport inside a walnut and
-## gold frame. Dice are duck-typed (Dictionary or Object with `faces`, `rune`, `edited`).
+## Bottom-of-screen dice tray: a 3D felt tray rendered in a SubViewport inside a frame: the
+## pack's Nailed darkbrown-dark wood (Thin on short screens) over a navy fill, with a soft
+## inner shadow over the felt; without the pack, the walnut and gold frame shader.
+## Dice are duck-typed (Dictionary or Object with `faces`, `rune`, `edited`).
 ##
 ##   tray.set_dice(run.dice)
 ##   tray.roll(values, [0, 1, 2]); await tray.settled
@@ -13,6 +15,7 @@ extends Control
 signal settled
 signal die_pressed(idx: int)
 
+## The walnut shader frame's width (no pack); the pack frame's width comes from its art.
 const FRAME_PX := 13.0
 const CORNER_PX := 26.0
 const MIN_SPACING := 1.38
@@ -40,6 +43,12 @@ var _badge_icon: TextureRect = null
 var _viewport := SubViewport.new()
 var _view := TextureRect.new()
 var _frame := ColorRect.new()
+## Pack frame: the navy fill behind the felt and the wood rim over its edge (spec 4.2).
+var _back := Panel.new()
+var _rim := Panel.new()
+## The frame's inner inset on each side (px): the felt starts here.
+var _inset := Vector4(FRAME_PX, FRAME_PX, FRAME_PX, FRAME_PX)
+var _piece := ""
 var _labels_root := Control.new()
 var _labels: Array[Label] = []
 var _camera := Camera3D.new()
@@ -71,17 +80,27 @@ func _init() -> void:
 	_viewport.size = Vector2i(512, 256)
 	_viewport.positional_shadow_atlas_size = 0
 	add_child(_viewport)
+	for pn in [_back, _rim]:
+		pn.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pn.visible = false
+	_back.name = "TrayBack"
+	_rim.name = "TrayRim"
+	add_child(_back)
 	_view.texture = _viewport.get_texture()
 	_view.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_view.stretch_mode = TextureRect.STRETCH_SCALE
 	_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_view.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	# the felt is the tray's 3D surface (a background under the home indicator on phones, like
+	# the board), not UI content: the no-spillover audit skips it; the dice sit well inside
+	_view.set_meta("audit_skip", true)
 	add_child(_view)
 	_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var fm := ShaderMaterial.new()
 	fm.shader = preload("res://game/dice/frame.gdshader")
 	_frame.material = fm
 	add_child(_frame)
+	add_child(_rim)
 	_labels_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_labels_root)
 	_build_world()
@@ -221,26 +240,34 @@ func set_badge(text: String, color := Color(1.0, 0.82, 0.3), icon := "") -> void
 	_badge.visible = text != ""
 	if text == "":
 		return
-	var has_icon := icon != "" and UiIcons.exists(icon)
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.04, 0.03, 0.08, 0.82)
-	sb.set_corner_radius_all(14)
-	sb.set_border_width_all(2)
-	sb.border_color = Color(color, 0.85)
-	sb.content_margin_left = 40 if has_icon else 12
-	sb.content_margin_right = 12
-	sb.content_margin_top = 3
-	sb.content_margin_bottom = 3
+	var has_icon := icon != "" and Icons.exists(icon)
+	var pack := UiSkin.has("chip_white")
+	var sb: StyleBox
+	if pack:
+		# spec 2.3: a chip in the class colour with an ink label
+		sb = UiTheme.chip_box(color)
+	else:
+		var fb := StyleBoxFlat.new()
+		fb.bg_color = Color(0.04, 0.03, 0.08, 0.82)
+		fb.set_corner_radius_all(14)
+		fb.set_border_width_all(2)
+		fb.border_color = Color(color, 0.85)
+		sb = fb
+	sb.content_margin_left = 40 if has_icon else (16 if pack else 12)
+	sb.content_margin_right = 16 if pack else 12
+	sb.content_margin_top = 4 if pack else 3
+	sb.content_margin_bottom = 4 if pack else 3
 	_badge.add_theme_stylebox_override("normal", sb)
-	_badge.add_theme_color_override("font_color", color.lightened(0.25))
+	_badge.add_theme_color_override("font_color", UiPalette.TEXT_DARK if pack else color.lightened(0.25))
+	_badge.add_theme_constant_override("outline_size", 0 if pack else 6)
 	_badge.text = text
 	_badge_icon.visible = has_icon
 	if has_icon:
-		_badge_icon.texture = UiIcons.tex(icon, 52)
-		_badge_icon.position = Vector2(10, 4)
+		_badge_icon.texture = Icons.texture(icon, 24, UiPalette.TEXT_DARK if pack else null)
+		_badge_icon.position = Vector2(12 if pack else 10, 5 if pack else 4)
 		_badge_icon.size = Vector2(24, 24)
 	_badge.size = _badge.get_combined_minimum_size()
-	_badge.position = Vector2(FRAME_PX + 8.0, FRAME_PX + 6.0)
+	_badge.position = Vector2(frame_px() + 6.0, frame_px() + 4.0)
 
 
 ## Shows (or removes, with null) the Engineer's turret die on its side stand.
@@ -273,6 +300,16 @@ func set_turret(d: Variant) -> void:
 		_turret_label.add_theme_color_override("font_outline_color", Color(0.1, 0.06, 0.03))
 		_turret_label.add_theme_constant_override("outline_size", 6)
 		_turret_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		if UiSkin.has("chip_white"):
+			# a brass chip under the stand, ink label (plan b: turret label -> chip_box)
+			var tsb := UiTheme.chip_box(Color(1.0, 0.72, 0.36))
+			tsb.content_margin_left = 12
+			tsb.content_margin_right = 12
+			tsb.content_margin_top = 2
+			tsb.content_margin_bottom = 2
+			_turret_label.add_theme_stylebox_override("normal", tsb)
+			_turret_label.add_theme_color_override("font_color", UiPalette.TEXT_DARK)
+			_turret_label.add_theme_constant_override("outline_size", 0)
 		_turret_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(_turret_label)
 		turret.set_data(d)
@@ -358,7 +395,7 @@ func _place_turret_label() -> void:
 	var s := _turret_label.get_combined_minimum_size()
 	_turret_label.size = s
 	_turret_label.position = Vector2(r.get_center().x - s.x * 0.5, r.end.y + 12.0) - global_position
-	_turret_label.position.y = minf(_turret_label.position.y, size.y - FRAME_PX - s.y)
+	_turret_label.position.y = minf(_turret_label.position.y, size.y - (_inset.w if _back.visible else FRAME_PX) - s.y)
 
 
 ## Shows values instantly (one per die). No animation, no signal.
@@ -598,15 +635,31 @@ func _layout() -> void:
 	var sz := size
 	if sz.x < 8.0 or sz.y < 8.0:
 		return
-	var inset := FRAME_PX - 3.0
-	_view.position = Vector2(inset, inset)
-	_view.size = sz - Vector2(inset, inset) * 2.0
-	_frame.position = Vector2.ZERO
-	_frame.size = sz
 	var fm := _frame.material as ShaderMaterial
-	fm.set_shader_parameter("size", sz)
-	fm.set_shader_parameter("radius", CORNER_PX)
-	fm.set_shader_parameter("frame", FRAME_PX)
+	if _skin_frame():
+		# the felt tucks 4 px under the wood; the shader only adds the inner shadow now
+		var vr := Rect2(Vector2(_inset.x - 4.0, _inset.y - 4.0), sz - Vector2(_inset.x + _inset.z - 8.0, _inset.y + _inset.w - 8.0))
+		_view.position = vr.position
+		_view.size = vr.size
+		_frame.position = vr.position
+		_frame.size = vr.size
+		fm.set_shader_parameter("size", vr.size)
+		fm.set_shader_parameter("radius", 8.0)
+		fm.set_shader_parameter("frame", 0.0)
+		fm.set_shader_parameter("shadow_px", 22.0)
+		fm.set_shader_parameter("shadow_alpha", 0.45)
+		for pn in [_back, _rim]:
+			pn.position = Vector2.ZERO
+			pn.size = sz
+	else:
+		var inset := FRAME_PX - 3.0
+		_view.position = Vector2(inset, inset)
+		_view.size = sz - Vector2(inset, inset) * 2.0
+		_frame.position = Vector2.ZERO
+		_frame.size = sz
+		fm.set_shader_parameter("size", sz)
+		fm.set_shader_parameter("radius", CORNER_PX)
+		fm.set_shader_parameter("frame", FRAME_PX)
 	_labels_root.position = Vector2.ZERO
 	_labels_root.size = sz
 	var screen_scale := 1.0
@@ -648,6 +701,49 @@ func _layout() -> void:
 	_felt_mat.set_shader_parameter("falloff", maxf(vis_w * 0.55, 4.0))
 	_update_labels()
 	_place_turret_label.call_deferred()
+
+
+## Short screens (portrait under 1.6:1, e.g. the iPhone Duo outer, or phones in landscape)
+## take the Thin frame: the Nailed planks would eat the felt (plan b, L4).
+static func is_short(view: Vector2) -> bool:
+	if view.x <= 0.0 or view.y <= 0.0:
+		return false
+	return view.y / view.x < 1.6 if UiTheme.is_tall(view) else view.x / view.y > 2.0
+
+
+## Picks and applies the pack frame (Nailed / Thin); false when the pack is absent (the
+## walnut shader frame draws instead).
+func _skin_frame() -> bool:
+	var view := get_viewport_rect().size if is_inside_tree() else Vector2.ZERO
+	var piece := "panel_tray_thin" if is_short(view) and UiSkin.has("panel_tray_thin") else "panel_tray"
+	if not UiSkin.has(piece):
+		_back.visible = false
+		_rim.visible = false
+		return false
+	if piece != _piece:
+		_piece = piece
+		var sb := UiSkin.stylebox(piece)
+		var back: StyleBox = sb
+		var rim: StyleBox = StyleBoxEmpty.new()
+		if sb is UiLayeredStyleBox and (sb as UiLayeredStyleBox).layers.size() >= 2:
+			var ls := (sb as UiLayeredStyleBox).layers
+			back = ls[0]
+			rim = ls[ls.size() - 1]
+		_back.add_theme_stylebox_override("panel", back)
+		_rim.add_theme_stylebox_override("panel", rim)
+		if rim is StyleBoxTexture:
+			var t := rim as StyleBoxTexture
+			_inset = Vector4(t.texture_margin_left, t.texture_margin_top, t.texture_margin_right, t.texture_margin_bottom)
+		else:
+			_inset = Vector4(sb.content_margin_left, sb.content_margin_top, sb.content_margin_right, sb.content_margin_bottom)
+	_back.visible = true
+	_rim.visible = true
+	return true
+
+
+## The frame's width on the top / left side (badges and labels sit inside it).
+func frame_px() -> float:
+	return maxf(_inset.x, _inset.y) if _back.visible else FRAME_PX
 
 
 func _rebuild_labels() -> void:
