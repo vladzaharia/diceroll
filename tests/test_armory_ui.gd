@@ -172,11 +172,13 @@ func test_armory_screen_commands() -> void:
 	Character.clear_cache()
 
 
-## Picker rule text: "tier III:" clauses show tier III's numbers, tier-I prose reads naturally.
+## Rule text (ItemDefs, shown as-is by the picker): "tier III:" clauses show tier III's numbers,
+## counts read as prose ("turn 1", "once", "1 die"), factors as "+N%".
 func test_picker_rule_text() -> void:
 	for id in ItemDefs.IDS:
 		for t in [1, 2, 3]:
-			var s := ArmoryModal.rule_text(String(id), t, String(id))
+			var s := ItemDefs.rule_text(String(id), t, String(id))
 			assert_true(not s.contains("{"), "placeholders filled: %s %d: %s" % [id, t, s])
-			assert_true(not s.contains("+0%") and not s.contains("(s)") and not s.contains("turns 1-1"), "reads naturally: %s %d: %s" % [id, t, s])
-	assert_eq(ArmoryModal.rule_text("knight_cape", 1), "Style")
+			assert_true(not s.contains("+0%") and not s.contains("(s)") and not s.contains("turns 1-1") and not s.contains("1 dice")
+				and not s.contains("1 times") and not RegEx.create_from_string("x\\d").search(s), "reads naturally: %s %d: %s" % [id, t, s])
+	assert_eq(ItemDefs.rule_text("knight_cape", 1), "Style")
