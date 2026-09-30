@@ -11,6 +11,7 @@ shift 2; [ $# -gt 0 ] && shift
 log="$(mktemp -t godot_shot).log"
 open -g -n -W -a /Applications/Godot.app --args \
 	--path "$PWD" --position -4000,-4000 --resolution "$res" --log-file "$log" \
+	--fixed-fps 30 --disable-vsync \
 	-- --scenario="$scenario" --shot="$out" "$@"
 grep -v "^$" "$log" | grep -v "Godot Engine v\|Metal 4\|^$" || true
 rm -f "$log"
