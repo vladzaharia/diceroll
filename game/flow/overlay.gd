@@ -17,7 +17,6 @@ var _announce: VBoxContainer
 var _ann_title: Label
 var _ann_sub: Label
 var _ann_tween: Tween
-var _toast_count := 0
 var _dissolve: ColorRect
 var _vignette: TextureRect
 var _vig_tween: Tween
@@ -397,39 +396,13 @@ func announce(title: String, subtitle := "", color: Color = UiPalette.GOLD_BRIGH
 
 # --- toasts --------------------------------------------------------------------------------
 
-## Pill message above the bottom HUD that rises and fades. `y_ratio` is the screen height
-## fraction it appears at.
+## Toast (the shared Toast helper: callout box with a rim in `color`) above the bottom HUD
+## that rises and fades. `y_ratio` is the screen height fraction it appears at; up to 3 stack
+## upwards.
 func toast(text: String, icon := "", color: Color = UiPalette.TEXT, y_ratio := 0.47) -> void:
 	if modal_check.is_valid() and bool(modal_check.call()):
 		return
-	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.panel_box("pill"), 24, 12))
-	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var row := UiTheme.hbox(10)
-	p.add_child(row)
-	if icon != "" and UiIcons.exists(icon):
-		row.add_child(UiIcons.rect(icon, 36))
-	row.add_child(UiTheme.label(text, 28, color, true, 0, true))
-	_toasts.add_child(p)
-	p.reset_size()
-	var slot := _toast_count % 3
-	_toast_count += 1
-	var y := size.y * y_ratio - slot * 66.0
-	p.position = Vector2((size.x - p.size.x) * 0.5, y)
-	p.pivot_offset = p.size * 0.5
-	p.scale = Vector2(0.6, 0.6)
-	p.modulate.a = 0.0
-	var t := create_tween()
-	t.set_parallel(true)
-	t.tween_property(p, "scale", Vector2.ONE, _d(0.25)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	t.tween_property(p, "modulate:a", 1.0, _d(0.15))
-	t.chain().tween_interval(_d(1.3))
-	t.chain().set_parallel(true)
-	t.tween_property(p, "position:y", y - 50.0, _d(0.4))
-	t.tween_property(p, "modulate:a", 0.0, _d(0.4))
-	t.chain().tween_callback(func() -> void:
-		p.queue_free()
-		_toast_count = maxi(_toast_count - 1, 0))
+	Toast.show(_toasts, text, icon, color, {"y": size.y * y_ratio, "step": -66.0, "time_scale": _d})
 
 
 # --- popups --------------------------------------------------------------------------------
