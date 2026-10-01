@@ -22,6 +22,11 @@ extends RefCounted
 ##  game_biome_change  lap 6 starts mid-move: tier 1 sinks, tier 2 rises (--to=<biome id>
 ##                picks the arriving biome; tier 3 ids start at lap 11). Use --wait and --frames.
 ##  game_boss     final boss fight with its intro (--act=1..3)
+##  game_last_camp  the hero crosses Start finishing lap 14 (the Short Road's lap 9 with
+##                --mode=short): the Last Camp's fire rises by the Start and its modal opens
+##                (--pick=0|1|2 takes that gift and leaves the shop: the finale turns every tile
+##                into a boss tile under the looming boss; --roll=1 then rolls the final roll,
+##                --roll=2 also moves: the hero lands and the boss fight begins). Use --wait.
 ##  game_victory / game_defeat   summary screens (with passives and the route)
 ##  route_card    the run-start route card (--route=a,b,c --boss --miniboss)
 ##  game_pause    pause menu mid-run with the route strip (--lap=N, default 8)
@@ -42,7 +47,8 @@ extends RefCounted
 
 const NAMES := ["game_title", "game_board", "game_rolled", "game_combat", "game_combo", "game_shop", "game_draft",
 	"game_forge", "game_event", "game_portal", "game_boss", "game_victory", "game_defeat", "game_manual", "game_continue",
-	"play_auto", "game_passive", "game_die_inspect", "game_miniboss", "game_biome_change", "route_card", "game_pause"]
+	"play_auto", "game_passive", "game_die_inspect", "game_miniboss", "game_biome_change", "route_card", "game_pause",
+	"game_last_camp"]
 ## Passives shown by --passives=N (a mix of rarities, boss tier last).
 const DEMO_PASSIVES := ["pair_master", "iron_skin", "pathfinder", "rune_echo", "treasure_sense", "fast_feet", "midas_fist"]
 
@@ -128,6 +134,8 @@ class _Driver extends Node:
 			o["boss"] = String(args.boss)
 		if args.has("miniboss"):
 			o["miniboss"] = String(args.miniboss)
+		if args.has("mode"):
+			o["mode"] = String(args.mode)
 		if args.has("profile"):
 			# meta layer on: --profile=fresh|mid|max [--pet=<id>] [--asc=N]
 			var prof := MetaPresets.get_preset(String(args.profile), int(args.get("asc", "0")))
@@ -163,6 +171,8 @@ class _Driver extends Node:
 				f.run.dice[2].raise_face(0)
 			"game_shop":
 				_pool(f, 3)
+			"game_last_camp":
+				_camp_setup(f)
 		if scenario == "game_board" and args.has("affixes"):
 			# --affixes=a,b,...: dealt round-robin to the fight tiles' leaders (board preview chips)
 			var al: Array = Array(String(args.affixes).split(",", false))
@@ -188,6 +198,8 @@ class _Driver extends Node:
 				await _miniboss(f)
 			"game_biome_change":
 				await _biome_change(f)
+			"game_last_camp":
+				await _last_camp(f)
 			"game_combat", "game_combo":
 				var ids := String(args.get("enemies", "skeleton_warrior,skeleton_minion,skeleton_archer"))
 				f.run.pos = int(args.get("tile", "3"))
@@ -311,6 +323,48 @@ class _Driver extends Node:
 		var ev := f._move(5, false)
 		f._advance(ev)
 		await c.play_events(ev)
+
+	## The hero crosses Start finishing the second-to-last lap: the Last Camp. The run is set
+	## to its last biome, part-worn (65% HP, a mid-run pool). --pick=N takes gift N and leaves
+	## the shop that follows, to show the final lap's board.
+	func _camp_setup(f: GameFlow) -> void:
+		var run := f.run
+		var act := run.biome_laps().size()
+		run.act = act
+		run.lap = run.total_laps() - 1
+		run.board = Board.generate(run.rng, act, Balance.BOARD_SIZE, run.eff_lap(), run.biome())
+		run.level = 8
+		run.max_hp += 28
+		run.hp = int(run.max_hp * 0.65)
+		run.gold = 140
+		for k in ["high", "giant", "twin"]:
+			run.dice.append(Die.make("", k))
+		run.dice[1].rune = "blade"
+		run.pos = run.board.size() - 2
+
+	func _last_camp(f: GameFlow) -> void:
+		await get_tree().create_timer(0.4).timeout
+		var ev := f._move(3, false)
+		f._advance(ev)
+		await c.play_events(ev)
+		if args.has("pick") and f.phase == GameFlow.Phase.EVENT:
+			await c.run_command("event_choose", [int(args.pick)])
+			for k in 6:
+				if f.phase == GameFlow.Phase.DRAFT and String(f.offer.get("kind", "")) == "draft":
+					await c.run_command("pick_draft", [0])
+				elif f.phase == GameFlow.Phase.DRAFT:
+					await c.run_command("rune_assign", [0])
+				elif f.phase == GameFlow.Phase.SHOP:
+					await c.run_command("shop_leave")
+				elif f.phase == GameFlow.Phase.COMBAT or f.phase == GameFlow.Phase.EVENT:
+					break
+			if args.get("roll", "0") != "0" and f.phase == GameFlow.Phase.BOARD_READY and f.run.finale:
+				await get_tree().create_timer(0.5).timeout
+				await c.run_command("roll_board")
+				if args.get("roll", "0") == "2":
+					await get_tree().create_timer(0.6).timeout
+					await c.run_command("confirm_move")
+
 	## the save does) and presents the loaded copy: checks Continue for mid-run phases.
 	func _continue() -> void:
 		var f := _flow()

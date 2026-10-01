@@ -6,9 +6,9 @@ extends UiModal
 signal draft_picked(index: int)
 
 const ICONS := {"new_die": "dice", "max_hp": "heart", "combat_reroll": "reroll", "face_raise": "anvil"}
-const TITLES := {"level": "LEVEL UP!", "elite": "ELITE SPOILS", "chest": "TREASURE!", "reward": "REWARD"}
+const TITLES := {"level": "LEVEL UP!", "elite": "ELITE SPOILS", "chest": "TREASURE!", "reward": "REWARD", "camp": "BY THE FIRE"}
 const SUBS := {"level": "Choose one upgrade", "elite": "Choose a rune", "chest": "The chest holds a rune. Choose one",
-	"reward": "Choose one"}
+	"reward": "Choose one", "camp": "A rune for the last lap. Choose one"}
 
 var _sub: Label
 var _list: VBoxContainer

@@ -109,13 +109,13 @@ func test_biome_enemy_hp() -> void:
 
 func test_new_tile_mixes() -> void:
 	var l := Board.layout_for(28, "mines")
-	assert_eq([l.ore, l.chest, l.trap], [3, 4, 2])
+	assert_eq([l.ore, l.chest, l.trap], [3, 3, 2])
 	l = Board.layout_for(28, "warcamp")
-	assert_eq([l.drum, l.enemy, l.event], [1, 7, 4])
+	assert_eq([l.drum, l.enemy, l.event], [1, 9, 3])
 	l = Board.layout_for(28, "ruins")
 	assert_eq([l.oasis, l.campfire], [3, 1])
 	l = Board.layout_for(28, "moonlit")
-	assert_eq([l.event, l.trap], [5, 1])
+	assert_eq([l.event, l.trap], [4, 1])
 	for id in ["mines", "warcamp", "ruins", "moonlit"]:
 		var total := 0
 		for t in Board.layout_for(28, id):

@@ -213,6 +213,14 @@ Meta currencies, gear, pets, online features, more than 4 classes, Ranger class,
   - Tapping any game control turns AUTO off.
   - Combat choices use expected value, computed with a private RNG that never touches the run's RNG.
 
+- **The Last Camp and the Final Roll (Vlad, 2026-09-30; supersedes "the final boss comes at lap 15"):** the run's last lap is no longer board play.
+  - Finishing **lap 14** (the Short Road's lap 9) stops the hero on Start, where the **Last Camp** waits: a campfire set piece by the Start corner. The hero rests (**35% of max HP**; **25% from Ascension 2**, the lap-heal rule), then takes **one gift**: a Healing Draught (belt, or drunk at once when the belt is full), a rune (1 of 2), or **Steady Hands** (+1 combat reroll every turn of the final boss fight). That lap's shop follows as the last buy.
+  - Then **every tile turns into a boss tile**, one after another in board order from Start (about 50 ms a tile, sped up by 2×/4×, a tap finishes it), while the final boss looms over the island.
+  - The hero makes **one final roll** (no board rerolls; the roll is a ceremony, not a choice) and fights the final boss **wherever they land**. No tile effects fire on the way. The finale counts as lap 15 (the lap counter reads 15/15 and "FINAL ROLL", the final roll completes the final lap, and the Crowns "Laps" payout is unchanged: 14 laps for a boss death, 15 for a win).
+  - The difficulty of the old lap 15 moved into the final boss: regular enemies stop scaling at lap 12, the mutation into lap 14 spawns no new fights, and each final boss has more HP after the camp (`Balance.CAMP_BOSS_HP_BY_ID`; the Short Road has its own table). Numbers: `docs/plans/balance.md`.
+- **Fight-first boards (Vlad, 2026-09-30):** the board skews toward fights, early laps most. Layouts gain 2 Enemy tiles and lose 1 Chest and 1 Event (28: 9 Enemy, 3 Chest, 3 Event, 2 Campfire, 2 Trap, 5 Empty); the first biome's lap mutations spawn 2 more Enemies; events and played minigame tiles come back on every other lap of a biome (a new biome's board always has them). Minigames stay a treat, shops and events stay.
+- **Expert-bot ceiling accepted (Vlad, 2026-09-30):** the expert bot winning about 95%+ at max is fine. The **realistic** bot stays the balance reference, and Ascension 1–10 is the expert's challenge. The old "expert about 80, at most 85" target is dropped (the §16 "expert ceiling about 75–80% on a fresh profile" line is superseded too).
+
 ## 16. Meta layer (2026-09-28, from Vlad): Camp, minigames, pets, potions. Non-monetized
 
 Principles: no premium currency, no paid or random rolls for power. Every upgrade has a known cost and a deterministic result. Meta power is bounded, and wins unlock **Ascension** levels to counter it.

@@ -60,6 +60,10 @@ var _path_lit: Array[int] = []
 var _hidden_fx: Array[Node3D] = []
 ## Orc Warcamp: Empty tiles that still show the broken staves of a smashed drum.
 var _smashed: Dictionary = {}
+## The Last Camp set piece beside Start (show_last_camp), or null.
+var last_camp: Node3D
+## The finale's looming boss over the island centre (show_boss_looming), or null.
+var boss_looming: Node3D
 
 
 func _init() -> void:
@@ -392,6 +396,189 @@ func _bounce(n: Node3D, depth: float) -> void:
 	var t := n.create_tween()
 	t.tween_property(n, "position:y", -depth, 0.07).set_trans(Tween.TRANS_SINE)
 	t.tween_property(n, "position:y", 0.0, 0.3).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+
+
+# --- the Last Camp ---------------------------------------------------------------------------
+
+## Where the Last Camp sits: on the island, in the first cell inside the Start corner (one
+## tile in along both edges, clear of the ring).
+func last_camp_position() -> Vector3:
+	return tile_position(0) + tile_inward(0) * PITCH * 1.414 - Vector3(0, TILE_TOP, 0)
+
+
+## The Last Camp (the pre-boss camp, lap 14): a big campfire just inside Start with log seats,
+## a bedroll, a lantern and firewood, rising embers and a warm light. It stays up through the
+## final lap and goes out when the boss rises (show_last_camp(false)).
+func show_last_camp(on: bool, animate := true) -> void:
+	if not on:
+		if last_camp and is_instance_valid(last_camp):
+			var old := last_camp
+			last_camp = null
+			if animate:
+				var t := old.create_tween()
+				t.tween_property(old, "scale", Vector3.ONE * 0.01, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+				t.tween_callback(old.queue_free)
+			else:
+				old.queue_free()
+		return
+	if last_camp and is_instance_valid(last_camp):
+		return
+	var root := Node3D.new()
+	root.name = "LastCamp"
+	root.position = last_camp_position()
+	# face the fire toward the ring's front so the seats frame it
+	var inward := tile_inward(0)
+	root.rotation.y = atan2(inward.x, inward.z)
+	add_child(root)
+	last_camp = root
+	var fire := TileStyle.make_prop("campfire")
+	fire.name = "Fire"
+	fire.scale = Vector3.ONE * 1.6
+	root.add_child(fire)
+	var res := Props.K + "resources/"
+	# log seats either side, a bedroll behind, firewood and a lantern: a rest stop, not a fight
+	for sx in [-1.0, 1.0]:
+		if Props.has(res + "Wood_Log_A.gltf"):
+			Props.put(root, res + "Wood_Log_A.gltf", Vector3(sx * 0.98, 0.0, 0.1), 90.0 + sx * 14.0, 0.4)
+	if Props.has(Props.DUN + "bed_floor.gltf"):
+		Props.put(root, Props.DUN + "bed_floor.gltf", Vector3(0.05, 0.0, -0.98), 4.0, 0.46)
+	if Props.has(res + "Wood_Log_Stack.gltf"):
+		Props.put(root, res + "Wood_Log_Stack.gltf", Vector3(-0.85, 0.0, -0.85), 40.0, 0.3)
+	if Props.has(Props.HAL + "lantern_standing.gltf"):
+		Props.put(root, Props.HAL + "lantern_standing.gltf", Vector3(0.9, 0.0, -0.85), -20.0, 0.6)
+	var glow := OmniLight3D.new()
+	glow.name = "CampLight"
+	glow.light_color = Color(1.0, 0.58, 0.26)
+	glow.light_energy = 3.2
+	glow.omni_range = 5.5
+	glow.omni_attenuation = 1.2
+	glow.position = Vector3(0, 1.1, 0)
+	root.add_child(glow)
+	root.add_child(_camp_embers())
+	if animate:
+		root.scale = Vector3.ONE * 0.01
+		var tw := root.create_tween()
+		tw.tween_property(root, "scale", Vector3.ONE, 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		Fx.shockwave(self, root.position + Vector3.UP * 0.05, Color(1.0, 0.7, 0.35), 2.2, 0.6)
+
+
+## The finale: the tiles turn into boss tiles one at a time, in board order from `from` (the
+## hero's tile on Start), WAVE_STEP apart (28 tiles: about 1.4 s at 1x). Each flip hops, spins a
+## half turn, lands crimson with its skull and ticks, the tick rising in pitch as the wave goes.
+## `speed` is the game speed (2x / 4x shorten it); skip_wave() finishes it at once (a tap).
+## `new_tiles` is the new tile list (all "boss"). Returns when every tile has turned.
+const WAVE_STEP := 0.05
+var wave_running := false
+var _wave_skip := false
+
+
+func finale_wave(new_tiles: Array, from: int, speed := 1.0) -> void:
+	clear_targets()
+	wave_running = true
+	_wave_skip = false
+	var sp := maxf(speed, 0.1)
+	for k in ring_size:
+		var i := (from + k) % ring_size
+		var tile: Dictionary = new_tiles[i] if i < new_tiles.size() else {"type": "boss"}
+		if _wave_skip:
+			set_tile(i, tile, false)
+			continue
+		var n := _tile_nodes[i]
+		var t := n.create_tween()
+		t.tween_property(n, "position:y", 0.3, 0.08 / sp).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		t.parallel().tween_property(n, "rotation:y", n.rotation.y + PI, 0.16 / sp)
+		t.tween_callback(set_tile.bind(i, tile, false))
+		t.tween_property(n, "position:y", 0.0, 0.16 / sp).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+		Fx.burst(self, tile_position(i) + Vector3.UP * 0.2, {"amount": 8, "lifetime": 0.45, "speed": Vector2(0.8, 2.0),
+			"size": 0.2, "color": Color(1.0, 0.3, 0.2), "tex": "spark"})
+		Audio.play_sfx("tick", 0.0, -4.0, 0.8 + 0.7 * float(k) / float(ring_size))
+		await get_tree().create_timer(WAVE_STEP / sp, false).timeout
+	if not _wave_skip:
+		await get_tree().create_timer(0.3 / sp, false).timeout
+	wave_running = false
+	_wave_skip = false
+
+
+## Finishes a running finale wave at once (the rest of the tiles turn together).
+func skip_wave() -> void:
+	if wave_running:
+		_wave_skip = true
+
+
+## The finale's boss looming over the island centre: a giant, dimmed figure of the final boss
+## that rises slowly while the tiles turn (show_boss_looming(false) when the fight starts).
+func show_boss_looming(id: String, on: bool, animate := true) -> void:
+	if not on:
+		if boss_looming and is_instance_valid(boss_looming):
+			var old := boss_looming
+			boss_looming = null
+			if animate:
+				var t := old.create_tween()
+				t.tween_property(old, "position:y", old.position.y - 3.0, 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+				t.tween_callback(old.queue_free)
+			else:
+				old.queue_free()
+		return
+	if boss_looming and is_instance_valid(boss_looming):
+		return
+	var root := Node3D.new()
+	root.name = "BossLooming"
+	add_child(root)
+	boss_looming = root
+	var ch := EnemyLooks.create(id, false, EnemyLooks.spawn_context({"id": id}, -1, [], biome_id))
+	ch.scale = Vector3.ONE * 1.9 * EnemyLooks.scale_of(id) / 1.3
+	# face the front edge of the ring (the camera's side)
+	ch.rotation.y = 0.0
+	root.add_child(ch)
+	ch.set_tint(Color(0.32, 0.06, 0.12), 0.5, Color(0.28, 0.02, 0.06))
+	var glow := OmniLight3D.new()
+	glow.light_color = Color(1.0, 0.25, 0.2)
+	glow.light_energy = 2.2
+	glow.omni_range = 6.0
+	glow.position = Vector3(0, 1.2, 1.2)
+	root.add_child(glow)
+	# over the island's heart, a little toward the back edge, hovering above the dressing
+	var y := TILE_TOP + 0.6
+	root.position = Vector3(0, y, -0.3 * PITCH)
+	if animate:
+		root.position.y = y - 3.5
+		var tw := root.create_tween()
+		tw.tween_property(root, "position:y", y, 1.8).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+
+## Embers drifting up from the Last Camp's fire.
+func _camp_embers() -> GPUParticles3D:
+	var e := GPUParticles3D.new()
+	e.name = "Embers"
+	e.amount = 18
+	e.lifetime = 2.8
+	e.preprocess = 2.8
+	e.position = Vector3(0, 0.4, 0)
+	var pm := ParticleProcessMaterial.new()
+	pm.direction = Vector3.UP
+	pm.spread = 18.0
+	pm.initial_velocity_min = 0.7
+	pm.initial_velocity_max = 1.4
+	pm.gravity = Vector3(0.06, 0.12, 0.0)
+	pm.turbulence_enabled = true
+	pm.turbulence_noise_strength = 0.7
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	pm.emission_sphere_radius = 0.22
+	pm.scale_min = 0.5
+	pm.scale_max = 1.0
+	var grad := Gradient.new()
+	grad.offsets = PackedFloat32Array([0.0, 0.2, 0.7, 1.0])
+	grad.colors = PackedColorArray([Color(1.0, 0.9, 0.5, 0.0), Color(1.0, 0.75, 0.3, 1.0), Color(1.0, 0.35, 0.08, 0.9), Color(0.6, 0.1, 0.05, 0.0)])
+	var gt := GradientTexture1D.new()
+	gt.gradient = grad
+	pm.color_ramp = gt
+	e.process_material = pm
+	var q := Props.quad(0.08)
+	q.material = Props.particle_material("hard")
+	e.draw_pass_1 = q
+	e.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	e.visibility_aabb = AABB(Vector3(-2, -1, -2), Vector3(4, 6, 4))
+	return e
 
 
 # --- new-biome twists (docs/design/2026-09-29-new-biomes.md) ---------------------------------

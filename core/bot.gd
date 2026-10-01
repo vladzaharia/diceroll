@@ -344,6 +344,13 @@ static func _forge(f: GameFlow) -> Array:
 static func _event(f: GameFlow) -> int:
 	var ch: Array = f.offer.choices
 	match String(f.offer.id):
+		"camp":
+			# the Last Camp: a belt potion for the boss while the belt has room, else a rune
+			var want := "potion" if (f.run.potion_cap > 0 and f.run.potions < f.run.potion_cap) or hp_ratio(f) < 0.5 else "rune"
+			for i in ch.size():
+				if String(ch[i].id) == want:
+					return i
+			return 0
 		"ore":
 			# Deep Mines: the Raise, unless the pool is full and a shop comes at this lap's end
 			if not bool(ch[1].enabled) or (f.run.dice.size() >= f.run.max_dice() and f.run.is_shop_lap(f.run.lap)):
@@ -522,8 +529,12 @@ static func decide(f: GameFlow, rules: AutoRules = null) -> Dictionary:
 		GameFlow.Phase.BOARD_READY:
 			if not rules.board:
 				return _stop("AUTO board moves are off.")
+			if f.run.finale and rules.stop_before_boss:
+				return _stop("The final roll is yours.")
 			if low:
 				return _stop(low_msg)
+			if f.run.finale:
+				return _result(["roll_board"], "The final roll")
 			return _result(["roll_board"], "Rolling to move")
 		GameFlow.Phase.BOARD_ROLLED:
 			if not rules.board:
@@ -2153,6 +2164,9 @@ static func _decide_event(f: GameFlow, rules: AutoRules) -> Dictionary:
 		var v := 0.0
 		var why := String(c.label)
 		match id:
+			"camp":
+				v = _camp_value(f, rules, String(c.id))
+				why = {"potion": "A potion for the boss", "rune": "A rune by the fire", "steady": "Steady Hands for the boss fight"}.get(String(c.id), why)
 			"ore":
 				if String(c.get("ore", "")) == "gold":
 					v = float(c.get("gold", 0)) * gold_pt
@@ -2231,6 +2245,31 @@ static func _decide_event(f: GameFlow, rules: AutoRules) -> Dictionary:
 				best = i
 				break
 	return _result(["event_choose", best], whys[best] if best < whys.size() else "Choosing")
+
+## Value of a Last Camp pick (see GameFlow._open_camp).
+static func _camp_value(f: GameFlow, rules: AutoRules, id: String) -> float:
+	var run := f.run
+	match id:
+		"potion":
+			var belt := run.potion_cap > 0 and run.potions < run.potion_cap
+			var share := run.potion_pct() if run.potion_cap > 0 else Balance.SHOP_POTION_PCT
+			var heal := float(run.pct_of_max(share))
+			if not belt:
+				heal = minf(heal, float(run.max_hp - run.hp))
+			return heal * _hp_pt(f, rules) * _pref(rules, "def")
+		"rune":
+			# the better of CAMP_RUNE_CHOICES random runes: about the pool's best-third gain
+			var gains: Array = []
+			for r in f._rune_pool():
+				gains.append(float(_best_rune_die(f, rules, r)[1]) * _pref(rules, String(RUNE_CAT.get(r, "dmg"))))
+			gains.sort()
+			if gains.is_empty():
+				return 0.0
+			return maxf(0.0, float(gains[int(gains.size() * 2 / 3)]))
+		"steady":
+			# +1 reroll every turn, for the final boss fight only
+			return 0.18 * _pv_run(f, rules) * _pref(rules, "dmg") * 0.6
+	return 0.0
 
 # ------------------------------------------------------------------------------ board
 
@@ -2371,7 +2410,7 @@ static func _move_value(f: GameFlow, rules: AutoRules, move: int, memo: Dictiona
 	var v := 0.0
 	if move > 0:
 		var crossing := run.board.crosses_start(run.pos, move)
-		var target := 0 if (crossing and run.lap >= run.total_laps()) else run.board.landing(run.pos, move)
+		var target := 0 if (crossing and not run.finale and (run.lap >= run.total_laps() or run.is_camp_lap(run.lap))) else run.board.landing(run.pos, move)
 		v = _tile_value(f, rules, target, crossing)
 		var p := run.board.path(run.pos, move)
 		for k in range(0, p.size() - 1):
@@ -2397,7 +2436,7 @@ static func _decide_board(f: GameFlow, rules: AutoRules) -> Dictionary:
 	var run := f.run
 	var target := f.board_target()
 	var crossing := run.board.crosses_start(run.pos, f.board_move)
-	var boss_next := f.board_move > 0 and crossing and run.lap >= run.total_laps()
+	var boss_next := run.finale or (f.board_move > 0 and crossing and run.lap >= run.total_laps())
 	var tile: Dictionary = run.board.tiles[target]
 	var mini_next: bool = f.board_move > 0 and String(tile.type) == "miniboss" and not tile.enemies.is_empty()
 	if boss_next and rules.stop_before_boss:

@@ -127,8 +127,10 @@ func refresh(flow: GameFlow) -> void:
 	var rolled := ph == GameFlow.Phase.BOARD_ROLLED
 	_col.visible = (ready or rolled) and not busy
 	roll_btn.visible = ready
+	# the finale's one roll into the boss fight
+	roll_btn.text = "FINAL ROLL" if flow.run.finale else "ROLL"
 	go_btn.visible = rolled
-	reroll_btn.visible = rolled
+	reroll_btn.visible = rolled and not flow.run.finale
 	move_pill.visible = rolled
 	reroll_btn.sub_text = "%d left" % flow.board_rerolls_left
 	reroll_btn.set_enabled(flow.board_rerolls_left > 0)
@@ -171,7 +173,7 @@ func _fill_move(flow: GameFlow) -> void:
 		var pv := flow.board_pair_value()
 		tag.add_child(UiTheme.label("DOUBLES · PAIR OF %d" % pv if pv > 0 else "DOUBLES!", 22, UiPalette.GOLD_BRIGHT, true, 4))
 		_move_row.add_child(tag)
-	elif flow.run.lap >= Balance.TOTAL_LAPS and flow.run.board.crosses_start(flow.run.pos, flow.board_move):
+	elif flow.run.finale or (flow.run.lap >= flow.run.total_laps() and flow.run.board.crosses_start(flow.run.pos, flow.board_move)):
 		_move_row.add_child(UiTheme.label("BOSS!", 26, UiPalette.HP_BRIGHT, true, 4))
 
 

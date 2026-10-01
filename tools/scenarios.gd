@@ -17,6 +17,8 @@ const REGISTRY := {
 	"dev_menu_confirm": "res://ui/modals/dev_menu_scenarios.gd",
 	"dev_menu_store": "res://ui/modals/dev_menu_scenarios.gd",
 	"dev_menu_boot": "res://ui/modals/dev_menu_scenarios.gd",
+	# the Last Camp (pre-boss camp at the lap-14 finish; --pick=N shows the final lap after it)
+	"game_last_camp": "res://game/scenarios.gd",
 }
 
 const PROVIDERS := [

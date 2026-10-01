@@ -15,9 +15,9 @@ func test_generation_constraints_many_seeds() -> void:
 		assert_eq(b.tiles[6].type, "forge")
 		assert_eq(b.tiles[12].type, "treasury")
 		assert_eq(b.tiles[18].type, "portal")
-		assert_eq(_count(b, "enemy"), 6, "enemies seed %d" % s)
-		assert_eq(_count(b, "chest"), 3)
-		assert_eq(_count(b, "event"), 3)
+		assert_eq(_count(b, "enemy"), 8, "enemies seed %d" % s)
+		assert_eq(_count(b, "chest"), 2)
+		assert_eq(_count(b, "event"), 2)
 		assert_eq(_count(b, "campfire"), 2)
 		assert_eq(_count(b, "trap"), 2)
 		assert_eq(_count(b, "empty"), 4)
@@ -35,7 +35,7 @@ func test_generation_constraints_many_seeds() -> void:
 func test_later_acts_have_an_elite() -> void:
 	var b := Board.generate(Rng.new(4), 2, 24)
 	assert_eq(_count(b, "elite"), 1)
-	assert_eq(_count(b, "enemy"), 5)
+	assert_eq(_count(b, "enemy"), 7)
 	for t in b.tiles:
 		if t.type == "elite":
 			assert_true(t.elite)
@@ -83,9 +83,9 @@ func test_default_size_is_28() -> void:
 		assert_eq(b.corners(), {0: "start", 7: "forge", 14: "treasury", 21: "portal"})
 		assert_eq(b.tiles[7].type, "forge")
 		assert_eq(b.tiles[21].type, "portal")
-		assert_eq(_count(b, "enemy"), 7)
-		assert_eq(_count(b, "chest"), 4)
-		assert_eq(_count(b, "event"), 4)
+		assert_eq(_count(b, "enemy"), 9)
+		assert_eq(_count(b, "chest"), 3)
+		assert_eq(_count(b, "event"), 3)
 		assert_eq(_count(b, "campfire"), 2)
 		assert_eq(_count(b, "trap"), 2)
 		assert_eq(_count(b, "empty"), 5)
@@ -115,9 +115,9 @@ func test_size_32_geometry() -> void:
 func test_size_32_distribution() -> void:
 	for s in 30:
 		var b := Board.generate(Rng.new(s), 1, 32)
-		assert_eq(_count(b, "enemy"), 8, "enemies seed %d" % s)
-		assert_eq(_count(b, "chest"), 4)
-		assert_eq(_count(b, "event"), 4)
+		assert_eq(_count(b, "enemy"), 10, "enemies seed %d" % s)
+		assert_eq(_count(b, "chest"), 3)
+		assert_eq(_count(b, "event"), 3)
 		assert_eq(_count(b, "campfire"), 3)
 		assert_eq(_count(b, "trap"), 3)
 		assert_eq(_count(b, "empty"), 6)
@@ -125,7 +125,7 @@ func test_size_32_distribution() -> void:
 			assert_true(b.tiles[i].type != "enemy" and b.tiles[i].type != "elite", "no fight right after start")
 	var b2 := Board.generate(Rng.new(4), 2, 32)
 	assert_eq(_count(b2, "elite"), 1)
-	assert_eq(_count(b2, "enemy"), 7)
+	assert_eq(_count(b2, "enemy"), 9)
 
 func test_size_32_mutation_and_round_trip() -> void:
 	var r := Rng.new(6)
@@ -134,7 +134,7 @@ func test_size_32_mutation_and_round_trip() -> void:
 	b.mutate(r, 1, 2)
 	assert_eq(_count(b, "enemy"), enemies + 3, "32 ring spawns 3 enemies per lap")
 	assert_eq(_count(b, "elite"), 1)
-	assert_eq(_count(b, "event"), 4, "events refresh to 4")
+	assert_eq(_count(b, "event"), 3, "events refresh to 3")
 	var parsed: Dictionary = JSON.parse_string(JSON.stringify(b.to_dict()))
 	var c := Board.from_dict(parsed)
 	assert_eq(c.size(), 32)
@@ -171,7 +171,7 @@ func test_mutation() -> void:
 	# cleared one (-1) then +2 enemies
 	assert_eq(_count(b, "enemy"), before_enemy - 1 + 2)
 	assert_eq(_count(b, "elite"), 1)
-	assert_eq(_count(b, "event"), 3, "events refresh")
+	assert_eq(_count(b, "event"), 2, "events refresh")
 	assert_true(changes.size() >= 4, "changes reported")
 	for c in changes:
 		assert_true(c.has("idx") and c.has("type") and c.has("enemies"))

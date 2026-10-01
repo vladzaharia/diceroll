@@ -224,6 +224,12 @@ func start(f: GameFlow) -> void:
 	board.variant_seed = hash([f.run.seed, f.run.biome()])
 	board.moon_phase = f.run.moon_phase()
 	board.build(f.run.biome(), f.run.board.to_dict().tiles)
+	var boss_now := f.phase == GameFlow.Phase.COMBAT and f.combat != null and f.combat.boss
+	if bool(f.run.stats.get("camped", false)) and f.run.lap >= f.run.total_laps() and not boss_now and not f.is_over():
+		# a run saved after the Last Camp: its fire still burns by the Start
+		board.show_last_camp(true, false)
+		if f.run.finale:
+			board.show_boss_looming(f.run.boss_id, true, false)
 	if f.phase == GameFlow.Phase.BOARD_READY:
 		rig.home(board.hero, true)
 	else:
@@ -507,6 +513,8 @@ func begin_combat(ev: Dictionary) -> void:
 ## name card slams in. The camera starts close on the boss and eases to combat framing.
 func _boss_intro(tile: int, enemies: Array) -> void:
 	var nm := String(enemies[0].get("name", "Boss")) if not enemies.is_empty() else "Boss"
+	board.show_last_camp(false, true) # the Last Camp's fire goes out as the boss rises
+	board.show_boss_looming("", false, true)
 	Audio.play_music("calm", 0.6)
 	overlay.vignette(0.85, 0.6)
 	# cinematic: no HUD bottom bar or tray while the boss rises
@@ -649,6 +657,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	var mb := event as InputEventMouseButton
 	if mb and mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
 		if busy:
+			# the finale's boss-tile wave is skippable (like the Camp's reveals)
+			board.skip_wave()
 			return
 		_tap(mb.position)
 		return

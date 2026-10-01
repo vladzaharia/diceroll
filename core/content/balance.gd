@@ -19,6 +19,31 @@ const ACTS := 3
 const SHOP_LAPS := [1, 3, 5, 6, 8, 10, 12, 14]
 ## Short Road (10 laps, biome change at 6).
 const SHOP_LAPS_SHORT := [1, 3, 5, 7, 9]
+## The Last Camp (pre-boss camp): once per run, when the hero finishes the second-to-last lap
+## (lap 14; the Short Road's lap 9), they rest by a campfire on Start before the final lap: a heal
+## of CAMP_HEAL_PCT of max HP (A2+: CAMP_ASC_HEAL_PCT) and one pick of CAMP_CHOICES, before that
+## lap's shop (the last buy). The final boss is tougher in exchange: x CAMP_BOSS_HP HP.
+const CAMP_HEAL_PCT := 0.35
+const CAMP_ASC_HEAL_PCT := 0.25
+## Final-boss HP after the camp, by boss (the difficulty of the old lap 15 moved into the boss).
+## Bosses whose threat grows with fight length (the Moon King's Moonfall, the Sand Colossus)
+## take less. Unlisted bosses: CAMP_BOSS_HP.
+const CAMP_BOSS_HP := 1.5
+const CAMP_BOSS_HP_BY_ID := {
+	"boss_lich": 1.54, "boss_bone_warden": 1.68, "boss_cinder_king": 1.52, "boss_magma_golem": 1.46,
+	"boss_moon_king": 1.23, "boss_sand_colossus": 1.36,
+}
+## The Short Road's finale bosses after its camp (lap 9), on top of their short_boss_hp.
+const CAMP_BOSS_HP_SHORT_BY_ID := {
+	"boss_lich": 1.17, "boss_bone_warden": 1.13, "boss_cinder_king": 1.26, "boss_magma_golem": 1.18,
+	"boss_moon_king": 1.15, "boss_sand_colossus": 1.28,
+}
+## The mutation into the camp's lap (lap 14) spawns no new fights: the road to the camp is quiet.
+const CAMP_QUIET_LAP := true
+## The camp's one pick: a Healing Draught, a rune (1 of CAMP_RUNE_CHOICES) or Steady Hands (+1
+## combat reroll every turn of the final boss fight).
+const CAMP_CHOICES := ["potion", "rune", "steady"]
+const CAMP_RUNE_CHOICES := 2
 ## The mini-boss appears when this lap starts and is gone when the next biome starts.
 const MINIBOSS_LAP := 7
 const BIOME_HEAL_PCT := 0.30
@@ -74,9 +99,10 @@ const LAVA_LAND_PCT := 0.06
 # Enemy scaling by lap (1..15): HP x (ENEMY_BASE_SCALE + ENEMY_LAP_STEP*(lap-1)), attack x
 # (ENEMY_BASE_SCALE + ENEMY_ATK_LAP_STEP*(lap-1)). 2026-09-28 rebalance: a gentle start (no
 # drafts, 2 dice), HP growing faster than attack late (long fights, fewer one-shots).
-const ENEMY_BASE_SCALE := 1.0
+const ENEMY_BASE_SCALE := 0.985
 const ENEMY_LAP_STEP := 0.35
 const ENEMY_ATK_LAP_STEP := 0.125
+const ENEMY_SCALE_CAP_LAP := 12
 const ELITE_HP_MULT := 1.3
 const ELITE_ATK_MULT := 1.15
 const ELITE_REWARD_MULT := 1.5
@@ -155,6 +181,11 @@ static func act_for_lap(lap: int) -> int:
 			a = k + 1
 	return a
 
+## The final boss's HP multiplier after the Last Camp.
+static func camp_boss_mult(id: String, short := false) -> float:
+	var table: Dictionary = CAMP_BOSS_HP_SHORT_BY_ID if short else CAMP_BOSS_HP_BY_ID
+	return float(table.get(id, CAMP_BOSS_HP)) * camp_boss_hp
+
 static func is_shop_lap(completed_lap: int) -> bool:
 	if tune_shop != "":
 		return Array(tune_shop.split(",")).has(str(completed_lap))
@@ -171,14 +202,26 @@ static var tune_gold := 1.0
 static var tune_shop := "" # "" = default cadence; else comma list of completed laps
 
 static var tune_atk_step := ENEMY_ATK_LAP_STEP
+## The Last Camp dials (sim --camp=off|on, --camp-heal=, --camp-asc-heal=, --camp-boss=).
+static var camp_on := true
+static var camp_heal := CAMP_HEAL_PCT
+static var camp_asc_heal := CAMP_ASC_HEAL_PCT
+## Scales every CAMP_BOSS_HP_BY_ID entry (sim --camp-boss=).
+static var camp_boss_hp := 1.0
+## Regular-enemy scaling stops at ENEMY_SCALE_CAP_LAP (laps 12-14 fight lap-12 enemies: the
+## late difficulty lives in the final boss). 0 = never (sim --tune-cap=N).
+static var tune_cap := ENEMY_SCALE_CAP_LAP
 
 ## Enemy HP multiplier at `lap`.
 static func enemy_scale(lap: int) -> float:
-	return tune_base + tune_step * (lap - 1)
+	return tune_base + tune_step * (_capped(lap) - 1)
 
 ## Enemy attack multiplier at `lap` (grows slower than HP late: long fights, fewer one-shots).
 static func enemy_atk_scale(lap: int) -> float:
-	return tune_base + tune_atk_step * (lap - 1)
+	return tune_base + tune_atk_step * (_capped(lap) - 1)
+
+static func _capped(lap: int) -> int:
+	return mini(lap, tune_cap) if tune_cap > 0 else lap
 
 static func gold_scale(lap: int) -> float:
 	return 1.0 + GOLD_LAP_STEP * (lap - 1)
@@ -193,6 +236,19 @@ const POTION_HEAL_PCT := 0.30
 const CHEST_POTION_CHANCE := 0.2
 ## One minigame tile per equipped minigame (at most this many), respawned on lap mutation.
 const MINIGAME_TILES_MAX := 3
+## Played minigame tiles come back on every MINIGAME_REFILL_EVERY-th lap of a biome (its 1st, 3rd
+## and 5th lap: a treat, not a fixture); a new biome's board always gets them.
+const MINIGAME_REFILL_EVERY := 2
+## Fight-first boards (2026-09-30): events top up on every EVENT_REFILL_EVERY-th lap of a biome, and
+## the first biome's lap mutations spawn MUTATE_EXTRA_ENEMIES_T1 more Enemies.
+const EVENT_REFILL_EVERY := 2
+const MUTATE_EXTRA_ENEMIES_T1 := 2
+static var tune_mg_refill := MINIGAME_REFILL_EVERY
+## Analysis dials: events top up every N laps of a biome (1 = every lap), and extra Enemy spawns
+## in the first biome's lap mutations (sim --event-refill=N, --mut-enemy=N).
+static var tune_event_refill := EVENT_REFILL_EVERY
+static var tune_mut_enemy := MUTATE_EXTRA_ENEMIES_T1
+static var tune_quiet_last := CAMP_QUIET_LAP
 
 # Short Road mode (opts.mode = "short"): 10 laps, 2 biomes. Laps 1-5 walk the route's tier-1
 # biome, laps 6-10 its tier-3 biome. The mini-boss (from the tier-3 biome's list) appears when
@@ -211,6 +267,6 @@ const TARGET_FRESH := [0.30, 0.40]
 const TARGET_MID := [0.45, 0.50]
 const TARGET_MAX := [0.55, 0.65]
 const TARGET_MAX_A10 := [0.20, 0.30]
-## Greedy (naive floor) on a fresh profile, and the expert ceiling on a fresh profile.
+## Greedy (naive floor) on a fresh profile. The expert ceiling has no target (Vlad, 2026-09-30:
+## expert ~95%+ at max is accepted; Ascension is the expert's challenge).
 const TARGET_GREEDY_FRESH := [0.15, 0.30]
-const TARGET_EXPERT_FRESH_MAX := 0.80

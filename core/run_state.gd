@@ -63,6 +63,9 @@ var cursed_faces: Array[Dictionary] = []
 ## Sunscorched Ruins: the lap in which the hero landed on an oasis (0 = none); that lap's heat is
 ## skipped.
 var cooled_lap: int = 0
+## The finale (after the Last Camp): every tile is a boss tile and the next board roll is the
+## final roll into the boss fight (GameFlow._final_roll).
+var finale: bool = false
 ## Armory item state across fights (ItemLogic): ambush (primed), dominion (stacks), soul (bonus),
 ## key_act (Skeleton Key's first chest), last_stand (used). All ints.
 var item_state: Dictionary = {}
@@ -250,6 +253,17 @@ func is_shop_lap(completed_lap: int) -> bool:
 		return Array(Balance.tune_shop.split(",")).has(str(completed_lap))
 	return (Balance.SHOP_LAPS_SHORT if mode == "short" else Balance.SHOP_LAPS).has(completed_lap)
 
+## The lap whose completion opens the Last Camp (the second-to-last lap; 0 = camp off).
+func camp_lap() -> int:
+	return total_laps() - 1 if Balance.camp_on else 0
+
+func is_camp_lap(completed_lap: int) -> bool:
+	return camp_lap() > 0 and completed_lap == camp_lap()
+
+## The Last Camp's heal share of max HP (A2+ "lap_heal": smaller).
+func camp_heal_pct() -> float:
+	return Balance.camp_asc_heal if has_asc("lap_heal") else Balance.camp_heal
+
 ## The standard-run lap of equal difficulty (enemy scaling, pools, gold). == lap in standard.
 func eff_lap(l: int = -1) -> int:
 	var x := lap if l < 0 else l
@@ -426,7 +440,7 @@ func to_dict() -> Dictionary:
 		"route": Array(route), "miniboss_id": miniboss_id, "boss_id": boss_id, "chill": chill,
 		"meta": meta.duplicate(true), "mode": mode, "belt": Array(belt), "potions": potions, "potion_cap": potion_cap,
 		"pet_state": pet_state.duplicate(true), "lap_rerolls": lap_rerolls, "cursed_faces": cursed_faces.duplicate(true),
-		"cooled_lap": cooled_lap, "item_state": item_state.duplicate(true),
+		"cooled_lap": cooled_lap, "item_state": item_state.duplicate(true), "finale": finale,
 		"skin": skin, "skin_prestige": skin_prestige, "turret": turret.to_dict() if turret != null else null,
 	}
 
@@ -476,6 +490,7 @@ static func from_dict(d: Dictionary) -> RunState:
 	r.potion_cap = int(d.get("potion_cap", 0))
 	r.lap_rerolls = int(d.get("lap_rerolls", 0))
 	r.cooled_lap = int(d.get("cooled_lap", 0))
+	r.finale = bool(d.get("finale", false))
 	var ist: Dictionary = d.get("item_state", {})
 	for k in ist:
 		r.item_state[String(k)] = int(ist[k])

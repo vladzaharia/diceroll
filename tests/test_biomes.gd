@@ -189,11 +189,11 @@ func test_replay_equality_every_route() -> void:
 
 func test_biome_tile_mix() -> void:
 	var expect := {
-		"glade": {"campfire": 3, "chest": 5, "empty": 3},
+		"glade": {"campfire": 3, "chest": 4, "empty": 3},
 		"crypt": {"trap": 4, "empty": 3},
-		"hollow": {"event": 6, "empty": 3},
+		"hollow": {"event": 5, "empty": 3},
 		"frost": {"ice": 3, "trap": 0, "empty": 4},
-		"throne": {"elite": 1, "enemy": 6},
+		"throne": {"elite": 1, "enemy": 8},
 		"magma": {"lava": 3, "empty": 2},
 	}
 	for id in expect:

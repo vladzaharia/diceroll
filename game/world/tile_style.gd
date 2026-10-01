@@ -3,7 +3,7 @@ extends RefCounted
 ## Tile colours and the small 3D prop that identifies each tile type.
 
 const TYPES := ["start", "forge", "treasury", "portal", "enemy", "elite", "miniboss", "chest", "event", "campfire",
-	"trap", "ice", "lava", "minigame", "ore", "drum", "oasis", "empty"]
+	"trap", "ice", "lava", "minigame", "ore", "drum", "oasis", "boss", "empty"]
 
 ## Inset top colour per type (sRGB).
 const COLORS := {
@@ -26,6 +26,8 @@ const COLORS := {
 	"ore": Color(0.78, 0.6, 0.2),
 	"drum": Color(0.62, 0.3, 0.16),
 	"oasis": Color(0.1, 0.72, 0.86),
+	# the finale: every tile turns into the final boss's ground (deep crimson)
+	"boss": Color(0.62, 0.07, 0.16),
 	"empty": Color(0.7, 0.66, 0.6),
 }
 ## Moonlit Woods: the moon rune chest's silver top (a chest tile with `moon`).
@@ -128,6 +130,21 @@ static func make_prop(type: String, game := "", opts := {}) -> Node3D:
 				var fl := Biome.flame(root, Vector3(0.48, 0.46, -0.42), Color(1.0, 0.75, 0.35), 0.06, 4)
 				fl.name = "CandleFlame"
 			root.add_child(_question_mark())
+		"boss":
+			# the finale: a skull on a smouldering crimson sigil
+			var sk := Props.put(root, Props.HAL + "skull_candle.gltf", Vector3(0, 0, -0.05), randf_range(-20.0, 20.0), 0.7)
+			sk.name = "Skull"
+			var sig := MeshInstance3D.new()
+			sig.name = "Sigil"
+			var cm := CylinderMesh.new()
+			cm.top_radius = 0.5
+			cm.bottom_radius = 0.5
+			cm.height = 0.02
+			cm.radial_segments = 20
+			sig.mesh = cm
+			sig.material_override = Props.glow_material(Color(1.0, 0.18, 0.12, 0.45), true, 1.4)
+			sig.position = Vector3(0, 0.02, 0)
+			root.add_child(sig)
 		"campfire":
 			root.add_child(_campfire())
 			if Props.has(RES + "Wood_Log_Stack.gltf"):
