@@ -207,13 +207,27 @@ static func describe_result(r: Dictionary, channel: String, current: String) -> 
 ## Returns {"action": NONE|PACK|READY|BINARY|STORE, "mandatory": bool, "url": String,
 ##          "version": String, "reason": String}.
 static func decide(m: Dictionary, ctx: Dictionary) -> Dictionary:
+	var out := _decide(m, ctx)
+	# "required" only ever accompanies an action the player can take: NONE (up to date, behind,
+	# a store build without a listing, a distribution updated elsewhere) is never mandatory.
+	if String(out["action"]) == NONE:
+		out["mandatory"] = false
+	return out
+
+
+static func _decide(m: Dictionary, ctx: Dictionary) -> Dictionary:
 	var ver := String(m.get("version", ""))
 	var dist := String(ctx.get("distribution", "dev"))
 	var bin := String(ctx.get("binary_version", ctx.get("version", "")))
 	var cur := String(ctx.get("version", bin))
 	var min_sup := String(m.get("min_supported", ""))
-	var mandatory := min_sup != "" and Semver.compare(bin, min_sup) < 0
 	var newer := Semver.is_newer(ver, cur)
+	# min_supported only makes an update *required* when there is something to update to: the
+	# channel's version is newer than the executable and itself satisfies min_supported. A
+	# manifest whose min_supported the release fails (e.g. "0.1.0" on 0.1.0-rc.6, since a
+	# prerelease sorts below its release) must never flag the build that is already on it.
+	var mandatory := (min_sup != "" and Semver.compare(bin, min_sup) < 0
+		and Semver.is_newer(ver, bin) and Semver.compare(ver, min_sup) >= 0)
 	# behind: the channel's latest is older than what runs (e.g. beta -> stable on a beta
 	# build). Never a downgrade: nothing to do until the channel passes the running version.
 	var out := {"action": NONE, "mandatory": mandatory, "url": "", "version": ver, "reason": "",
@@ -246,7 +260,13 @@ static func decide(m: Dictionary, ctx: Dictionary) -> Dictionary:
 			return out
 		var skip := String(ctx.get("skip_version", "")) == ver
 		var engine_ok := String(m.get("engine", "")) == String(ctx.get("engine", ""))
-		var bin_ok := Semver.compare(bin, String(m.get("min_binary", "0.0.0"))) >= 0
+		# a release can't need an executable newer than itself: a min_binary above the version
+		# is a manifest slip (old CI wrote "0.1.0" on every 0.1.0-rc.N, refusing every rc
+		# binary), so it is ignored and only the engine match gates the pack
+		var min_bin := String(m.get("min_binary", "0.0.0"))
+		if min_bin == "" or Semver.compare(min_bin, ver) > 0:
+			min_bin = "0.0.0"
+		var bin_ok := Semver.compare(bin, min_bin) >= 0
 		if not pack.is_empty() and engine_ok and bin_ok and not skip:
 			out["action"] = PACK
 			out["url"] = String(pack["url"])
@@ -254,7 +274,7 @@ static func decide(m: Dictionary, ctx: Dictionary) -> Dictionary:
 			return out
 		out["reason"] = "pack rolled back" if skip else ("no pack" if pack.is_empty()
 			else ("engine %s != %s" % [m.get("engine"), ctx.get("engine")] if not engine_ok
-			else "binary %s < min_binary %s" % [bin, m.get("min_binary")]))
+			else "binary %s < min_binary %s" % [bin, min_bin]))
 	else:
 		out["reason"] = "binary %s < min_supported %s" % [bin, min_sup]
 	out["action"] = BINARY
