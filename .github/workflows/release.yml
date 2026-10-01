@@ -284,6 +284,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          # no --min-supported / --min-binary: the defaults ("" / 0.0.0) never exceed the release
+          # (a "0.1.0" floor on 0.1.0-rc.N marked every rc build "Update required"); raise them
+          # only to a version <= $V, which update_manifest.py enforces
           python3 tools/ci/update_manifest.py --version "$V" --dist dist --channel "$CHANNEL" \
             --release-url "$REPO_URL/releases/download/v$V" --notes notes/store/android_whats_new.txt --out channels
           src=altstore-source.json
