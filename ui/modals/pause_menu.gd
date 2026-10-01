@@ -122,6 +122,8 @@ func refresh(flow: GameFlow) -> void:
 
 
 func open() -> void:
+	# CONTROLS teaches the keys: keyboard / mouse only (spec 6)
+	_controls.visible = InputMode.platform_default_kbm() and InputMode.is_kbm()
 	_unask()
 	super.open()
 

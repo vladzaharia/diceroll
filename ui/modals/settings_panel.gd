@@ -120,8 +120,12 @@ func _build() -> void:
 	auto.pressed.connect(func() -> void: auto_settings_pressed.emit())
 	body.add_child(auto)
 	# Controls (desktop only, spec 6): every shortcut with its keycaps, from the action table
+	# (ControlsList: slice e's widget; shown in keyboard / mouse mode, hidden on touch)
 	if InputMode.platform_default_kbm():
-		_controls = ControlsList.make()
+		_controls = UiTheme.vbox(8)
+		_controls.name = "Controls"
+		_controls.add_child(UiModal.section_label("Controls"))
+		_controls.add_child(ControlsList.make())
 		body.add_child(_controls)
 	# credits
 	var credits := UiTheme.vbox(4)
@@ -215,6 +219,8 @@ func refresh(_flow: GameFlow = null) -> void:
 		_update_btn.set_pressed_no_signal(on)
 		_update_btn.set("_knob", 1.0 if on else 0.0)
 		_update_btn.queue_redraw()
+	if _controls != null:
+		_controls.visible = InputMode.is_kbm()
 	var us := ui_size()
 	for i in _size_btns.size():
 		_size_btns[i].set_pressed_no_signal(is_equal_approx(us, UI_SIZES[i]))
