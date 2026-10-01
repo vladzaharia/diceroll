@@ -176,7 +176,7 @@ func _init() -> void:
 	chips.add_child(act)
 	var ar := UiTheme.hbox(8)
 	act.add_child(ar)
-	_boss_icon = UiIcons.rect("skull", 28)
+	_boss_icon = Icons.rect("boss", 28)
 	_boss_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_boss_icon.visible = false
 	ar.add_child(_boss_icon)
@@ -405,7 +405,7 @@ func set_lap(act: int, lap: int) -> void:
 		var bn := _boss_name if _boss_name != "" else "the final boss"
 		_act_chip.tooltip_text = ("Every tile is %s's now: one last roll, and wherever you land, you fight." % bn) if _finale \
 			else "After the Last Camp, one final roll into %s." % bn
-	_act_chip.add_theme_stylebox_override("panel", UiTheme.panel_box("pill", UiPalette.HP_BRIGHT if final else bc))
+	_act_chip.add_theme_stylebox_override("panel", UiTheme.chip_box("red") if final else UiTheme.panel_box("pill", bc))
 	_set_laps(act, lap)
 	if final and not was_final and is_inside_tree():
 		UiTheme.pop(_act_chip, 1.25, 0.4)
