@@ -1,227 +1,292 @@
 class_name WorkshopModal
 extends CampModal
-## Dice Workshop (review §5.2): unlock packs bought with Sigils (their runes, die kinds and
-## passives join the drop pools), the pool toggle (at most 25% of each pool off), the Starter
-## Kit (kind of the second starting die) and the Whetstone.
+## Dice Workshop (review §5.2; Camp stations pass, docs/design/2026-10-01-camp-stations.md):
+## unlock packs bought with Sigils (their runes, die kinds and passives join the drop pools),
+## the pool toggles (at most 25% of each pool off), the Starter Kit (kind of the second
+## starting die) and the Whetstone. Every pack is a StationCard of the same height: its
+## contents are a Carousel of item tiles (tap one for its rule), so the 25-item Starter pack
+## is no taller than a 4-item pack.
 
 const POOLS := [["runes", "Runes"], ["kinds", "Die kinds"], ["passives", "Passives"]]
+const POOL_ICON := {"runes": "rune_choice", "kinds": "dice", "passives": "trophy"}
 const ACCENT := Color("7ad0ff")
+## Item tiles: height and narrowest width (4 per page on a phone, 5 on a wide panel).
+const TILE_H := 132.0
+const TILE_W := 104.0
+
+## Pack, pool and Starter Kit cards: one spec each (every pack card is the same height).
+var pack_spec := _spec(true)
+var pool_spec := _pool_spec()
+var kit_spec := _spec(true)
+var whet_spec := _whet_spec()
 
 
 func _build() -> void:
 	set_title("DICE WORKSHOP", PLAQUE_DEFAULT)
 
 
+static func _carousel_h() -> float:
+	# the strip only: its indicator row (arrows, dots) sits in the card's footer
+	return TILE_H
+
+
+static func _spec(with_footer: bool) -> StationCard.Spec:
+	var s := StationCard.Spec.new()
+	s.contents_h = _carousel_h()
+	s.footer_h = 88.0 if with_footer else 0.0
+	return s
+
+
+static func _pool_spec() -> StationCard.Spec:
+	var s := StationCard.Spec.new()
+	s.contents_h = _carousel_h()
+	s.footer_h = 88.0
+	return s
+
+
+static func _whet_spec() -> StationCard.Spec:
+	var s := StationCard.Spec.new()
+	s.contents_h = 0.0
+	s.footer_h = 48.0
+	return s
+
+
 func rebuild(p: Profile) -> void:
-	body.add_child(CampModal.heading("Unlock packs", "Each pack adds a build idea to the drops: runes, die kinds and passives."))
+	fit_columns()
+	body.add_child(CampModal.heading("Unlock packs", "Each pack adds its runes, dice and passives to what you find. Tap an item for its rule."))
+	var packs := card_grid()
+	body.add_child(packs)
 	for id in UnlockDefs.PACK_IDS:
-		body.add_child(_pack_card(p, String(id)))
-	body.add_child(CampModal.heading("Drop pools", "Switch off up to 25% of each pool to steer what you find."))
+		packs.add_child(pack_card(p, String(id)))
+	body.add_child(CampModal.heading("Drop pools", "Tap to switch an item off: up to 25% of each pool, to steer what you find."))
+	var pools := card_grid()
+	body.add_child(pools)
 	for pool in POOLS:
-		body.add_child(_pool_card(p, String(pool[0]), String(pool[1])))
+		pools.add_child(_pool_card(p, String(pool[0]), String(pool[1])))
 	body.add_child(CampModal.heading("Starting kit"))
-	body.add_child(_starter_card(p))
-	body.add_child(_whetstone_card(p))
+	var kit := card_grid()
+	body.add_child(kit)
+	kit.add_child(_starter_card(p))
+	kit.add_child(_whetstone_card(p))
 
 
-func _pack_card(p: Profile, id: String) -> Control:
+# ---------------------------------------------------------------- packs
+
+## One pack: medallion, name, its build idea, what it adds (pills), its items (carousel),
+## OWNED or UNLOCK [sigil] N, and how it unlocks / what of it is switched off.
+func pack_card(p: Profile, id: String) -> StationCard:
 	var d: Dictionary = UnlockDefs.PACKS[id]
 	var owned := p.owns("packs", id)
-	var c := CampUi.card(false, ACCENT) if owned else CampUi.locked_card()
-	var v := UiTheme.vbox(10)
-	c.add_child(v)
-	var head := UiTheme.hbox(10)
-	v.add_child(head)
-	var n := (d.runes as Array).size() + (d.kinds as Array).size() + (d.passives as Array).size()
-	var tr := CampArt.title_row(String(CampInfo.PACK_ICON.get(id, "pack")), ACCENT, String(d.name), "%d ITEMS" % n, 56, not owned)
-	tr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(tr)
+	var c := StationCard.make(pack_spec, String(CampInfo.PACK_ICON.get(id, "pack")), ACCENT, String(d.name),
+		String(CampInfo.PACK_BLURB.get(id, "")), "normal" if owned else "locked")
+	c.name = "Pack_" + id
+	var nr := (d.runes as Array).size()
+	var nk := (d.kinds as Array).size()
+	var np := (d.passives as Array).size()
+	if nr > 0:
+		c.add_pill(String(POOL_ICON.runes), _count(nr, "RUNE", "RUNES"))
+	if nk > 0:
+		c.add_pill(String(POOL_ICON.kinds), _count(nk, "DIE", "DICE"))
+	if np > 0:
+		c.add_pill(String(POOL_ICON.passives), _count(np, "PASSIVE", "PASSIVES"))
 	if owned:
-		head.add_child(CampArt.chip("OWNED", "green", "", 18))
+		c.set_state("OWNED", "green", "check")
 	else:
 		var cost := UnlockDefs.sigil_cost("packs", id)
 		var b := CampUi.buy_button("UNLOCK", cost, p.can_afford(cost), 22)
+		b.name = "Unlock"
 		b.pressed.connect(cmd.bind(["unlock", "packs", id]))
-		head.add_child(b)
-	var flow := HFlowContainer.new()
-	flow.add_theme_constant_override("h_separation", 8)
-	flow.add_theme_constant_override("v_separation", 8)
-	flow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	v.add_child(flow)
-	for r in d.runes:
-		flow.add_child(_item_chip(UiIcons.rune_icon(String(r)), String(Runes.DEFS[r].name), UiPalette.rune_color(String(r)), owned))
-	for k in d.kinds:
-		flow.add_child(_item_chip("kind_" + String(k), DiceKinds.label(String(k)), UiPalette.kind_color(String(k)), owned))
-	for pid in d.passives:
-		flow.add_child(_passive_chip(String(pid), owned))
-	if not owned:
+		c.set_action(b)
+	# contents: every item as a tile; a switched-off item says OFF
+	var tiles: Array = []
+	var off_n := 0
+	for pool in ["runes", "kinds", "passives"]:
+		var off: Array = p.disabled.get(pool, [])
+		for item in d[pool]:
+			var is_off := owned and off.has(item)
+			if is_off:
+				off_n += 1
+			tiles.append(_item_tile(String(pool), String(item), "dim" if not owned else "normal", is_off))
+	var car := Carousel.make(tiles, TILE_H, TILE_W, "workshop:pack:" + id)
+	car.count_text = _count(tiles.size(), "ITEM", "ITEMS")
+	car.page_changed.connect(func(_pg: int) -> void: hide_tip())
+	c.set_carousel(car)
+	# footer: in the drops (and what is off), or how to unlock it
+	if owned:
+		c.set_status("In your drops" + ("  ·  %d switched off" % off_n if off_n > 0 else ""), "check", UiPalette.HEAL)
+	else:
 		var m := CampInfo.milestone_for("packs", id)
-		if not m.is_empty():
-			v.add_child(CampUi.lock_line(String(m.desc)))
-	if not owned:
-		c.modulate = Color(1, 1, 1, 0.92)
+		if m.is_empty():
+			c.set_status("Unlock it with Sigils.", "lock", UiPalette.TEXT_DIM)
+		else:
+			var pr := CampInfo.progress(p, m.cond)
+			var prog := "  (%d/%d)" % [int(pr[0]), int(pr[1])] if int(pr[1]) > 1 else ""
+			c.set_status(String(m.desc) + prog, "lock", UiPalette.TEXT_DIM)
 	return c
 
 
-func _item_chip(icon: String, text: String, color: Color, on: bool) -> Control:
-	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", _chip_box(color, on))
-	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var row := UiTheme.hbox(6)
-	p.add_child(row)
-	row.add_child(CampArt.icon(icon, 26, color if on else color.darkened(0.4), not on))
-	row.add_child(UiTheme.label(text, 18, UiPalette.TEXT if on else UiPalette.TEXT_MUTED, false, 0, false, 600))
-	return p
+static func _count(n: int, one: String, many: String) -> String:
+	return "%d %s" % [n, one if n == 1 else many]
 
 
-func _passive_chip(id: String, on: bool) -> Control:
-	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", _chip_box(UiPalette.TEXT_MUTED, on))
-	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var row := UiTheme.hbox(6)
-	p.add_child(row)
-	var ic := PassiveIcon.make(id, 28)
-	if not on:
-		ic.modulate = Color(0.6, 0.6, 0.7)
-	row.add_child(ic)
-	row.add_child(UiTheme.label(String(Passives.DEFS[id].name) if Passives.DEFS.has(id) else id, 18,
-		UiPalette.TEXT if on else UiPalette.TEXT_MUTED, false, 0, false, 600))
-	return p
+## A drop-pool entry as display data: {name, tag, desc, color, detail, detail_color, icon}.
+static func drop_info(pool: String, id: String) -> Dictionary:
+	match pool:
+		"runes":
+			var r: Dictionary = Runes.DEFS[id]
+			var rar := String(r.rarity)
+			return {"name": "%s Rune" % String(r.name), "tag": "RUNE  ·  " + rar.to_upper(), "desc": String(r.desc),
+				"color": UiPalette.rune_color(id), "detail": rar.to_upper(), "detail_color": UiPalette.rarity_color(rar),
+				"icon": UiIcons.rune_icon(id)}
+		"kinds":
+			var k: Dictionary = DiceKinds.def(id)
+			var rar := String(k.rarity)
+			return {"name": DiceKinds.label(id), "tag": "DIE  ·  " + rar.to_upper(), "desc": String(k.desc),
+				"color": UiPalette.kind_color(id), "detail": rar.to_upper(), "detail_color": UiPalette.rarity_color(rar),
+				"icon": "kind_" + id}
+		"passives":
+			var rar := Passives.rarity(id)
+			var pd: Dictionary = Passives.DEFS.get(id, {})
+			return {"name": String(pd.get("name", id)), "tag": "PASSIVE  ·  " + rar.to_upper(), "desc": String(pd.get("desc", "")),
+				"color": UiPalette.passive_color(rar), "detail": rar.to_upper(), "detail_color": UiPalette.passive_color(rar),
+				"icon": PassiveIcon.glyph(id)}
+	return {"name": id, "tag": "", "desc": "", "color": UiPalette.GOLD, "detail": "", "detail_color": UiPalette.TEXT_MUTED, "icon": ""}
 
 
-## A pack's content chip: a dark inset pill (the rune / kind / passive colour is in its icon).
-static func _chip_box(_color: Color, on: bool) -> StyleBox:
-	if UiTheme.skinned("panel_inset"):
-		return UiTheme.pad(UiTheme.inset_box(), 10, 4)
-	return UiTheme.pad(UiTheme.box(Color(0.03, 0.03, 0.09, 0.6), 14, 2, Color(_color, 0.45 if on else 0.15)), 8, 4)
+## The tile's picture: the rune / passive icon, or a die kind's six faces.
+static func item_visual(pool: String, id: String, dim := false) -> Control:
+	var v: Control
+	match pool:
+		"kinds":
+			var g := GridContainer.new()
+			g.columns = 3
+			g.add_theme_constant_override("h_separation", 3)
+			g.add_theme_constant_override("v_separation", 3)
+			g.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			for f in DiceKinds.faces(id):
+				var face := DieFace.make(int(f), "", false, 21)
+				face.kind = id
+				face.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				g.add_child(face)
+			v = g
+		"passives":
+			v = PassiveIcon.make(id, 44)
+		_:
+			v = CampArt.icon(UiIcons.rune_icon(id), 44, UiPalette.rune_color(id))
+	if dim:
+		v.modulate = Color(0.7, 0.7, 0.8, 0.85)
+	return v
 
 
-func _pool_card(p: Profile, kind: String, label: String) -> Control:
-	var owned := UnlockDefs.pool_from_packs(p.unlocks.get("packs", []), kind)
-	var off: Array = p.disabled.get(kind, [])
-	var cap := int(floor(owned.size() * UnlockDefs.POOL_TOGGLE_MAX))
-	var c := CampUi.card(false, ACCENT)
-	var v := UiTheme.vbox(10)
-	c.add_child(v)
-	var head := UiTheme.hbox(10)
-	v.add_child(head)
-	var hl := UiTheme.label(label.to_upper(), 24, UiPalette.TEXT, true, 5)
-	hl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(hl)
-	head.add_child(UiTheme.label("%d/%d off" % [off.size(), cap], 19, UiPalette.GOLD if off.size() < cap else UiPalette.HP_BRIGHT, false, 0, false, 700))
-	var flow := HFlowContainer.new()
-	flow.add_theme_constant_override("h_separation", 8)
-	flow.add_theme_constant_override("v_separation", 8)
-	flow.mouse_filter = Control.MOUSE_FILTER_PASS
-	v.add_child(flow)
-	for id in owned:
-		var is_off := off.has(id)
-		var can := is_off or off.size() < cap
-		var icon := ""
-		var col := UiPalette.GOLD
-		var name := String(id)
-		match kind:
-			"runes":
-				icon = UiIcons.rune_icon(String(id))
-				col = UiPalette.rune_color(String(id))
-				name = String(Runes.DEFS[id].name)
-			"kinds":
-				icon = "kind_" + String(id)
-				col = UiPalette.kind_color(String(id))
-				name = DiceKinds.label(String(id))
-			"passives":
-				icon = PassiveIcon.glyph(String(id))
-				col = UiPalette.passive_color(Passives.rarity(String(id)))
-				name = String(Passives.DEFS[id].name)
-		var t := _toggle(icon, name, col, not is_off, can)
-		t.pressed.connect(cmd.bind(["toggle_pool", kind, String(id), is_off]))
-		flow.add_child(t)
-	if cap == 0:
-		v.add_child(CampUi.lock_line("Unlock more packs to toggle this pool."))
-	return c
-
-
-func _toggle(icon: String, text: String, color: Color, on: bool, can: bool) -> CampUi.Tile:
-	var t := CampUi.Tile.new()
-	t.enabled = can
-	t.mouse_filter = Control.MOUSE_FILTER_STOP
-	t.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if can else Control.CURSOR_ARROW
-	t.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	var sb: StyleBox
-	if UiTheme.skinned("panel_inset"):
-		sb = UiTheme.pad(UiTheme.inset_box(), 8, 4)
-	else:
-		sb = UiTheme.pad(UiTheme.box(Color(0.05, 0.06, 0.14, 0.9) if on else Color(0.03, 0.03, 0.07, 0.5), 16, 2,
-			Color(color, 0.55) if on else Color(UiPalette.DANGER, 0.45)), 10, 5)
-	t.add_theme_stylebox_override("panel", sb)
-	var row := UiTheme.hbox(6)
-	t.add_child(row)
-	# the pack checkbox shows the state; the icon says what it is
-	var box := UiSkin.texture("checkbox", "checked" if on else "unchecked", 30)
-	if box:
-		var cb := TextureRect.new()
-		cb.texture = box
-		cb.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		cb.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		cb.custom_minimum_size = Vector2(30, 30)
-		cb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		cb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_child(cb)
-	if icon.begins_with("passive_") or icon.begins_with("rune_") or icon.begins_with("kind_"):
-		row.add_child(CampArt.icon(icon, 26, color if on else UiPalette.TEXT_MUTED, not on))
-	else:
-		row.add_child(UiIcons.rect(icon, 24, color if on else UiPalette.TEXT_MUTED))
-	var l := UiTheme.label(text, 18, UiPalette.TEXT if on else UiPalette.TEXT_MUTED, false, 0, false, 600)
-	row.add_child(l)
-	if not on:
-		row.add_child(CampArt.chip("OFF", "red", "", 16))
-	if not can:
-		t.modulate = Color(1, 1, 1, 0.6)
+func _item_tile(pool: String, id: String, state: String, is_off: bool) -> Carousel.ItemTile:
+	var info := drop_info(pool, id)
+	var detail := "OFF" if is_off else String(info.detail)
+	var dcol: Color = UiPalette.HP_BRIGHT if is_off else info.detail_color
+	var t := Carousel.ItemTile.make(item_visual(pool, id, state == "dim" or is_off), String(info.name), detail, dcol, null,
+		"dim" if is_off else state)
+	t.name = "Item_" + id
+	t.pressed.connect(func() -> void:
+		show_tip(t, String(info.name), String(info.tag), String(info.desc) + ("\nSwitched off in the drop pools." if is_off else ""),
+			info.color, String(info.icon)))
 	return t
 
 
-func _starter_card(p: Profile) -> Control:
-	var d := UnlockDefs.upgrade_def("workshop", "starter_kit")
-	var owned := int(p.upgrades.get("starter_kit", 0)) >= 1
-	var c := CampUi.card(owned, ACCENT)
-	var v := UiTheme.vbox(10)
-	c.add_child(v)
-	var head := UiTheme.hbox(10)
-	v.add_child(head)
-	var tr := CampArt.title_row("upgrade_starter_kit", ACCENT, String(d.name), "SECOND STARTING DIE", 56)
-	tr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(tr)
-	if not owned:
-		var b := CampUi.buy_button("BUY", d.cost, p.can_afford(d.cost), 22)
-		b.pressed.connect(cmd.bind(["buy_upgrade", "workshop", "starter_kit"]))
-		head.add_child(b)
-	v.add_child(UiTheme.para(String(d.desc), 19, UiPalette.TEXT_DIM, 500))
-	if owned:
-		var row := UiTheme.hbox(10)
-		v.add_child(row)
-		var cur := p.starter_kind if p.starter_kind != "" else "standard"
-		for k in UnlockDefs.starter_kinds(p.pool("kinds")):
-			var dd: Dictionary = DiceKinds.def(String(k))
-			var t := CampUi.tile(DiceKinds.label(String(k)), String(dd.get("desc", "")), cur == String(k), true, "", UiPalette.kind_color(String(k)))
-			CampArt.tile_icon(t, CampArt.icon("kind_" + String(k), 28, UiPalette.kind_color(String(k))))
-			t.pressed.connect(cmd.bind(["set_starter_kind", String(k)]))
-			row.add_child(t)
+# ---------------------------------------------------------------- drop pools
+
+func _pool_card(p: Profile, kind: String, label: String) -> StationCard:
+	var owned := UnlockDefs.pool_from_packs(p.unlocks.get("packs", []), kind)
+	var off: Array = p.disabled.get(kind, [])
+	var cap := int(floor(owned.size() * UnlockDefs.POOL_TOGGLE_MAX))
+	var desc := "Switch off up to %d to see the rest more often." % cap if cap > 0 else "Every %s you own is in the drops." % label.to_lower().trim_suffix("s")
+	var c := StationCard.make(pool_spec, String(POOL_ICON[kind]), ACCENT, label, desc)
+	c.name = "Pool_" + kind
+	c.add_pill("check", "%d IN POOL" % (owned.size() - off.size()), "grey")
+	c.add_pill("", "%d/%d OFF" % [off.size(), cap], "red" if off.size() >= cap and cap > 0 else "grey")
+	var tiles: Array = []
+	for id in owned:
+		var sid := String(id)
+		var is_off := off.has(sid)
+		var can := is_off or off.size() < cap
+		var info := drop_info(kind, sid)
+		var t := Carousel.ItemTile.make(item_visual(kind, sid, is_off), String(info.name), "OFF" if is_off else "ON",
+			UiPalette.HP_BRIGHT if is_off else UiPalette.HEAL, null, "dim" if is_off else "normal")
+		t.name = "Toggle_" + sid
+		if not can:
+			t.modulate = Color(1, 1, 1, 0.6)
+			t.mouse_default_cursor_shape = Control.CURSOR_ARROW
+		t.pressed.connect(func() -> void:
+			if can:
+				cmd(["toggle_pool", kind, sid, is_off])
+			else:
+				UiTheme.sfx("error")
+				show_tip(t, String(info.name), "POOL FULL", "Up to %d %s can be off. Switch one back on first." % [cap, label.to_lower()],
+					UiPalette.HP_BRIGHT, String(info.icon)))
+		tiles.append(t)
+	var car := Carousel.make(tiles, TILE_H, TILE_W, "workshop:pool:" + kind)
+	car.count_text = "%d ITEMS" % owned.size()
+	car.page_changed.connect(func(_pg: int) -> void: hide_tip())
+	c.set_carousel(car)
+	if cap > 0:
+		c.set_status("Tap an item to switch it off or on.", "info", UiPalette.TEXT_DIM)
+	else:
+		c.set_status("Unlock more packs to switch these off.", "lock", UiPalette.TEXT_DIM)
 	return c
 
 
-func _whetstone_card(p: Profile) -> Control:
+# ---------------------------------------------------------------- starting kit
+
+func _starter_card(p: Profile) -> StationCard:
+	var d := UnlockDefs.upgrade_def("workshop", "starter_kit")
+	var owned := int(p.upgrades.get("starter_kit", 0)) >= 1
+	var c := StationCard.make(kit_spec, "upgrade_starter_kit", ACCENT, String(d.name), String(d.desc))
+	c.name = "StarterKit"
+	var cur := p.starter_kind if p.starter_kind != "" else "standard"
+	c.add_pill("dice", "SECOND STARTING DIE")
+	if owned:
+		c.set_state("OWNED", "green", "check")
+	else:
+		var b := CampUi.buy_button("BUY", d.cost, p.can_afford(d.cost), 22)
+		b.pressed.connect(cmd.bind(["buy_upgrade", "workshop", "starter_kit"]))
+		c.set_action(b)
+	var tiles: Array = []
+	for k in UnlockDefs.starter_kinds(p.pool("kinds")):
+		var kid := String(k)
+		var sel := owned and cur == kid
+		var info := drop_info("kinds", kid)
+		var t := Carousel.ItemTile.make(item_visual("kinds", kid, not owned), String(info.name), "IN USE" if sel else ("PICK" if owned else ""),
+			UiPalette.GOLD_BRIGHT if sel else UiPalette.TEXT_MUTED, null, "selected" if sel else ("normal" if owned else "dim"))
+		t.name = "Kind_" + kid
+		t.pressed.connect(func() -> void:
+			if owned and not sel:
+				cmd(["set_starter_kind", kid])
+			else:
+				show_tip(t, String(info.name), String(info.tag), String(info.desc), info.color, String(info.icon)))
+		tiles.append(t)
+	var car := Carousel.make(tiles, TILE_H, TILE_W, "workshop:kit")
+	car.count_text = _count(tiles.size(), "KIND", "KINDS")
+	car.page_changed.connect(func(_pg: int) -> void: hide_tip())
+	c.set_carousel(car)
+	if owned:
+		c.set_status("Your second die starts as a %s." % DiceKinds.label(cur), "dice", UiPalette.TEXT_DIM)
+	else:
+		c.set_status("Buy it to pick the kind. Packs add more kinds.", "lock", UiPalette.TEXT_DIM)
+	return c
+
+
+func _whetstone_card(p: Profile) -> StationCard:
 	var d := UnlockDefs.upgrade_def("workshop", "whetstone")
 	var owned := int(p.upgrades.get("whetstone", 0)) >= 1
-	var c := CampUi.card(owned, ACCENT)
-	var row := UiTheme.hbox(10)
-	c.add_child(row)
-	var tr := CampArt.title_row("upgrade_whetstone", ACCENT, String(d.name), String(d.desc).to_upper(), 56)
-	tr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(tr)
+	var c := StationCard.make(whet_spec, "upgrade_whetstone", ACCENT, String(d.name), String(d.desc))
+	c.name = "Whetstone"
+	c.add_pill("upgrade_whetstone", "1 FACE RAISE PER RUN")
 	if owned:
-		row.add_child(CampArt.chip("OWNED", "green", "", 18))
+		c.set_state("OWNED", "green", "check")
+		c.set_status("Every run starts with a free Face Raise.", "check", UiPalette.HEAL)
 	else:
 		var b := CampUi.buy_button("BUY", d.cost, p.can_afford(d.cost), 22)
 		b.pressed.connect(cmd.bind(["buy_upgrade", "workshop", "whetstone"]))
-		row.add_child(b)
+		c.set_action(b)
+		var short := int((d.cost as Dictionary).get("crowns", 0)) - p.crowns
+		c.set_status("%d Crowns to go." % short if short > 0 else "Ready to buy.", "crown" if short > 0 else "check",
+			UiPalette.TEXT_DIM if short > 0 else UiPalette.HEAL)
 	return c

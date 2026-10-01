@@ -2,8 +2,9 @@ class_name WardrobeModal
 extends CampModal
 ## Wardrobe (docs/design/2026-09-28-classes-enemies-skins.md §4.3): the class carousel (owned
 ## classes; locked ones as dark medallions, the secret one as "???"), the hero turning on a
-## pedestal, four skin swatches (Default, Victor, Ascendant, Bossbane) and the A10 prestige
-## toggle. Owned swatches equip on tap (free, instant); locked ones preview on the pedestal and
+## pedestal, the class's skins card (a StationCard whose carousel holds Default, Victor,
+## Ascendant and Bossbane; Camp stations pass, docs/design/2026-10-01-camp-stations.md) and the
+## A10 prestige toggle. Owned swatches equip on tap (free, instant); locked ones preview on the pedestal and
 ## show their condition with live progress, plus a "250 Crowns" buy button once every Crowns sink
 ## is maxed (never on prestige). "NEW" chips come from profile.cosmetics.unseen; viewing a class
 ## sends mark_skins_seen, the chips stay up until the screen closes.
@@ -39,18 +40,28 @@ func rebuild(p: Profile) -> void:
 			if not _fresh.has(u):
 				_fresh.append(u)
 		(func() -> void: cmd(["mark_skins_seen", view_class])).call_deferred()
+	fit_columns()
 	body.add_child(_classes(p, unseen))
-	body.add_child(_stand(p))
-	body.add_child(CampModal.heading("Skins", "Cosmetic only. Win with the class to earn them."))
-	var grid := GridContainer.new()
-	grid.columns = 2
-	grid.add_theme_constant_override("h_separation", 10)
-	grid.add_theme_constant_override("v_separation", 10)
-	grid.mouse_filter = Control.MOUSE_FILTER_PASS
-	body.add_child(grid)
-	for s in SWATCHES:
-		grid.add_child(_swatch(p, String(s)))
-	body.add_child(_prestige(p))
+	# landscape: the pedestal on the left, the skins beside it (no scrolling to see them)
+	var right: VBoxContainer = body
+	if is_wide():
+		var row := UiTheme.hbox(UiModal.GAP_ITEM)
+		row.mouse_filter = Control.MOUSE_FILTER_PASS
+		body.add_child(row)
+		var left := UiTheme.vbox(UiModal.GAP_ITEM)
+		left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		left.size_flags_stretch_ratio = 0.8
+		row.add_child(left)
+		left.add_child(_stand(p))
+		right = UiTheme.vbox(UiModal.GAP_ITEM)
+		right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		right.mouse_filter = Control.MOUSE_FILTER_PASS
+		row.add_child(right)
+	else:
+		body.add_child(_stand(p))
+		body.add_child(CampModal.heading("Skins", "Cosmetic only. Win with the class to earn them."))
+	right.add_child(skins_card(p))
+	right.add_child(_prestige(p))
 
 
 ## Landscape screens: a shorter pedestal and swatches (more of the list fits).
@@ -62,7 +73,7 @@ func _wide() -> bool:
 ## The class carousel: every class as a medallion (owned: tappable; NEW dot on unseen skins).
 func _classes(p: Profile, unseen: Array) -> Control:
 	var grid := GridContainer.new()
-	grid.columns = 6
+	grid.columns = 12 if is_wide() else 6
 	grid.add_theme_constant_override("h_separation", 6)
 	grid.add_theme_constant_override("v_separation", 8)
 	grid.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -92,7 +103,7 @@ func _stand(p: Profile) -> Control:
 	var col := UiTheme.vbox(4)
 	c.add_child(col)
 	_portrait = HeroPortrait.new()
-	_portrait.custom_minimum_size = Vector2(0, 280 if _wide() else 330)
+	_portrait.custom_minimum_size = Vector2(0, 470 if is_wide() else (280 if _wide() else 330))
 	_portrait.ring_color = UiPalette.class_color(view_class)
 	_portrait.set_hero(view_class, shown, p.prestige_on(view_class), false)
 	col.add_child(_portrait)
@@ -108,19 +119,82 @@ func _stand(p: Profile) -> Control:
 	return c
 
 
-## One skin swatch: a small portrait, its name and status (worn / equip / lock + progress / buy).
-func _swatch(p: Profile, skin: String) -> Control:
+## Skin tiles: a portrait, the name and one state line (WORN, WEAR, progress).
+const SKIN_TILE_H := 236.0
+const SKIN_TILE_W := 132.0
+
+
+## The class's skins as one StationCard: pills (owned count), a carousel of skin tiles (tap:
+## wear an owned skin, preview a locked one on the pedestal) and, in the footer, the previewed
+## skin's condition and progress, with BUY [crown] 250 once every Crowns sink is maxed.
+func skins_card(p: Profile) -> StationCard:
+	var col := UiPalette.class_color(view_class)
+	var cname := String(HeroDefs.DATA[view_class].name)
+	var spec := StationCard.Spec.new()
+	spec.desc_lines = 2
+	spec.contents_h = SKIN_TILE_H
+	spec.footer_h = 88.0
+	var eq := p.equipped_skin(view_class)
+	var shown := preview_skin if preview_skin != "" else eq
+	var shown_owned := p.owns_skin(view_class, shown)
+	# the description is about the skin on the pedestal: how to earn it when it's locked
+	var desc := "Tap a skin to wear it, or to preview a locked one." if shown_owned else \
+		"%s: %s" % [String(SkinDefs.NAMES[shown]), SkinDefs.cond_text(view_class, shown)]
+	var c := StationCard.make(spec, Icons.class_icon(view_class), col, "%s skins" % cname, desc)
+	c.name = "Skins"
+	var have := 0
+	for s in SWATCHES:
+		if p.owns_skin(view_class, String(s)):
+			have += 1
+	c.add_pill("wardrobe_hats", "%d/%d OWNED" % [have, SWATCHES.size()])
+	if p.crowns_capped():
+		c.add_pill("crown", "%d EACH" % SkinDefs.BUY_PRICE)
+	else:
+		c.add_pill("trophy", "EARNED BY WINNING")
+	var tiles: Array = []
+	for s in SWATCHES:
+		tiles.append(_skin_tile(p, String(s)))
+	var car := Carousel.make(tiles, SKIN_TILE_H, SKIN_TILE_W, "wardrobe:" + view_class)
+	car.count_text = "%d SKINS" % SWATCHES.size()
+	c.set_carousel(car)
+	# footer: the shown skin (preview or worn): worn, or the live progress toward it
+	if shown_owned:
+		c.set_status("Wearing %s. Skins never change the numbers." % String(SkinDefs.NAMES[shown]) if shown == eq
+			else "%s is yours: tap it to wear it." % String(SkinDefs.NAMES[shown]), "check", UiPalette.HEAL)
+	else:
+		var prog := progress_text(p, view_class, shown)
+		c.set_status(prog if prog != "" else "Not earned yet.", "lock", Color("c79bff"))
+		if p.crowns_capped():
+			var b := CampUi.buy_button("BUY", {"crowns": SkinDefs.BUY_PRICE}, p.crowns >= SkinDefs.BUY_PRICE, 22)
+			b.name = "BuySkin"
+			b.tooltip_text = "Buy %s" % String(SkinDefs.NAMES[shown])
+			b.pressed.connect(cmd.bind(["buy_skin", view_class, shown]))
+			# the card's one priced action sits top-right, like every station card
+			c.set_action(b)
+	return c
+
+
+## Short progress for a locked skin's tile ("BEST A2", "1/4 BOSSES", "WIN A RUN").
+static func tile_progress(p: Profile, class_id: String, skin: String) -> String:
+	var best := int((p.records.get("best_asc_by_class", {}) as Dictionary).get(class_id, -1))
+	match skin:
+		"victor":
+			return "WIN A RUN"
+		"ascendant":
+			return "BEST A%d/A3" % best if best >= 0 else "WIN AT A3"
+		"bossbane":
+			var beaten: Array = (p.records.get("bosses_by_class", {}) as Dictionary).get(class_id, [])
+			return "%d/%d BOSSES" % [beaten.size(), SkinDefs.BOSSES_FOR_BOSSBANE]
+	return "LOCKED"
+
+
+func _skin_tile(p: Profile, skin: String) -> Carousel.ItemTile:
 	var owned := p.owns_skin(view_class, skin)
 	var worn := owned and p.equipped_skin(view_class) == skin
 	var shown := (preview_skin if preview_skin != "" else p.equipped_skin(view_class)) == skin
 	var is_new := _fresh.has("%s:%s" % [view_class, skin])
-	var card := _Swatch.new()
-	card.add_theme_stylebox_override("panel", swatch_box(worn, shown, owned, UiPalette.class_color(view_class)))
-	card.size_flags_vertical = Control.SIZE_FILL
-	var col := UiTheme.vbox(6)
-	card.add_child(col)
 	var por := HeroPortrait.new()
-	por.custom_minimum_size = Vector2(0, 150 if _wide() else 170)
+	por.custom_minimum_size = Vector2(SKIN_TILE_W - 24.0, 150)
 	por.spin = 0.0
 	por.zoom = 1.15
 	por.ring_color = UiPalette.class_color(view_class) if owned else Color(0.35, 0.33, 0.45)
@@ -128,31 +202,12 @@ func _swatch(p: Profile, skin: String) -> Control:
 	por.silhouette = false
 	if not owned:
 		por.modulate = Color(0.62, 0.6, 0.7)
-	col.add_child(por)
-	var head := UiTheme.hbox(6)
-	col.add_child(head)
-	if not owned:
-		head.add_child(CampArt.lock_icon(24))
-	var nm := UiTheme.label(String(SkinDefs.NAMES[skin]), 24, UiPalette.GOLD_BRIGHT if worn else (UiPalette.TEXT if owned else UiPalette.TEXT_DIM), true, 4)
-	nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(nm)
-	if is_new:
-		head.add_child(CampArt.chip("NEW", "red", "", 16))
-	if worn:
-		col.add_child(CampArt.chip("WORN", "purple", "", 16))
-	elif owned:
-		col.add_child(UiTheme.label("Tap to wear", 17, UiPalette.HEAL, false, 0, false, 700))
-	else:
-		col.add_child(UiTheme.para(SkinDefs.cond_text(view_class, skin), 16, UiPalette.TEXT_DIM, 500))
-		var prog := progress_text(p, view_class, skin)
-		if prog != "":
-			col.add_child(UiTheme.para(prog, 16, Color("c79bff"), 700))
-		if p.crowns_capped():
-			var b := CampUi.buy_button("BUY", {"crowns": SkinDefs.BUY_PRICE}, p.crowns >= SkinDefs.BUY_PRICE, 20)
-			b.min_height = 60
-			b.pressed.connect(cmd.bind(["buy_skin", view_class, skin]))
-			col.add_child(b)
-	card.pressed.connect(func() -> void:
+	var detail := "WORN" if worn else ("NEW" if is_new else ("WEAR" if owned else tile_progress(p, view_class, skin)))
+	var dcol: Color = Color("c79bff") if worn else (UiPalette.HP_BRIGHT if is_new else (UiPalette.HEAL if owned else UiPalette.TEXT_MUTED))
+	var state := "worn" if worn else ("on" if shown else ("normal" if owned else "dim"))
+	var t := Carousel.ItemTile.make(por, String(SkinDefs.NAMES[skin]), detail, dcol, UiPalette.class_color(view_class) if owned else null, state)
+	t.name = "Skin_" + skin
+	t.pressed.connect(func() -> void:
 		if owned:
 			preview_skin = ""
 			if not worn:
@@ -162,7 +217,7 @@ func _swatch(p: Profile, skin: String) -> Control:
 		else:
 			preview_skin = skin
 			show_profile(profile))
-	return card
+	return t
 
 
 ## The A10 prestige overlay: a toggle when owned, else its condition and the best ascension.
@@ -217,26 +272,6 @@ static func progress_text(p: Profile, class_id: String, skin: String) -> String:
 				s += " (%s)" % ", ".join(names)
 			return s + "  ·  " + best_s
 	return ""
-
-
-## A skin swatch's card: worn = the yellow rim, previewed = purple, owned = the class accent,
-## locked = the locked card.
-static func swatch_box(worn: bool, shown: bool, owned: bool, accent: Color) -> StyleBox:
-	var sb: StyleBox
-	if UiTheme.skinned("panel_card"):
-		sb = UiTheme.tile_box("worn" if worn else ("on" if shown else ("normal" if owned else "locked")), accent if owned and not worn and not shown else null)
-		sb.content_margin_left = 12
-		sb.content_margin_right = 12
-		sb.content_margin_top = 12
-		sb.content_margin_bottom = 12
-		return sb
-	if worn:
-		sb = UiTheme.box(UiPalette.NAVY_3, 20, 3, UiPalette.GOLD_BRIGHT, 12, Color(0.95, 0.7, 0.2, 0.3), Vector2.ZERO)
-	elif shown:
-		sb = UiTheme.box(Color(0.1, 0.08, 0.2, 0.9), 20, 3, Color("c79bff"))
-	else:
-		sb = UiTheme.box(Color(0.03, 0.03, 0.09, 0.6), 20, 2, Color(1, 1, 1, 0.08) if not owned else Color(accent, 0.4))
-	return UiTheme.pad(sb, 10, 10)
 
 
 ## A class medallion in the carousel.
@@ -294,28 +329,3 @@ class _Dot:
 		var r := minf(size.x, size.y) * 0.5
 		draw_circle(size * 0.5, r, UiPalette.OUTLINE)
 		draw_circle(size * 0.5, r - 2.5, UiPalette.HP)
-
-
-## A tappable swatch card.
-class _Swatch:
-	extends PanelContainer
-	signal pressed
-	var _down := false
-
-	func _init() -> void:
-		mouse_filter = Control.MOUSE_FILTER_STOP
-		size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-
-	func _gui_input(event: InputEvent) -> void:
-		var mb := event as InputEventMouseButton
-		if mb == null or mb.button_index != MOUSE_BUTTON_LEFT:
-			return
-		if mb.pressed:
-			_down = true
-		elif _down:
-			_down = false
-			if get_global_rect().has_point(mb.global_position):
-				UiTheme.sfx("click")
-				UiTheme.pop(self, 1.03, 0.15)
-				pressed.emit()

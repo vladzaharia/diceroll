@@ -532,7 +532,11 @@ func _item_card(p: Profile, id: String) -> Control:
 			if p.has_blueprint(id, String(vv)):
 				cr += 1
 		var s := "%d variants" % vs.size() + ("  ·  %d owned" % have if have > 0 else "") + ("  ·  %d to craft" % cr if cr > 0 else "")
-		col.add_child(UiTheme.label(s + "  ▸", 16, UiPalette.GOLD if cr > 0 else UiPalette.TEXT_MUTED, false, 0, false, 700))
+		var vrow := UiTheme.hbox(4)
+		var vc := UiPalette.GOLD if cr > 0 else UiPalette.TEXT_MUTED
+		vrow.add_child(UiTheme.label(s, 16, vc, false, 0, false, 700))
+		vrow.add_child(CampArt.icon("chevron_right", 18, vc))
+		col.add_child(vrow)
 	var lo2 := p.loadout_for(view_class)
 	var blocked: bool = sel_slot == "offhand" and ItemDefs.hand_mount(id) and String(lo2.weapon.id) != "" \
 		and ItemDefs.hands(String(lo2.weapon.id), String(lo2.weapon.variant)) >= 2
@@ -633,20 +637,25 @@ func _acquire(p: Profile, id: String) -> Control:
 
 # ---------------------------------------------------------------- variants
 
+## Variant tiles: a 3D thumbnail, the name and one state line (WORN, OWNED, [crown] 20, 22/45).
+const VARIANT_TILE_H := 156.0
+const VARIANT_TILE_W := 112.0
+
+
 func _variants(p: Profile, id: String) -> Control:
 	var box := UiTheme.vbox(8)
 	var eq := _equipped(p, sel_slot)
 	var worn := String(eq[1]) if String(eq[0]) == id else ""
-	box.add_child(UiTheme.label("VARIANTS  ·  same rule, one extra property", 17, UiPalette.GOLD, false, 0, false, 800))
-	var grid := GridContainer.new()
-	grid.columns = 3 if not _wide() else 4
-	grid.add_theme_constant_override("h_separation", 8)
-	grid.add_theme_constant_override("v_separation", 8)
-	grid.mouse_filter = Control.MOUSE_FILTER_PASS
-	box.add_child(grid)
+	box.add_child(UiModal.subsection_label("Variants  ·  same rule, one extra property"))
 	var chips: Array = Camp.new(p).variant_chips(id)
+	var tiles: Array = []
 	for ch in chips:
-		grid.add_child(_variant_chip(p, id, ch, String(ch.id) == worn))
+		tiles.append(_variant_chip(p, id, ch, String(ch.id) == worn))
+	# a carousel: the focused item's card keeps one height however many variants it has
+	var car := Carousel.make(tiles, VARIANT_TILE_H, VARIANT_TILE_W, "armory:variants:" + id)
+	car.name = "Variants"
+	car.count_text = "%d VARIANTS" % chips.size()
+	box.add_child(car)
 	if chip != "":
 		for ch in chips:
 			if String(ch.id) == chip:
@@ -657,47 +666,35 @@ func _variants(p: Profile, id: String) -> Control:
 func _variant_chip(p: Profile, item: String, ch: Dictionary, worn: bool) -> Control:
 	var vid := String(ch.id)
 	var st := String(ch.state)
-	var t := _Tap.new()
 	var sel := chip == vid
-	var state := "worn" if worn else ("normal" if sel else ("craftable" if st == "craftable" else ("owned" if st == "owned" else "dim")))
-	t.add_theme_stylebox_override("panel", select_box(state, 6, ACCENT if sel and not worn else null))
-	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var v := UiTheme.vbox(2)
-	t.add_child(v)
 	var holder := Control.new()
-	holder.custom_minimum_size = Vector2(0, 70)
+	holder.custom_minimum_size = Vector2(70, 70)
 	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	v.add_child(holder)
 	var th := ItemThumb.make(ArmoryLook.shown_id(view_class, item, vid) if worn else vid, 70)
-	th.set_anchors_preset(Control.PRESET_FULL_RECT)
+	th.size = Vector2(70, 70)
 	if st == "locked":
 		th.modulate = Color(0.5, 0.48, 0.58, 0.8)
 	holder.add_child(th)
 	if _fresh.has(vid):
 		holder.add_child(CampArt.pin(CampArt.new_dot(16), "tr", 2.0))
-	var nm := UiTheme.label(String(ch.name), 18, UiPalette.GOLD_BRIGHT if worn else (UiPalette.TEXT if st != "locked" else UiPalette.TEXT_DIM), false, 0, false, 800)
-	nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	nm.custom_minimum_size.x = 40
-	v.add_child(nm)
 	var line := ""
 	var lc := UiPalette.TEXT_MUTED
+	var icon := ""
 	match st:
 		"owned":
 			line = "WORN" if worn else "OWNED"
-			lc = UiPalette.HEAL if worn else UiPalette.TEXT_DIM
+			lc = Color("c79bff") if worn else UiPalette.TEXT_DIM
 		"craftable":
-			line = "CRAFT  %d" % int((ch.cost as Dictionary).get("crowns", 0))
+			# a price: the currency icon and the bare number
+			line = str(int((ch.cost as Dictionary).get("crowns", 0)))
 			lc = UiPalette.GOLD_BRIGHT
+			icon = "crown"
 		_:
 			var ms: Array = ch.get("mastery", [0, 0])
-			line = "%d/%d fights" % [int(ms[0]), int(ms[1])] if int(ms[1]) > 0 else "FEAT"
-	var ll := UiTheme.label(line, 17, lc, false, 0, false, 800)
-	ll.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	v.add_child(ll)
-	if st == "locked" and int((ch.get("mastery", [0, 0]) as Array)[1]) > 0:
-		var ms2: Array = ch.mastery
-		v.add_child(CampUi.bar(float(ms2[0]), float(ms2[1]), UiPalette.GOLD, 12.0))
+			line = "%d/%d FIGHTS" % [int(ms[0]), int(ms[1])] if int(ms[1]) > 0 else "FEAT"
+	var state := "worn" if worn else ("on" if sel else ("craftable" if st == "craftable" else ("normal" if st == "owned" else "dim")))
+	var t := Carousel.ItemTile.make(holder, String(ch.name), line, lc, null, state, icon)
+	t.name = "Variant_" + vid
 	t.pressed.connect(func() -> void:
 		if st == "owned" and not worn:
 			chip = vid
@@ -913,67 +910,60 @@ func _rank_text(group: String, r: int) -> String:
 	return s
 
 
-## A rank group: name, pips (tier steps as diamonds), what the next rank does, RANK UP.
-func _rank_card(p: Profile, group: String, compact: bool) -> Control:
+## Rank cards and the Belt Pouch share one StationCard spec (one height).
+static func _rank_spec() -> StationCard.Spec:
+	var sp := StationCard.Spec.new()
+	sp.desc_lines = 2
+	sp.contents_h = 28.0
+	sp.footer_h = 88.0
+	return sp
+
+
+const GROUP_DESC := {"weapon": "Powers every weapon.", "offhand": "Powers shields and off-hand items.",
+	"armor": "Powers head and body pieces, and adds max HP.", "trinket": "Powers trinkets; rank 5 opens the Belt Pouch."}
+
+
+## A rank group: what it powers, RANK / TIER / HP pills, the rank pips (tier steps as stars),
+## what the next rank does and RANK UP [crown] N (or MAX).
+func _rank_card(p: Profile, group: String, _compact: bool) -> Control:
 	var owned := p.owns("gear", group)
 	var r := p.rank(group)
 	var up := _seen_ranks.has(group) and r > int(_seen_ranks[group])
-	var c := CampUi.card(up, ACCENT) if owned else CampUi.locked_card()
+	var c := StationCard.make(_rank_spec(), String(GROUP_ICONS[group]), ACCENT, "%s rank" % String(GROUP_NAMES[group]),
+		String(GROUP_DESC.get(group, "")), ("equipped" if up else "normal") if owned else "locked")
+	c.name = "Rank_" + group
 	if up:
 		_flash(c, "RANK %d!" % r if ItemDefs.rank_tier(r) == ItemDefs.rank_tier(r - 1) else "TIER %s!" % String(TIER_NAMES[ItemDefs.rank_tier(r)]))
-	var v := UiTheme.vbox(6)
-	c.add_child(v)
-	var head := UiTheme.hbox(10)
-	v.add_child(head)
-	var tr := CampArt.title_row(String(GROUP_ICONS[group]), ACCENT, "%s rank" % String(GROUP_NAMES[group]), _rank_text(group, r),
-		48 if compact else 56, not owned)
-	tr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(tr)
+	c.add_pill("rank", "RANK %d/%d" % [r, ItemDefs.RANK_MAX])
+	var t := ItemDefs.rank_tier(r)
+	if t > 0:
+		c.add_pill(String(CampArt.TIER_ICON[t]), "TIER %s" % String(TIER_NAMES[t]))
+	else:
+		c.add_pill("lock", "NOT FORGED")
+	if group == "armor":
+		var hp := int(ItemDefs.base_stats({"armor": r}).max_hp)
+		if hp > 0:
+			c.add_pill("heart", "+%d HP" % hp)
+	var pips := CampUi.pips(r, ItemDefs.RANK_MAX, ACCENT, [1, 4, 8])
+	pips.custom_minimum_size = Vector2(ItemDefs.RANK_MAX * 26, 26)
+	pips.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	c.set_contents(pips)
 	if not owned:
 		var m := CampInfo.milestone_for("gear", group)
-		v.add_child(CampUi.lock_line(String(m.get("desc", "Locked")), 16))
+		c.set_status(String(m.get("desc", "Locked")), "lock")
 		return c
 	var cost := ItemDefs.rank_cost(r)
-	# narrow cards (the picker's compact card, phones at 125%+ zoom): the button goes under
-	# the title so "Weapon rank" never truncates
-	var stack := compact or _narrow()
-	var btn: GameButton = null
-	if cost.is_empty():
-		head.add_child(CampArt.chip("MAX", "yellow", "tier_3", 18))
-	else:
-		btn = CampUi.buy_button("RANK UP" if r > 0 else "UNLOCK", cost, p.can_afford(cost), 20)
-		btn.min_height = 64
-		btn.pad_x = 14
-		btn.name = "RankUp"
-		btn.pressed.connect(cmd.bind(["rank_up", group]))
-		if not stack:
-			head.add_child(btn)
-	# pips + what the next rank does; when stacked the button sits to their right, under the
-	# title, so the title keeps the card's full width
-	var prow := UiTheme.hbox(10)
-	v.add_child(prow)
-	var info := UiTheme.vbox(4)
-	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info.alignment = BoxContainer.ALIGNMENT_CENTER
-	var pips := CampUi.pips(r, ItemDefs.RANK_MAX, ACCENT, [1, 4, 8])
 	var nxt := _next_text(group, r)
-	var nl: Label = null
-	if nxt != "":
-		nl = UiTheme.label(nxt, 16, UiPalette.HEAL if r < ItemDefs.RANK_MAX else UiPalette.TEXT_DIM, false, 0, false, 700)
-		nl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		nl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		nl.custom_minimum_size.x = 60
-	if stack and btn != null:
-		prow.add_child(info)
-		info.add_child(pips)
-		if nl:
-			info.add_child(nl)
-		btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		prow.add_child(btn)
-	else:
-		prow.add_child(pips)
-		if nl:
-			prow.add_child(nl)
+	if cost.is_empty():
+		c.set_state("MAX", "yellow", "tier_3")
+		c.set_status(nxt, "tier_3", UiPalette.TEXT_DIM)
+		return c
+	c.set_status(nxt, "rank", UiPalette.HEAL)
+	var btn := CampUi.buy_button("RANK UP" if r > 0 else "UNLOCK", cost, p.can_afford(cost), 20)
+	btn.pad_x = 14
+	btn.name = "RankUp"
+	btn.pressed.connect(cmd.bind(["rank_up", group]))
+	c.add_footer(btn)
 	return c
 
 
@@ -1001,35 +991,31 @@ func _next_text(group: String, r: int) -> String:
 	return "Next: " + ", ".join(parts) if not parts.is_empty() else ""
 
 
-## The Belt Pouch: the second trinket slot.
+## The Belt Pouch: the second trinket slot (a rank-card twin: same height).
 func _pouch_card(p: Profile) -> Control:
 	var owned := p.has_pouch()
 	var ready := p.rank("trinket") >= ItemDefs.POUCH_RANK
-	var c := CampUi.card(owned, UiPalette.GOLD) if (owned or ready) else CampUi.locked_card()
+	var c := StationCard.make(_rank_spec(), "slot_trinket2", UiPalette.GOLD, "Belt Pouch",
+		"A second trinket slot: one tier lower, without rank bonuses.", "normal" if (owned or ready) else "locked")
+	c.name = "Pouch"
 	if owned and _seen_ranks.has("pouch") and int(_seen_ranks.pouch) == 0:
 		_flash(c, "NEW SLOT!")
-	var v := UiTheme.vbox(6)
-	c.add_child(v)
-	var row := UiTheme.hbox(12)
-	v.add_child(row)
-	var tr := CampArt.title_row("slot_trinket2", UiPalette.GOLD, "Belt Pouch",
-		"A 2ND TRINKET, ONE TIER LOWER" if not owned else "OWNED  ·  2ND TRINKET SLOT", 56, not (owned or ready))
-	tr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(tr)
+	c.add_pill("slot_trinket2", "2ND TRINKET")
+	c.add_pill("rank", "TRINKET RANK %d" % ItemDefs.POUCH_RANK)
+	var bar := CampUi.bar(float(mini(p.rank("trinket"), ItemDefs.POUCH_RANK)), float(ItemDefs.POUCH_RANK), UiPalette.GOLD, 18.0)
+	c.set_contents(bar)
 	if owned:
-		row.add_child(CampArt.chip("OWNED", "green", "", 16))
+		c.set_state("OWNED", "green", "check")
+		c.set_status("Equip a second trinket in the Belt Pouch slot.", "check", UiPalette.HEAL)
 	elif ready:
+		c.set_status("Trinket rank %d reached." % ItemDefs.POUCH_RANK, "check", UiPalette.HEAL)
 		var cost := {"crowns": ItemDefs.POUCH_COST}
 		var b := CampUi.buy_button("BUY", cost, p.can_afford(cost), 20)
-		b.min_height = 64
+		b.name = "BuyPouch"
 		b.pressed.connect(cmd.bind(["buy_pouch"]))
-		if _narrow():
-			b.size_flags_horizontal = Control.SIZE_SHRINK_END
-			v.add_child(b)
-		else:
-			row.add_child(b)
+		c.add_footer(b)
 	else:
-		v.add_child(CampUi.lock_line("Needs Trinket rank %d (now %d)." % [ItemDefs.POUCH_RANK, p.rank("trinket")], 16))
+		c.set_status("Needs Trinket rank %d (now %d)." % [ItemDefs.POUCH_RANK, p.rank("trinket")], "lock")
 	return c
 
 
