@@ -6,6 +6,207 @@ Numbers live in `core/content/` (`balance.gd`, `heroes.gd`, `enemies.gd`, `biome
 `potions.gd`, `minigames.gd`, `unlocks.gd`), `core/runes.gd`, `core/combo.gd`,
 `core/item_logic.gd` and the profile presets in `core/meta/presets.gd`.
 
+## The Last Camp, the Final Roll and fight-first boards (2026-09-30, `wp-preboss`)
+
+This section is authoritative where it differs from the whole-game pass below. Design: spec §15
+("The Last Camp and the Final Roll", "Fight-first boards", "Expert-bot ceiling accepted").
+
+### What changed
+
+- **The Last Camp** (`GameFlow._open_camp`): finishing lap 14 (Short Road: lap 9) stops on Start.
+  The hero heals **35%** of max HP (**25%** from A2, the `lap_heal` rule), takes one gift
+  (Healing Draught / a rune, 1 of 2 / Steady Hands: +1 combat reroll every turn of the boss
+  fight), then that lap's shop.
+- **The Final Roll** (`GameFlow._start_finale`, `_final_roll`): every tile turns into a boss tile.
+  One roll, no board rerolls, and the boss fight starts wherever the hero lands. **Lap 15 is no
+  longer played** (it counts as reached when the finale starts; the final roll completes it, so
+  `laps_completed` and the Crowns lap payout are unchanged).
+- **The late difficulty moved into the final boss:**
+  - Regular enemies stop scaling at lap 12 (`ENEMY_SCALE_CAP_LAP`).
+  - The mutation into lap 14 spawns no new fights (`CAMP_QUIET_LAP`).
+  - Each boss has more HP after the camp (`CAMP_BOSS_HP_BY_ID`; the Short Road uses
+    `CAMP_BOSS_HP_SHORT_BY_ID`). Bosses whose threat grows with fight length take less: the
+    Moon King's Moonfall and the Sand Colossus.
+- **Fight-first boards:**
+  - Layouts gain +2 Enemy and lose 1 Chest and 1 Event (28: 9 / 3 / 3).
+  - The first biome's lap mutations spawn +2 Enemy (`MUTATE_EXTRA_ENEMIES_T1`).
+  - Events and played minigame tiles return on every other lap of a biome
+    (`EVENT_REFILL_EVERY`, `MINIGAME_REFILL_EVERY`). A new biome's board always gets them.
+- **Rebalance levers after the two changes:**
+  - Enemy base scale 1.0 → **0.985** (more early fights).
+  - Hero HP: Knight 62 → **60**, Ranger 52 → **55**, Ninja 55 → **58**, Rogue 55 → **57**,
+    Mage 64 → **66**, Druid 58 → **60**.
+  - Biome enemy HP: Hollow 1.05 → **1.06**, Mines 0.92 → **0.94**, Warcamp 0.92 → **0.90**,
+    Ruins 0.97 → **0.95**, Magma 1.0 → **1.02**.
+- **Sim dials added** (`tools/sim.gd`):
+  - `--camp=on|off`, `--camp-heal=`, `--camp-asc-heal=`, `--camp-boss=` (scales every boss).
+  - `--tune-cap=N` (0 = no cap), `--quiet-last=0|1`.
+  - `--mix=enemy:-2,chest:1,event:1` (layout deltas), `--mg-refill=N`, `--event-refill=N`,
+    `--mut-enemy=N`.
+  - `--landings`: fights, tiles, shops and minigames per lap and biome, plus the lap-start tile
+    mix.
+
+### How this was measured
+
+- Realistic policy, A0, standard mode, 28-tile board.
+- **"Before"** is `main` at 6969723, re-measured on this branch's seeds:
+  - class rows: 600 runs per class at fresh and mid (seeds 1001 + 1000k, 25 runs per shard);
+  - max: 1,200 runs per class;
+  - A10: 300 runs per class;
+  - greedy fresh: 600 per class;
+  - Short Road max: 600 per class.
+- **"After"** uses the same seeds, so rows are paired.
+  - Druid rows after its HP change are its own 600-run rows.
+  - Max, bosses, routes and deaths by lap come from the full route sweep: 36 routes × 616 runs
+    (seeds 50001 and 100001), 22,176 runs.
+- **Deaths by lap** use the average over the laps that are played. Before that is laps 1–15;
+  after it is laps 1–14, since lap 15 is now the finale and finale deaths are boss deaths.
+
+### Targets
+
+| target | before | after | |
+|---|---|---|---|
+| fresh 30–40 | 38.5 | **35.2** | met |
+| mid 45–50 | 46.7 | **49.6** | met (top half) |
+| max 55–65 | 64.1 | **61.2** | met |
+| max A10 20–30 | 23.8 | **23.5** | met (spread −7.2 / +4.8) |
+| class spread ±5, fresh | −3.8 / +3.8 | **−4.0 / +3.8** | met |
+| class spread ±5, mid | −5.3 / +5.8 | **−5.8 / +4.7** | Ninja −5.8 (noise ±2.0) |
+| bosses within ±3 (max, route sweep) | −2.6 / +1.9 (prior pass) | **−3.2 / +2.4 → about −1.6 / +2.4** | met after the Bone Warden fix |
+| routes within ±3 (max) | 32 / 36 (prior pass) | **32 / 36** (−3.5 / +3.9) | met |
+| Short Road tier-2 vs tier-3 finales ≤ 3 pp | 60.1 vs 60.5 | **62.9 vs 63.0** | met |
+| greedy fresh ≥ 10 every class | 15.0 (Ranger 10.5) | **12.4** (Ninja **8.0**, Paladin 10.0) | Ninja misses |
+| L14 deaths ≤ 1.5× average | 2.73× | **1.46×** | met |
+| L15 deaths ≤ 1.5× average | 4.57× | **none** (no lap 15) | met by construction |
+| Crowns: whole sink earned by run 60–80 | 73 (prior pass) | **75** (median of 16 realistic campaigns, 70–86) | met |
+| expert ≤ 85 at max | | | **dropped** (expert ~95%+ accepted) |
+
+- **The Ninja's greedy row (8.0, was 10.7) is the one miss.** The greedy bot never uses Shadow
+  Step, and more early fights hurt it most. Raising the Ninja's HP enough to lift it puts the
+  Ninja at +4 to +6 at max (66.3 at 60 HP).
+- **Deaths by lap after (max route sweep):**
+  - L3 2.87×, L5 2.59×, L12 1.43×, L13 1.35×, L14 1.46×. The rest are under 1.2×.
+  - The late spike is gone, but the early peaks grew.
+  - Two causes add up: more fights in laps 1–5, and fewer late deaths, which lowers the
+    average. Laps 3 and 5 are the tier-1 elite laps.
+  - Lap deaths are 10.8% of runs (was 15.3%), and boss deaths 28.0% (was 20.7%).
+- **Max class spread** is −6.8 / +6.8 (Monster Kid 54.2, Paladin 55.2, Mage 67.9). There is
+  no max-spread target in this brief; the old ±6 is slightly exceeded.
+- **Fresh profile deaths by lap:** L12–14 stay above 2× (2.55 / 2.36 / 2.45 in the first
+  shipped-default run). A fresh profile is weakest exactly in the tier-3 biome. The brief's
+  target is the max reference, but this is reported for completeness.
+
+### Class rows (realistic)
+
+| class | fresh | mid | max (route sweep) |
+|---|---|---|---|
+| Knight | 39.5 → **37.0** | 48.0 → **51.8** | 64.8 → **61.9** |
+| Barbarian | 36.7 → **34.7** | 43.7 → **47.0** | 62.2 → **61.6** |
+| Paladin | 36.0 → **33.7** | 52.5 → **54.3** | 62.2 → **55.2** |
+| Mage | 35.0 → **39.0** | 48.7 → **50.3** | 63.7 → **67.9** |
+| Ranger | 34.7 → **33.7** | 46.8 → **49.5** | 65.3 → **62.6** |
+| Rogue | 39.3 → **31.2** | 46.0 → **52.0** | 68.2 → **62.3** |
+| Ninja | 37.0 → **34.7** | 43.7 → **43.8** | 69.2 → **65.5** |
+| Druid | 42.3 → **35.5** | 49.7 → **46.3** | 61.3 → **58.5** |
+| Engineer | 42.3 → **37.2** | 49.7 → **48.2** | 65.2 → **61.6** |
+| Necromancer | 38.8 → **37.2** | 43.3 → **54.3** | 61.1 → **59.9** |
+| Monster Kid | 41.8 → **33.2** | 41.3 → **47.8** | 61.6 → **54.2** |
+| **average** | 38.5 → **35.2** | 46.7 → **49.6** | 64.1 → **61.0** |
+| spread | -3.8 / +3.8 → **-4.0 / +3.8** | -5.3 / +5.8 → **-5.8 / +4.7** | -3.0 / +5.2 → **-6.8 / +6.8** |
+
+### Final bosses (max route sweep; boss-win% = won / reached)
+
+| boss | camp HP × | boss-win | Δ mean |
+|---|---|---|---|
+| The Lich | 1.54 | 70.5 | +1.9 |
+| Bone Warden | 1.68 → **1.63** | 65.4 | −3.2 → about −0.8 (see below) |
+| Cinder King | 1.52 | 69.3 | +0.7 |
+| Magma Golem | 1.46 | 69.5 | +1.0 |
+| Sand Colossus | 1.29 | 71.0 | +2.4 |
+| The Moon King | 1.23 | 67.0 | −1.6 |
+
+- The sweep ran with the Bone Warden at ×1.68 (−3.2), the only boss outside ±3. A paired check
+  on its routes (glade, frost, throne with the Bone Warden forced; 2,200 runs, A/B on the same
+  seeds) read 69.3 → **72.3** boss-win at ×1.63 (+3.0), which puts it at about −0.8. ×1.63 ships.
+- The boss-win mean is 68.6 (was 75.6 before: the bosses carry the old lap 15's difficulty now).
+- At A10 the double final still spreads the bosses widely (Magma Golem −11.8, Moon King +5.4).
+  That was already so before (−13.8 / +8.3), and there is no A10 boss target.
+
+### Short Road (max)
+
+- **Tier-2 vs tier-3 finales: 62.9% vs 63.0%** (target ≤ 3 pp; before 60.1 vs 60.5). The first
+  shipped cut read 58.8 vs 65.0, so the tier-2 biomes' `short_boss_hp` went down ×0.94 (Hollow
+  0.88 → **0.83**, Frost 0.85 → **0.80**, Warcamp 0.80 → **0.75**). The tier-3 ones went up
+  ×1.04 (Moonlit 0.70 → **0.73**, default `SHORT_T3_BOSS_HP` 0.65 → **0.68**). The Short Road's
+  camp table: Lich 1.17, Bone Warden 1.13, Cinder King 1.26, Magma Golem 1.18, Moon King
+  **1.07**, Sand Colossus 1.28.
+- Overall 60.3% → **63.0%** (600 runs per class; the Short Road has no band of its own).
+- Deaths by lap: L9 (its camp lap) 1.80× (before L9 2.03×, L10 1.95×). L10 is now the finale.
+- Short Road bosses (boss-win): Lich 74.1, Bone Warden 71.8, Magma Golem 72.5, Cinder King 71.6,
+  Moon King 66.1, Sand Colossus 66.5. There is no Short Road boss target. The two
+  length-sensitive bosses sit lowest.
+- Class cells span −9.7 / +6.3: Paladin, Druid and Monster Kid low, as before the pass
+  (Monster Kid 53.8 then).
+
+### Fights per lap (realistic; "before" = main)
+
+Fights per run that reached the lap, at lap start. Laps 1–5 are the first biome; lap 6 is the
+second biome's first lap.
+
+| lap | fresh before → after | mid before → after | max before → after |
+|---|---|---|---|
+| 1 | 0.97 → **1.25** (+29%) | 0.96 → **1.34** (+40%) | 0.93 → **1.34** (+44%) |
+| 2 | 1.21 → **1.53** (+26%) | 1.26 → **1.52** (+21%) | 1.17 → **1.45** (+24%) |
+| 3 | 1.35 → **1.62** (+20%) | 1.32 → **1.62** (+23%) | 1.27 → **1.56** (+23%) |
+| 4 | 1.55 → **1.90** (+23%) | 1.52 → **1.83** (+20%) | 1.45 → **1.74** (+20%) |
+| 5 | 1.67 → **2.02** (+21%) | 1.62 → **1.91** (+18%) | 1.58 → **1.91** (+21%) |
+| 6 | 0.83 → **1.07** (+29%) | 0.80 → **1.02** (+28%) | 0.78 → **1.00** (+28%) |
+
+Other landings per lap, laps 1–5 (fresh, before → after):
+- events: 0.63 / 0.61 / 0.53 / 0.49 / 0.47 → 0.46 / 0.43 / 0.36 / 0.30 / 0.24;
+- chests: 0.82 / 0.86 / 0.66 / 0.54 / 0.43 → 0.66 / 0.69 / 0.54 / 0.42 / 0.34;
+- minigames played: 0.22 / 0.22 / 0.22 / 0.20 / 0.18 → 0.24 / 0.21 / 0.19 / 0.17 / 0.15.
+
+Shops (one per shop lap) are unchanged. The lap-start board mix at lap 1 (mid) goes from
+7.0 fights / 4.4 chests / 4.0 events / 1.9 minigames to **9.0 / 3.4 / 3.0 / 1.9**.
+
+| economy | before | after |
+|---|---|---|
+| minigames per run (fresh / mid / max) | 2.91 / 2.75 / 3.66 | 2.62 / 2.49 / 3.27 |
+| Crowns per run (fresh / mid / max) | 101.3 / 105.4 / 119.1 | 97.4 / 104.0 / 113.6 |
+| minigame share of a run's Crowns (max, 4.65 Crowns per play) | 14.3% | 13.4% |
+| run at which the whole sink (8,850) is earned | 73 (prior pass) | 75 (70–86) |
+
+### Every lever tried
+
+Max, realistic. 4,400 runs per row unless noted. The rows share seeds, so they are paired.
+
+| lever | max win% | L14 ratio | notes |
+|---|---|---|---|
+| none: before (main) | 64.1 | 2.73 (L15 4.57) | 13,200 runs |
+| finale + camp (heal 35%, every boss ×1.15), fight-first boards | 69.3 | 3.97 | L15 gone; L14 now the peak over 14 laps; Moon King −6.8 |
+| same, old boards (`--mix=enemy:-2,chest:1,event:1 --mg-refill=1`) | 71.3 | 3.54 | the fight-first board costs ~2 pp |
+| + regular scaling capped at lap 13 | 71.0 | 3.08 | |
+| + capped at lap 12 | 73.3 | 2.67 | |
+| + capped at lap 11 | 76.4 | 1.94 | too easy; early laps become the peak |
+| fights: +event refill every 2 laps, +1 tier-1 mutation enemy | 68.5 | 3.64 | fights +16–32% per early lap |
+| fights: +enemy 10 in layouts (fresh, 2,200 runs) | 43.3 fresh | | lap 1 +37% (over the 40% target), laps 3–5 +17–22% |
+| fights: +2 tier-1 mutation enemies (fresh, 2,200 runs) | 45.7 fresh | | +20–29% on every early lap: **shipped** |
+| cap 11 + **quiet lap 14** | 76.3 | **0.88** | quiet lap 14 is the L14 lever |
+| cap 12 + quiet lap 14 | 73.7 | **1.13** | **shipped** |
+| quiet lap 14, no cap | 70.4 | 2.44 | the cap is needed too |
+| quiet + cap 13 | 72.0 | 2.27 | |
+| cap 12 + quiet + every boss ×1.45 | 59.2 | 1.22 | Moon King −19, Sand Colossus −15: per-boss HP needed |
+| per-boss camp HP (first table) | 62.7 | 1.22 | bosses within ±2.1 |
+| greedy floor: enemy base 0.92 (fresh greedy, 3,300 runs) | 13.8 | | Ninja 8.0, Paladin 9.7 |
+| base 0.92 + Lich −7% | 17.5 (realistic fresh 45.7) | | far too easy for realistic fresh |
+| base 0.97, Lich 1.47, Ranger +3, Ninja +5 | fresh 39.3, mid 52.6 | | mid over the band; Ninja +7.9 at max |
+| **shipped:** base 0.985, bosses re-cut, Ninja +3, Rogue/Mage +2, Druid +2 | 61.2 | 1.46 | |
+| Druid HP 59 (paired, 600 runs) | fresh 35.7 / mid 40.7 | | too low: Druid is very HP-sensitive (2 HP ≈ 7–9 pp) |
+| Druid HP 60 (paired, 600 runs) | fresh 35.5 / mid 46.3 / max 58.5, greedy 17.2 | | **shipped** |
+| Bone Warden camp ×1.68 → ×1.63 (paired, 2,200 runs on its routes) | boss-win 69.3 → 72.3 | | **shipped** |
+| Short Road: tier-2 `short_boss_hp` ×0.94, tier-3 ×1.04, Moon King short camp 1.15 → 1.07 | short 62.1 → 63.0 | | tier gap 6.2 → 0.1 pp: **shipped** |
+
 ## Whole-game balance pass (2026-09-29, `wp-balance`)
 
 This section is authoritative. It re-measures every target on `main` with the Armory, the 11

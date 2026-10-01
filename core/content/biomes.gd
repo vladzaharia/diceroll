@@ -49,7 +49,7 @@ const DEFS := {
 			["cultist", "bandit", "hollow_wisp", "werewolf"]],
 		"elite": "fallen_paladin",
 		"minibosses": ["mini_pumpkin_knight", "mini_grave_mage", "mini_moonfang"], "bosses": [],
-		"short_bosses": ["boss_lich", "boss_bone_warden"], "short_boss_hp": 0.88,
+		"short_bosses": ["boss_lich", "boss_bone_warden"], "short_boss_hp": 0.83,
 	},
 	"frost": {
 		"name": "Frostpeak", "tier": 2,
@@ -59,7 +59,7 @@ const DEFS := {
 			["frost_skeleton", "ice_archer", "skeleton_warrior", "orc_drummer"]],
 		"elite": "brute",
 		"minibosses": ["mini_frost_warden", "mini_bone_champion"], "bosses": [],
-		"short_bosses": ["boss_bone_warden", "boss_lich"], "short_boss_hp": 0.85,
+		"short_bosses": ["boss_bone_warden", "boss_lich"], "short_boss_hp": 0.8,
 	},
 	"throne": {
 		"name": "Bone Throne", "tier": 3,
@@ -98,7 +98,7 @@ const DEFS := {
 			["orc_raider", "orc_drummer", "wolf_bandit", "skeleton_warrior"]],
 		"elite": "orc_raider",
 		"minibosses": ["mini_orc_warchief", "mini_cinder_brute"], "bosses": [],
-		"short_bosses": ["boss_cinder_king", "boss_magma_golem"], "short_boss_hp": 0.80,
+		"short_bosses": ["boss_cinder_king", "boss_magma_golem"], "short_boss_hp": 0.75,
 	},
 	"ruins": {
 		"name": "Sunscorched Ruins", "tier": 3, "twist": "heat", "look": "ruins", "enemy_hp": 0.95,
@@ -116,7 +116,7 @@ const DEFS := {
 		"pools": [["werewolf", "wolf_bandit", "hollow_wisp", "orc_raider"],
 			["werewolf", "werewolf", "brute", "wolf_bandit"]],
 		"elite": "werewolf",
-		"minibosses": ["mini_moonfang"], "bosses": ["boss_moon_king", "boss_lich"], "short_boss_hp": 0.70,
+		"minibosses": ["mini_moonfang"], "bosses": ["boss_moon_king", "boss_lich"], "short_boss_hp": 0.73,
 	},
 }
 
@@ -231,7 +231,7 @@ static func final_boss_candidates(biome: String) -> Array:
 
 ## Short Road final-boss HP multiplier when `biome` ends the run: the biome's short_boss_hp (tier 2:
 ## the finale comes after easier tier-2 laps, so the boss keeps more HP), else SHORT_T3_BOSS_HP.
-const SHORT_T3_BOSS_HP := 0.65
+const SHORT_T3_BOSS_HP := 0.68
 
 ## Regular and elite enemies in the biome (not mini-bosses, not final bosses) have x this HP
 ## (DEFS "enemy_hp", default 1.0): the whole-game balance pass's route-spread lever

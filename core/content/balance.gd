@@ -30,13 +30,13 @@ const CAMP_ASC_HEAL_PCT := 0.25
 ## take less. Unlisted bosses: CAMP_BOSS_HP.
 const CAMP_BOSS_HP := 1.5
 const CAMP_BOSS_HP_BY_ID := {
-	"boss_lich": 1.54, "boss_bone_warden": 1.68, "boss_cinder_king": 1.52, "boss_magma_golem": 1.46,
+	"boss_lich": 1.54, "boss_bone_warden": 1.63, "boss_cinder_king": 1.52, "boss_magma_golem": 1.46,
 	"boss_moon_king": 1.23, "boss_sand_colossus": 1.29,
 }
 ## The Short Road's finale bosses after its camp (lap 9), on top of their short_boss_hp.
 const CAMP_BOSS_HP_SHORT_BY_ID := {
 	"boss_lich": 1.17, "boss_bone_warden": 1.13, "boss_cinder_king": 1.26, "boss_magma_golem": 1.18,
-	"boss_moon_king": 1.15, "boss_sand_colossus": 1.28,
+	"boss_moon_king": 1.07, "boss_sand_colossus": 1.28,
 }
 ## The mutation into the camp's lap (lap 14) spawns no new fights: the road to the camp is quiet.
 const CAMP_QUIET_LAP := true
