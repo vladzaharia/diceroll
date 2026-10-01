@@ -48,7 +48,13 @@ func rebuild(p: Profile) -> void:
 
 
 func _slots(p: Profile) -> Control:
-	var row := UiTheme.hbox(10)
+	# three slots in a row; two (or one) per row on a narrow canvas so names never break
+	var row := GridContainer.new()
+	row.columns = grid_columns(3, 190.0, 10.0)
+	row.add_theme_constant_override("h_separation", 10)
+	row.add_theme_constant_override("v_separation", 10)
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.mouse_filter = Control.MOUSE_FILTER_PASS
 	var mg: Array = p.loadout.get("minigames", [])
 	for i in 3:
 		var locked := i >= p.loadout_slots()

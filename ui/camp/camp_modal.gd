@@ -69,6 +69,9 @@ func show_tip(anchor: Control, title_text: String, tag: String, text: String, ac
 		_tip = PanelContainer.new()
 		_tip.name = "StationTip"
 		_tip.z_index = 20
+		# a floating callout over the modal (like the plaque): it may cross the frame edge;
+		# UiTooltip.place keeps it inside the safe area, which the audit still checks
+		_tip.set_meta(UiAudit.ALLOW, true)
 		add_child(_tip)
 	var opts := {"max_w": minf(UiTooltip.MAX_W, size.x - 90.0) if size.x > 0.0 else UiTooltip.MAX_W}
 	if icon != "" and Icons.exists(icon):

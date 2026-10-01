@@ -172,3 +172,47 @@ Rules:
 - **Ranks**: rank cards share one height. RANK n/8, TIER and +HP become pills, so they are never
   trimmed. The footer has "Next: …" (2-line budget) and RANK UP [crown] N. The Belt Pouch is a
   card of the same height.
+
+## 5. Results (after)
+
+Iterated with screenshots (phone, 125% UI size, Duo, iPhone landscape, 1080p). Changes from the
+first build, after critique:
+
+- The carousel arrows moved from beside the strip into the footer: beside it, they left room for
+  only two tiles on a phone (13 pages for the Starter pack). Now four fit (seven pages).
+- Short packs keep full-page tile widths (fillers), so a 3-item pack doesn't stretch its tiles.
+- The line height includes the label line spacing, so 3-line descriptions don't push one card's
+  rows 3 px below its neighbour's.
+- On the Wardrobe, BUY moved to the head and the locked skin's condition to the description.
+  In the footer, next to the arrows, the condition was cut mid-word on phones.
+- The Arcade loadout slots wrap to two per row on narrow canvases. At 125% UI size the old row
+  broke names mid-word ("Fossi l Hunt er"). This was there before this pass.
+- The item tooltip floats over the frame on purpose. It carries the audit's `allow_overflow`
+  meta like the plaque, and the safe-area check still applies.
+
+Audit: `tools/shoot_matrix.sh … all --wait=10 --audit` (25 devices) on these scenarios, with
+AUDIT_TEXT and AUDIT_TAP included:
+
+- `ui_workshop`, `ui_petden`, `ui_arcade` at fresh, mid and max;
+- `ui_wardrobe` on the demo, fresh and capped profiles;
+- `ui_armory` at fresh, mid and max;
+- `ui_armory_picker`, `ui_armory_craft` and `ui_armory_rankup`;
+- the tooltip states (`--tip=…`) and a previewed locked skin.
+
+Result: 0 findings.
+
+Scenario args added to `ui_workshop` / `ui_petden` / `ui_arcade`:
+
+- `--page=<card>:<n>` turns a card's carousel to page n;
+- `--tip=<card>/<tile>` taps a tile.
+
+Tests: `tests/test_station_ui.gd` covers:
+
+- carousel paging and clamping, and keeping the first item visible on resize;
+- no arrows on one page, dots vs N/M;
+- ←/→ and focus;
+- swipe left / right, a short drag snapping back, a vertical drag not paging, and tap vs drag on a tile;
+- pages remembered across rebuilds;
+- every Workshop pack card the same height, with every row inside its budget (mid and max);
+- the UNLOCK and toggle commands;
+- a rule and detail for every pack item.
