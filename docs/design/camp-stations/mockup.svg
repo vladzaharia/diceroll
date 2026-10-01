@@ -1,0 +1,159 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2060" height="1060" viewBox="0 0 2060 1060" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <style>
+      .bg{fill:#14112a}
+      .frame{fill:#1b2140;stroke:#6b4423;stroke-width:16}
+      .card{fill:#232a52;stroke:#7ad0ff88;stroke-width:2}
+      .worn{fill:#2b3466;stroke:#ffc63a;stroke-width:4}
+      .lock{fill:#15182e;stroke:#ffffff14;stroke-width:2}
+      .tile{fill:#1c2246;stroke:#ffffff22;stroke-width:2}
+      .tilesel{fill:#2b3466;stroke:#ffc63a;stroke-width:3}
+      .h{fill:#ffc63a;font-weight:800;font-size:20px;letter-spacing:1px}
+      .t{fill:#f4efe6;font-weight:800}
+      .d{fill:#b7b3c9}
+      .m{fill:#7f7b95}
+      .note{fill:#9fe1ff;font-size:17px;font-style:italic}
+      .pill{fill:#2a2f45}
+      .gold{fill:#ffc63a}
+      .ink{fill:#2a1a0a;font-weight:900}
+      .btn{fill:#ffc63a;stroke:#c98a12;stroke-width:3}
+      .btng{fill:#3b3f52;stroke:#22263a;stroke-width:3}
+      .round{fill:#3b3f52;stroke:#22263a;stroke-width:3}
+      .med{stroke:#ffffff55;stroke-width:3}
+      .ok{fill:#5fd068}
+      .purple{fill:#9a6bff}
+      .bracket{stroke:#9fe1ff;stroke-width:2;fill:none}
+    </style>
+  </defs>
+  <rect class="bg" width="2060" height="1060"/>
+  <text x="30" y="44" fill="#fff" font-size="28" font-weight="800">CAMP STATIONS: one card for every station</text>
+  <text x="30" y="74" class="note">Fixed rows (head · pills · contents · footer) → every card of a station is the same height. Wide canvases: two columns.</text>
+
+  <!-- ============ ANATOMY: Workshop pack card ============ -->
+  <g transform="translate(30,110)">
+    <text x="0" y="0" fill="#fff" font-size="22" font-weight="800">1 · The station card (Workshop pack, phone width)</text>
+    <rect class="card" x="0" y="20" width="660" height="470" rx="18"/>
+    <!-- head -->
+    <circle cx="52" cy="72" r="32" class="med" fill="#3a6f9a"/>
+    <text x="52" y="80" text-anchor="middle" fill="#fff" font-size="24" font-weight="900">6</text>
+    <text x="100" y="64" class="t" font-size="28">Gambler's Kit</text>
+    <text x="100" y="92" class="d" font-size="18">Blank-or-six dice, banked rerolls and lucky</text>
+    <text x="100" y="114" class="d" font-size="18">streaks.</text>
+    <rect class="btn" x="470" y="40" width="170" height="64" rx="12"/>
+    <text x="555" y="80" text-anchor="middle" class="ink" font-size="22">◆ UNLOCK 6</text>
+    <!-- pills -->
+    <rect class="pill" x="20" y="140" width="96" height="30" rx="15"/><text x="36" y="161" class="t" font-size="16">▮ 1 RUNE</text>
+    <rect class="pill" x="124" y="140" width="80" height="30" rx="15"/><text x="140" y="161" class="t" font-size="16">⚀ 1 DIE</text>
+    <rect class="pill" x="212" y="140" width="130" height="30" rx="15"/><text x="228" y="161" class="t" font-size="16">🏆 2 PASSIVES</text>
+    <!-- carousel strip -->
+    <g transform="translate(20,186)">
+      <rect class="tile" x="0" y="0" width="140" height="132" rx="12"/>
+      <circle cx="70" cy="34" r="22" fill="#58c060"/>
+      <text x="70" y="86" text-anchor="middle" class="t" font-size="16">Lucky Rune</text>
+      <text x="70" y="112" text-anchor="middle" fill="#6fa8ff" font-size="15" font-weight="800">RARE</text>
+      <rect class="tile" x="155" y="0" width="140" height="132" rx="12"/>
+      <g fill="#f4efe6"><rect x="190" y="12" width="20" height="20" rx="4"/><rect x="214" y="12" width="20" height="20" rx="4"/><rect x="238" y="12" width="20" height="20" rx="4"/><rect x="190" y="36" width="20" height="20" rx="4"/><rect x="214" y="36" width="20" height="20" rx="4"/><rect x="238" y="36" width="20" height="20" rx="4"/></g>
+      <text x="225" y="86" text-anchor="middle" class="t" font-size="16">Gambler Die</text>
+      <text x="225" y="112" text-anchor="middle" fill="#6fa8ff" font-size="15" font-weight="800">RARE</text>
+      <rect class="tile" x="310" y="0" width="140" height="132" rx="12"/>
+      <circle cx="380" cy="34" r="22" fill="#4a8be0"/>
+      <text x="380" y="80" text-anchor="middle" class="t" font-size="16">Double</text>
+      <text x="380" y="98" text-anchor="middle" class="t" font-size="16">Trouble</text>
+      <text x="380" y="118" text-anchor="middle" fill="#5fd068" font-size="15" font-weight="800">UNCOMMON</text>
+      <rect class="tile" x="465" y="0" width="140" height="132" rx="12"/>
+      <circle cx="535" cy="34" r="22" fill="#ff9a3a"/>
+      <text x="535" y="86" text-anchor="middle" class="t" font-size="16">Encore</text>
+      <text x="535" y="112" text-anchor="middle" fill="#ff9a3a" font-size="15" font-weight="800">BOSS</text>
+    </g>
+    <!-- footer -->
+    <text x="20" y="372" fill="#7f7b95" font-size="22">🔒</text>
+    <text x="50" y="364" class="d" font-size="18">Win a run with 3 different classes.</text>
+    <text x="50" y="386" class="d" font-size="18">(1/3)</text>
+    <text x="400" y="376" class="m" font-size="15" font-weight="800">4 ITEMS</text>
+    <!-- tooltip example -->
+    <rect x="300" y="400" width="350" height="78" rx="12" fill="#0d0f22" stroke="#6fa8ff" stroke-width="3"/>
+    <text x="316" y="428" fill="#bcd6ff" font-size="20" font-weight="800">Gambler Die  <tspan font-size="14">DIE · RARE</tspan></text>
+    <text x="316" y="452" class="d" font-size="16">Faces 0,0,6,6,6,6. A blank moves</text>
+    <text x="316" y="470" class="d" font-size="16">nothing and scores nothing.</text>
+    <path d="M 225 320 L 330 400" stroke="#6fa8ff" stroke-width="2" stroke-dasharray="6 5"/>
+    <!-- annotations -->
+    <path class="bracket" d="M 672 30 h 12 v 100 h -12"/><text x="694" y="70" class="note">HEAD: medallion · name · 2-line</text><text x="694" y="92" class="note">description · state chip or ONE action</text>
+    <path class="bracket" d="M 672 140 h 12 v 30 h -12"/><text x="694" y="162" class="note">PILLS: key stats, one line (drops off the end)</text>
+    <path class="bracket" d="M 672 186 h 12 v 132 h -12"/><text x="694" y="246" class="note">CONTENTS: fixed slot. Workshop = carousel of</text><text x="694" y="268" class="note">item tiles (tap = rule in UiTooltip)</text>
+    <path class="bracket" d="M 672 334 h 12 v 60 h -12"/><text x="694" y="360" class="note">FOOTER: status (lock hint + progress / "In your</text><text x="694" y="382" class="note">drops") · N ITEMS · ‹ dots › (hidden on 1 page)</text>
+  </g>
+
+  <!-- carousel with arrows -->
+  <g transform="translate(30,640)">
+    <text x="0" y="0" fill="#fff" font-size="22" font-weight="800">2 · Carousel (25-item Starter pack, page 2 of 7)</text>
+    <rect class="card" x="0" y="20" width="660" height="230" rx="18"/>
+    <g transform="translate(20,40)">
+      <rect class="tile" x="0" y="0" width="140" height="132" rx="12"/><text x="70" y="86" text-anchor="middle" class="t" font-size="16">Vampire Rune</text>
+      <rect class="tile" x="155" y="0" width="140" height="132" rx="12"/><text x="225" y="86" text-anchor="middle" class="t" font-size="16">Gilded Rune</text>
+      <rect class="tile" x="310" y="0" width="140" height="132" rx="12"/><text x="380" y="86" text-anchor="middle" class="t" font-size="16">Standard Die</text>
+      <rect class="tile" x="465" y="0" width="140" height="132" rx="12"/><text x="535" y="86" text-anchor="middle" class="t" font-size="16">Low Die</text>
+    </g>
+    <text x="20" y="214" class="ok" font-size="18" font-weight="700">✓ In your drops</text>
+    <text x="330" y="214" class="m" font-size="15" font-weight="800">25 ITEMS</text>
+    <circle cx="450" cy="208" r="28" class="round"/><text x="450" y="216" text-anchor="middle" fill="#fff" font-size="24" font-weight="900">«</text>
+    <text x="530" y="214" text-anchor="middle" fill="#b7b3c9" font-size="16" font-weight="800">2/7</text>
+    <circle cx="610" cy="208" r="28" class="round"/><text x="610" y="216" text-anchor="middle" fill="#fff" font-size="24" font-weight="900">»</text>
+    <text x="0" y="290" class="note">Arrows: icon-only GameButtons (key hint in their tooltip, hover only); ←/→ page the focused carousel (last hovered or used);</text>
+    <text x="0" y="312" class="note">a sideways drag swipes, a vertical drag still scrolls; ≤ 6 pages = dots, more = N/M. Pages survive a rebuild (buy, toggle).</text>
+  </g>
+
+  <!-- ============ OTHER STATIONS ============ -->
+  <g transform="translate(1130,110)">
+    <text x="0" y="0" fill="#fff" font-size="22" font-weight="800">3 · The same card at the other stations</text>
+    <!-- pet -->
+    <rect class="worn" x="0" y="20" width="900" height="250" rx="18"/>
+    <circle cx="52" cy="72" r="32" class="med" fill="#ff9a3a"/>
+    <text x="100" y="64" class="t" font-size="28">Pumpkin Sprite</text>
+    <text x="100" y="92" class="d" font-size="18">Healer. Charges from your dice; fires on its own.</text>
+    <rect x="770" y="40" width="110" height="30" rx="15" class="purple"/><text x="825" y="61" text-anchor="middle" fill="#fff" font-size="16" font-weight="800">EQUIPPED</text>
+    <rect class="pill" x="20" y="130" width="120" height="30" rx="15"/><text x="34" y="151" class="t" font-size="16">⚡ CHARGE 6</text>
+    <rect class="pill" x="148" y="130" width="120" height="30" rx="15"/><text x="162" y="151" class="t" font-size="16">★ LEVEL 7/10</text>
+    <rect class="pill" x="276" y="130" width="100" height="30" rx="15"/><text x="290" y="151" class="t" font-size="16">♥ HEALER</text>
+    <g transform="translate(20,172)">
+      <rect class="tile" x="0" y="0" width="200" height="56" rx="10"/><text x="12" y="22" class="h" font-size="14">FILLS</text><text x="12" y="44" class="d" font-size="15">+1 per attack with a Pair+</text>
+      <rect class="tile" x="215" y="0" width="200" height="56" rx="10"/><text x="227" y="22" class="h" font-size="14">FIRES</text><text x="227" y="44" class="d" font-size="15">Heal 5.5% of max HP</text>
+      <rect class="tile" x="430" y="0" width="200" height="56" rx="10"/><text x="442" y="22" class="h" font-size="14">L5 ✓</text><text x="442" y="44" class="d" font-size="15">Also removes Burn.</text>
+      <rect class="tile" x="645" y="0" width="200" height="56" rx="10"/><text x="657" y="22" class="m" font-size="14" font-weight="800">L10</text><text x="657" y="44" class="m" font-size="15">Overheal becomes Block.</text>
+    </g>
+    <text x="20" y="256" class="d" font-size="17">★★★★★★★☆☆☆  Level 8 for 40 Crowns</text>
+    <rect class="btn" x="640" y="226" width="160" height="40" rx="10"/><text x="720" y="253" text-anchor="middle" class="ink" font-size="18">LEVEL UP 👑40</text>
+    <rect class="btng" x="808" y="226" width="80" height="40" rx="10"/><text x="848" y="253" text-anchor="middle" fill="#ddd" font-size="16" font-weight="800">REMOVE</text>
+
+    <!-- minigame -->
+    <rect class="card" x="0" y="300" width="900" height="230" rx="18"/>
+    <circle cx="52" cy="352" r="32" class="med" fill="#e0b070"/>
+    <text x="100" y="344" class="t" font-size="28">Fossil Hunter</text>
+    <text x="100" y="372" class="d" font-size="18">Dig a 7x7 site for three buried fossils. 10 digs, no hints.</text>
+    <rect class="btn" x="740" y="320" width="140" height="56" rx="12"/><text x="810" y="356" text-anchor="middle" class="ink" font-size="22">EQUIP</text>
+    <rect class="pill" x="20" y="410" width="150" height="30" rx="15"/><text x="34" y="431" class="t" font-size="16">SKILL 20% · LUCK 80%</text>
+    <rect class="pill" x="178" y="410" width="80" height="30" rx="15"/><text x="192" y="431" class="t" font-size="16">⏱ 20 S</text>
+    <rect class="pill" x="266" y="410" width="130" height="30" rx="15"/><text x="280" y="431" class="t" font-size="16">MASTERY 2/5</text>
+    <g transform="translate(20,452)">
+      <rect class="tile" x="0" y="0" width="270" height="56" rx="10"/><text x="12" y="22" fill="#e0925a" font-size="14" font-weight="800">BRONZE · 👑3</text><text x="12" y="44" class="d" font-size="15">Gold or +1 Crown</text>
+      <rect class="tile" x="285" y="0" width="270" height="56" rx="10"/><text x="297" y="22" fill="#d6dde9" font-size="14" font-weight="800">SILVER · 👑5</text><text x="297" y="44" class="d" font-size="15">Potion, Face Raise or gold</text>
+      <rect class="tile" x="570" y="0" width="270" height="56" rx="10"/><text x="582" y="22" fill="#ffc24a" font-size="14" font-weight="800">GOLD · 👑6</text><text x="582" y="44" class="d" font-size="15">A new die of an unlocked kind</text>
+    </g>
+
+    <!-- wardrobe + armory -->
+    <text x="0" y="580" fill="#fff" font-size="22" font-weight="800">4 · Carousels elsewhere</text>
+    <rect class="card" x="0" y="600" width="430" height="300" rx="18"/>
+    <text x="20" y="634" class="h">SKINS · KNIGHT</text>
+    <rect class="tilesel" x="20" y="650" width="120" height="180" rx="12"/><text x="80" y="800" text-anchor="middle" class="t" font-size="16">Victor</text><text x="80" y="820" text-anchor="middle" fill="#9a6bff" font-size="14" font-weight="800">WORN</text>
+    <rect class="tile" x="155" y="650" width="120" height="180" rx="12"/><text x="215" y="800" text-anchor="middle" class="t" font-size="16">Default</text><text x="215" y="820" text-anchor="middle" class="ok" font-size="14" font-weight="800">WEAR</text>
+    <rect class="tile" x="290" y="650" width="120" height="180" rx="12"/><text x="350" y="800" text-anchor="middle" class="m" font-size="16" font-weight="800">Bossbane</text><text x="350" y="820" text-anchor="middle" fill="#c79bff" font-size="14" font-weight="800">2/4 BOSSES</text>
+    <text x="20" y="880" class="m" font-size="15" font-weight="800">4 SKINS   ‹ ●○ ›</text>
+
+    <rect class="card" x="470" y="600" width="430" height="300" rx="18"/>
+    <text x="490" y="634" class="h">VARIANTS · ARMING SWORD</text>
+    <rect class="tilesel" x="490" y="650" width="120" height="150" rx="12"/><text x="550" y="770" text-anchor="middle" class="t" font-size="15">Arming Sword</text><text x="550" y="790" text-anchor="middle" fill="#9a6bff" font-size="14" font-weight="800">WORN</text>
+    <rect class="tile" x="625" y="650" width="120" height="150" rx="12" stroke="#ffc63a"/><text x="685" y="770" text-anchor="middle" class="t" font-size="15">Training Sword</text><text x="685" y="790" text-anchor="middle" fill="#ffc63a" font-size="14" font-weight="800">👑20 CRAFT</text>
+    <rect class="tile" x="760" y="650" width="120" height="150" rx="12"/><text x="820" y="770" text-anchor="middle" class="m" font-size="15" font-weight="800">Knight's Sword</text><text x="820" y="790" text-anchor="middle" class="m" font-size="14" font-weight="800">22/45 FIGHTS</text>
+    <text x="490" y="830" class="m" font-size="15" font-weight="800">7 VARIANTS   ‹ ●○○ ›</text>
+    <text x="490" y="866" class="note">The opened variant's detail card (CRAFT) sits under the strip.</text>
+  </g>
+</svg>

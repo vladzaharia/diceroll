@@ -164,6 +164,24 @@ class _Driver extends Node:
 					await get_tree().create_timer(0.5).timeout
 					var m: CampModal = c.ui.camp.modal(String(SCREENS[scenario]))
 					m._scroll.scroll_vertical = int(args.scroll)
+				# Camp stations pass: --page=<card>:<n> turns a card's carousel to page n;
+				# --tip=<card>/<tile> taps a tile (its rule in the shared tooltip)
+				if args.has("page") or args.has("tip"):
+					await get_tree().create_timer(0.6).timeout
+					var sm: CampModal = c.ui.camp.modal(String(SCREENS[scenario]))
+					if args.has("page"):
+						var pp := String(args.page).split(":")
+						var card := sm.body.find_child(pp[0], true, false)
+						var cars := card.find_children("*", "Carousel", true, false) if card else []
+						if not cars.is_empty():
+							(cars[0] as Carousel).set_page(int(pp[1]) if pp.size() > 1 else 1, false)
+					if args.has("tip"):
+						var tp := String(args.tip).split("/")
+						var host: Node = sm.body.find_child(tp[0], true, false) if tp.size() > 1 else sm.body
+						var tile: Node = host.find_child(tp[tp.size() - 1], true, false) if host else null
+						if tile and tile.has_signal("pressed"):
+							await get_tree().process_frame
+							tile.emit_signal("pressed")
 
 	func _preset(n: String) -> Profile:
 		return load("res://game/camp/scenarios.gd").preset(n)

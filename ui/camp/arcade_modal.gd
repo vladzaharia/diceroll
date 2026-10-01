@@ -1,30 +1,60 @@
 class_name ArcadeModal
 extends CampModal
-## Arcade (review §5.4): the minigame loadout (2 slots, a 3rd bought with Crowns once its
-## milestone is reached), every minigame owned or locked with its gold-tier signature reward,
-## and mastery (1-5, from plays; up to +10% gold rewards).
+## Arcade (review §5.4; Camp stations pass, docs/design/2026-10-01-camp-stations.md): the
+## minigame loadout (2 slots, a 3rd bought with Crowns once its milestone is reached) and every
+## minigame as a StationCard of one height. Pills: skill / luck, length, mastery. Contents: what
+## it pays, as three tier tiles (Crowns per tier from Economy.CROWNS_MINIGAME, then the reward
+## options GameFlow offers: bronze gold or a Crown, silver a potion / Face Raise / gold, gold the
+## game's signature). Footer: mastery (1-5, from plays; up to +10% gold rewards) or how to
+## unlock it.
 
 const ACCENT := Color("ff6fd0")
+const TIERS := ["bronze", "silver", "gold"]
+const TIER_COLOR := {"bronze": Color("e0925a"), "silver": Color("d6dde9"), "gold": Color("ffc24a")}
+const TIER_ICON := {"bronze": "trophy_bronze", "silver": "trophy_silver", "gold": "trophy_gold"}
+
+var spec := _game_spec()
 
 
 func _build() -> void:
 	set_title("ARCADE", PLAQUE_DEFAULT)
 
 
+static func _game_spec() -> StationCard.Spec:
+	var s := StationCard.Spec.new()
+	s.desc_lines = 2
+	s.contents_h = _tile_h()
+	s.footer_h = 88.0
+	return s
+
+
+static func _tile_h() -> float:
+	return 16.0 + 24.0 + StationCard.line_h(16) * 3.0 + 2.0
+
+
 func rebuild(p: Profile) -> void:
-	var intro := UiTheme.para("Each equipped minigame puts one tile on the board. Land on it to play for rewards. Your best tier decides the prize.",
-		20, UiPalette.TEXT_DIM, 500)
+	fit_columns()
+	var intro := UiTheme.para("Each equipped minigame puts one tile on the board. Land on it to play; the better you do, the better the prize.",
+		19, UiPalette.TEXT_DIM, 500)
 	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	body.add_child(intro)
 	body.add_child(CampModal.heading("Loadout"))
 	body.add_child(_slots(p))
-	body.add_child(CampModal.heading("Minigames"))
+	body.add_child(CampModal.heading("Minigames", "Tap a prize for every option of its tier."))
+	var grid := card_grid()
+	body.add_child(grid)
 	for id in MinigameDefs.IDS:
-		body.add_child(_game_card(p, String(id)))
+		grid.add_child(game_card(p, String(id)))
 
 
 func _slots(p: Profile) -> Control:
-	var row := UiTheme.hbox(10)
+	# three slots in a row; two (or one) per row on a narrow canvas so names never break
+	var row := GridContainer.new()
+	row.columns = grid_columns(3, 190.0, 10.0)
+	row.add_theme_constant_override("h_separation", 10)
+	row.add_theme_constant_override("v_separation", 10)
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.mouse_filter = Control.MOUSE_FILTER_PASS
 	var mg: Array = p.loadout.get("minigames", [])
 	for i in 3:
 		var locked := i >= p.loadout_slots()
@@ -64,72 +94,104 @@ func _third_slot(p: Profile) -> Control:
 	return box
 
 
-func _game_card(p: Profile, id: String) -> Control:
+## What a tier pays: [short line, every option] (GameFlow._reward_options, at the Camp without
+## the lap's gold scaling: gold amounts are "gold").
+static func payout(id: String, tier: String) -> Array:
+	match tier:
+		"bronze":
+			return ["Gold or +1 Crown", "Pick one: %d+ gold, or +1 Crown banked at the end of the run." % MinigameDefs.BRONZE_GOLD]
+		"silver":
+			return ["A potion, a Face Raise or gold", "Pick one: a Healing Draught, a Face Raise or %d+ gold." % MinigameDefs.SILVER_GOLD]
+	var sig := String(MinigameDefs.DEFS[id].signature_desc).trim_prefix("Gold: ")
+	sig = sig.left(1).to_upper() + sig.substr(1)
+	return [sig, "Pick one: %s, a rune of your choice, or a potion and %d+ gold." % [sig.trim_suffix(".").left(1).to_lower()
+		+ sig.trim_suffix(".").substr(1), MinigameDefs.GOLD_POTION_GOLD]]
+
+
+func game_card(p: Profile, id: String) -> StationCard:
 	var d: Dictionary = MinigameDefs.DEFS[id]
 	var owned := p.owns("minigames", id)
 	var col: Color = CampInfo.MINIGAME_COLOR.get(id, ACCENT)
 	var mg: Array = p.loadout.get("minigames", [])
-	var equipped := mg.has(id)
-	var c := CampUi.card(equipped, col) if owned else CampUi.locked_card()
-	var v := UiTheme.vbox(10)
-	c.add_child(v)
-	var head := UiTheme.hbox(10)
-	v.add_child(head)
-	var mastery := p.mastery(id)
+	var equipped := owned and mg.has(id)
+	var glyph := String(CampInfo.MINIGAME_GLYPH.get(id, "station_arcade"))
+	var c := StationCard.make(spec, glyph, col, String(d.name), String(d.desc),
+		"equipped" if equipped else ("normal" if owned else "locked"))
+	c.name = "Game_" + id
+	c.on_info(func(a: Control) -> void: show_tip(a, String(d.name), "HOW TO PLAY", String(d.desc), col, glyph))
+	# pills: skill / luck, length, mastery
 	var sk := String(d.skill).split(":")
-	var sub := ("SKILL %s%%  ·  LUCK %s%%" % [sk[0], sk[1]]) if sk.size() == 2 else String(d.skill)
+	c.add_pill("", ("SKILL %s%%  ·  LUCK %s%%" % [sk[0], sk[1]]) if sk.size() == 2 else String(d.skill))
+	var secs := int((MinigameDefs.CALIBRATION.get(id, {}) as Dictionary).get("secs", 0))
+	if secs > 0:
+		c.add_pill("speed", "%d S" % secs)
+	var mastery := p.mastery(id)
 	if owned:
-		sub += "  ·  MASTERY %d" % mastery
-	var tr := CampArt.title_row(String(CampInfo.MINIGAME_GLYPH.get(id, "station_arcade")), col, String(d.name), sub, 64, not owned)
-	tr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(tr)
-	if owned:
-		if equipped:
-			# state = the purple EQUIPPED chip (as in the Armory); the action = a ghost REMOVE
-			var col2 := UiTheme.vbox(6)
-			col2.alignment = BoxContainer.ALIGNMENT_CENTER
-			col2.add_child(CampArt.chip("EQUIPPED", "purple", "", 16))
-			var b := GameButton.make("REMOVE", "", GameButton.Kind.GHOST, 20)
-			b.min_height = 64
-			b.pad_x = 14
-			var rest := mg.duplicate()
-			rest.erase(id)
-			b.pressed.connect(cmd.bind(["set_loadout", rest, String(p.loadout.get("pet", ""))]))
-			col2.add_child(b)
-			head.add_child(col2)
-		else:
-			var full := mg.size() >= p.loadout_slots()
-			var b := GameButton.make("SWAP IN" if full else "EQUIP", "", GameButton.Kind.PRIMARY, 22)
-			b.min_height = 64
-			var next := mg.duplicate()
-			if full:
-				next.pop_back()
-			next.append(id)
-			b.pressed.connect(cmd.bind(["set_loadout", next, String(p.loadout.get("pet", ""))]))
-			head.add_child(b)
+		c.add_pill("mastery", "MASTERY %d/%d" % [mastery, MinigameDefs.MAX_MASTERY])
+	# head: the state or the action
+	var full := mg.size() >= p.loadout_slots()
+	if equipped:
+		c.set_state("EQUIPPED", "purple")
+	elif owned:
+		var b := GameButton.make("SWAP IN" if full else "EQUIP", "", GameButton.Kind.PRIMARY, 22)
+		b.name = "Equip"
+		b.min_height = 72
+		var next := mg.duplicate()
+		if full:
+			next.pop_back()
+			b.tooltip_text = "Replaces %s" % MinigameDefs.name_of(String(mg.back()))
+		next.append(id)
+		b.pressed.connect(cmd.bind(["set_loadout", next, String(p.loadout.get("pet", ""))]))
+		c.set_action(b)
 	else:
 		var cost := UnlockDefs.sigil_cost("minigames", id)
 		var b := CampUi.buy_button("UNLOCK", cost, p.can_afford(cost), 22)
+		b.name = "Unlock"
 		b.pressed.connect(cmd.bind(["unlock", "minigames", id]))
-		head.add_child(b)
-	v.add_child(UiTheme.para(String(d.desc), 19, UiPalette.TEXT_DIM if owned else UiPalette.TEXT_MUTED, 500))
-	var sig := UiTheme.hbox(8)
-	v.add_child(sig)
-	sig.add_child(CampArt.chip("GOLD TIER", "yellow", "trophy_gold" if Icons.is_mapped("trophy_gold") else "", 16))
-	var sl := UiTheme.para(String(d.signature_desc).trim_prefix("Gold: "), 19, UiPalette.TEXT if owned else UiPalette.TEXT_MUTED, 600)
-	sl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	sig.add_child(sl)
+		c.set_action(b)
+	# contents: what it pays, per tier
+	var row := UiTheme.hbox(10)
+	row.mouse_filter = Control.MOUSE_FILTER_PASS
+	for tier in TIERS:
+		var t: String = tier
+		var pay := payout(id, t)
+		var crowns := CampUi.amount("crown", int(Economy.CROWNS_MINIGAME[t]), CampUi.CROWN_COLOR, 16)
+		crowns.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		crowns.alignment = BoxContainer.ALIGNMENT_END
+		var tile := StationCard.rule_tile(String(TIER_ICON[t]), t.to_upper(), TIER_COLOR[t], String(pay[0]), owned, 3, crowns)
+		tile.custom_minimum_size.y = _tile_h()
+		tile.name = "Pays_" + t
+		tile.pressed.connect(func() -> void:
+			show_tip(tile, "%s tier" % t.capitalize(), "+%d CROWNS" % int(Economy.CROWNS_MINIGAME[t]), String(pay[1]), TIER_COLOR[t],
+				String(TIER_ICON[t])))
+		row.add_child(tile)
+	c.set_contents(row)
+	# footer: mastery or how to unlock it; REMOVE when equipped
 	if owned:
-		var mrow := UiTheme.hbox(10)
-		v.add_child(mrow)
-		mrow.add_child(UiTheme.label("MASTERY", 16, UiPalette.GOLD, false, 0, false, 700))
-		mrow.add_child(CampUi.pips(mastery, MinigameDefs.MAX_MASTERY, col))
 		var plays := int(p.minigame_plays.get(id, 0))
-		var nxt := "max" if mastery >= MinigameDefs.MAX_MASTERY else "%d/%d plays" % [plays, int(MinigameDefs.MASTERY_PLAYS[mastery - 1])]
-		mrow.add_child(UiTheme.label("+%d%% gold  ·  %s" % [int(round((MinigameDefs.mastery_mult(mastery) - 1.0) * 100.0)), nxt], 17,
-			UiPalette.TEXT_DIM, false, 0, false, 600))
+		var bonus := int(round((MinigameDefs.mastery_mult(mastery) - 1.0) * 100.0))
+		var s := "+%d%% gold" % bonus
+		if mastery < MinigameDefs.MAX_MASTERY:
+			s += "  ·  %d/%d plays to mastery %d" % [plays, int(MinigameDefs.MASTERY_PLAYS[mastery - 1]), mastery + 1]
+		else:
+			s += "  ·  max mastery"
+		if not equipped and full:
+			s = "Replaces %s.  %s" % [MinigameDefs.name_of(String(mg.back())), s]
+		c.set_status(s, "mastery", UiPalette.TEXT_DIM)
+		if equipped:
+			var r := GameButton.make("REMOVE", "", GameButton.Kind.GHOST, 20)
+			r.name = "Remove"
+			r.min_height = 72
+			r.pad_x = 14
+			var rest := mg.duplicate()
+			rest.erase(id)
+			r.pressed.connect(cmd.bind(["set_loadout", rest, String(p.loadout.get("pet", ""))]))
+			c.add_footer(r)
 	else:
 		var m := CampInfo.milestone_for("minigames", id)
-		if not m.is_empty():
-			v.add_child(CampUi.lock_line(String(m.desc)))
+		if m.is_empty():
+			c.set_status("Unlock it with Sigils.", "lock")
+		else:
+			var pr := CampInfo.progress(p, m.cond)
+			c.set_status(String(m.desc) + ("  (%d/%d)" % [int(pr[0]), int(pr[1])] if int(pr[1]) > 1 else ""), "lock")
 	return c

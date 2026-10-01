@@ -21,7 +21,8 @@ const PET_COLOR := {
 	"tinker_gear": Color("d8b46a"), "grimoire": Color("b58cff"), "cauldron": Color("7fd08a"),
 }
 const ROLE_LABEL := {"heal": "Healer", "attack": "Striker", "burn": "Poisoner", "tempo": "Tempo",
-	"defense": "Guardian", "economy": "Treasurer"}
+	"defense": "Guardian", "economy": "Treasurer", "armor": "Bulwark", "control": "Controller", "burst": "Blaster",
+	"fixing": "Fixer", "runes": "Runecaster", "sustain": "Brewer"}
 const CHARGE_TEXT := {
 	"pair_plus": "+1 per attack with a Pair or better",
 	"low_die": "+1 per die showing 2 or less when you attack",
@@ -29,6 +30,12 @@ const CHARGE_TEXT := {
 	"kept": "+1 per die you never rerolled, when you attack",
 	"attack_intent": "+1 per enemy attack intent",
 	"board_double": "+1 per board move with doubles",
+	"block": "+1 per 3 Block you hold when you attack",
+	"one": "+1 per die showing 1 when you attack",
+	"set3": "+1 per attack with Three of a Kind or better",
+	"reroll": "+1 per combat reroll",
+	"rune": "+1 per attack where a rune triggers",
+	"win": "+1 per fight won",
 }
 const MINIGAME_ICON := {"fossil_hunter": "skull", "bubble_breaker": "star", "scratch_off": "coin", "claw_machine": "trophy",
 	"bubble_shooter": "bolt", "plinko": "dice", "shell_game": "chest", "memory_match": "mirror", "fishing": "snowflake",
@@ -75,6 +82,17 @@ const MINIGAME_GLYPH := {"fossil_hunter": "mg_fossil_hunter", "bubble_breaker": 
 	"plinko": "mg_plinko", "shell_game": "mg_shell_game", "memory_match": "mg_memory_match", "fishing": "mg_fishing",
 	"lucky_wheel": "mg_lucky_wheel", "high_low": "mg_high_low"}
 ## One icon per Workshop pack ("pack" = the generic unlock).
+## Workshop packs: the build idea in one line (the Workshop card's description).
+const PACK_BLURB := {
+	"starter": "The core runes, dice and passives every run draws from.",
+	"gamblers_kit": "Blank-or-six dice, banked rerolls and lucky streaks.",
+	"cold_steel": "Freeze foes, start turns with Block and hit back.",
+	"pyromancy": "Sixes that burn every enemy and huge opening hits.",
+	"storm": "Rerolls that strike back and runes that add max HP.",
+	"numerology": "Odd and even dice for straights and snake eyes.",
+	"resonance": "Runes that trigger twice.",
+	"colossus": "Giant dice, wild faces and boss-grade passives.",
+}
 const PACK_ICON := {"starter": "pack_starter", "gamblers_kit": "pack_gamblers_kit", "cold_steel": "pack_cold_steel",
 	"pyromancy": "pack_pyromancy", "storm": "pack_storm", "numerology": "pack_numerology", "resonance": "pack_resonance",
 	"colossus": "pack_colossus"}
