@@ -16,6 +16,9 @@ const TAGS := {"gold": "GOLD", "crown": "META", "potion": "POTION", "potion_gold
 	"high_roller": "DICE"}
 
 var _medal: MgWidgets.Medal
+## The pack trophy (MgWidgets.trophy) shown in place of the drawn medal.
+var _trophy: Control
+var _top: HBoxContainer
 var _sub: Label
 var _list: VBoxContainer
 var _take: GameButton
@@ -27,6 +30,7 @@ func _build() -> void:
 	var top := UiTheme.hbox(16)
 	top.alignment = BoxContainer.ALIGNMENT_CENTER
 	body.add_child(top)
+	_top = top
 	_medal = MgWidgets.Medal.new()
 	_medal.custom_minimum_size = Vector2(96, 108)
 	top.add_child(_medal)
@@ -37,12 +41,14 @@ func _build() -> void:
 	_list = UiTheme.vbox(14)
 	body.add_child(_list)
 	body.add_child(UiTheme.spacer(2))
-	_take = GameButton.make("TAKE", "check", GameButton.Kind.PRIMARY, 38)
+	# forced modal (spec 3.2): no close, no Esc; TAKE is the decision (Enter)
+	_take = GameButton.make("TAKE", "check", GameButton.Kind.SUCCESS, 38)
 	_take.icon_tint = UiPalette.TEXT_DARK
 	_take.pressed.connect(func() -> void:
 		if _choice >= 0:
 			reward_picked.emit(_choice))
 	body.add_child(_take)
+	primary_action = _take
 
 
 func refresh(flow: GameFlow) -> void:
@@ -50,7 +56,11 @@ func refresh(flow: GameFlow) -> void:
 	var tier := String(offer.get("tier", "silver"))
 	var col: Color = MgLogic.TIER_COLORS.get(tier, UiPalette.GOLD)
 	set_title("%s PRIZE" % tier.to_upper(), col.darkened(0.1) if tier != "silver" else Color("8e9bb8"))
+	# a colour without a native plaque family (steel, silver...): the white plaque x colour
+	if not ribbon.skinned():
+		ribbon.family = "white"
 	_medal.tier = tier
+	_set_trophy(tier)
 	_sub.text = "%s\nChoose one reward" % MinigameDefs.name_of(String(offer.get("id", "")))
 	UiTheme.clear(_list)
 	_cards.clear()
@@ -76,6 +86,16 @@ func refresh(flow: GameFlow) -> void:
 	_choice = -1
 	_take.set_enabled(false)
 	relayout()
+
+
+## The pack trophy (trophy_gold / silver / bronze at 96 px, spec 4.5) in place of the drawn medal.
+func _set_trophy(tier: String) -> void:
+	if _trophy != null and is_instance_valid(_trophy):
+		_trophy.queue_free()
+	_trophy = MgWidgets.trophy(tier, 96)
+	_medal.visible = false
+	_top.add_child(_trophy)
+	_top.move_child(_trophy, 0)
 
 
 func select(i: int) -> void:

@@ -112,34 +112,21 @@ func show_tip(i: int, k: int, pin := 3.0) -> void:
 		return
 	var a := String(hud.affixes[k])
 	var col := SkinRules.affix_color(a)
-	UiTheme.clear(_panel)
-	_panel.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(0.05, 0.05, 0.12, 0.97), 16, 2, col, 10, Color(0, 0, 0, 0.4)), 16, 10))
-	var colm := UiTheme.vbox(2)
-	_panel.add_child(colm)
-	var head := UiTheme.hbox(8)
-	head.add_child(UiIcons.rect(String(SkinRules.AFFIXES[a].icon), 34, col.lightened(0.2)))
-	head.add_child(UiTheme.label(AffixDefs.name_of(a), 28, col.lightened(0.3), true, 5))
-	colm.add_child(head)
-	var desc := UiTheme.para(String(AffixDefs.card(a).desc), 21, UiPalette.TEXT_DIM, 500)
-	desc.custom_minimum_size.x = minf(360.0, size.x - 60.0)
-	colm.add_child(desc)
-	var live := live_value(a, i)
-	if live != "":
-		colm.add_child(UiTheme.label(live, 21, UiPalette.GOLD_BRIGHT, false, 0, false, 700))
+	# the shared tooltip recipe (UiTooltip): rim in the affix colour, its icon, the rule and
+	# the live value
+	UiTooltip.fill(_panel, AffixDefs.name_of(a), "", String(AffixDefs.card(a).desc), col,
+		{"icon": String(SkinRules.AFFIXES[a].icon), "icon_px": 44, "status": live_value(a, i),
+		"max_w": minf(360.0, size.x - 120.0)})
 	_panel.visible = true
-	_panel.reset_size()
-	var s := _panel.get_combined_minimum_size()
-	_panel.size = s
 	var cam := get_viewport().get_camera_3d()
-	var at := size * 0.5
+	var anchor := Rect2()
 	if cam:
 		var b := hud.affix_badges[k]
-		at = _to_overlay(cam.unproject_position(b.global_position))
-	var pos := Vector2(at.x - s.x * 0.5, at.y + 34.0)
-	if pos.y + s.y > size.y - 20.0:
-		pos.y = at.y - s.y - 34.0
-	pos.x = clampf(pos.x, 12.0, size.x - s.x - 12.0)
-	_panel.position = pos
+		var at := _to_overlay(cam.unproject_position(b.global_position))
+		var g := get_global_transform() * at
+		anchor = Rect2(g - Vector2(26, 26), Vector2(52, 52))
+	# under the badge, flipped above near the bottom, clamped inside the safe area
+	UiTooltip.place(_panel, self, anchor)
 	_shown = Vector2i(i, k)
 	_pinned = pin
 

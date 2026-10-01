@@ -147,7 +147,8 @@ class Card extends Control:
 		var t := EncounterCards.text_for(it)
 		var col: Color = t.color
 		var p := PanelContainer.new()
-		p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(0.06, 0.05, 0.13, 0.97), 28, 4, col, 22, Color(col, 0.35), Vector2.ZERO), 26, 20))
+		# enemy / danger surface: ink + the Pointed frame in the affix / enemy colour (spec 1.2)
+		p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.danger_box(col), 30, 24))
 		p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(p)
 		var row: BoxContainer = UiTheme.vbox(10) if portrait else UiTheme.hbox(22)
@@ -160,7 +161,7 @@ class Card extends Control:
 		row.add_child(colm)
 		var cap := UiTheme.hbox(10)
 		if it.kind == "affix":
-			cap.add_child(UiIcons.rect(String(SkinRules.AFFIXES[it.id].icon), 44, col.lightened(0.2)))
+			cap.add_child(Icons.rect(String(SkinRules.AFFIXES[it.id].icon), 48, col.lightened(0.2)))
 		cap.add_child(UiTheme.label(String(t.caption), 22, col.lightened(0.3), false, 0, false, 800))
 		colm.add_child(cap)
 		var fs := 56
@@ -176,7 +177,7 @@ class Card extends Control:
 			ex.custom_minimum_size.x = w
 			colm.add_child(ex)
 		colm.add_child(UiTheme.spacer(4))
-		colm.add_child(UiTheme.label("Tap to continue", 20, UiPalette.TEXT_MUTED, false, 0, false, 700))
+		colm.add_child(UiTheme.label("Click to continue" if InputMode.is_kbm() else "Tap to continue", 20, UiPalette.TEXT_MUTED, false, 0, false, 700))
 		p.reset_size()
 		var s := p.get_combined_minimum_size()
 		p.size = s

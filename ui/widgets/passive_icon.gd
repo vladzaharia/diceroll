@@ -31,7 +31,7 @@ static func make(p_id: String, px := 40.0, p_interactive := false) -> PassiveIco
 
 static func glyph(p_id: String) -> String:
 	var name := "passive_" + p_id
-	return name if UiIcons.exists(name) else "star"
+	return name if Icons.exists(name) else "star"
 
 
 func rarity() -> String:
@@ -83,6 +83,6 @@ func _draw() -> void:
 	draw_circle(c, inner, UiPalette.INK.lerp(ring, 0.18))
 	draw_circle(c - Vector2(0, inner * 0.3), inner * 0.7, Color(1, 1, 1, 0.05))
 	var gs := inner * 1.42
-	var tex := UiIcons.tex(glyph(id), int(maxf(s * 1.6, 24.0)), GLYPH_TINT.lerp(ring.lightened(0.4), 0.25))
+	var tex := Icons.tex(glyph(id), int(maxf(s * 1.6, 24.0)), GLYPH_TINT.lerp(ring.lightened(0.4), 0.25))
 	if tex:
 		draw_texture_rect(tex, Rect2(c - Vector2(gs, gs) * 0.5, Vector2(gs, gs)), false)

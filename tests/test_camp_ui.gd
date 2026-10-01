@@ -51,7 +51,7 @@ func test_lock_text_and_names() -> void:
 	for kind in UnlockDefs.KINDS:
 		for id in UnlockDefs.all_ids(kind):
 			assert_true(CampInfo.name_of(kind, String(id)) != "", "name for %s/%s" % [kind, id])
-			assert_true(UiIcons.exists(CampInfo.icon_of(kind, String(id))), "icon for %s/%s" % [kind, id])
+			assert_true(Icons.exists(CampInfo.glyph_of(kind, String(id))), "icon for %s/%s" % [kind, id])
 
 
 func test_nearest_goals() -> void:

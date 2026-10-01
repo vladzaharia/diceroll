@@ -18,6 +18,7 @@ var _name: Label
 var _hint: Label
 var _boo: Label
 var _gen := 0
+var _kicker_chip: PanelContainer
 
 
 static func make(id: String) -> SecretReveal:
@@ -49,9 +50,15 @@ func _build() -> void:
 	_boo.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	_boo.visible = false
 	holder.add_child(UiTheme.full_rect(_boo))
+	# the kicker is a chip like the other unlock cards' tags: violet "secret", BOO green once known
+	_kicker_chip = PanelContainer.new()
+	_kicker_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_kicker_chip.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_kicker = UiTheme.label("A SECRET STIRS…", 18, Color("c79bff"), false, 0, false, 800)
 	_kicker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	col.add_child(_kicker)
+	_kicker_chip.add_child(_kicker)
+	OptionCard.style_tag(_kicker_chip, _kicker, Color("c79bff"), 18)
+	col.add_child(_kicker_chip)
 	_name = UiTheme.label("???", 44, UiPalette.TEXT_MUTED, true, 8, true)
 	_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(_name)
@@ -61,9 +68,10 @@ func _build() -> void:
 
 
 func _style(on: bool) -> void:
-	var sb := UiTheme.box(Color(0.1, 0.16, 0.08, 0.95) if on else Color(0.07, 0.05, 0.13, 0.95), 26, 3,
-		BOO_GREEN if on else Color(0.55, 0.45, 0.75, 0.5), 18 if on else 0, Color(BOO_GREEN, 0.35), Vector2.ZERO)
+	# a card like the other unlock cards (accent rim: BOO green once revealed, violet before)
+	var sb := UiTheme.card_box("normal", BOO_GREEN if on else Color(0.55, 0.45, 0.75))
 	UiTheme.pad(sb, 16, 14)
+	sb.content_margin_bottom = maxf(sb.content_margin_bottom, 22.0 if UiTheme.skinned("card_accent") else 14.0)
 	add_theme_stylebox_override("panel", sb)
 
 
@@ -101,7 +109,7 @@ func _reveal(burst: bool) -> void:
 	portrait.spin = 0.35
 	_style(true)
 	_kicker.text = "NEW SECRET HERO"
-	_kicker.label_settings = UiTheme.label_settings(20, BOO_GREEN, false, 0, UiPalette.OUTLINE, false, 800)
+	OptionCard.style_tag(_kicker_chip, _kicker, BOO_GREEN, 20)
 	_name.text = String(HeroDefs.DATA[class_id].name).to_upper()
 	_name.label_settings = UiTheme.label_settings(46, UiPalette.TEXT, true, 8, UiPalette.OUTLINE, true)
 	_hint.text = ClassInfo.tagline(class_id)

@@ -62,17 +62,22 @@ func _build() -> void:
 	var row := UiTheme.hbox(14)
 	_footer = UiTheme.margin(row, 12, 38, 12, 0)
 	_frame.add_child(_footer)
-	var title := GameButton.make("", "home", GameButton.Kind.SECONDARY, 30)
-	title.icon_tint = UiPalette.GOLD
-	title.min_height = 100
+	# forced (spec 3.2): no close / Esc / backdrop. TO CAMP is the main choice (full width,
+	# Enter); home is a round utility button
+	var title := GameButton.round_icon("home", 88)
+	title.round_family = "grey"
+	title.icon_tint = UiPalette.TEXT
+	title.tooltip_text = "Title screen"
+	title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	title.pressed.connect(func() -> void: title_pressed.emit())
 	row.add_child(title)
 	_camp_btn = GameButton.make("TO CAMP", "campfire", GameButton.Kind.PRIMARY, 38)
-	_camp_btn.icon_tint = UiPalette.TEXT_DARK
 	_camp_btn.min_height = 100
 	_camp_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_camp_btn.pressed.connect(func() -> void: new_run_pressed.emit())
 	row.add_child(_camp_btn)
+	primary_action = _camp_btn
+	ScrollFade.attach(self, _scroll, UiPalette.NAVY_2, _frame)
 
 
 func refresh(flow: GameFlow) -> void:
@@ -82,7 +87,7 @@ func refresh(flow: GameFlow) -> void:
 	if st.is_empty():
 		st = flow._summary()
 	var won := flow.phase == GameFlow.Phase.VICTORY or bool(st.get("victory", false))
-	set_title("VICTORY!" if won else "DEFEATED", UiPalette.GOLD if won else UiPalette.DANGER)
+	set_title("VICTORY!" if won else "DEFEATED", "green" if won else "red")
 	var info := flow.route_info()
 	var boss_name := String(info.boss.name)
 	var last := BiomeDefs.name_of(String(r.route.back())) if not r.route.is_empty() else String(ACT_NAMES[2])
@@ -91,7 +96,7 @@ func refresh(flow: GameFlow) -> void:
 	_headline.label_settings = UiTheme.label_settings(28, UiPalette.GOLD_BRIGHT if won else UiPalette.TEXT, true, 0, UiPalette.OUTLINE, true)
 	UiTheme.clear(_hero)
 	var cls: Dictionary = HeroDefs.DATA.get(r.class_id, HeroDefs.DATA.knight)
-	_hero.add_child(OptionCard.Medallion.make(UiIcons.class_icon(r.class_id), 80, null, UiPalette.GOLD if won else UiPalette.DANGER))
+	_hero.add_child(OptionCard.Medallion.make(Icons.class_icon(r.class_id), 80, null, UiPalette.GOLD if won else UiPalette.DANGER))
 	var col := UiTheme.vbox(0)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	_hero.add_child(col)
@@ -121,7 +126,9 @@ func open() -> void:
 	_animate()
 
 
-## UiModal's layout, with the footer's height kept free under the scrolling panel.
+## UiModal's layout (MIN_W floor, shrink-to-fit via _fit), with the footer's height kept free
+## under the scrolling panel. Narrow canvases (iPhone at 125 % UI size: 576 px) scale the whole
+## frame down instead of letting wide rows (route strip, first chips) push it off-screen.
 func _layout() -> void:
 	if _frame == null or _footer == null:
 		super._layout()
@@ -129,21 +136,33 @@ func _layout() -> void:
 	var view := size
 	if view.x <= 0.0:
 		return
-	var safe := UiTheme.safe_margins(self)
-	var w := minf(max_width, view.x - safe.left - safe.right)
-	_frame.custom_minimum_size.x = w
-	_frame.size = Vector2(w, 0)
-	var avail_h := view.y - safe.top - safe.bottom
 	_apply_scale(view)
-	_fit_plaque(w)
-	var chrome := chrome_height()
-	chrome += _footer.get_combined_minimum_size().y - 26.0
+	var safe := UiTheme.safe_margins(self)
+	var avail_w := view.x - safe.left - safe.right
+	var w := minf(max_width, avail_w)
+	# never lay out narrower than MIN_W: shrink instead (as UiModal does)
+	var lw := maxf(w, minf(MIN_W, max_width))
+	_frame.custom_minimum_size.x = lw
+	_frame.size = Vector2(lw, 0)
+	_fit_plaque(lw)
+	var k := minf(1.0, w / lw)
+	var avail_h := (view.y - safe.top - safe.bottom) / k
+	var chrome := chrome_height() + _footer.get_combined_minimum_size().y - header_overlap()
 	var natural := _inner.get_combined_minimum_size().y
 	_scroll.custom_minimum_size.y = maxf(120.0, minf(natural, avail_h - chrome))
 	_frame.reset_size()
-	_frame.size.x = w
-	_frame.position = Vector2((view.x - w) * 0.5, maxf(safe.top, (view.y - _frame.size.y) * 0.5))
+	_frame.size.x = maxf(_frame.size.x, lw)
+	# content wider than the screen allows: shrink the whole frame
+	k = minf(k, avail_w / maxf(_frame.size.x, 1.0))
+	k = minf(k, (view.y - safe.top - safe.bottom) / maxf(_frame.size.y, 1.0))
+	var was := _fit
+	_fit = clampf(k, 0.6, 1.0)
+	if not is_equal_approx(was, _fit) and is_equal_approx(_frame.scale.x, was):
+		_frame.scale = Vector2.ONE * _fit
+	var fh := _frame.size.y * _fit
+	var c := Vector2(safe.left + avail_w * 0.5, maxf(safe.top, safe.top + (view.y - safe.top - safe.bottom - fh) * 0.5) + fh * 0.5)
 	_frame.pivot_offset = _frame.size * 0.5
+	_frame.position = c - _frame.size * 0.5
 
 
 func show_now() -> void:
@@ -170,7 +189,7 @@ func _build_crowns(st: Dictionary) -> void:
 	_crowns_box.visible = true
 	_crowns_box.add_child(UiModal.section_label("Crowns earned"))
 	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", UiTheme.panel_box("inset"))
+	panel.add_theme_stylebox_override("panel", UiTheme.inset_box())
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_crowns_box.add_child(panel)
 	var list := UiTheme.vbox(4)
@@ -185,7 +204,7 @@ func _build_crowns(st: Dictionary) -> void:
 		var row := UiTheme.hbox(12)
 		list.add_child(row)
 		var def: Array = LINES.get(key, ["star", key.capitalize()])
-		row.add_child(UiIcons.rect(String(def[0]), 32))
+		row.add_child(Icons.rect(String(def[0]), 32))
 		var lab := UiTheme.label(String(def[1]), 23, UiPalette.TEXT, false, 0, false, 600)
 		row.add_child(lab)
 		var det := UiTheme.label(_detail(key, amt, st), 18, UiPalette.TEXT_MUTED, false, 0, false, 600)
@@ -204,7 +223,7 @@ func _build_crowns(st: Dictionary) -> void:
 	list.add_child(sep)
 	_total_row = UiTheme.hbox(12)
 	list.add_child(_total_row)
-	_total_row.add_child(UiIcons.rect("crown", 44, CampUi.CROWN_COLOR))
+	_total_row.add_child(Icons.rect("crown", 44))
 	var tl := UiTheme.label("TOTAL", 30, UiPalette.TEXT, true, 6)
 	tl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_total_row.add_child(tl)
@@ -273,7 +292,7 @@ func _build_extra() -> void:
 		var row := CampUi.card(l1 > l0, CampInfo.PET_COLOR.get(pet, UiPalette.GOLD))
 		var h := UiTheme.hbox(12)
 		row.add_child(h)
-		h.add_child(OptionCard.Medallion.make(String(CampInfo.PET_ICON.get(pet, "heart")), 56, CampInfo.PET_COLOR.get(pet, UiPalette.GOLD), CampInfo.PET_COLOR.get(pet, UiPalette.GOLD)))
+		h.add_child(OptionCard.Medallion.make(CampInfo.glyph_of("pets", pet), 56, CampInfo.PET_COLOR.get(pet, UiPalette.GOLD), CampInfo.PET_COLOR.get(pet, UiPalette.GOLD)))
 		var c := UiTheme.vbox(4)
 		c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		h.add_child(c)
@@ -459,12 +478,19 @@ func _first_chip(e: Dictionary) -> Control:
 		"short_win": label = "Short Road win"
 		_: label = kind
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(0.12, 0.08, 0.22, 0.9), 18, 2, Color(CampUi.SIGIL_COLOR, 0.6)), 12, 6))
+	# a flat round chip (never the 3D card: too short for its lip); ink on the pack purple
+	var skin := UiTheme.skinned("chip_purple")
+	if skin:
+		p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.chip_box(Color(CampUi.SIGIL_COLOR, 1.0)), 16, 5))
+	else:
+		p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(0.12, 0.08, 0.22, 0.9), 18, 2, Color(CampUi.SIGIL_COLOR, 0.6)), 12, 6))
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var row := UiTheme.hbox(8)
 	p.add_child(row)
-	row.add_child(UiTheme.label(label, 19, UiPalette.TEXT, false, 0, false, 600))
-	row.add_child(CampUi.sigils(int(e.get("sigils", 0)), 20))
+	var fg := UiPalette.INK_LABEL if skin else UiPalette.TEXT
+	row.add_child(UiTheme.label(label, 19, fg, false, 0, false, 700))
+	row.add_child(Icons.rect(CampUi.sigil_icon(), 24))
+	row.add_child(UiTheme.label(str(int(e.get("sigils", 0))), 20, fg, true, 0))
 	return p
 
 
@@ -476,7 +502,7 @@ func _unlock_card(kind: String, id: String, why: String) -> Control:
 	if kind == "items":
 		row.add_child(ItemThumb.make(id, 72))
 	else:
-		row.add_child(OptionCard.Medallion.make(CampInfo.icon_of(kind, id), 64, null if kind == "biomes" else col, col))
+		row.add_child(OptionCard.Medallion.make(CampInfo.glyph_of(kind, id), 64, null if kind == "biomes" else col, col))
 	var v := UiTheme.vbox(0)
 	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(v)
@@ -505,7 +531,7 @@ func _skin_card(class_id: String, skin: String) -> Control:
 	row.add_child(v)
 	var kick := UiTheme.hbox(6)
 	v.add_child(kick)
-	kick.add_child(UiIcons.rect("wardrobe", 22, Color("c79bff")))
+	kick.add_child(Icons.rect("wardrobe", 28))
 	kick.add_child(UiTheme.label("NEW SKIN", 16, Color("c79bff"), false, 0, false, 800))
 	v.add_child(UiTheme.label("%s, %s" % [CampInfo.name_of("classes", class_id), String(SkinDefs.NAMES.get(skin, skin))], 28, UiPalette.TEXT, true, 6))
 	v.add_child(UiTheme.para("Wear it from the Wardrobe in the Camp.", 17, UiPalette.TEXT_DIM, 500))
@@ -543,7 +569,7 @@ func _build_goals() -> void:
 		c.add_child(v)
 		var head := UiTheme.hbox(10)
 		v.add_child(head)
-		head.add_child(UiIcons.rect(String(g.icon), 30, g.color))
+		head.add_child(Icons.rect(String(g.icon), 32, g.color))
 		var t := UiTheme.label(String(g.title), 22, UiPalette.TEXT, true, 4)
 		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		t.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
