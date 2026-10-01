@@ -2413,6 +2413,495 @@
      "svg": "rhosgfx/cartoony-ui-pack-full/Widgets/Cursor/cursor-focus.svg"
     }
    }
+  },
+  "dev_panel": {
+   "note": "Developer menu frame (DevMenu only, slate direction C): Container 3D grey-darker inset 8 px under the Square Corners grey-dark frame, scale 0.625 (phone / small canvas). Never used by player-facing modals.",
+   "fallback": "panel:main",
+   "content": [
+    34,
+    32,
+    34,
+    36
+   ],
+   "states": {
+    "normal": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/3D/1. Grey/container-3d-grey-darker.svg",
+       "slice": [
+        15,
+        15,
+        15,
+        25
+       ],
+       "scale": 0.8,
+       "expand": [
+        -8,
+        -8,
+        -8,
+        -8
+       ]
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Frames/Square Corners/1. Grey/frame-squarecorners-grey-dark.svg",
+       "slice": [
+        32,
+        42,
+        32,
+        42
+       ],
+       "scale": 0.625,
+       "draw_center": false,
+       "runtime_tint": false
+      }
+     ]
+    }
+   }
+  },
+  "dev_panel_lg": {
+   "note": "Developer menu frame (DevMenu only, slate direction C): Container 3D grey-darker inset 8 px under the Square Corners grey-dark frame, scale 0.8 (canvas >= 1000 logical px both ways). Never used by player-facing modals.",
+   "fallback": "panel:main",
+   "content": [
+    40,
+    40,
+    40,
+    44
+   ],
+   "states": {
+    "normal": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/3D/1. Grey/container-3d-grey-darker.svg",
+       "slice": [
+        15,
+        15,
+        15,
+        25
+       ],
+       "scale": 0.8,
+       "expand": [
+        -8,
+        -8,
+        -8,
+        -8
+       ]
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Frames/Square Corners/1. Grey/frame-squarecorners-grey-dark.svg",
+       "slice": [
+        32,
+        42,
+        32,
+        42
+       ],
+       "scale": 0.8,
+       "draw_center": false,
+       "runtime_tint": false
+      }
+     ]
+    }
+   }
+  },
+  "dev_header": {
+   "note": "Developer menu header bar (full-screen dev surface: DEVELOPER tag, title, close): Flat white x #1b2d38 (deep slate).",
+   "fallback": "panel:inset",
+   "slice": [
+    10,
+    10,
+    10,
+    10
+   ],
+   "content": [
+    22,
+    4,
+    8,
+    4
+   ],
+   "states": {
+    "normal": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+     "tint": "#1b2d38"
+    }
+   }
+  },
+  "dev_button": {
+   "note": "Developer menu secondary button (>= 80 px): 3D Square 2.5 grey-light (slate), ink labels.",
+   "fallback": "button",
+   "fit": true,
+   "slice": [
+    9,
+    9,
+    9,
+    19
+   ],
+   "scale": 1.25,
+   "content": [
+    25.0,
+    12.5,
+    25.0,
+    25.0
+   ],
+   "states": {
+    "normal": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/1. Grey/button-square-3d-2.5-grey-light_standard.svg"
+    },
+    "hover": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/1. Grey/button-square-3d-2.5-grey-light_hover.svg"
+    },
+    "pressed": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/1. Grey/button-square-3d-2.5-grey-light_pressed.svg",
+     "slice": [
+      9,
+      15,
+      9,
+      13
+     ],
+     "content": [
+      25.0,
+      20.0,
+      25.0,
+      17.5
+     ]
+    },
+    "focus": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/1. Grey/button-square-3d-2.5-grey-light_focus.svg"
+    },
+    "disabled": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/1. Grey/button-square-3d-2.5-grey-dark_standard.svg",
+     "modulate": "#ffffffb3"
+    }
+   }
+  },
+  "dev_button_accent": {
+   "note": "Developer menu accent button (>= 80 px: SWITCH, channel on): 3D Square 2.5 white x muted teal #5ccfc3 (tooling accent, not the game's yellow), ink labels.",
+   "fallback": "button",
+   "fit": true,
+   "slice": [
+    9,
+    9,
+    9,
+    19
+   ],
+   "scale": 1.25,
+   "content": [
+    25.0,
+    12.5,
+    25.0,
+    25.0
+   ],
+   "tint": "#5ccfc3",
+   "states": {
+    "normal": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/0. White/button-square-3d-2.5-white_standard.svg"
+    },
+    "hover": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/0. White/button-square-3d-2.5-white_hover.svg"
+    },
+    "pressed": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/0. White/button-square-3d-2.5-white_pressed.svg",
+     "slice": [
+      9,
+      15,
+      9,
+      13
+     ],
+     "content": [
+      25.0,
+      20.0,
+      25.0,
+      17.5
+     ]
+    },
+    "focus": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/0. White/button-square-3d-2.5-white_focus.svg"
+    },
+    "disabled": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/1. Grey/button-square-3d-2.5-grey-dark_standard.svg",
+     "tint": "#ffffff",
+     "modulate": "#ffffffb3"
+    }
+   }
+  },
+  "dev_button_dark": {
+   "note": "Developer menu toggle off (>= 80 px: channel chips): 3D Square 2.5 grey-dark, light labels.",
+   "fallback": "button",
+   "fit": true,
+   "slice": [
+    9,
+    9,
+    9,
+    19
+   ],
+   "scale": 1.25,
+   "content": [
+    25.0,
+    12.5,
+    25.0,
+    25.0
+   ],
+   "states": {
+    "normal": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/1. Grey/button-square-3d-2.5-grey-dark_standard.svg"
+    },
+    "hover": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/1. Grey/button-square-3d-2.5-grey-dark_hover.svg"
+    },
+    "pressed": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/1. Grey/button-square-3d-2.5-grey-dark_pressed.svg",
+     "slice": [
+      9,
+      15,
+      9,
+      13
+     ],
+     "content": [
+      25.0,
+      20.0,
+      25.0,
+      17.5
+     ]
+    },
+    "focus": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/1. Grey/button-square-3d-2.5-grey-dark_focus.svg"
+    },
+    "disabled": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/1. Grey/button-square-3d-2.5-grey-dark_standard.svg",
+     "modulate": "#ffffffb3"
+    }
+   }
+  },
+  "dev_button_sm": {
+   "note": "Developer menu secondary button (<= 72 px): 3D Square 2.5 grey-light (slate), ink labels.",
+   "fallback": "button",
+   "fit": true,
+   "slice": [
+    9,
+    9,
+    9,
+    19
+   ],
+   "scale": 1.0,
+   "content": [
+    20.0,
+    10.0,
+    20.0,
+    20.0
+   ],
+   "states": {
+    "normal": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/1. Grey/button-square-3d-2.5-grey-light_standard.svg"
+    },
+    "hover": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/1. Grey/button-square-3d-2.5-grey-light_hover.svg"
+    },
+    "pressed": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/1. Grey/button-square-3d-2.5-grey-light_pressed.svg",
+     "slice": [
+      9,
+      15,
+      9,
+      13
+     ],
+     "content": [
+      20.0,
+      16.0,
+      20.0,
+      14.0
+     ]
+    },
+    "focus": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/1. Grey/button-square-3d-2.5-grey-light_focus.svg"
+    },
+    "disabled": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/1. Grey/button-square-3d-2.5-grey-dark_standard.svg",
+     "modulate": "#ffffffb3"
+    }
+   }
+  },
+  "dev_button_accent_sm": {
+   "note": "Developer menu accent button (<= 72 px: SWITCH, channel on): 3D Square 2.5 white x muted teal #5ccfc3 (tooling accent, not the game's yellow), ink labels.",
+   "fallback": "button",
+   "fit": true,
+   "slice": [
+    9,
+    9,
+    9,
+    19
+   ],
+   "scale": 1.0,
+   "content": [
+    20.0,
+    10.0,
+    20.0,
+    20.0
+   ],
+   "tint": "#5ccfc3",
+   "states": {
+    "normal": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/0. White/button-square-3d-2.5-white_standard.svg"
+    },
+    "hover": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/0. White/button-square-3d-2.5-white_hover.svg"
+    },
+    "pressed": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/0. White/button-square-3d-2.5-white_pressed.svg",
+     "slice": [
+      9,
+      15,
+      9,
+      13
+     ],
+     "content": [
+      20.0,
+      16.0,
+      20.0,
+      14.0
+     ]
+    },
+    "focus": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/0. White/button-square-3d-2.5-white_focus.svg"
+    },
+    "disabled": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/1. Grey/button-square-3d-2.5-grey-dark_standard.svg",
+     "tint": "#ffffff",
+     "modulate": "#ffffffb3"
+    }
+   }
+  },
+  "dev_button_dark_sm": {
+   "note": "Developer menu toggle off (<= 72 px: channel chips): 3D Square 2.5 grey-dark, light labels.",
+   "fallback": "button",
+   "fit": true,
+   "slice": [
+    9,
+    9,
+    9,
+    19
+   ],
+   "scale": 1.0,
+   "content": [
+    20.0,
+    10.0,
+    20.0,
+    20.0
+   ],
+   "states": {
+    "normal": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/1. Grey/button-square-3d-2.5-grey-dark_standard.svg"
+    },
+    "hover": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/1. Grey/button-square-3d-2.5-grey-dark_hover.svg"
+    },
+    "pressed": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/1. Grey/button-square-3d-2.5-grey-dark_pressed.svg",
+     "slice": [
+      9,
+      15,
+      9,
+      13
+     ],
+     "content": [
+      20.0,
+      16.0,
+      20.0,
+      14.0
+     ]
+    },
+    "focus": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/1. Grey/button-square-3d-2.5-grey-dark_focus.svg"
+    },
+    "disabled": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/1. Grey/button-square-3d-2.5-grey-dark_standard.svg",
+     "modulate": "#ffffffb3"
+    }
+   }
+  },
+  "dev_inset": {
+   "note": "Developer menu inset (build info): Flat white x deep slate #16242d, alpha .85.",
+   "fallback": "panel:inset",
+   "slice": [
+    10,
+    10,
+    10,
+    10
+   ],
+   "content": [
+    18,
+    12,
+    18,
+    12
+   ],
+   "states": {
+    "normal": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+     "tint": "#16242d",
+     "modulate": "#ffffffd9"
+    }
+   }
+  },
+  "dev_callout": {
+   "note": "Developer menu confirm box (channel switch): Flat deep slate + Thin white rim x teal.",
+   "fallback": "panel:tooltip",
+   "content": [
+    20,
+    16,
+    20,
+    16
+   ],
+   "states": {
+    "normal": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "slice": [
+        10,
+        10,
+        10,
+        10
+       ],
+       "scale": 1.0,
+       "tint": "#16242d",
+       "modulate": "#fffffff2"
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Frames/Thin/0. White/frame-thin-white.svg",
+       "slice": [
+        22,
+        22,
+        22,
+        22
+       ],
+       "scale": 0.35,
+       "tint": "#5ccfc3",
+       "draw_center": false
+      }
+     ]
+    }
+   }
+  },
+  "dev_chip": {
+   "note": "Developer menu DEVELOPER tag: Flat Round 2.5 white x teal (fit shrinks to the chip height).",
+   "fallback": "empty",
+   "fit": true,
+   "slice": [
+    32,
+    31,
+    32,
+    32
+   ],
+   "scale": 1.0,
+   "content": [
+    14,
+    3,
+    14,
+    3
+   ],
+   "tint": "#5ccfc3",
+   "states": {
+    "normal": {
+     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/Flat/Round/0. White/button-round-flat-2.5-white_standard.svg"
+    }
+   }
   }
  }
 }
