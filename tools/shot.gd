@@ -58,7 +58,8 @@ static func parse_args(list: PackedStringArray) -> Dictionary:
 func _run(name: String, wait: float, frames: int) -> void:
 	var tree := get_tree()
 	var missing := AssetCheck.run(true)
-	if not missing.is_empty():
+	# asset_missing IS the missing-assets screen: it must be shootable with packs absent
+	if not missing.is_empty() and name != "asset_missing":
 		push_error("Shot: required game assets are missing (%s); run tools/import_assets.sh" % ", ".join(missing))
 		tree.quit(1)
 		return
