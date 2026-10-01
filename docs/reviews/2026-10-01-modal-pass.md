@@ -188,6 +188,7 @@ This follows the spec 3.2 inventory exactly. The changes are:
 | 31 | polish | HUD under modals (Last Camp, ore) | The twist chip made the whole top row shrink: WANING 15.1 px, pause 66 px. | The chip drops its word, then the lap pips, before the row shrinks (both stay in tooltips). |
 | 32 | major | All modals | Sections were packed tight: 18 px everywhere, with the action row 20 px under the cards (user). | The spacing scale. |
 | 33 | major | Shop pick, pause, AUTO settings, results at 125% UI size on phones | Content wider than the 576 px canvas made the panel shrink to 0.85–0.93, putting tags at 13.6 px and taps at 68 px. | Title/tag and die faces flow; slimmer segment pills; compact route columns 120 px; the fit snaps near 1. |
+| 35 | major | All modals on canvases narrower than 620 px | The panel was shrunk to fit instead of reflowing (option cards, die-chip grids, long detail lines). | Lay out at the real width: `grid_columns()`, flowing card titles and faces, `wrap_wide_labels()`. |
 | 34 | minor | Camp bottom panel (max profile, Ascension 10, 125%) | The loadout row pushed past the safe area: 6 AUDIT_SAFE (tech lead). | The name trims and the mode line wraps. |
 
 Every finding is fixed.
@@ -262,4 +263,20 @@ Columns:
 - **`icon_map.json`:** `controls` (Technology / Keyboard Key Flat White, new SVG; bundles re-packed, lock updated).
 
 ## Audit
-Zero `AUDIT_OVERFLOW`, `AUDIT_SAFE`, `AUDIT_CLIP`, `AUDIT_TEXT` and `AUDIT_TAP` findings on every scenario above, on the quick set and on the zoom set for the densest seven. See the gallery and the report for the log paths.
+Results after the pass:
+- **Quick set** (55 scenarios × 5 devices): zero `AUDIT_OVERFLOW`, `AUDIT_SAFE`, `AUDIT_CLIP`, `AUDIT_TEXT` and `AUDIT_TAP` findings.
+- **Zoom set** (0.8–1.5 UI zoom, 6 devices) for shop pick, Settings, AUTO settings, results, Armory picker, pause loadout, draft and the max-profile Workshop at Ascension 10: zero findings.
+
+Before the pass:
+- shop pick: 40 findings
+- AUTO settings: 74
+- Settings: 35
+- pause loadout: 25
+- results: 16
+- Last Camp HUD: 2
+- missing assets: 5
+
+Tests:
+- `tests/run.sh`: 792 passed, 0 failed, including `tests/test_modal_conventions.gd`.
+- `ui/check_scripts.gd`: UI_SCRIPTS_OK.
+- `assets.py verify`: all units match the lock.
