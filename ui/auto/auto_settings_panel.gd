@@ -119,7 +119,7 @@ func _build() -> void:
 		_right.add_child(row)
 		_stop_rows[s[0]] = row
 
-	body.add_child(UiTheme.spacer(4))
+	body.add_child(UiModal.action_gap())
 	# a normal-width ghost: resetting is a real (if rare) choice, not the way out
 	var reset := GameButton.make("RESET TO DEFAULTS", "reroll", GameButton.Kind.GHOST, 24)
 	reset.name = "Reset"
@@ -139,7 +139,7 @@ func _segmented(ids: Array, labels: Dictionary, store: Dictionary, cb: Callable)
 	var names: Array[String] = []
 	for id in ids:
 		names.append(String(labels[id]))
-	var sg := SettingsPanel.Segmented.make(names, func(i: int) -> void: cb.call(String(ids[i])), 23)
+	var sg := SettingsPanel.Segmented.make(names, func(i: int) -> void: cb.call(String(ids[i])), 19)
 	for i in ids.size():
 		store[ids[i]] = sg.buttons[i]
 	return sg

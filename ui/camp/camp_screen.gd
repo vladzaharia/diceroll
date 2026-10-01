@@ -665,6 +665,7 @@ class WelcomeModal:
 			nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			st.add_child(nm)
 			row.add_child(st)
+		body.add_child(UiModal.action_gap())
 		var go := GameButton.make("LET'S GO", "arrow_right", GameButton.Kind.PRIMARY, 36)
 		go.icon_tint = UiPalette.TEXT_DARK
 		go.pressed.connect(func() -> void: close())

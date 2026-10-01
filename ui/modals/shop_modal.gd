@@ -57,6 +57,7 @@ func _build() -> void:
 	_pick_grid.add_theme_constant_override("v_separation", 12)
 	_pick_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_picker.add_child(_pick_grid)
+	body.add_child(UiModal.action_gap())
 	var foot := UiTheme.hbox(14)
 	body.add_child(foot)
 	_buy = GameButton.make("BUY", "coin", GameButton.Kind.PRIMARY, 34)

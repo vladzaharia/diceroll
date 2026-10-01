@@ -31,6 +31,7 @@ func _build() -> void:
 	_note = UiTheme.label(" ", 22, UiPalette.TEXT_DIM, false, 0, false, 600)
 	_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	body.add_child(_note)
+	body.add_child(UiModal.action_gap())
 	_bind = GameButton.make("BIND RUNE", "check", GameButton.Kind.SUCCESS, 38)
 	_bind.icon_tint = UiPalette.TEXT_DARK
 	_bind.pressed.connect(func() -> void:

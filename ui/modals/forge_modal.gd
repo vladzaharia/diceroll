@@ -31,7 +31,6 @@ var _src_btns: Array[_FaceButton] = []
 
 
 func _build() -> void:
-	body.add_theme_constant_override("separation", 14)
 	dismissible = true
 	close_tooltip = "Skip the forge"
 	_skip = close_button
@@ -77,6 +76,7 @@ func _build() -> void:
 	_preview.alignment = BoxContainer.ALIGNMENT_CENTER
 	_preview.custom_minimum_size.y = 104
 	pv.add_child(_preview)
+	body.add_child(UiModal.action_gap())
 	var foot := UiTheme.hbox(14)
 	body.add_child(foot)
 	_apply = GameButton.make("FORGE", "anvil", GameButton.Kind.PRIMARY, 36)

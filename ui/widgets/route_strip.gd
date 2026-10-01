@@ -67,7 +67,7 @@ func _stop(b: Dictionary, tier: int) -> Control:
 	var past := current > 0 and tier < current
 	var col := UiTheme.vbox(2 if compact else 4)
 	col.alignment = BoxContainer.ALIGNMENT_BEGIN
-	col.custom_minimum_size.x = 140 if compact else 172
+	col.custom_minimum_size.x = 120 if compact else 172
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var px := 64 if compact else 104
 	var med := OptionCard.Medallion.make(Icons.biome_icon(id), px, null, bc if (here or current == 0) else bc.darkened(0.35))

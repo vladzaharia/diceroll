@@ -43,6 +43,7 @@ func _build() -> void:
 	_passives.add_theme_constant_override("v_separation", 8)
 	_passives.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	body.add_child(_passives)
+	body.add_child(UiModal.action_gap())
 	_main = UiTheme.vbox(16)
 	body.add_child(_main)
 	# one exit (spec 3.2): RESUME is the main choice (full width, Enter / Esc); no close button

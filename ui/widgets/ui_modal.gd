@@ -24,6 +24,21 @@ const PLAQUE_WIN := "green"
 const PLAQUE_DANGER := "red"
 const PLAQUE_FAMILIES := [PLAQUE_DEFAULT, PLAQUE_LEVEL, PLAQUE_WIN, PLAQUE_DANGER]
 
+## Spacing scale (modal pass 2026-10-01; logical px on the 1280-tall canvas, scaled down on
+## short canvases by spacing_k(): landscape phones, small windows):
+##   GAP_SECTION  between sections (header-separated groups; cards vs the action row)
+##   GAP_ITEM     between items inside a section (the body's separation)
+##   GAP_HEAD     between a section header and its content (composite headers)
+##   GAP_TOP      under the plaque, above the first section
+##   GAP_ACTIONS  above the bottom action row (TAKE, BUY, BEGIN...): action_gap()
+const GAP_SECTION := 36
+const GAP_ITEM := 18
+const GAP_HEAD := 12
+const GAP_TOP := 30
+const GAP_ACTIONS := 36
+## Canvas height the spacing scale is designed for.
+const GAP_REF_H := 1280.0
+
 signal opened
 signal closed
 ## The player dismissed the modal (close button, Esc or backdrop), just before it closes.
@@ -110,9 +125,9 @@ func _init() -> void:
 	_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	_scroll.mouse_filter = Control.MOUSE_FILTER_PASS
 	panel.add_child(_scroll)
-	body = UiTheme.vbox(18)
+	body = UiTheme.vbox(GAP_ITEM)
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_inner = UiTheme.margin(body, 0, 22, 0, 0)
+	_inner = UiTheme.margin(body, 0, GAP_TOP, 0, 0)
 	_inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_scroll.add_child(_inner)
 	_inner.minimum_size_changed.connect(relayout)
@@ -330,6 +345,7 @@ func _layout() -> void:
 	if view.x <= 0.0:
 		return
 	_apply_scale(view)
+	_apply_spacing()
 	var safe := UiTheme.safe_margins(self)
 	var avail_w := view.x - safe.left - safe.right
 	var w := minf(max_width, avail_w)
@@ -360,6 +376,9 @@ func _layout() -> void:
 	k = minf(k, avail_w / maxf(_frame.size.x, 1.0))
 	var was := _fit
 	_fit = clampf(k, 0.6, 1.0)
+	# float noise (0.9997) is not a shrink: it put 16 px text at 15.99
+	if _fit > 0.995:
+		_fit = 1.0
 	if not is_equal_approx(was, _fit) and is_equal_approx(_frame.scale.x, was):
 		_frame.scale = Vector2.ONE * _fit
 	var fh := _frame.size.y * _fit
@@ -368,6 +387,22 @@ func _layout() -> void:
 	_frame.pivot_offset = _frame.size * 0.5
 	_frame.position = c - _frame.size * 0.5
 	_place_close()
+
+
+## Scales the body gap, the top gap and every section spacer / header pad by spacing_k().
+func _apply_spacing() -> void:
+	var k := spacing_k()
+	if not body.has_meta("gap_custom"):
+		body.add_theme_constant_override("separation", int(round(GAP_ITEM * k)))
+	_inner.add_theme_constant_override("margin_top", int(round(GAP_TOP * k)))
+	var pad := float(GAP_SECTION - GAP_ITEM) * k
+	for n in body.find_children("*", "Control", true, false):
+		if not (n as Control).has_meta("section_gap"):
+			continue
+		if n is Label:
+			(n as Control).custom_minimum_size.y = ceilf(UiTheme.body_font(700).get_height(20)) + round(pad)
+		elif n.get_child_count() == 0:
+			(n as Control).custom_minimum_size.y = round(pad)
 
 
 ## Smallest panel scale that keeps every visible label at TEXT_MIN px and every small
@@ -471,11 +506,38 @@ func _deferred_layout() -> void:
 
 # ---------------------------------------------------------------- small shared builders
 
-## Section header (convention): UPPERCASE, gold, 20 px, centred, no "!" and no colon.
+## Section header (convention): UPPERCASE, gold, 20 px, centred, no "!" and no colon. It
+## carries the section gap above itself (GAP_SECTION - GAP_ITEM, the text sits at the bottom
+## of a taller label), so every header-separated group gets the same breathing room.
 static func section_label(text: String) -> Label:
 	var l := UiTheme.label(text.to_upper(), 20, UiPalette.GOLD, false, 0, false, 700)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	l.custom_minimum_size.y = ceilf(UiTheme.body_font(700).get_height(20)) + float(GAP_SECTION - GAP_ITEM)
+	l.set_meta("section_gap", true)
 	return l
+
+
+## Spacer above the bottom action row (TAKE, BUY, BEGIN...): with the body's own separation
+## it makes GAP_ACTIONS.
+static func action_gap() -> Control:
+	var s := UiTheme.spacer(float(GAP_ACTIONS - GAP_ITEM))
+	s.set_meta("section_gap", true)
+	return s
+
+
+## Spacer between two header-less sections (e.g. an event's text vs its choices).
+static func section_gap() -> Control:
+	var s := UiTheme.spacer(float(GAP_SECTION - GAP_ITEM))
+	s.set_meta("section_gap", true)
+	return s
+
+
+## Spacing factor for this canvas: 1 on the 1280-tall portrait canvas, down to 0.6 on short
+## (landscape / small window) canvases so extra air never forces a scroll.
+func spacing_k() -> float:
+	var h := size.y if size.y > 0.0 else GAP_REF_H
+	return clampf(h / GAP_REF_H, 0.6, 1.0)
 
 
 ## Group header inside a section (e.g. the Controls list's RUN / COMBAT): UPPERCASE, muted,

@@ -47,7 +47,7 @@ func _build() -> void:
 	_text = UiTheme.para("", 26, UiPalette.TEXT, 500)
 	_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	body.add_child(_text)
-	body.add_child(UiTheme.spacer(4))
+	body.add_child(UiModal.section_gap())
 	_choices = UiTheme.vbox(12)
 	body.add_child(_choices)
 

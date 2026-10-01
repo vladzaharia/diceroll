@@ -21,6 +21,7 @@ func _build() -> void:
 	body.add_child(_sub)
 	_strip_holder = UiTheme.vbox(0)
 	body.add_child(_strip_holder)
+	body.add_child(UiModal.action_gap())
 	var go := GameButton.make("BEGIN", "arrow_right", GameButton.Kind.PRIMARY, 38)
 	go.icon_tint = UiPalette.TEXT_DARK
 	go.pressed.connect(_begin)

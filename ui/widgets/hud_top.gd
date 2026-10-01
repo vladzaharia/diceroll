@@ -228,6 +228,11 @@ func _layout() -> void:
 		_twist_label.visible = true
 		if _row.get_combined_minimum_size().x > w:
 			_twist_label.visible = false
+	# ...then the lap pips (the lap number / BOSS NEXT stays; the pips are in its tooltip)
+	if lap_pips != null:
+		lap_pips.visible = true
+		if _row.get_combined_minimum_size().x > w:
+			lap_pips.visible = false
 	var need := _row.get_combined_minimum_size().x
 	_fit = clampf(w / maxf(need, 1.0), 0.6, 1.0)
 	var lw := w / _fit

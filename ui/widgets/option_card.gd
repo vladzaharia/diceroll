@@ -32,7 +32,7 @@ var premium := false:
 		premium = v
 		_apply_margins()
 		queue_redraw()
-var _faces_row: HBoxContainer
+var _faces_row: HFlowContainer
 var _hover := false
 var _margin: MarginContainer
 var _title: Label
@@ -81,10 +81,14 @@ func _build(title: String, desc: String) -> void:
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.alignment = BoxContainer.ALIGNMENT_BEGIN
 	row.add_child(col)
-	var tr := UiTheme.hbox(10)
+	# title + tag flow: on a narrow card the tag drops under the title instead of forcing the
+	# card (and the modal) wider than the screen
+	var tr := HFlowContainer.new()
+	tr.add_theme_constant_override("h_separation", 10)
+	tr.add_theme_constant_override("v_separation", 4)
+	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(tr)
 	_title = UiTheme.label(title, 30, UiPalette.TEXT, true, 0, true)
-	_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tr.add_child(_title)
 	_tag_panel = PanelContainer.new()
@@ -96,7 +100,11 @@ func _build(title: String, desc: String) -> void:
 	_tag_panel.add_child(_tag)
 	_desc = UiTheme.para(desc, 22, UiPalette.TEXT_DIM, 500)
 	col.add_child(_desc)
-	_faces_row = UiTheme.hbox(5)
+	# a flow, so a narrow card wraps the six faces instead of widening the modal
+	_faces_row = HFlowContainer.new()
+	_faces_row.add_theme_constant_override("h_separation", 5)
+	_faces_row.add_theme_constant_override("v_separation", 5)
+	_faces_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_faces_row.visible = false
 	col.add_child(_faces_row)
 	_right = UiTheme.vbox(0)

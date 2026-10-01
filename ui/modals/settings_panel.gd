@@ -99,7 +99,7 @@ func _build() -> void:
 	dismissible = true
 	for row in [["Master", "speaker"], ["Music", "music"], ["SFX", "sfx"]]:
 		body.add_child(_volume_row(row[0], row[1]))
-	body.add_child(UiTheme.spacer(4))
+	body.add_child(UiModal.section_gap())
 	body.add_child(_row_head("speed", "Game speed"))
 	var speeds: Array[String] = []
 	for sp in SPEEDS:
@@ -273,10 +273,11 @@ class Segmented:
 			b.custom_minimum_size = Vector2(0, 80)
 			b.add_theme_font_override("font", UiTheme.display_font())
 			b.add_theme_font_size_override("font_size", font)
+			# 12 px side padding (the pill's 18 made a 4-way row wider than a phone at 125%)
 			for st in ["normal", "hover", "disabled"]:
-				b.add_theme_stylebox_override(st, UiTheme.tab_box(false, st))
+				b.add_theme_stylebox_override(st, _slim(UiTheme.tab_box(false, st)))
 			for st in ["pressed", "hover_pressed"]:
-				b.add_theme_stylebox_override(st, UiTheme.tab_box(true))
+				b.add_theme_stylebox_override(st, _slim(UiTheme.tab_box(true)))
 			b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 			b.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
 			b.add_theme_color_override("font_hover_color", UiPalette.TEXT)
@@ -288,3 +289,9 @@ class Segmented:
 			row.add_child(b)
 			sg.buttons.append(b)
 		return sg
+
+	static func _slim(sb: StyleBox) -> StyleBox:
+		var d := sb.duplicate() as StyleBox
+		d.content_margin_left = 12
+		d.content_margin_right = 12
+		return d
