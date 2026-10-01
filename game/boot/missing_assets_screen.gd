@@ -230,6 +230,8 @@ func _card_panel() -> Control:
 	link.uri = AssetCheck.README_URL
 	link.underline = LinkButton.UNDERLINE_MODE_ON_HOVER
 	link.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	# a full 80 px tap row (44 pt on a phone), the text centred in it
+	link.custom_minimum_size.y = 80
 	link.add_theme_font_override("font", _font(0.0))
 	link.add_theme_font_size_override("font_size", 17)
 	link.add_theme_color_override("font_color", MUTED)

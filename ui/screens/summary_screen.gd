@@ -87,7 +87,7 @@ func refresh(flow: GameFlow) -> void:
 	if st.is_empty():
 		st = flow._summary()
 	var won := flow.phase == GameFlow.Phase.VICTORY or bool(st.get("victory", false))
-	set_title("VICTORY!" if won else "DEFEATED", "green" if won else "red")
+	set_title("VICTORY!" if won else "DEFEATED", PLAQUE_WIN if won else PLAQUE_DANGER)
 	var info := flow.route_info()
 	var boss_name := String(info.boss.name)
 	var last := BiomeDefs.name_of(String(r.route.back())) if not r.route.is_empty() else String(ACT_NAMES[2])
@@ -303,7 +303,7 @@ func _build_extra() -> void:
 			var br := UiTheme.hbox(8)
 			c.add_child(br)
 			br.add_child(CampUi.bar(float(xb[0]), float(xb[1]), UiPalette.XP, 16))
-			br.add_child(UiTheme.label("%d / %d to L%d" % [int(xb[0]), int(xb[1]), l1 + 1], 17, UiPalette.TEXT_DIM, false, 0, false, 700))
+			br.add_child(UiTheme.label("%d/%d to L%d" % [int(xb[0]), int(xb[1]), l1 + 1], 17, UiPalette.TEXT_DIM, false, 0, false, 700))
 		else:
 			c.add_child(UiTheme.label("Level %d  ·  more levels at the Pet Den" % l1, 17, UiPalette.TEXT_DIM, false, 0, false, 700))
 		row.modulate.a = 0.0
@@ -336,7 +336,7 @@ func _build_extra() -> void:
 			"run_banked":
 				asc_up = int(e.get("ascension_unlocked", -1))
 	if not ms.is_empty() or asc_up > 0:
-		_extra.add_child(UiModal.section_label("Unlocked!"))
+		_extra.add_child(UiModal.section_label("Unlocked"))
 		for e in ms:
 			for u in e.unlocks:
 				var card: Control
@@ -358,7 +358,7 @@ func _build_extra() -> void:
 		if String(e.type) == "skin_unlocked":
 			skins.append(e)
 	if not skins.is_empty():
-		_extra.add_child(UiModal.section_label("New skins!"))
+		_extra.add_child(UiModal.section_label("New skins"))
 		for e in skins:
 			var card := _skin_card(String(e["class"]), String(e.skin))
 			card.modulate.a = 0.0
@@ -409,7 +409,7 @@ func _items_block(_evs: Array, _before: Profile, after: Profile) -> Control:
 			var br := UiTheme.hbox(8)
 			col.add_child(br)
 			br.add_child(CampUi.bar(float(m), float(nxt[1]), Color("e0a84a"), 12.0))
-			var bl := UiTheme.label("%d / %d  %s" % [m, int(nxt[1]), ItemDefs.name_of(String(nxt[0]))], 15, Color("e0c28a"), false, 0, false, 700)
+			var bl := UiTheme.label("%d/%d  %s" % [m, int(nxt[1]), ItemDefs.name_of(String(nxt[0]))], 16, Color("e0c28a"), false, 0, false, 700)
 			br.add_child(bl)
 	if v.get_child_count() == 0:
 		return null

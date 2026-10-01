@@ -37,7 +37,7 @@ func _build() -> void:
 func refresh(flow: GameFlow) -> void:
 	var offer := flow.offer
 	var source := String(offer.get("source", "level"))
-	set_title(TITLES.get(source, "REWARD"), UiPalette.XP if source == "level" else UiPalette.GOLD)
+	set_title(TITLES.get(source, "REWARD"), PLAQUE_LEVEL if source == "level" else PLAQUE_DEFAULT)
 	_sub.text = SUBS.get(source, "Choose one")
 	UiTheme.clear(_list)
 	_cards.clear()

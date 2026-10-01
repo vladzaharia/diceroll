@@ -26,7 +26,7 @@ var _controls: GameButton
 
 func _build() -> void:
 	ScrollFade.attach(self, _scroll, UiPalette.NAVY_2, _frame)
-	set_title("PAUSED")
+	set_title("PAUSED", PLAQUE_DEFAULT)
 	max_width = 560.0
 	_info = UiTheme.label("", 24, UiPalette.TEXT_DIM, false, 0, false, 600)
 	_info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -61,7 +61,7 @@ func _build() -> void:
 	settings.pad_x = 20
 	settings.pressed.connect(func() -> void: settings_pressed.emit())
 	more.add_child(settings)
-	_controls = GameButton.make("CONTROLS", "", GameButton.Kind.SECONDARY, 26)
+	_controls = GameButton.make("CONTROLS", "controls", GameButton.Kind.SECONDARY, 26)
 	_controls.min_height = 80
 	_controls.pad_x = 20
 	_controls.shortcut_hint = "key_f1"
@@ -76,10 +76,8 @@ func _build() -> void:
 	_confirm = UiTheme.vbox(16)
 	_confirm.visible = false
 	body.add_child(_confirm)
-	var q := UiTheme.label("Abandon this run?", 34, UiPalette.TEXT, true, 0, true)
-	q.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_confirm.add_child(q)
-	var w := UiTheme.para("Your hero falls here. The run ends and its save is deleted.", 24, UiPalette.TEXT_DIM)
+	# the red plaque asks the question ("ABANDON RUN?"); the body only states the consequence
+	var w := UiTheme.para("Your hero falls here. The run ends and its save is deleted.", 26, UiPalette.TEXT)
 	w.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_confirm.add_child(w)
 	# confirm dialog (spec 3.2): no close button; KEEP PLAYING (Esc / Enter: the safe option)
@@ -87,7 +85,7 @@ func _build() -> void:
 	var row := UiTheme.hbox(14)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	_confirm.add_child(row)
-	_keep = GameButton.make("KEEP PLAYING", "", GameButton.Kind.SECONDARY, 28)
+	_keep = GameButton.make("KEEP PLAYING", "arrow_right", GameButton.Kind.SECONDARY, 28)
 	_keep.pressed.connect(_unask)
 	row.add_child(_keep)
 	var yes := GameButton.make("ABANDON", "flag", GameButton.Kind.DANGER, 28)
@@ -99,7 +97,9 @@ func _build() -> void:
 func refresh(flow: GameFlow) -> void:
 	var r := flow.run
 	var biome := BiomeDefs.name_of(r.biome())
-	_info.text = "%s  ·  %s  ·  Lap %d/%d  ·  Level %d" % [HeroDefs.DATA[r.class_id].name, biome, r.lap, Balance.TOTAL_LAPS, r.level]
+	# each segment keeps its words together, so a narrow panel wraps only at the dots
+	var parts: Array[String] = [String(HeroDefs.DATA[r.class_id].name), biome, "Lap %d/%d" % [r.lap, Balance.TOTAL_LAPS], "Level %d" % r.level]
+	_info.text = "  ·  ".join(PackedStringArray(parts.map(func(p: String) -> String: return p.replace(" ", "\u00a0"))))
 	# this run's route: the three biomes with lap pips, and the two bosses ahead
 	UiTheme.clear(_track)
 	_track.add_child(RouteStrip.make(flow.route_info(), r.act, r.lap, true))
@@ -133,7 +133,7 @@ func _ask() -> void:
 	_confirm.visible = true
 	primary_action = _keep
 	cancel_action = _keep
-	set_title("ABANDON?", "red")
+	set_title("ABANDON RUN?", PLAQUE_DANGER)
 	relayout()
 
 
@@ -142,5 +142,5 @@ func _unask() -> void:
 	_confirm.visible = false
 	primary_action = _resume
 	cancel_action = _resume
-	set_title("PAUSED", "yellow")
+	set_title("PAUSED", PLAQUE_DEFAULT)
 	relayout()

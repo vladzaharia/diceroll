@@ -9,7 +9,7 @@ const ACCENT := Color("7ad0ff")
 
 
 func _build() -> void:
-	set_title("DICE WORKSHOP", ACCENT)
+	set_title("DICE WORKSHOP", PLAQUE_DEFAULT)
 
 
 func rebuild(p: Profile) -> void:
@@ -108,7 +108,7 @@ func _pool_card(p: Profile, kind: String, label: String) -> Control:
 	var hl := UiTheme.label(label.to_upper(), 24, UiPalette.TEXT, true, 5)
 	hl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(hl)
-	head.add_child(UiTheme.label("%d / %d off" % [off.size(), cap], 19, UiPalette.GOLD if off.size() < cap else UiPalette.HP_BRIGHT, false, 0, false, 700))
+	head.add_child(UiTheme.label("%d/%d off" % [off.size(), cap], 19, UiPalette.GOLD if off.size() < cap else UiPalette.HP_BRIGHT, false, 0, false, 700))
 	var flow := HFlowContainer.new()
 	flow.add_theme_constant_override("h_separation", 8)
 	flow.add_theme_constant_override("v_separation", 8)

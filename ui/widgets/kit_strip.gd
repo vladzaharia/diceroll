@@ -107,7 +107,7 @@ static func _cell(e: Dictionary, px: int) -> Control:
 	if t > 0:
 		# the Armory's tier badge (bronze / silver / gold star + numeral), inside the cell's
 		# bottom-right corner (spec 3.1: nothing hangs off a corner)
-		var b := CampArt.tier_badge(t, 14)
+		var b := CampArt.tier_badge(t, 16)
 		holder.add_child(b)
 		# anchored to the corner, growing up / left: stays inside however wide the badge is
 		b.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE)

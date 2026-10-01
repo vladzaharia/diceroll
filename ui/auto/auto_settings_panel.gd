@@ -7,10 +7,12 @@ extends UiModal
 
 signal rules_changed(rules: AutoRules)
 
-const SCOPES := [["board", "Board", "flag"], ["combat", "Combat", "sword"], ["drafts", "Drafts", "star"],
+const SCOPES := [["board", "Board", "flag"], ["combat", "Combat", "sword"], ["drafts", "Drafts", "level"],
 	["shop", "Shop", "coin"], ["forge", "Forge", "anvil"], ["events", "Events", "question"], ["portal", "Portal", "portal"]]
-const STOPS := [["stop_before_miniboss", "Before the mini-boss", "skull"], ["stop_before_boss", "Before the final boss", "crown"],
-	["stop_on_boss_passive", "A boss passive is offered", "star"], ["stop_on_shop", "At a shop (Shop is off)", "coin"]]
+## Icons follow the modal conventions: boss = the horned skull (crowns are the currency),
+## a passive reward = the trophy (the passive modal's "TROPHY" titles).
+const STOPS := [["stop_before_miniboss", "Before the mini-boss", "skull"], ["stop_before_boss", "Before the final boss", "boss"],
+	["stop_on_boss_passive", "Boss passive offered", "trophy"], ["stop_on_shop", "At a shop (Shop is off)", "coin"]]
 const FOCUS_LABELS := {"balanced": "Balanced", "damage": "Damage", "defense": "Defense", "economy": "Economy"}
 const MINIBOSS_LABELS := {"auto": "If winnable", "always": "Always", "never": "Avoid"}
 ## AutoRules.skill (when core has it): how sharp AUTO plays.
@@ -35,7 +37,7 @@ var _wide := true
 
 func _build() -> void:
 	ScrollFade.attach(self, _scroll, UiPalette.NAVY_2, _frame)
-	set_title("AUTO", AutoButton.ACCENT.darkened(0.15))
+	set_title("AUTO SETTINGS", PLAQUE_DEFAULT)
 	max_width = 1120.0
 	# one exit (spec 3.2): the header close button (back to Settings), Esc and the backdrop;
 	# every change saves at once, so there is no DONE
@@ -66,9 +68,9 @@ func _build() -> void:
 		var b := GameButton.make(s[1], s[2], GameButton.Kind.SECONDARY, 24)
 		b.toggle_mode = true
 		b.toggle_primary = true
-		b.min_height = 60
+		b.min_height = 80
 		b.pad_x = 18
-		b.icon_px = 28
+		b.icon_px = 32
 		b.toggled.connect(_on_scope.bind(String(s[0]), b))
 		flow.add_child(b)
 		_scope_btns[s[0]] = b
@@ -101,7 +103,7 @@ func _build() -> void:
 	_hp_slider.min_value = 0.0
 	_hp_slider.max_value = HP_MAX
 	_hp_slider.step = 0.05
-	_hp_slider.custom_minimum_size = Vector2(200, 40)
+	_hp_slider.custom_minimum_size = Vector2(200, 56)
 	_hp_slider.focus_mode = Control.FOCUS_NONE
 	_hp_slider.value_changed.connect(_on_hp)
 	_hp_slider.drag_ended.connect(func(_c: bool) -> void: UiTheme.sfx("click"))
@@ -119,7 +121,7 @@ func _build() -> void:
 
 	body.add_child(UiTheme.spacer(4))
 	# a normal-width ghost: resetting is a real (if rare) choice, not the way out
-	var reset := GameButton.make("Reset to defaults", "reroll", GameButton.Kind.GHOST, 24)
+	var reset := GameButton.make("RESET TO DEFAULTS", "reroll", GameButton.Kind.GHOST, 24)
 	reset.name = "Reset"
 	reset.min_height = 80
 	reset.pad_x = 22
@@ -260,7 +262,7 @@ class _SwitchRow:
 		r.toggle_mode = true
 		r.focus_mode = Control.FOCUS_NONE
 		r.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-		r.custom_minimum_size = Vector2(300, 54)
+		r.custom_minimum_size = Vector2(300, 80)
 		r._icon = Icons.rect(icon, 30)
 		r._icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		r.add_child(r._icon)

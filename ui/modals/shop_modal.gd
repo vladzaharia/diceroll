@@ -30,7 +30,7 @@ var _die := -1
 
 func _build() -> void:
 	ScrollFade.attach(self, _scroll, UiPalette.NAVY_2, _frame)
-	set_title("SHOP")
+	set_title("SHOP", PLAQUE_DEFAULT)
 	dismissible = true
 	close_tooltip = "Leave shop"
 	_leave = close_button
@@ -39,7 +39,7 @@ func _build() -> void:
 	gold = Counter.make("3d:coins", 0, 34, UiPalette.TEXT, "pill")
 	head.add_child(gold)
 	head.add_child(UiTheme.spacer(0, true))
-	_restock = GameButton.make("RESTOCK", "reroll", GameButton.Kind.SECONDARY, 26)
+	_restock = GameButton.make("RESTOCK", "coin", GameButton.Kind.SECONDARY, 26)
 	_restock.min_height = 80
 	_restock.pad_x = 20
 	_restock.pressed.connect(func() -> void: shop_reroll_pressed.emit())
@@ -71,7 +71,8 @@ func refresh(flow: GameFlow) -> void:
 	_flow = flow
 	var run := flow.run
 	gold.set_value(run.gold, visible)
-	_restock.sub_text = "%d gold" % Balance.SHOP_RESTOCK_PRICE
+	# a price reads the same everywhere: verb + currency icon + number ("BUY  50")
+	_restock.text = "RESTOCK  %d" % Balance.SHOP_RESTOCK_PRICE
 	_restock.set_enabled(run.gold >= Balance.SHOP_RESTOCK_PRICE)
 	UiTheme.clear(_list)
 	_cards.clear()

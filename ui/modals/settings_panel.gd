@@ -92,7 +92,7 @@ static func track_window(win: Window) -> void:
 
 func _build() -> void:
 	ScrollFade.attach(self, _scroll, UiPalette.NAVY_2, _frame)
-	set_title("SETTINGS")
+	set_title("SETTINGS", PLAQUE_DEFAULT)
 	max_width = 600.0
 	# one exit (spec 3.2): the header close button, Esc and the backdrop; settings apply live,
 	# so there is no DONE
@@ -187,13 +187,13 @@ func _volume_row(bus: String, icon: String) -> Control:
 
 ## Auto-update switch ([update] auto, owned by the Updater autoload) + a small manual CHECK.
 func _update_row() -> Control:
-	var r := _row_head("gear", "Auto-update")
+	var r := _row_head("download", "Auto-update")
 	_update_btn = ToggleSwitch.make(true)
 	_update_btn.tooltip_text = "Check for updates on launch"
 	_update_btn.toggled.connect(func(on: bool) -> void: _updater().call("set_auto_enabled", on))
 	r.add_child(_update_btn)
 	var chk := GameButton.make("CHECK", "", GameButton.Kind.SECONDARY, 24)
-	chk.min_height = 72
+	chk.min_height = 80
 	chk.pad_x = 16
 	chk.pressed.connect(func() -> void: _updater().call("check_now", true))
 	r.add_child(chk)
@@ -270,7 +270,7 @@ class Segmented:
 			b.focus_mode = Control.FOCUS_NONE
 			b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			b.custom_minimum_size = Vector2(0, 76)
+			b.custom_minimum_size = Vector2(0, 80)
 			b.add_theme_font_override("font", UiTheme.display_font())
 			b.add_theme_font_size_override("font_size", font)
 			for st in ["normal", "hover", "disabled"]:

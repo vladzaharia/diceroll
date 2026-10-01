@@ -83,11 +83,9 @@ func _fill() -> void:
 	var die: Die = _flow.run.dice[_idx]
 	var kd := DiceKinds.def(die.kind)
 	var kc := UiPalette.kind_color(die.kind)
-	set_title(("DIE %d" % (_idx + 1)) if die.kind == "standard" else String(kd.name).to_upper() + " DIE", kc.lerp(UiPalette.GOLD, 0.35))
-	# a colour without a native plaque family (steel, silver...): the white plaque x colour
-	if not ribbon.skinned():
-		ribbon.family = "white"
-	_nav_label.text = "%d / %d" % [_idx + 1, _flow.run.dice.size()]
+	# the plaque names the screen; the die's number lives in the pager, its kind in the header
+	set_title("YOUR DICE", PLAQUE_DEFAULT)
+	_nav_label.text = "Die %d of %d" % [_idx + 1, _flow.run.dice.size()]
 	_prev.visible = _flow.run.dice.size() > 1
 	_next.visible = _flow.run.dice.size() > 1
 	UiTheme.clear(_head)

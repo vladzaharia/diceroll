@@ -21,7 +21,7 @@ var _portrait: HeroPortrait
 
 
 func _build() -> void:
-	set_title("WARDROBE", Color("c79bff"))
+	set_title("WARDROBE", PLAQUE_DEFAULT)
 	closed.connect(func() -> void:
 		_fresh.clear()
 		preview_skin = "")

@@ -49,7 +49,7 @@ var _ranks_now: Dictionary = {}
 
 
 func _build() -> void:
-	set_title("ARMORY", ACCENT)
+	set_title("ARMORY", PLAQUE_DEFAULT)
 	closed.connect(func() -> void:
 		_fresh.clear()
 		focus = ""
@@ -583,7 +583,7 @@ func _mastery_line(p: Profile, id: String) -> Control:
 				Color("e0c28a"), false, 0, false, 700)
 		return UiTheme.label("Mastery %d  ·  every blueprint earned" % m, 16, UiPalette.HEAL, false, 0, false, 700)
 	var box := UiTheme.vbox(2)
-	var l := UiTheme.label("MASTERY %d / %d  ·  %s blueprint" % [m, next, ItemDefs.name_of(next_v)], 16, Color("e0c28a"), false, 0, false, 700)
+	var l := UiTheme.label("MASTERY %d/%d  ·  %s blueprint" % [m, next, ItemDefs.name_of(next_v)], 16, Color("e0c28a"), false, 0, false, 700)
 	l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	l.custom_minimum_size.x = 60
 	box.add_child(l)
@@ -622,7 +622,7 @@ func _acquire(p: Profile, id: String) -> Control:
 		row.add_child(b)
 		var sc := ItemDefs.price(id, classes, true)
 		if not sc.is_empty():
-			var bs := CampUi.buy_button("", sc, p.can_afford(sc), 20)
+			var bs := CampUi.buy_button("BUY", sc, p.can_afford(sc), 20)
 			bs.min_height = 60
 			bs.pressed.connect(cmd.bind(["buy_item", id, "sigils"]))
 			row.add_child(bs)
@@ -691,7 +691,7 @@ func _variant_chip(p: Profile, item: String, ch: Dictionary, worn: bool) -> Cont
 			lc = UiPalette.GOLD_BRIGHT
 		_:
 			var ms: Array = ch.get("mastery", [0, 0])
-			line = "%d / %d fights" % [int(ms[0]), int(ms[1])] if int(ms[1]) > 0 else "FEAT"
+			line = "%d/%d fights" % [int(ms[0]), int(ms[1])] if int(ms[1]) > 0 else "FEAT"
 	var ll := UiTheme.label(line, 17, lc, false, 0, false, 800)
 	ll.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(ll)
@@ -751,7 +751,7 @@ func _variant_detail(p: Profile, item: String, ch: Dictionary, worn: bool) -> Co
 				b.name = "CraftCrowns"
 				row.add_child(b)
 				var sc := ItemDefs.craft_cost(vid, true)
-				var bs := CampUi.buy_button("", sc, p.can_afford(sc), 22)
+				var bs := CampUi.buy_button("CRAFT", sc, p.can_afford(sc), 22)
 				bs.pressed.connect(cmd.bind(["craft_variant", item, vid, "sigils"]))
 				row.add_child(bs)
 		_:
@@ -904,7 +904,7 @@ func _ranks(p: Profile) -> Control:
 
 func _rank_text(group: String, r: int) -> String:
 	var t := ItemDefs.rank_tier(r)
-	var s := "RANK %d / %d" % [r, ItemDefs.RANK_MAX]
+	var s := "RANK %d/%d" % [r, ItemDefs.RANK_MAX]
 	s += "  ·  TIER %s" % String(TIER_NAMES[t]) if t > 0 else "  ·  NOT FORGED"
 	if group == "armor":
 		var hp := int(ItemDefs.base_stats({"armor": r}).max_hp)
@@ -941,7 +941,7 @@ func _rank_card(p: Profile, group: String, compact: bool) -> Control:
 	if cost.is_empty():
 		head.add_child(CampArt.chip("MAX", "yellow", "tier_3", 18))
 	else:
-		btn = CampUi.buy_button("RANK UP" if r > 0 else "FORGE", cost, p.can_afford(cost), 20)
+		btn = CampUi.buy_button("RANK UP" if r > 0 else "UNLOCK", cost, p.can_afford(cost), 20)
 		btn.min_height = 64
 		btn.pad_x = 14
 		btn.name = "RankUp"

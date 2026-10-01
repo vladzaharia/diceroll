@@ -171,7 +171,7 @@ func _init() -> void:
 	_twist_moon.custom_minimum_size = Vector2(30, 30)
 	_twist_moon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	tr.add_child(_twist_moon)
-	_twist_label = UiTheme.label("", 20, UiPalette.TEXT, true, 5)
+	_twist_label = UiTheme.label("", 22, UiPalette.TEXT, true, 5)
 	tr.add_child(_twist_label)
 	chips.add_child(act)
 	var ar := UiTheme.hbox(8)

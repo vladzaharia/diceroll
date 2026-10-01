@@ -1299,7 +1299,7 @@ func _open_event(ev: Array[Dictionary], forced_id := "") -> void:
 		"merchant":
 			var loss := run.pct_of_max(Balance.MERCHANT_HP_PCT)
 			choices.append({"label": "Trade %d max HP" % loss, "desc": "Receive a random Rare rune.", "enabled": run.max_hp - loss >= 10})
-			choices.append({"label": "Decline", "desc": "Keep walking.", "enabled": true})
+			choices.append({"label": "Walk away", "desc": "Keep your max HP.", "enabled": true})
 		"dicesmith":
 			# Two different kinds. With room the die is added; on a full pool it reforges the
 			# weakest die (lowest face sum) into that kind, keeping its rune.
@@ -1318,7 +1318,7 @@ func _open_event(ev: Array[Dictionary], forced_id := "") -> void:
 			choices.append({"label": "Walk away", "desc": "Keep your dice as they are.", "enabled": true})
 		"idol":
 			choices.append({"label": "Offer blood", "desc": "Take %d damage. The lowest face of every die gets +1." % Balance.IDOL_DAMAGE, "enabled": run.hp > Balance.IDOL_DAMAGE})
-			choices.append({"label": "Leave", "desc": "Nothing happens.", "enabled": true})
+			choices.append({"label": "Walk away", "desc": "Keep your HP.", "enabled": true})
 	_set_offer({"kind": "event", "id": id, "title": def.title, "text": def.text, "choices": choices}, Phase.EVENT, ev)
 
 func event_choose(i: int) -> Array[Dictionary]:

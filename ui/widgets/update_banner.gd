@@ -37,18 +37,23 @@ func _init() -> void:
 	add_child(_panel)
 	var row := UiTheme.hbox(12)
 	_panel.add_child(row)
-	row.add_child(Icons.rect("gear", 34, UiPalette.TEXT))
+	# the bell (icon_map: "Update banner"); the gear means Settings everywhere else
+	row.add_child(Icons.rect("bell", 40, UiPalette.TEXT))
 	_text = UiTheme.label("", 26, UiPalette.TEXT, true, 0)
 	_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_text.custom_minimum_size.x = 220
 	row.add_child(_text)
-	_action = GameButton.make("RESTART", "", GameButton.Kind.PRIMARY, 24)
-	_action.min_height = 64
+	_action = GameButton.make("RESTART", "download", GameButton.Kind.PRIMARY, 24)
+	_action.icon_tint = UiPalette.TEXT_DARK
+	_action.min_height = 80
 	_action.pad_x = 18
 	_action.pressed.connect(_on_action)
 	row.add_child(_action)
-	_close = GameButton.round_icon("close", 56)
+	# the one dismiss: the red round close, as on every modal
+	_close = GameButton.round_icon("close", 64)
+	_close.round_family = "red"
+	_close.tooltip_text = "Later"
 	_close.pressed.connect(func() -> void:
 		if _updater:
 			_updater.call("dismiss"))

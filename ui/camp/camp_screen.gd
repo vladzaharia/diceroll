@@ -643,7 +643,7 @@ class WelcomeModal:
 	extends UiModal
 
 	func _build() -> void:
-		set_title("WELCOME TO CAMP", UiPalette.GOLD)
+		set_title("WELCOME TO CAMP", PLAQUE_DEFAULT)
 		var t := UiTheme.para("This is home between runs. Every run pays Crowns, even a loss, and your firsts earn Sigils.", 24, UiPalette.TEXT, 500)
 		t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		body.add_child(t)
@@ -654,9 +654,17 @@ class WelcomeModal:
 		var row := UiTheme.hbox(22)
 		row.alignment = BoxContainer.ALIGNMENT_CENTER
 		body.add_child(row)
+		# each station medallion is captioned with its name (icons never stand alone)
 		for id in CampInfo.STATION_IDS:
 			var d: Dictionary = CampInfo.STATIONS[id]
-			row.add_child(CampArt.medal(String(CampInfo.STATION_ICON[id]), 64, d.color))
+			var st := UiTheme.vbox(4)
+			var md := CampArt.medal(String(CampInfo.STATION_ICON[id]), 64, d.color)
+			md.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+			st.add_child(md)
+			var nm := UiTheme.label(String(d.name), 18, UiPalette.TEXT_DIM, false, 0, false, 700)
+			nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			st.add_child(nm)
+			row.add_child(st)
 		var go := GameButton.make("LET'S GO", "arrow_right", GameButton.Kind.PRIMARY, 36)
 		go.icon_tint = UiPalette.TEXT_DARK
 		go.pressed.connect(func() -> void: close())

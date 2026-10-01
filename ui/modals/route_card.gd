@@ -13,7 +13,7 @@ var _timer: SceneTreeTimer
 
 
 func _build() -> void:
-	set_title("YOUR ROUTE", UiPalette.GOLD)
+	set_title("YOUR ROUTE", PLAQUE_DEFAULT)
 	max_width = 680.0
 	_sub = UiTheme.label("", 22, UiPalette.TEXT_DIM, false, 0, false, 600)
 	_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
