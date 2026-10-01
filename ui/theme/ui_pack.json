@@ -1681,6 +1681,264 @@
     }
    }
   },
+  "tile": {
+   "note": "Flat tile (modal pass 2026-10-01, user rule: tiles never look like buttons): Containers/Flat, no lip, no shadow. Only buttons carry the 3D lip. A rim layer (the flat art in the rim colour) under the face layer inset 2-3 px, so rims follow the rounded corners. normal = a navy a shade above the panel; hover (selectable tiles only) = NAVY_3 + a lighter rim; selected / worn = the yellow rim; on = purple; craftable = gold; owned = NAVY_3; locked = INK; dim = faded. Factory: UiTheme.tile_box(state, accent).",
+   "fallback": "panel:card",
+   "slice": [
+    10,
+    10,
+    10,
+    10
+   ],
+   "scale": 1.4,
+   "content": [
+    18,
+    14,
+    18,
+    14
+   ],
+   "states": {
+    "normal": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "#353a70",
+       "runtime_tint": false
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "#24284f",
+       "expand": [
+        -2,
+        -2,
+        -2,
+        -2
+       ],
+       "runtime_tint": false
+      }
+     ]
+    },
+    "hover": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "#4d5598",
+       "runtime_tint": false
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "palette:NAVY_3",
+       "expand": [
+        -2,
+        -2,
+        -2,
+        -2
+       ],
+       "runtime_tint": false
+      }
+     ]
+    },
+    "selected": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "palette:PACK_YELLOW",
+       "runtime_tint": false
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "palette:NAVY_3",
+       "expand": [
+        -3,
+        -3,
+        -3,
+        -3
+       ],
+       "runtime_tint": false
+      }
+     ]
+    },
+    "worn": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "palette:PACK_YELLOW",
+       "runtime_tint": false
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "palette:NAVY_3",
+       "expand": [
+        -3,
+        -3,
+        -3,
+        -3
+       ],
+       "runtime_tint": false
+      }
+     ]
+    },
+    "on": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "palette:PACK_PURPLE",
+       "runtime_tint": false
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "palette:NAVY_3",
+       "expand": [
+        -3,
+        -3,
+        -3,
+        -3
+       ],
+       "runtime_tint": false
+      }
+     ]
+    },
+    "craftable": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "palette:GOLD_DEEP",
+       "runtime_tint": false
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "#24284f",
+       "expand": [
+        -3,
+        -3,
+        -3,
+        -3
+       ],
+       "runtime_tint": false
+      }
+     ]
+    },
+    "owned": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "#353a70",
+       "runtime_tint": false
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "palette:NAVY_3",
+       "expand": [
+        -2,
+        -2,
+        -2,
+        -2
+       ],
+       "runtime_tint": false
+      }
+     ]
+    },
+    "locked": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "#1a1c38",
+       "runtime_tint": false
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "#121428",
+       "expand": [
+        -2,
+        -2,
+        -2,
+        -2
+       ],
+       "runtime_tint": false
+      }
+     ]
+    },
+    "dim": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "#262a52",
+       "runtime_tint": false
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "#1f2246",
+       "expand": [
+        -2,
+        -2,
+        -2,
+        -2
+       ],
+       "runtime_tint": false
+      }
+     ]
+    }
+   }
+  },
+  "tile_accent": {
+   "note": "Flat tile with an accent rim (rarity / class / biome / event colour, per-use tint, alpha .7) under the face inset 2 px. hover = NAVY_3 face, rim at full alpha. Factory: UiTheme.tile_box(state, accent).",
+   "fallback": "panel:card",
+   "slice": [
+    10,
+    10,
+    10,
+    10
+   ],
+   "scale": 1.4,
+   "content": [
+    18,
+    14,
+    18,
+    14
+   ],
+   "states": {
+    "normal": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "#ffffff",
+       "modulate": "#ffffffb3"
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "#24284f",
+       "expand": [
+        -2,
+        -2,
+        -2,
+        -2
+       ],
+       "runtime_tint": false
+      }
+     ]
+    },
+    "hover": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "#ffffff",
+       "modulate": "#ffffffff"
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "palette:NAVY_3",
+       "expand": [
+        -2,
+        -2,
+        -2,
+        -2
+       ],
+       "runtime_tint": false
+      }
+     ]
+    }
+   }
+  },
   "tooltip": {
    "note": "Tooltip with no accent: Flat INK .97 + Thin darkbrown-dark rim, scale 0.35.",
    "fallback": "panel:tooltip",

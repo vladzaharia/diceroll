@@ -195,3 +195,18 @@ func test_shrink_floor_keeps_text_and_taps_readable() -> void:
 	for b in s._speed_btns:
 		assert_true(b.custom_minimum_size.y >= 80.0, "segmented control rows are 80 px tall")
 	s.free()
+
+
+# ---------------------------------------------------------------- tiles never look like buttons
+
+func test_modal_tiles_are_flat() -> void:
+	# only buttons carry the 3D lip: no modal builds the 3D card (card_box / panel_card)
+	for path in MODAL_FILES + ["res://ui/widgets/option_card.gd", "res://ui/widgets/route_strip.gd",
+			"res://ui/widgets/secret_reveal.gd"]:
+		assert_true(not _src(path).contains("card_box("), "%s: tiles use UiTheme.tile_box (flat)" % path)
+	if UiSkin.has("tile"):
+		var sb := UiTheme.tile_box("normal")
+		assert_eq(sb.content_margin_bottom, sb.content_margin_top, "flat tile: no lip at the bottom")
+		var layers := UiSkin.layers("tile", "selected")
+		for l: Dictionary in layers:
+			assert_true(String(l.svg).contains("Containers/Flat"), "tile art is the flat container")

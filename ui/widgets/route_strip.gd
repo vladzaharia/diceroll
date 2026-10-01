@@ -108,7 +108,7 @@ func _stop(b: Dictionary, tier: int) -> Control:
 func _boss_chip(icon: String, caption: String, name: String, color: Color, done: bool) -> Control:
 	var p := PanelContainer.new()
 	# a card with a rim in the boss colour (pack art; flat fallback)
-	var sb := UiTheme.card_box("normal", color)
+	var sb := UiTheme.tile_box("normal", color)
 	sb.content_margin_left = 14 if compact else 18
 	sb.content_margin_right = 14 if compact else 18
 	sb.content_margin_top = maxf(sb.content_margin_top, 8)

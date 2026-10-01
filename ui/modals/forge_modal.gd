@@ -280,14 +280,14 @@ class _DieTab:
 	func _draw() -> void:
 		var r := Rect2(Vector2.ZERO, size)
 		if OptionCard.skinned():
-			draw_style_box(UiTheme.card_box("selected" if selected else ("hover" if is_hovered() else "normal")), r)
+			draw_style_box(UiTheme.tile_box("selected" if selected else ("hover" if is_hovered() else "normal")), r)
 		else:
 			if selected:
 				draw_style_box(UiTheme.box(Color(0, 0, 0, 0), 18, 0, Color.TRANSPARENT, 14, Color(1, 0.75, 0.25, 0.45), Vector2.ZERO), r)
 			draw_style_box(UiTheme.box(UiPalette.NAVY_3 if selected else UiPalette.NAVY_2, 18, 3 if selected else 2,
 				UiPalette.GOLD_BRIGHT if selected else Color(1, 1, 1, 0.08)), r)
-		# the card's 3D lip takes the bottom of the tab: the die and name sit above it
-		var lip := 8.0 if OptionCard.skinned() else 0.0
+		# flat tile (no lip): the die and name use the full height
+		var lip := 0.0
 		var s := minf(size.x - 20.0, size.y - 44.0 - lip)
 		var br := Rect2(Vector2((size.x - s) * 0.5, 8), Vector2(s, s))
 		# mini die body in rune tint with its best face

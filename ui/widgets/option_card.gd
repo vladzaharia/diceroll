@@ -122,14 +122,14 @@ func _build(title: String, desc: String) -> void:
 
 ## A bare full-colour icon on the left (spec 4.3); `tint` only reaches tinted (Flat White)
 ## map entries. Without the pack: the pre-reskin medallion.
-## Content inset: the card's own margins (its 3D lip at the bottom), wider inside the boss
+## Content inset: the flat tile's own margins, wider inside the boss
 ## tier's Ornate frame so nothing sits on the gold.
 func _apply_margins() -> void:
 	if _margin == null:
 		return
 	var m := [18.0, 14.0, 18.0, 14.0]
 	if skinned():
-		m[3] = maxf(14.0, UiTheme.card_box("normal").get_content_margin(SIDE_BOTTOM))
+		m[3] = maxf(14.0, UiTheme.tile_box("normal").get_content_margin(SIDE_BOTTOM))
 		if premium:
 			m = [32.0, 28.0, 32.0, 32.0]
 	for i in 4:
@@ -264,12 +264,12 @@ func _get_minimum_size() -> Vector2:
 ## The card box for the current state (pack art; flat fallback inside the factories).
 func _box() -> StyleBox:
 	if selected:
-		return UiTheme.card_box("selected")
+		return UiTheme.tile_box("selected")
 	var st := "hover" if _hover and not disabled else "normal"
 	if disabled and not sold:
 		st = "dim"
 	# the boss tier's Ornate overlay is its rim: no second accent frame under it
-	return UiTheme.card_box(st, accent if accent_rim and st != "dim" and not premium else null)
+	return UiTheme.tile_box(st, accent if accent_rim and st != "dim" and not premium else null)
 
 
 func _draw() -> void:

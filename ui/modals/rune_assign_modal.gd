@@ -49,7 +49,7 @@ func refresh(flow: GameFlow) -> void:
 	set_title("BIND %s" % String(def.name).to_upper(), PLAQUE_DEFAULT)
 	UiTheme.clear(_hero)
 	# the rune card: a card with a rim in the rune's colour (spec 4.3)
-	_hero.add_theme_stylebox_override("panel", UiTheme.card_box("normal", UiPalette.rune_color(_rune)))
+	_hero.add_theme_stylebox_override("panel", UiTheme.tile_box("normal", UiPalette.rune_color(_rune)))
 	var row := UiTheme.hbox(18)
 	_hero.add_child(row)
 	row.add_child(RuneBadge.make(_rune, 96))

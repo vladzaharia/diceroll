@@ -224,11 +224,11 @@ static func progress_text(p: Profile, class_id: String, skin: String) -> String:
 static func swatch_box(worn: bool, shown: bool, owned: bool, accent: Color) -> StyleBox:
 	var sb: StyleBox
 	if UiTheme.skinned("panel_card"):
-		sb = UiTheme.card_box("worn" if worn else ("on" if shown else ("normal" if owned else "locked")), accent if owned and not worn and not shown else null)
+		sb = UiTheme.tile_box("worn" if worn else ("on" if shown else ("normal" if owned else "locked")), accent if owned and not worn and not shown else null)
 		sb.content_margin_left = 12
 		sb.content_margin_right = 12
 		sb.content_margin_top = 12
-		sb.content_margin_bottom = 20
+		sb.content_margin_bottom = 12
 		return sb
 	if worn:
 		sb = UiTheme.box(UiPalette.NAVY_3, 20, 3, UiPalette.GOLD_BRIGHT, 12, Color(0.95, 0.7, 0.2, 0.3), Vector2.ZERO)

@@ -302,7 +302,7 @@ static func _tier_badge(tier: int, font := 16) -> Control:
 
 ## A selectable tile / chip box (slot tiles, picker cards, variant and look chips):
 ## state "normal" | "selected" | "worn" | "on" | "craftable" | "owned" | "locked" | "dim"
-## (card_box states) with a small content margin `pad` (the card's lip adds to the bottom).
+## (tile_box states: flat, no lip) with a content margin `pad` on every side.
 static func select_box(state: String, pad := 8, accent: Variant = null) -> StyleBox:
 	if not UiTheme.skinned("panel_card"):
 		var sb: StyleBoxFlat
@@ -320,11 +320,11 @@ static func select_box(state: String, pad := 8, accent: Variant = null) -> Style
 			_:
 				sb = UiTheme.box(Color(0.03, 0.03, 0.09, 0.7), 18, 2, Color(1, 1, 1, 0.1) if accent == null else Color(accent as Color, 0.85))
 		return UiTheme.pad(sb, pad, pad)
-	var box := UiTheme.card_box(state, accent if state in ["normal", "hover"] else null)
+	var box := UiTheme.tile_box(state, accent if state in ["normal", "hover"] else null)
 	box.content_margin_left = pad
 	box.content_margin_right = pad
 	box.content_margin_top = pad
-	box.content_margin_bottom = pad + 8
+	box.content_margin_bottom = pad
 	return box
 
 
@@ -392,7 +392,7 @@ func _sub_heading(text: String) -> Control:
 
 func _none_card(_p: Profile, is_eq: bool) -> Control:
 	var t := _Tap.new()
-	t.add_theme_stylebox_override("panel", _card_box(is_eq, false))
+	t.add_theme_stylebox_override("panel", _picker_box(is_eq, false))
 	var row := UiTheme.hbox(12)
 	t.add_child(row)
 	var holder := _thumb_box(56)
@@ -410,7 +410,7 @@ func _none_card(_p: Profile, is_eq: bool) -> Control:
 
 
 ## Picker card: equipped = the worn rim, focused = the accent rim, owned = plain, else dim.
-func _card_box(equipped: bool, is_focus: bool, owned := true) -> StyleBox:
+func _picker_box(equipped: bool, is_focus: bool, owned := true) -> StyleBox:
 	if equipped:
 		return select_box("worn", 12)
 	if is_focus:
@@ -447,7 +447,7 @@ func _item_card(p: Profile, id: String) -> Control:
 	var is_focus := focus == id
 	var cosmetic := ItemDefs.is_cosmetic(id)
 	var t := _Tap.new()
-	t.add_theme_stylebox_override("panel", _card_box(is_eq, is_focus, owned))
+	t.add_theme_stylebox_override("panel", _picker_box(is_eq, is_focus, owned))
 	var outer := UiTheme.vbox(10)
 	t.add_child(outer)
 	var row := UiTheme.hbox(12)

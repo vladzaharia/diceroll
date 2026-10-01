@@ -13,7 +13,7 @@ const CROWN_COLOR := UiPalette.GOLD_BRIGHT
 ## A card panel; `hi` = the selected / equipped look.
 static func card(hi := false, accent: Variant = null) -> PanelContainer:
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", UiTheme.card_box("selected" if hi else "normal", accent))
+	p.add_theme_stylebox_override("panel", UiTheme.tile_box("selected" if hi else "normal", accent))
 	p.mouse_filter = Control.MOUSE_FILTER_PASS
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return p
@@ -22,7 +22,7 @@ static func card(hi := false, accent: Variant = null) -> PanelContainer:
 ## A dimmed card for locked content.
 static func locked_card() -> PanelContainer:
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", UiTheme.card_box("locked"))
+	p.add_theme_stylebox_override("panel", UiTheme.tile_box("locked"))
 	p.mouse_filter = Control.MOUSE_FILTER_PASS
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return p
@@ -175,9 +175,9 @@ class Tile:
 		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if en else Control.CURSOR_ARROW
 		var sb: StyleBox
 		if UiTheme.skinned("panel_card"):
-			sb = UiTheme.card_box("selected" if sel else ("normal" if en else "dim"), accent if en and not sel else null)
+			sb = UiTheme.tile_box("selected" if sel else ("normal" if en else "dim"), accent if en and not sel else null)
 			UiTheme.pad(sb, 14, 10)
-			sb.content_margin_bottom = 18
+			sb.content_margin_bottom = 10
 		elif sel:
 			sb = UiTheme.pad(UiTheme.box(UiPalette.NAVY_3, 20, 3, UiPalette.GOLD_BRIGHT, 12, Color(0.95, 0.7, 0.2, 0.3), Vector2.ZERO), 14, 10)
 		elif en:
@@ -185,6 +185,12 @@ class Tile:
 		else:
 			sb = UiTheme.pad(UiTheme.box(Color(0.03, 0.03, 0.09, 0.35), 20, 2, Color(1, 1, 1, 0.04)), 14, 10)
 		add_theme_stylebox_override("panel", sb)
+		# selectable tile (flat, never button-like): hover lightens the face, desktop only
+		if en and not sel and UiTheme.skinned("panel_card"):
+			var hov := UiTheme.pad(UiTheme.tile_box("hover", accent), 14, 10)
+			hov.content_margin_bottom = 10
+			mouse_entered.connect(func() -> void: add_theme_stylebox_override("panel", hov))
+			mouse_exited.connect(func() -> void: add_theme_stylebox_override("panel", sb))
 		var col := UiTheme.vbox(2)
 		add_child(col)
 		var row := UiTheme.hbox(8)
