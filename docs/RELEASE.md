@@ -126,6 +126,11 @@ widget, `ui/widgets/dev_gesture.gd` (`add_child(DevGesture.new())`).
   The game keeps the running version until the channel ships something newer, and the menu
   says so. Picking `stable` while a prerelease runs first shows an inline confirmation that
   explains this.
+- **`min_supported` / `min_binary`:** `update_manifest.py` defaults them to `""` / `0.0.0`
+  and refuses a floor above the release itself (under semver `0.1.0-rc.6 < 0.1.0`, so a
+  `0.1.0` floor on an rc would flag that very build). In-game, `min_supported` only makes an
+  update *required* when the channel's version is newer than the executable and satisfies the
+  floor; a `none` decision is never mandatory, so "Up to date" can't come with "Update required".
 - **Where it's allowed:** only builds that update themselves (GitHub desktop builds; dev builds
   save the choice but never check). App Store / TestFlight / Google Play, web and sideloaded
   mobile builds show the picker disabled with the reason, and ignore any saved override. The

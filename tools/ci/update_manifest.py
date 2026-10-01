@@ -3,7 +3,7 @@
 
   tools/ci/update_manifest.py --version 0.2.0 --dist DIR --release-url URL --out DIR
                               [--notes store/android_whats_new.txt] [--channel stable|beta]
-                              [--min-binary 0.1.0] [--min-supported 0.1.0] [--engine 4.7.2]
+                              [--min-binary 0.0.0] [--min-supported ""] [--engine 4.7.2]
 
 DIR holds the release files; the manifest references them by name under --release-url
 (e.g. https://github.com/vladzaharia/diceroll/releases/download/v0.2.0):
@@ -14,6 +14,10 @@ Writes OUT/update-<channel>.json and, when UPDATE_SIGNING_KEY (PEM RSA private k
 OUT/update-<channel>.json.sig = base64(RSA PKCS#1 v1.5 SHA-256 signature of the exact bytes),
 verified in-game with Crypto.verify. A final release also refreshes the beta channel (beta
 players get stable releases too), so pass --channel stable once and both files are written.
+
+--min-supported (default "": no forced update) and --min-binary (default "0.0.0": any binary
+on the same engine takes the pack) must not be above --version under semver: a prerelease
+sorts below its release, so "0.1.0" on 0.1.0-rc.6 would mark that very build as unsupported.
 """
 
 from __future__ import annotations
@@ -25,8 +29,11 @@ import hashlib
 import json
 import os
 import subprocess
+import re
 import tempfile
 from pathlib import Path
+
+SEMVER = re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$")
 
 STORES = {
     "ios": "https://apps.apple.com/app/id0000000000",
@@ -46,6 +53,25 @@ def sha256(p: Path) -> str:
         for chunk in iter(lambda: f.read(1 << 20), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+def semver_key(v: str) -> tuple:
+    """Sort key matching game/update/semver.gd (prerelease < release, numeric ids < alnum)."""
+    m = SEMVER.match(v)
+    if not m:
+        raise SystemExit(f"update_manifest: '{v}' is not a semantic version")
+    core = tuple(int(x) for x in m.group(1, 2, 3))
+    if m.group(4) is None:
+        return core + (1, ())
+    ids = tuple((0, int(i), "") if i.isdigit() else (1, 0, i) for i in m.group(4).split("."))
+    return core + (0, ids)
+
+
+def check_floor(name: str, floor: str, version: str) -> None:
+    """A release must satisfy its own floors, or every build of it would be told to update."""
+    if floor and semver_key(floor) > semver_key(version):
+        raise SystemExit(f"update_manifest: --{name} {floor} is above the release {version} "
+                         f"(a prerelease sorts below its release); use {version} or lower")
 
 
 def sign(data: bytes, pem: str) -> str:
@@ -69,11 +95,16 @@ def main() -> None:
     ap.add_argument("--notes")
     ap.add_argument("--notes-url")
     ap.add_argument("--engine", default="4.7.2")
-    ap.add_argument("--min-binary", default="0.1.0")
-    ap.add_argument("--min-supported", default="0.1.0")
+    ap.add_argument("--min-binary", default="0.0.0")
+    ap.add_argument("--min-supported", default="")
     args = ap.parse_args()
 
     v = args.version.lstrip("v")
+    args.min_binary = args.min_binary.lstrip("v") or "0.0.0"
+    args.min_supported = args.min_supported.lstrip("v")
+    semver_key(v)
+    check_floor("min-binary", args.min_binary, v)
+    check_floor("min-supported", args.min_supported, v)
     channel = args.channel or ("beta" if "-" in v else "stable")
     dist, base = Path(args.dist), args.release_url.rstrip("/")
     notes = Path(args.notes).read_text().strip()[:500] if args.notes and Path(args.notes).exists() else ""

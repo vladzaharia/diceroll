@@ -44,6 +44,8 @@ const PROVIDERS := [
 	"res://ui/camp/armory_ui_scenarios.gd",
 	# RhosGFX skin machinery: ui_skin_demo (UiSkin / Icons showcase), ui_skin_bench (SVG timings)
 	"res://ui/theme/ui_skin_scenarios.gd",
+	# update banner states (update_banner*) and the GameButton size sheet (ui_button_sizes)
+	"res://ui/widgets/update_banner_scenarios.gd",
 ]
 
 
