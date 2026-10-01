@@ -53,6 +53,7 @@ func _init() -> void:
 	roll_btn.min_height = 120
 	roll_btn.pad_x = 64
 	roll_btn.sfx_id = "dice_shake"
+	roll_btn.shortcut_hint = InputActions.glyph_for(InputActions.PRIMARY)
 	roll_btn.pressed.connect(func() -> void: roll_pressed.emit())
 	_bar.add_child(roll_btn)
 
@@ -60,6 +61,7 @@ func _init() -> void:
 	reroll_btn.icon_tint = UiPalette.GOLD_BRIGHT
 	reroll_btn.min_height = 110
 	reroll_btn.pad_x = 26
+	reroll_btn.shortcut_hint = InputActions.glyph_for(InputActions.REROLL)
 	reroll_btn.pressed.connect(func() -> void: reroll_pressed.emit())
 	_bar.add_child(reroll_btn)
 
@@ -68,6 +70,7 @@ func _init() -> void:
 	go_btn.min_height = 120
 	go_btn.pad_x = 70
 	go_btn.sfx_id = "step"
+	go_btn.shortcut_hint = InputActions.glyph_for(InputActions.PRIMARY)
 	go_btn.pressed.connect(func() -> void: go_pressed.emit())
 	_bar.add_child(go_btn)
 
@@ -91,7 +94,8 @@ func _layout() -> void:
 	if slot.size.x > 0.0:
 		# landscape: beside the tray, bottom-aligned, so the board keeps the height
 		_col.size = Vector2(slot.size.x, h)
-		_col.position = Vector2(slot.position.x, slot.end.y - h)
+		# the slot ends at the tray's foot, which may dip under a home indicator: stay above it
+		_col.position = Vector2(slot.position.x, minf(slot.end.y, size.y - (safe.bottom if safe.bottom > UiTheme.EDGE else 0.0)) - h)
 		return
 	var w := minf(UiTheme.MODAL_MAX_W, size.x - safe.left - safe.right)
 	# portrait: the reserved band is sized for the tallest state (move pill + GO); a
@@ -165,11 +169,13 @@ func _fill_move(flow: GameFlow) -> void:
 		_move_row.add_child(UiTheme.label("STAY", 26, UiPalette.TEXT_DIM, true, 4))
 	elif flow.is_board_double():
 		var tag := PanelContainer.new()
-		tag.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(UiPalette.GOLD, 0.2), 12, 2, UiPalette.GOLD_BRIGHT), 10, 2))
+		var pack := UiSkin.has("chip_yellow")
+		tag.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.chip_box("yellow"), 14, 2) if pack else UiTheme.pad(UiTheme.box(Color(UiPalette.GOLD, 0.2), 12, 2, UiPalette.GOLD_BRIGHT), 10, 2))
 		tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		var pv := flow.board_pair_value()
-		tag.add_child(UiTheme.label("DOUBLES · PAIR OF %d" % pv if pv > 0 else "DOUBLES!", 22, UiPalette.GOLD_BRIGHT, true, 4))
+		var tl := "DOUBLES · PAIR OF %d" % pv if pv > 0 else "DOUBLES!"
+		tag.add_child(UiTheme.label(tl, 22, UiPalette.TEXT_DARK, true, 0) if pack else UiTheme.label(tl, 22, UiPalette.GOLD_BRIGHT, true, 4))
 		_move_row.add_child(tag)
 	elif flow.run.lap >= Balance.TOTAL_LAPS and flow.run.board.crosses_start(flow.run.pos, flow.board_move):
 		_move_row.add_child(UiTheme.label("BOSS!", 26, UiPalette.HP_BRIGHT, true, 4))

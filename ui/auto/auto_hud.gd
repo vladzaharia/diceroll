@@ -57,20 +57,21 @@ func _init() -> void:
 	gear_btn = GameButton.round_icon("gear", 74)
 	gear_btn.kind = GameButton.Kind.GHOST
 	gear_btn.icon_px = 40
-	gear_btn.icon_tint = Color(AutoButton.ACCENT, 0.95)
+	gear_btn.icon_tint = UiPalette.TEXT if UiSkin.has("round_grey") else Color(AutoButton.ACCENT, 0.95)
 	gear_btn.tooltip_text = "AUTO settings"
 	gear_btn.pressed.connect(func() -> void: settings_requested.emit())
 	cluster.add_child(gear_btn)
 
 	ticker = PanelContainer.new()
 	ticker.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	ticker.add_theme_stylebox_override("panel", UiTheme.pad(
+	# spec 2.6: the ticker is a callout with the AUTO accent rim
+	ticker.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.callout_box(ACCENT), 18, 8) if UiSkin.has("callout") else UiTheme.pad(
 		UiTheme.box(Color(0.03, 0.05, 0.1, 0.82), 22, 2, Color(ACCENT, 0.45), 10, Color(0, 0, 0, 0.35)), 18, 7))
 	ticker.visible = false
 	add_child(ticker)
 	var tr := UiTheme.hbox(10)
 	ticker.add_child(tr)
-	_ticker_icon = UiIcons.rect("auto", 26, ACCENT)
+	_ticker_icon = Icons.rect("auto", 26, ACCENT)
 	_ticker_icon.custom_minimum_size = Vector2(26, 26)
 	_ticker_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	tr.add_child(_ticker_icon)
@@ -81,13 +82,13 @@ func _init() -> void:
 
 	_stop_card = PanelContainer.new()
 	_stop_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_stop_card.add_theme_stylebox_override("panel", UiTheme.pad(
+	_stop_card.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.callout_box(ACCENT), 24, 14) if UiSkin.has("callout") else UiTheme.pad(
 		UiTheme.box(Color(0.03, 0.05, 0.1, 0.94), 24, 3, ACCENT, 16, Color(0, 0, 0, 0.45)), 24, 12))
 	_stop_card.visible = false
 	add_child(_stop_card)
 	var sr := UiTheme.hbox(14)
 	_stop_card.add_child(sr)
-	var pi := UiIcons.rect("pause", 40, ACCENT)
+	var pi := Icons.rect("pause", 40, ACCENT)
 	pi.custom_minimum_size = Vector2(40, 40)
 	pi.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	sr.add_child(pi)

@@ -162,7 +162,7 @@ func _draw() -> void:
 		draw_line(cc - Vector2(k, k), cc + Vector2(k, k), Color(pip_col, 0.32), lw, true)
 		draw_line(cc + Vector2(-k, k), cc + Vector2(k, -k), Color(pip_col, 0.32), lw, true)
 	elif star:
-		var tex := UiIcons.tex("star", int(s * 1.4), UiPalette.GOLD_BRIGHT)
+		var tex := Icons.tex("die_wild_face" if Icons.is_mapped("die_wild_face") else "star", int(s * 1.4), UiPalette.GOLD_BRIGHT)
 		var ts := s * 0.64
 		draw_texture_rect(tex, Rect2(top.get_center() - Vector2(ts, ts) * 0.5, Vector2(ts, ts)), false)
 	elif PIPS.has(value):
@@ -176,6 +176,6 @@ func _draw() -> void:
 		_draw_kind_mark(top.position + Vector2(s * 0.14, s * 0.14), s * 0.085, UiPalette.kind_color(kind), dimmed)
 	if locked:
 		draw_style_box(UiTheme.box(Color(0.1, 0.02, 0.18, 0.55), r), rect)
-		var lt := UiIcons.tex("curse", int(s * 1.2))
+		var lt := Icons.tex("die_locked" if Icons.is_mapped("die_locked") else "curse", int(s * 1.2))
 		var ls := s * 0.52
 		draw_texture_rect(lt, Rect2(rect.get_center() - Vector2(ls, ls) * 0.5, Vector2(ls, ls)), false)

@@ -343,7 +343,7 @@ static func tile_chips(holder: Node3D, lists: Array, height := 1.15) -> void:
 	var size := 0.62
 	for k in ids.size():
 		var a := String(ids[k])
-		var b := UnitHud.affix_badge(String(SkinRules.AFFIXES[a].icon), SkinRules.AFFIXES[a].color, size)
+		var b := UnitHud.affix_badge(String(SkinRules.AFFIXES[a].icon), SkinRules.AFFIXES[a].color, size, 0.0)
 		b.name = "Chip_" + a
 		var m := b.material_override as ShaderMaterial
 		m.set_shader_parameter("billboard", 1.0)

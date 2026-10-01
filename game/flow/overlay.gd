@@ -141,6 +141,9 @@ func vignette(alpha: float, time := 0.5) -> void:
 
 ## Boss name card: a dark band across the screen with the name slamming in (non-blocking).
 func boss_card(title: String, subtitle: String, color: Color = UiPalette.DANGER, hold := 1.6) -> void:
+	if UiSkin.has("frame_pointed"):
+		_boss_plate(title, subtitle, color, hold)
+		return
 	var band := Control.new()
 	band.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(band)
@@ -200,6 +203,51 @@ func boss_card(title: String, subtitle: String, color: Color = UiPalette.DANGER,
 	t.tween_callback(band.queue_free)
 
 
+## Boss name card with the pack (spec 1.2: enemy and danger surfaces use the Pointed frame x
+## the danger colour): the name slams into a Pointed plate centred at 30 % height, inside the
+## safe area, over a soft dark band.
+func _boss_plate(title: String, subtitle: String, color: Color, hold: float) -> void:
+	var safe := UiTheme.safe_margins(self)
+	var avail := size.x - safe.left - safe.right - 24.0
+	var p := PanelContainer.new()
+	p.name = "BossCard"
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.danger_box(color), 44, 20))
+	add_child(p)
+	move_child(p, _fade.get_index())
+	var col := UiTheme.vbox(-6)
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_child(col)
+	var fs := 92
+	var tw := UiTheme.display_font().get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + fs * 0.4
+	var inner := avail - 100.0
+	if tw > inner:
+		fs = int(fs * inner / tw)
+	var tl := UiTheme.label(title, fs, color.lightened(0.3), true, int(fs * 0.16))
+	tl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(tl)
+	var sl := UiTheme.label(subtitle.to_upper(), 28, UiPalette.GOLD_BRIGHT, true, 6)
+	sl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sl.custom_minimum_size.x = minf(inner, UiTheme.display_font().get_string_size(sl.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 28).x + 8.0)
+	col.add_child(sl)
+	p.reset_size()
+	var s := p.get_combined_minimum_size()
+	s.x = minf(s.x, avail)
+	p.size = s
+	p.position = Vector2(safe.left + 12.0 + (avail - s.x) * 0.5, size.y * 0.3 - s.y * 0.5)
+	p.pivot_offset = s * 0.5
+	p.scale = Vector2(1.6, 1.6)
+	p.modulate.a = 0.0
+	var t := create_tween()
+	t.tween_property(p, "scale", Vector2.ONE, _d(0.28)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t.parallel().tween_property(p, "modulate:a", 1.0, _d(0.12))
+	t.tween_interval(_d(hold))
+	t.tween_property(p, "modulate:a", 0.0, _d(0.4))
+	t.tween_callback(p.queue_free)
+
+
 ## "New passive" card sliding in under the top HUD: rarity-ringed icon, name, description.
 ## Non-blocking; holds for `hold` seconds.
 func passive_card(id: String, hold := 1.7) -> void:
@@ -245,7 +293,9 @@ func passive_card(id: String, hold := 1.7) -> void:
 func biome_card(id: String, title: String, caption: String, desc: String, hold := 2.4) -> void:
 	var bc := UiPalette.biome_color(id)
 	var p := PanelContainer.new()
-	var sb := UiTheme.pad(UiTheme.box(Color(0.05, 0.05, 0.12, 0.93), 30, 4, bc, 24, Color(bc, 0.4), Vector2.ZERO), 26, 18)
+	# spec 2.6: a callout (ink + Thin rim in the biome colour)
+	var sb: StyleBox = UiTheme.pad(UiTheme.callout_box(bc), 30, 22) if UiSkin.has("callout") else \
+		UiTheme.pad(UiTheme.box(Color(0.05, 0.05, 0.12, 0.93), 30, 4, bc, 24, Color(bc, 0.4), Vector2.ZERO), 26, 18)
 	p.add_theme_stylebox_override("panel", sb)
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(p)
@@ -253,14 +303,15 @@ func biome_card(id: String, title: String, caption: String, desc: String, hold :
 	var col := UiTheme.vbox(4)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	p.add_child(col)
-	var icon := UiIcons.rect(UiIcons.biome_icon(id), 104)
+	var icon := Icons.rect(Icons.biome_icon(id), 104)
 	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	col.add_child(icon)
 	var cap := UiTheme.label(caption.to_upper(), 20, bc.lightened(0.25), false, 0, false, 800)
 	cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(cap)
 	var fs := 64
-	var w := minf(560.0, size.x - 90.0)
+	var bsafe := UiTheme.safe_margins(self)
+	var w := minf(560.0, size.x - bsafe.left - bsafe.right - 90.0)
 	var tw := UiTheme.display_font().get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + fs * 0.4
 	if tw > w:
 		fs = int(fs * w / tw)
@@ -367,18 +418,23 @@ func item_pop(at: Vector2, item_id: String, text: String, color: Color, top := 0
 ## Big centred title + subtitle that pops in, holds, and fades (non-blocking).
 func announce(title: String, subtitle := "", color: Color = UiPalette.GOLD_BRIGHT, hold := 1.1, y_ratio := 0.3) -> void:
 	_ann_title.text = title
+	# fit inside the safe area (landscape phones have side insets)
+	var safe := UiTheme.safe_margins(self)
+	var avail := size.x - safe.left - safe.right - 24.0
 	var fs := 84
 	var tw := UiTheme.display_font().get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + fs * 0.5
-	if tw > size.x - 48.0:
-		fs = int(fs * (size.x - 48.0) / tw)
+	if tw > avail:
+		fs = int(fs * avail / tw)
 	_ann_title.label_settings = UiTheme.label_settings(fs, color, true, int(fs * 0.19))
 	_ann_sub.text = subtitle
 	_ann_sub.visible = subtitle != ""
+	_ann_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_ann_sub.custom_minimum_size.x = minf(avail, 900.0)
 	_announce.visible = true
 	_announce.reset_size()
 	var s := _announce.get_combined_minimum_size()
-	_announce.size = Vector2(size.x, s.y)
-	_announce.position = Vector2(0, size.y * y_ratio - s.y * 0.5)
+	_announce.size = Vector2(avail, s.y)
+	_announce.position = Vector2(safe.left + 12.0, size.y * y_ratio - s.y * 0.5)
 	_announce.pivot_offset = _announce.size * 0.5
 	_announce.scale = Vector2(0.4, 0.4)
 	_announce.modulate.a = 0.0
@@ -410,8 +466,8 @@ func toast(text: String, icon := "", color: Color = UiPalette.TEXT, y_ratio := 0
 func popup(at: Vector2, text: String, color: Color, icon := "", font := 30) -> void:
 	var row := UiTheme.hbox(6)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	if icon != "" and UiIcons.exists(icon):
-		row.add_child(UiIcons.rect(icon, int(font * 1.2)))
+	if icon != "" and Icons.exists(icon):
+		row.add_child(Icons.rect(icon, int(font * 1.2)))
 	row.add_child(UiTheme.label(text, font, color, true, 8))
 	_popups.add_child(row)
 	row.reset_size()

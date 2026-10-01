@@ -15,6 +15,8 @@ uniform float shielded = 0.0;
 uniform float segments = 1.0;
 uniform float border = 0.035;
 uniform float opacity = 1.0;
+// 1 = the pack bar look (Bars/Regular red): a flat fill with a flat lighter top band, no gloss
+uniform float flat_band = 0.0;
 
 float rbox(vec2 p, vec2 half_size, float r) {
 	vec2 q = abs(p) - half_size + vec2(r);
@@ -35,8 +37,11 @@ void fragment() {
 	float gy = (p.y + size.y * 0.5) / size.y;   // 0 bottom .. 1 top
 	if (x < ghost) col = ghost_color.rgb * 0.9;
 	if (x < fill) {
-		col = fill_color.rgb * mix(0.72, 1.15, smoothstep(0.1, 0.9, gy));
-		col += vec3(0.25) * smoothstep(0.62, 0.8, gy) * smoothstep(0.95, 0.8, gy);
+		vec3 gloss = fill_color.rgb * mix(0.72, 1.15, smoothstep(0.1, 0.9, gy));
+		gloss += vec3(0.25) * smoothstep(0.62, 0.8, gy) * smoothstep(0.95, 0.8, gy);
+		float band = smoothstep(0.6, 0.64, gy);
+		vec3 flat_col = mix(fill_color.rgb * 0.86, mix(fill_color.rgb, vec3(1.0), 0.28), band);
+		col = mix(gloss, flat_col, flat_band);
 	}
 	if (segments > 1.0) {
 		float s = fract(x * segments);
