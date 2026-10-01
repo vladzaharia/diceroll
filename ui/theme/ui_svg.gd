@@ -218,6 +218,87 @@ static func recolor(svg: String, tint: Variant = null, saturation: float = 1.0) 
 	return out + svg.substr(at)
 
 
+## Darkens the bottom lip of RhosGFX 3D Square button art until its luminance is at most
+## `ratio` x the face's. The pack draws a 3D button as two stacked rects of the same x / y /
+## width (the taller one first: the lip showing under the face) inside an outline <path>; on
+## some colours (yellow: #fc9504 under #fdaf18) the lip is nearly the face colour, so a short
+## button reads as one flat slab and its label (centred on the face) looks low. The lip is
+## blended toward the outline colour (toward black past it, or when the outline is the white
+## focus ring) in 5 % steps until it is dark enough, and gets that fill as an attribute
+## instead of its CSS class.
+## SVGs without that shape come back unchanged.
+static func deepen_lip(svg: String, ratio: float) -> String:
+	var shapes := lip_shapes(svg)
+	if shapes.is_empty():
+		return svg
+	var lip: Color = shapes["lip"]
+	var face: Color = shapes["face"]
+	var outline: Color = shapes.get("outline", Color.BLACK)
+	if outline.get_luminance() >= lip.get_luminance():
+		outline = Color.BLACK  # focus art: the outline is the white focus ring
+	var target := face.get_luminance() * ratio
+	var c := lip
+	var t := 0.0
+	while c.get_luminance() > target and t < 2.0:
+		t += 0.05
+		c = lip.lerp(outline, minf(t, 1.0)) if t <= 1.0 else outline.lerp(Color.BLACK, t - 1.0)
+	if c == lip:
+		return svg
+	var tag: String = shapes["lip_tag"]
+	var re := RegEx.create_from_string("\\s(class|fill)=\"[^\"]*\"")
+	var fixed := re.sub(tag, "", true).replace("<rect", "<rect fill=\"#%s\"" % c.to_html(false))
+	return svg.substr(0, shapes["lip_at"]) + fixed + svg.substr(int(shapes["lip_at"]) + tag.length())
+
+
+## The lip / face rects (and outline colour) of 3D button art, or {} when the SVG isn't one:
+## {"lip": Color, "face": Color, "outline": Color, "lip_tag": String, "lip_at": int,
+##  "face_rect": Rect2, "lip_rect": Rect2} (rects in SVG units).
+static func lip_shapes(svg: String) -> Dictionary:
+	var cls := {}
+	for m in RegEx.create_from_string("\\.([\\w-]+)\\s*\\{[^}]*?fill:\\s*(#[0-9a-fA-F]{3,6})").search_all(svg):
+		cls[m.get_string(1)] = Color.html(m.get_string(2))
+	var rects := []
+	for m in RegEx.create_from_string("<rect\\b[^>]*>").search_all(svg):
+		var tag := m.get_string()
+		var col: Variant = _shape_fill(tag, cls)
+		if col == null:
+			continue
+		rects.append({"tag": tag, "at": m.get_start(), "fill": col, "x": _attr_f(tag, "x"),
+			"y": _attr_f(tag, "y"), "w": _attr_f(tag, "width"), "h": _attr_f(tag, "height")})
+	for i in rects.size():
+		for j in range(i + 1, rects.size()):
+			var a: Dictionary = rects[i]
+			var b: Dictionary = rects[j]
+			if is_equal_approx(a["x"], b["x"]) and is_equal_approx(a["y"], b["y"]) \
+					and is_equal_approx(a["w"], b["w"]) and a["h"] > b["h"] and a["x"] > 0.0:
+				var out := {"lip": a["fill"], "face": b["fill"], "lip_tag": a["tag"], "lip_at": a["at"],
+					"face_rect": Rect2(b["x"], b["y"], b["w"], b["h"]), "lip_rect": Rect2(a["x"], a["y"], a["w"], a["h"])}
+				var p := RegEx.create_from_string("<path\\b[^>]*>").search(svg)
+				if p:
+					var oc: Variant = _shape_fill(p.get_string(), cls)
+					if oc != null:
+						out["outline"] = oc
+				return out
+	return {}
+
+
+static func _shape_fill(tag: String, cls: Dictionary) -> Variant:
+	var f := RegEx.create_from_string("fill=\"(#[0-9a-fA-F]{3,6})\"").search(tag)
+	if f:
+		return Color.html(f.get_string(1))
+	var c := RegEx.create_from_string("class=\"([^\"]+)\"").search(tag)
+	if c:
+		for name in c.get_string(1).split(" ", false):
+			if cls.has(name):
+				return cls[name]
+	return null
+
+
+static func _attr_f(tag: String, attr: String) -> float:
+	var m := RegEx.create_from_string("\\s%s=\"([-0-9.]+)\"" % attr).search(tag)
+	return float(m.get_string(1)) if m else 0.0
+
+
 ## Removes <text> elements. ThorVG (Godot's SVG rasteriser) drops them anyway, so a keycap
 ## from vector-keyboard-controls renders as a blank cap: strip it explicitly and draw the
 ## label with a Label on top. tools/import_ui_svgs.py does the same at import for entries with

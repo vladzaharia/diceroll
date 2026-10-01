@@ -19,6 +19,7 @@
     25.0,
     25.0
    ],
+   "lip": 0.72,
    "states": {
     "normal": {
      "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/3. Yellow/button-square-3d-2.5-yellow-regular_standard.svg"
@@ -66,6 +67,7 @@
     20.0,
     20.0
    ],
+   "lip": 0.72,
    "states": {
     "normal": {
      "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/3. Yellow/button-square-3d-2.5-yellow-regular_standard.svg"
@@ -113,6 +115,7 @@
     25.0,
     25.0
    ],
+   "lip": 0.72,
    "states": {
     "normal": {
      "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/6. Blue/button-square-3d-2.5-blue-regular_standard.svg"
@@ -160,6 +163,7 @@
     20.0,
     20.0
    ],
+   "lip": 0.72,
    "states": {
     "normal": {
      "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/6. Blue/button-square-3d-2.5-blue-regular_standard.svg"
@@ -207,6 +211,7 @@
     25.0,
     25.0
    ],
+   "lip": 0.72,
    "states": {
     "normal": {
      "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/2. Red/button-square-3d-2.5-red-regular_standard.svg"
@@ -254,6 +259,7 @@
     20.0,
     20.0
    ],
+   "lip": 0.72,
    "states": {
     "normal": {
      "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/2. Red/button-square-3d-2.5-red-regular_standard.svg"
@@ -301,6 +307,7 @@
     25.0,
     25.0
    ],
+   "lip": 0.72,
    "states": {
     "normal": {
      "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/4. Green/button-square-3d-2.5-green-regular_standard.svg"
@@ -348,6 +355,7 @@
     20.0,
     20.0
    ],
+   "lip": 0.72,
    "states": {
     "normal": {
      "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/4. Green/button-square-3d-2.5-green-regular_standard.svg"
@@ -395,6 +403,7 @@
     25.0,
     25.0
    ],
+   "lip": 0.72,
    "states": {
     "normal": {
      "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/1. Grey/button-square-3d-2.5-grey-darker_standard.svg"
@@ -442,6 +451,7 @@
     20.0,
     20.0
    ],
+   "lip": 0.72,
    "states": {
     "normal": {
      "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/1. Grey/button-square-3d-2.5-grey-darker_standard.svg"
@@ -489,6 +499,7 @@
     16,
     20
    ],
+   "lip": 0.72,
    "states": {
     "normal": {
      "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/6. Blue/button-square-3d-1-blue-regular_standard.svg"

@@ -12,7 +12,8 @@ extends RefCounted
 ##                  spar, chat and tinker, pets roam (use --frames; --clean hides the UI)
 ##  ui_workshop / ui_petden / ui_arcade / ui_run_setup   a Camp screen open (the Armory's
 ##                  scenarios live in ui/camp/armory_ui_scenarios.gd)
-##                  (--profile=fresh|mid|max, default mid; --scroll=N scrolls the screen)
+##                  (--profile=fresh|mid|max, default mid; --scroll=N scrolls the screen;
+##                  ui_run_setup also takes --asc=N, --mode=short, --class=<id>)
 ##  ui_results_win / ui_results_loss   the results screen after banking a run (the loss is a
 ##                  fresh profile's first run: milestone unlock cards; the win a mid profile)
 ##  camp_toasts     the Camp (mid) with its toasts stacked above the bottom panel:
@@ -143,6 +144,14 @@ class _Driver extends Node:
 				await _first_run()
 			_:
 				c.profile = _preset(String(args.get("profile", "mid")))
+				# run setup: --asc=N selects an Ascension level (up to the unlocked one),
+				# --mode=short the Short Road, --class=<id> a hero
+				if args.has("asc"):
+					c.profile.ascension.selected = clampi(int(args.asc), 0, int(c.profile.ascension.get("unlocked", 0)))
+				if args.has("mode"):
+					c.profile.loadout["mode"] = String(args.mode)
+				if args.has("class") and c.profile.class_allowed(String(args["class"])):
+					c.profile.loadout["class"] = String(args["class"])
 				c.show_camp()
 				await get_tree().create_timer(0.2).timeout
 				c.ui.camp.open_station(String(SCREENS[scenario]))

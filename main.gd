@@ -9,6 +9,8 @@ var controller: GameController
 
 
 func _ready() -> void:
+	# Desktop: landscape window fitted to the screen (phones stay portrait-first).
+	DesktopWindow.apply()
 	# Keyboard shortcuts live in one table (ui/input/input_actions.gd); register them first.
 	InputActions.ensure()
 	# Source checkouts without the git-ignored third-party assets get a plain explanation

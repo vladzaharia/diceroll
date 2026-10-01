@@ -62,6 +62,24 @@ base64 -d <"$T/upd/update-stable.json.sig" >"$T/sig.bin" 2>/dev/null || base64 -
 openssl dgst -sha256 -verify "$T/sign.pub" -signature "$T/sig.bin" "$T/upd/update-stable.json" >/dev/null
 [ -f "$T/upd/update-beta.json" ]
 ok "update manifest signing"
+# a prerelease must not ship a floor it fails itself ("0.1.0" on 0.1.0-rc.6 flagged every rc)
+python3 "$ROOT/tools/ci/update_manifest.py" --version 0.1.0-rc.6 --dist "$T/dist" \
+	--release-url https://example.invalid/v0.1.0-rc.6 --out "$T/rc" >/dev/null
+python3 - "$T/rc/update-beta.json" <<'PY'
+import json, sys
+m = json.load(open(sys.argv[1]))
+assert m["channel"] == "beta" and m["min_supported"] == "" and m["min_binary"] == "0.0.0", m
+PY
+python3 "$ROOT/tools/ci/update_manifest.py" --version 0.1.0-rc.6 --min-supported 0.1.0-rc.6 --dist "$T/dist" \
+	--release-url https://example.invalid/v0.1.0-rc.6 --out "$T/rc" >/dev/null
+for bad in "--min-supported 0.1.0" "--min-binary 0.1.0"; do
+	# shellcheck disable=SC2086
+	if python3 "$ROOT/tools/ci/update_manifest.py" --version 0.1.0-rc.6 $bad --dist "$T/dist" \
+		--release-url https://example.invalid/v0.1.0-rc.6 --out "$T/rc" >/dev/null 2>&1; then
+		echo "selftest: $bad above 0.1.0-rc.6 should fail" >&2; exit 1
+	fi
+done
+ok "update manifest floors never above the release"
 
 # 5. Contact sheet on a synthetic result set.
 mkdir -p "$T/shots"
