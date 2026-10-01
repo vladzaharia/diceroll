@@ -271,3 +271,17 @@ func test_key_glyph_label_of_handles_null_labels() -> void:
 	assert_eq(KeyGlyph.label_of("mouse_left"), "", "mouse glyph has no label")
 	assert_eq(KeyGlyph.label_of("key_space"), "SPACE")
 	assert_eq(KeyGlyph.label_of("key_unmapped_x"), "UNMAPPED_X", "unmapped ids derive a label")
+
+
+func test_icon_only_button_glyph_is_centred() -> void:
+	# an empty text column used to keep the HBox separation and push the glyph ~5 px left
+	var b := GameButton.round_icon("close", 88)
+	b._ready()
+	assert_true(not b._text_col.visible, "icon-only button hides its text column")
+	var t := GameButton.make("ROLL", "dice", GameButton.Kind.PRIMARY, 34)
+	t._ready()
+	assert_true(t._text_col.visible, "labelled button keeps its text column")
+	b.text = "NOW LABELLED"
+	assert_true(b._text_col.visible, "setting text shows the column again")
+	b.free()
+	t.free()
