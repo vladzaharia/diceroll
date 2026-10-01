@@ -10,7 +10,8 @@ extends UiModal
 ##   {stats: game_over stats, events: Camp.bank_run() events, before: Profile.to_dict() before
 ##    banking, after: Profile}
 ## Without `results` (legacy scenarios) only the run half is shown.
-## Emits new_run_pressed (= go to Camp) and title_pressed.
+## Emits new_run_pressed (= go to Camp). title_pressed is kept for callers but no longer
+## has a button on this screen.
 
 signal new_run_pressed
 signal title_pressed
@@ -62,15 +63,9 @@ func _build() -> void:
 	var row := UiTheme.hbox(14)
 	_footer = UiTheme.margin(row, 12, 38, 12, 0)
 	_frame.add_child(_footer)
-	# forced (spec 3.2): no close / Esc / backdrop. TO CAMP is the main choice (full width,
-	# Enter); home is a round utility button
-	var title := GameButton.round_icon("home", 88)
-	title.round_family = "grey"
-	title.icon_tint = UiPalette.TEXT
-	title.tooltip_text = "Title screen"
-	title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	title.pressed.connect(func() -> void: title_pressed.emit())
-	row.add_child(title)
+	# forced (spec 3.2): no close / Esc / backdrop. TO CAMP is the one exit (full width,
+	# Enter). There is no round Home: the Camp has its own, and two exits to two places
+	# (title vs camp) confused players (user, modal pass 2026-10-01)
 	_camp_btn = GameButton.make("TO CAMP", "campfire", GameButton.Kind.PRIMARY, 38)
 	_camp_btn.min_height = 100
 	_camp_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL

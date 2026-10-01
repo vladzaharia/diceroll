@@ -333,8 +333,13 @@ func _layout() -> void:
 	var safe := UiTheme.safe_margins(self)
 	var avail_w := view.x - safe.left - safe.right
 	var w := minf(max_width, avail_w)
-	# never lay out narrower than MIN_W (cards would wrap word by word): shrink instead
+	# never lay out narrower than MIN_W (cards would wrap word by word): shrink instead, but
+	# only while that keeps text >= 16 px and taps >= 80 px; past that lay out at the real
+	# width (cards wrap a little more) rather than shrink under the audit floors
+	var floor_k := _shrink_floor()
 	var lw := maxf(w, minf(MIN_W, max_width))
+	if w / lw < floor_k - 0.001:
+		lw = w
 	_frame.custom_minimum_size.x = lw
 	_frame.size = Vector2(lw, 0)
 	_fit_plaque(lw)
@@ -346,7 +351,7 @@ func _layout() -> void:
 	var kh := avail_h / maxf(natural + chrome, 1.0)
 	# ...but never below the scale that keeps text >= 16 px and tap targets >= 80 px (the
 	# audit floors): past that the body scrolls at full size instead
-	var k := minf(w / lw, kh if kh >= maxf(0.8, _shrink_floor()) and kh < 1.0 else 1.0)
+	var k := minf(w / lw, kh if kh >= maxf(0.8, floor_k) and kh < 1.0 else 1.0)
 	_scroll.custom_minimum_size.y = minf(natural, avail_h / k - chrome)
 	_update_gutter(natural > _scroll.custom_minimum_size.y + 0.5)
 	_frame.reset_size()

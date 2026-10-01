@@ -222,6 +222,12 @@ func _layout() -> void:
 	var group := w + reserve
 	# too narrow for the row's natural width (small phones, big UI size): shrink it to fit
 	_row.scale = Vector2.ONE
+	# a twist chip that would make the row shrink (text under 16 px, buttons under 80) drops
+	# its word first: the moon / sun / drum glyph alone still reads, the word is in its tooltip
+	if _twist_label != null and twist_chip.visible:
+		_twist_label.visible = true
+		if _row.get_combined_minimum_size().x > w:
+			_twist_label.visible = false
 	var need := _row.get_combined_minimum_size().x
 	_fit = clampf(w / maxf(need, 1.0), 0.6, 1.0)
 	var lw := w / _fit

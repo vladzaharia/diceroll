@@ -11,8 +11,9 @@ extends BaseButton
 ##   c.set_price(50, can_afford)
 ##   c.selected = true
 
-## Icon size on the left (spec 4.3: card art 96-128 px).
-const ICON_PX := 96.0
+## Icon size on the left: a compact 60 px icon top-aligned with the title (user, modal pass
+## 2026-10-01: choice icons must not fill the card's height; the text gets the width).
+const ICON_PX := 60.0
 const ICON_PX_SMALL := 72.0
 
 var selected := false:
@@ -68,15 +69,17 @@ func _build(title: String, desc: String) -> void:
 	UiTheme.full_rect(_margin)
 	add_child(_margin)
 	_apply_margins()
-	var row := UiTheme.hbox(18)
+	var row := UiTheme.hbox(14)
 	_margin.add_child(row)
 	_medal_holder = CenterContainer.new()
 	_medal_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_medal_holder.custom_minimum_size = Vector2(ICON_PX, ICON_PX) if skinned() else Vector2(84, 84)
+	# top-aligned with the title row, never stretched down the card
+	_medal_holder.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	row.add_child(_medal_holder)
 	var col := UiTheme.vbox(4)
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.alignment = BoxContainer.ALIGNMENT_BEGIN
 	row.add_child(col)
 	var tr := UiTheme.hbox(10)
 	col.add_child(tr)
@@ -169,7 +172,7 @@ func set_die(kind: String, rune := "") -> void:
 	var best := 0
 	for v in faces:
 		best = maxi(best, v)
-	var big := DieFace.make(best, rune, false, 74)
+	var big := DieFace.make(best, rune, false, ICON_PX - 4.0)
 	big.kind = kind
 	_medal_holder.add_child(big)
 	UiTheme.clear(_faces_row)

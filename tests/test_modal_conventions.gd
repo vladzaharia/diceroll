@@ -97,6 +97,17 @@ func test_dismiss_modes_match_the_inventory() -> void:
 		m.free()
 
 
+func test_results_have_one_exit() -> void:
+	# TO CAMP is the only button: no round Home next to it (the Camp has its own)
+	var s := SummaryScreen.new()
+	var buttons := s.find_children("*", "GameButton", true, false).filter(
+		func(b: Node) -> bool: return b != s.close_button)
+	assert_eq(buttons.size(), 1, "results: one exit button")
+	assert_eq(s.primary_action, s._camp_btn, "Enter = TO CAMP")
+	assert_eq(String(s._camp_btn.text), "TO CAMP")
+	s.free()
+
+
 func test_pause_and_confirm_exits() -> void:
 	var p := PauseMenu.new()
 	assert_eq(p.primary_action, p._resume, "pause: RESUME is the exit")
