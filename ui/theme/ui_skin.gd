@@ -28,6 +28,8 @@ extends RefCounted
 ##                                   use the "0. White" colour variants)
 ##       "modulate": null | "#hex[aa]" | "palette:NAME", StyleBoxTexture.modulate_color (alpha ok)
 ##       "saturation": 1.0,          < 1 desaturates (disabled states)
+##       "lip": null | 0.72,          3D button art: darken the bottom lip to at most this x
+##                                   the face's luminance (UiSvg.deepen_lip)
 ##       "axis": "stretch" | "tile" | "tile_fit" | [h, v],   "draw_center": true,
 ##       "rotate": 0 | 90 | 180 | 270   (clockwise; e.g. horizontal bar art as a vertical scroll
 ##                                       track: slice / scale then refer to the rotated art),
@@ -330,6 +332,8 @@ static func _layer_svg(l: Dictionary) -> String:
 	var src := UiSvg.source(UiSvg.runtime_path("pack", String(l.get("svg", ""))))
 	if src == "":
 		return ""
+	if l.has("lip"):
+		src = UiSvg.deepen_lip(src, float(l["lip"]))
 	src = UiSvg.recolor(src, UiSvg.color(l.get("tint", null)), float(l.get("saturation", 1.0)))
 	return UiSvg.rotate(src, int(l.get("rotate", 0))) if int(l.get("rotate", 0)) % 360 != 0 else src
 
