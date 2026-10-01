@@ -312,11 +312,19 @@ func _build_loadout(p: Profile) -> void:
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	_loadout.add_child(col)
-	col.add_child(UiTheme.label(String(HeroDefs.DATA[cls].name) if HeroDefs.DATA.has(cls) else cls, 28, UiPalette.TEXT, true, 5))
+	# the name trims and the mode line wraps, so a full loadout (pet + 3 minigames +
+	# wardrobe) never pushes the panel past the screen at 125% UI size
+	var nm := UiTheme.label(String(HeroDefs.DATA[cls].name) if HeroDefs.DATA.has(cls) else cls, 28, UiPalette.TEXT, true, 5)
+	nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	nm.custom_minimum_size.x = 60
+	col.add_child(nm)
 	var mode := "SHORT ROAD" if String(p.loadout.get("mode", "standard")) == "short" else "STANDARD"
 	var asc := int(p.ascension.get("selected", 0))
 	var sub := mode + ("  ·  ASCENSION %d" % asc if asc > 0 else "")
-	col.add_child(UiTheme.label(sub, 17, UiPalette.GOLD if asc == 0 else UiPalette.HP_BRIGHT, false, 0, false, 700))
+	var sl := UiTheme.label(sub, 17, UiPalette.GOLD if asc == 0 else UiPalette.HP_BRIGHT, false, 0, false, 700)
+	sl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sl.custom_minimum_size.x = 60
+	col.add_child(sl)
 	var pet := String(p.loadout.get("pet", ""))
 	if pet != "":
 		_loadout.add_child(_badge(String(CampInfo.PET_GLYPH.get(pet, "station_pet_den")), CampInfo.PET_COLOR.get(pet, UiPalette.GOLD), "L%d" % p.pet_level(pet)))

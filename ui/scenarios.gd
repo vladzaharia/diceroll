@@ -5,8 +5,7 @@ extends RefCounted
 
 const NAMES := ["ui_title", "ui_class", "ui_board_hud", "ui_board_ready", "ui_combat_hud", "ui_combat_sheet",
 	"ui_combo_banner", "ui_draft", "ui_rune_choice", "ui_rune_assign", "ui_shop", "ui_shop_pick", "ui_forge",
-	"ui_event", "ui_event_duel", "ui_portal", "ui_pause", "ui_settings", "ui_victory", "ui_defeat", "ui_icons",
-	"ui_update_banner"]
+	"ui_event", "ui_event_duel", "ui_portal", "ui_pause", "ui_settings", "ui_victory", "ui_defeat", "ui_icons"]
 
 
 static func names() -> PackedStringArray:
@@ -118,40 +117,7 @@ static func build(name: String) -> Node:
 		"ui_icons":
 			backdrop.visible = false
 			ui.add_child(IconSheet.new())
-		"ui_update_banner":
-			# the Updater's banner over the board (--state=ready|binary|store|downloading,
-			# --mandatory=1); the real Updater is inert in scenario runs, so a stub drives it
-			ui.add_child(TrayPlaceholder.make(flow))
-			var h := BoardHud.new()
-			ui.add_child(h)
-			h.refresh(flow)
-			var up := _FakeUpdater.new()
-			up.status = _arg("state", "ready")
-			up.status_mandatory = _arg("mandatory", "0") == "1"
-			root.add_child(up)
-			var b: Control = load("res://ui/widgets/update_banner.gd").new()
-			ui.add_child(b)
-			b.call("bind", up)
-			b.call("refresh")
 	return root
-
-
-## Duck-typed Updater stand-in for ui_update_banner (see ui/widgets/update_banner.gd).
-class _FakeUpdater:
-	extends Node
-	signal download_progress(pct: int)
-	var status := "ready"
-	var status_version := "0.2.0"
-	var status_mandatory := false
-
-	func restart_to_update() -> void:
-		pass
-
-	func open_download(_url: String) -> void:
-		pass
-
-	func dismiss() -> void:
-		pass
 
 
 ## Harness arg (--key=value) or default.

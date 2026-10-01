@@ -343,31 +343,9 @@ static func unlock_text(p: Profile, kind: String, id: String) -> String:
 ## Flat surfaces (user rule: popup tiles must not look like buttons; only real actions get the
 ## 3D lip). No lip, no drop shadow, no bevel. state: "normal" | "hover" (selectable tiles) |
 ## "selected" (yellow inner rim) | "info" (read-only card) | "inset" | "locked". `accent` = a
-## thin rim colour. Local until the shared flat card piece lands: swap the body of this func.
+## thin rim colour. The shared flat tile: UiTheme.tile_box (pieces tile / tile_accent).
 static func surface(state: String, accent: Variant = null) -> StyleBox:
-	var bg := UiPalette.NAVY_2
-	var rim := Color(1, 1, 1, 0.07)
-	var bw := 2
-	match state:
-		"hover":
-			bg = UiPalette.NAVY_3
-			rim = Color(1, 1, 1, 0.16)
-		"selected":
-			bg = UiPalette.NAVY_3
-			rim = UiPalette.GOLD_BRIGHT
-			bw = 4
-		"inset":
-			bg = Color(0.03, 0.03, 0.09, 0.55)
-		"locked":
-			bg = Color(0.05, 0.05, 0.12, 0.85)
-			rim = Color(1, 1, 1, 0.04)
-	if accent is Color and state != "selected":
-		rim = Color(accent as Color, 0.6)
-	var sb := UiTheme.box(bg, 16, bw, rim)
-	sb.shadow_size = 0
-	sb.anti_aliasing = true
-	UiTheme.pad(sb, 14, 12)
-	return sb
+	return UiTheme.pad(UiTheme.inset_box() if state == "inset" else UiTheme.tile_box("normal" if state == "info" else state, accent if state in ["normal", "hover", "info"] else null), 14, 12)
 
 
 ## A read-only PanelContainer on a flat surface (no hover).
