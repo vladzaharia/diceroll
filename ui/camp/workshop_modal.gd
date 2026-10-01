@@ -33,11 +33,11 @@ func _pack_card(p: Profile, id: String) -> Control:
 	var head := UiTheme.hbox(10)
 	v.add_child(head)
 	var n := (d.runes as Array).size() + (d.kinds as Array).size() + (d.passives as Array).size()
-	var tr := CampUi.title_row("dice", ACCENT if owned else UiPalette.TEXT_MUTED, String(d.name), "%d ITEMS" % n, 56)
+	var tr := CampArt.title_row(String(CampInfo.PACK_ICON.get(id, "pack")), ACCENT, String(d.name), "%d ITEMS" % n, 56, not owned)
 	tr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(tr)
 	if owned:
-		head.add_child(CampUi.chip("OWNED", ACCENT.darkened(0.45), UiPalette.TEXT, 18))
+		head.add_child(CampArt.chip("OWNED", "green", "", 18))
 	else:
 		var cost := UnlockDefs.sigil_cost("packs", id)
 		var b := CampUi.buy_button("UNLOCK", cost, p.can_afford(cost), 22)
@@ -51,7 +51,7 @@ func _pack_card(p: Profile, id: String) -> Control:
 	for r in d.runes:
 		flow.add_child(_item_chip(UiIcons.rune_icon(String(r)), String(Runes.DEFS[r].name), UiPalette.rune_color(String(r)), owned))
 	for k in d.kinds:
-		flow.add_child(_item_chip("dice", DiceKinds.label(String(k)), UiPalette.kind_color(String(k)), owned))
+		flow.add_child(_item_chip("kind_" + String(k), DiceKinds.label(String(k)), UiPalette.kind_color(String(k)), owned))
 	for pid in d.passives:
 		flow.add_child(_passive_chip(String(pid), owned))
 	if not owned:
@@ -65,18 +65,18 @@ func _pack_card(p: Profile, id: String) -> Control:
 
 func _item_chip(icon: String, text: String, color: Color, on: bool) -> Control:
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(0.03, 0.03, 0.09, 0.6), 14, 2, Color(color, 0.45 if on else 0.15)), 8, 4))
+	p.add_theme_stylebox_override("panel", _chip_box(color, on))
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var row := UiTheme.hbox(6)
 	p.add_child(row)
-	row.add_child(UiIcons.rect(icon, 24, color if on else color.darkened(0.4)))
+	row.add_child(CampArt.icon(icon, 26, color if on else color.darkened(0.4), not on))
 	row.add_child(UiTheme.label(text, 18, UiPalette.TEXT if on else UiPalette.TEXT_MUTED, false, 0, false, 600))
 	return p
 
 
 func _passive_chip(id: String, on: bool) -> Control:
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(0.03, 0.03, 0.09, 0.6), 14, 2, Color(1, 1, 1, 0.08)), 6, 3))
+	p.add_theme_stylebox_override("panel", _chip_box(UiPalette.TEXT_MUTED, on))
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var row := UiTheme.hbox(6)
 	p.add_child(row)
@@ -87,6 +87,13 @@ func _passive_chip(id: String, on: bool) -> Control:
 	row.add_child(UiTheme.label(String(Passives.DEFS[id].name) if Passives.DEFS.has(id) else id, 18,
 		UiPalette.TEXT if on else UiPalette.TEXT_MUTED, false, 0, false, 600))
 	return p
+
+
+## A pack's content chip: a dark inset pill (the rune / kind / passive colour is in its icon).
+static func _chip_box(_color: Color, on: bool) -> StyleBox:
+	if UiTheme.skinned("panel_inset"):
+		return UiTheme.pad(UiTheme.inset_box(), 10, 4)
+	return UiTheme.pad(UiTheme.box(Color(0.03, 0.03, 0.09, 0.6), 14, 2, Color(_color, 0.45 if on else 0.15)), 8, 4)
 
 
 func _pool_card(p: Profile, kind: String, label: String) -> Control:
@@ -119,7 +126,7 @@ func _pool_card(p: Profile, kind: String, label: String) -> Control:
 				col = UiPalette.rune_color(String(id))
 				name = String(Runes.DEFS[id].name)
 			"kinds":
-				icon = "dice"
+				icon = "kind_" + String(id)
 				col = UiPalette.kind_color(String(id))
 				name = DiceKinds.label(String(id))
 			"passives":
@@ -140,17 +147,34 @@ func _toggle(icon: String, text: String, color: Color, on: bool, can: bool) -> C
 	t.mouse_filter = Control.MOUSE_FILTER_STOP
 	t.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if can else Control.CURSOR_ARROW
 	t.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	var sb := UiTheme.box(Color(0.05, 0.06, 0.14, 0.9) if on else Color(0.03, 0.03, 0.07, 0.5), 16, 2,
-		Color(color, 0.55) if on else Color(UiPalette.DANGER, 0.45))
-	UiTheme.pad(sb, 10, 5)
+	var sb: StyleBox
+	if UiTheme.skinned("panel_inset"):
+		sb = UiTheme.pad(UiTheme.inset_box(), 8, 4)
+	else:
+		sb = UiTheme.pad(UiTheme.box(Color(0.05, 0.06, 0.14, 0.9) if on else Color(0.03, 0.03, 0.07, 0.5), 16, 2,
+			Color(color, 0.55) if on else Color(UiPalette.DANGER, 0.45)), 10, 5)
 	t.add_theme_stylebox_override("panel", sb)
 	var row := UiTheme.hbox(6)
 	t.add_child(row)
-	row.add_child(UiIcons.rect(icon, 24, color if on else UiPalette.TEXT_MUTED))
+	# the pack checkbox shows the state; the icon says what it is
+	var box := UiSkin.texture("checkbox", "checked" if on else "unchecked", 30)
+	if box:
+		var cb := TextureRect.new()
+		cb.texture = box
+		cb.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		cb.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		cb.custom_minimum_size = Vector2(30, 30)
+		cb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		cb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(cb)
+	if icon.begins_with("passive_") or icon.begins_with("rune_") or icon.begins_with("kind_"):
+		row.add_child(CampArt.icon(icon, 26, color if on else UiPalette.TEXT_MUTED, not on))
+	else:
+		row.add_child(UiIcons.rect(icon, 24, color if on else UiPalette.TEXT_MUTED))
 	var l := UiTheme.label(text, 18, UiPalette.TEXT if on else UiPalette.TEXT_MUTED, false, 0, false, 600)
 	row.add_child(l)
 	if not on:
-		row.add_child(UiTheme.label("OFF", 16, UiPalette.HP_BRIGHT, false, 0, false, 700))
+		row.add_child(CampArt.chip("OFF", "red", "", 16))
 	if not can:
 		t.modulate = Color(1, 1, 1, 0.6)
 	return t
@@ -164,7 +188,7 @@ func _starter_card(p: Profile) -> Control:
 	c.add_child(v)
 	var head := UiTheme.hbox(10)
 	v.add_child(head)
-	var tr := CampUi.title_row("dice", ACCENT, String(d.name), "SECOND STARTING DIE", 56)
+	var tr := CampArt.title_row("upgrade_starter_kit", ACCENT, String(d.name), "SECOND STARTING DIE", 56)
 	tr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(tr)
 	if not owned:
@@ -178,7 +202,8 @@ func _starter_card(p: Profile) -> Control:
 		var cur := p.starter_kind if p.starter_kind != "" else "standard"
 		for k in UnlockDefs.starter_kinds(p.pool("kinds")):
 			var dd: Dictionary = DiceKinds.def(String(k))
-			var t := CampUi.tile(DiceKinds.label(String(k)), String(dd.get("desc", "")), cur == String(k), true, "dice", UiPalette.kind_color(String(k)))
+			var t := CampUi.tile(DiceKinds.label(String(k)), String(dd.get("desc", "")), cur == String(k), true, "", UiPalette.kind_color(String(k)))
+			CampArt.tile_icon(t, CampArt.icon("kind_" + String(k), 28, UiPalette.kind_color(String(k))))
 			t.pressed.connect(cmd.bind(["set_starter_kind", String(k)]))
 			row.add_child(t)
 	return c
@@ -190,11 +215,11 @@ func _whetstone_card(p: Profile) -> Control:
 	var c := CampUi.card(owned, ACCENT)
 	var row := UiTheme.hbox(10)
 	c.add_child(row)
-	var tr := CampUi.title_row("anvil", ACCENT, String(d.name), String(d.desc).to_upper(), 56)
+	var tr := CampArt.title_row("upgrade_whetstone", ACCENT, String(d.name), String(d.desc).to_upper(), 56)
 	tr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(tr)
 	if owned:
-		row.add_child(CampUi.chip("OWNED", ACCENT.darkened(0.45), UiPalette.TEXT, 18))
+		row.add_child(CampArt.chip("OWNED", "green", "", 18))
 	else:
 		var b := CampUi.buy_button("BUY", d.cost, p.can_afford(d.cost), 22)
 		b.pressed.connect(cmd.bind(["buy_upgrade", "workshop", "whetstone"]))

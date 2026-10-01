@@ -92,6 +92,12 @@ func set_item(p_id: String, p_slot := "") -> void:
 
 
 func _placeholder() -> void:
+	# while the 3D render is pending (or headless): the item's pack glyph, else its slot glyph
+	var g := CampInfo.item_icon(id) if id != "" else String(CampInfo.SLOT_GLYPH.get(slot, ""))
+	if g != "" and Icons.is_mapped(g):
+		texture = Icons.tex(g, 96)
+		modulate = Color(1, 1, 1, 0.55)
+		return
 	texture = UiIcons.tex(String(SLOT_ICON.get(slot, "star")), 96, Color(1, 1, 1, 0.3))
 	modulate = Color(1, 1, 1, 0.8)
 

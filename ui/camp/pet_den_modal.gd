@@ -33,7 +33,7 @@ func _pet_card(p: Profile, id: String) -> Control:
 	v.add_child(head)
 	var role := String(CampInfo.ROLE_LABEL.get(String(card.role), String(card.role))).to_upper()
 	var sub := ("%s  ·  LEVEL %d" % [role, lvl]) if owned else role
-	var tr := CampUi.title_row(String(CampInfo.PET_ICON.get(id, "heart")), col if owned else UiPalette.TEXT_MUTED, String(card.name), sub, 72)
+	var tr := CampArt.title_row(String(CampInfo.PET_GLYPH.get(id, "station_pet_den")), col, String(card.name), sub, 72, not owned)
 	tr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(tr)
 	if owned:
@@ -61,7 +61,7 @@ func _pet_card(p: Profile, id: String) -> Control:
 		UiPalette.TEXT if owned else UiPalette.TEXT_MUTED, 600)
 	ct.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	charge.add_child(ct)
-	v.add_child(_line("bolt", "Fires", String(card.fires), owned))
+	v.add_child(_line("pet_charge", "Fires", String(card.fires), owned))
 	v.add_child(_line("flag", "Board", String(card.perk), owned))
 	v.add_child(_line("star", "L5", String(card.l5), owned and lvl >= 5))
 	v.add_child(_line("crown", "L10", String(card.l10), owned and lvl >= 10))
@@ -75,8 +75,10 @@ func _pet_card(p: Profile, id: String) -> Control:
 	if int(xpb[1]) > 0 and lvl < PetDefs.XP_LEVEL_MAX:
 		var row := UiTheme.hbox(10)
 		v.add_child(row)
-		row.add_child(UiIcons.rect("xp", 26))
-		row.add_child(CampUi.bar(float(xpb[0]), float(xpb[1]), UiPalette.XP, 18))
+		row.add_child(CampArt.icon("pet_xp", 30))
+		var xb := CampUi.bar(float(xpb[0]), float(xpb[1]), UiPalette.XP, 24)
+		xb.kind = "xp"
+		row.add_child(xb)
 		row.add_child(UiTheme.label("%d / %d fights to L%d" % [int(xpb[0]), int(xpb[1]), lvl + 1], 18, UiPalette.TEXT_DIM, false, 0, false, 700))
 	else:
 		var row := UiTheme.hbox(10)
@@ -86,7 +88,7 @@ func _pet_card(p: Profile, id: String) -> Control:
 		row.add_child(sp)
 		var cost := PetDefs.level_cost(lvl)
 		if cost.is_empty():
-			row.add_child(CampUi.chip("MAX LEVEL", UiPalette.GOLD_DEEP, UiPalette.TEXT, 18))
+			row.add_child(CampArt.chip("MAX LEVEL", "yellow", "crown", 18))
 		else:
 			var b := CampUi.buy_button("LEVEL %d" % (lvl + 1), cost, p.can_afford(cost), 21)
 			b.pressed.connect(cmd.bind(["level_pet", id]))
@@ -96,8 +98,10 @@ func _pet_card(p: Profile, id: String) -> Control:
 
 func _line(icon: String, tag: String, text: String, on: bool) -> Control:
 	var row := UiTheme.hbox(10)
-	var t := CampUi.chip(tag, Color(0.03, 0.03, 0.09, 0.8), UiPalette.GOLD if on else UiPalette.TEXT_MUTED, 16)
-	t.custom_minimum_size.x = 70
+	var t := CampArt.chip(tag, "grey", icon, 16)
+	t.custom_minimum_size.x = 96
+	if not on:
+		t.modulate = Color(1, 1, 1, 0.6)
 	row.add_child(t)
 	var l := UiTheme.para(text, 19, UiPalette.TEXT_DIM if on else UiPalette.TEXT_MUTED, 500)
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -112,7 +116,7 @@ func _meter(n: int, col: Color) -> Control:
 	var m := CampUi.pips(0, n, col)
 	m.custom_minimum_size = Vector2(n * 16, 18)
 	var holder := PanelContainer.new()
-	holder.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(0.02, 0.02, 0.07, 0.8), 12, 2, Color(col, 0.5)), 8, 4))
+	holder.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.inset_box(), 10, 4))
 	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	holder.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	holder.add_child(m)

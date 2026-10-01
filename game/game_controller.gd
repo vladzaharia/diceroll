@@ -865,6 +865,10 @@ func show_camp() -> void:
 ## A Camp toast: low on the screen, so it never lands on the station heading or the row the
 ## player just tapped (the rank-up toast sat on the Ranks heading at mid-screen).
 func _camp_toast(text: String, icon := "", color: Color = UiPalette.TEXT) -> void:
+	# on the Camp screen itself: above its bottom panel and over its station screens
+	if ui and ui.camp and ui.camp.visible and ui.camp.is_inside_tree():
+		ui.camp.toast(text, icon, color)
+		return
 	overlay.toast(text, icon, color, CAMP_TOAST_Y)
 
 
@@ -881,19 +885,19 @@ func camp_command(cmd: Array) -> void:
 		match String(e.get("type", "")):
 			"upgrade_bought":
 				Audio.play_sfx("levelup")
-				_camp_toast(_upgrade_text(e), "up", UiPalette.HEAL)
+				_camp_toast(_upgrade_text(e), "rank", UiPalette.HEAL)
 			"unlocked":
 				Audio.play_sfx("fanfare")
 				_camp_toast("Unlocked: %s" % CampInfo.name_of(String(e.kind), String(e.id)),
-					CampInfo.icon_of(String(e.kind), String(e.id)), UiPalette.GOLD_BRIGHT)
+					CampInfo.glyph_of(String(e.kind), String(e.id)), UiPalette.GOLD_BRIGHT)
 			"pool_toggled", "starter_kind_set", "ascension_changed", "loadout_changed":
 				Audio.play_sfx("dice_select")
 			"item_unlocked":
 				Audio.play_sfx("fanfare")
-				_camp_toast("New item: %s" % ItemDefs.name_of(String(e.id)), CampInfo.icon_of("items", String(e.id)), UiPalette.GOLD_BRIGHT)
+				_camp_toast("New item: %s" % ItemDefs.name_of(String(e.id)), CampInfo.item_icon(String(e.id)), UiPalette.GOLD_BRIGHT)
 			"variant_crafted":
 				Audio.play_sfx("levelup")
-				_camp_toast("Crafted: %s" % ItemDefs.name_of(String(e.variant)), "anvil", UiPalette.GOLD_BRIGHT)
+				_camp_toast("Crafted: %s" % ItemDefs.name_of(String(e.variant)), "craft", UiPalette.GOLD_BRIGHT)
 			"item_equipped":
 				Audio.play_sfx("buff")
 			"appearance_set":
@@ -903,7 +907,7 @@ func camp_command(cmd: Array) -> void:
 			"skin_unlocked":
 				Audio.play_sfx("fanfare")
 				_camp_toast("New skin: %s, %s" % [CampInfo.name_of("classes", String(e["class"])), String(SkinDefs.NAMES.get(String(e.skin), e.skin))],
-					"wardrobe", Color("c79bff"))
+					"wardrobe_hats", Color("c79bff"))
 	if camp_scene:
 		camp_scene.apply_profile(profile)
 	ui.camp.show_profile(profile, TitleScreen.has_save())
