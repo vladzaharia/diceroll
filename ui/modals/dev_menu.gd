@@ -10,9 +10,25 @@ extends UiModal
 ##   DevMenu.register_row("debug", "fps", func(m: DevMenu) -> Control:
 ##       return m.info_row("FPS", str(Engine.get_frames_per_second())))
 ## Rows are built once per menu instance; row builders get the menu for its helpers
-## (info_row, button_row, note) and `updater`.
+## (info_row, button_row, note, section_title) and `updater`.
+##
+## Look: its own "slate" skin (direction C of the reskin mockups) so it never passes for part
+## of normal play: Square Corners grey-dark frame over a grey-darker container, a slate
+## plaque, slate / teal buttons, monospace values and a DEVELOPER tag. Only the `dev_*` pieces
+## of ui/theme/ui_pack.json are used here; every player-facing modal keeps the wood + navy kit.
 
 const Policy := preload("res://game/update/update_policy.gd")
+
+## Slate palette (pack grey family) + the tooling accent (muted teal, never the game's yellow).
+const SLATE_BG := Color("324652")
+const SLATE_RIM := Color("476475")
+const SLATE_DEEP := Color("16242d")
+const SLATE_DIM := Color("a3b8c3")
+const SLATE_MUTED := Color("7b97a6")
+const TEAL := Color("5ccfc3")
+const TEAL_BRIGHT := Color("8ae6db")
+const MONO_NAMES := ["JetBrains Mono", "SF Mono", "Menlo", "Cascadia Mono", "Consolas",
+	"DejaVu Sans Mono", "Liberation Mono", "Roboto Mono", "monospace"]
 
 ## id -> {"title": String, "order": int}
 static var _sections: Dictionary = {}
@@ -37,6 +53,10 @@ var _check_btn: GameButton
 var _reset_btn: GameButton
 var _build_values: Dictionary = {}
 var _busy := false
+## 1 / 0 = the dev frame for a desktop / phone canvas is applied; -1 = not yet.
+var _skin_lg := -1
+static var _mono: Font
+static var _mono_settings: Dictionary = {}
 
 
 # ---------------------------------------------------------------- registration API
@@ -96,21 +116,19 @@ static func _register_builtins() -> void:
 # ---------------------------------------------------------------- build
 
 func _build() -> void:
-	ScrollFade.attach(self, _scroll, UiPalette.NAVY_2, _frame)
-	set_title("DEVELOPER", "red")
+	_install_plaque()
+	ScrollFade.attach(self, _scroll, SLATE_BG, _frame)
+	set_title("DEV TOOLS")
 	max_width = 640.0
 	# one exit (spec 3.2): the header close button, Esc and the backdrop; the channel-switch
 	# confirm turns them off while it is up (its CANCEL / SWITCH are the exits, Esc = CANCEL)
 	dismissible = true
 	_register_builtins()
-	var first := true
+	body.add_child(_dev_tag())
 	for sid in section_ids():
 		if (_rows.get(sid, []) as Array).is_empty():
 			continue
-		if not first:
-			body.add_child(UiTheme.spacer(2))
-		first = false
-		body.add_child(UiModal.section_label(String(_sections[sid]["title"])))
+		body.add_child(section_title(String(_sections[sid]["title"])))
 		for r: Dictionary in _rows[sid]:
 			var c: Variant = (r["build"] as Callable).call(self)
 			if c is Control:
@@ -127,13 +145,13 @@ func _ready() -> void:
 
 # ---------------------------------------------------------------- row helpers (public)
 
-## "Label ........ value" line.
+## "Label ........ value" line (value in monospace).
 func info_row(label_text: String, value: String) -> HBoxContainer:
 	var r := UiTheme.hbox(12)
-	var l := UiTheme.label(label_text, 22, UiPalette.TEXT_DIM, false, 0, false, 500)
+	var l := UiTheme.label(label_text, 22, SLATE_DIM, false, 0, false, 500)
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	r.add_child(l)
-	var v := UiTheme.label(value, 22, UiPalette.TEXT, false, 0, false, 600)
+	var v := mono_label(value, 21, UiPalette.TEXT)
 	v.name = "Value"
 	v.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	v.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -143,15 +161,144 @@ func info_row(label_text: String, value: String) -> HBoxContainer:
 	return r
 
 
+## A slate (SECONDARY) or teal (PRIMARY) dev button.
 func button_row(text: String, icon: String, action: Callable, kind := GameButton.Kind.SECONDARY) -> GameButton:
-	var b := GameButton.make(text, icon, kind, 26)
+	var b := DevButton.make_dev(text, icon, kind, 26)
 	b.min_height = 76
 	b.pressed.connect(action)
 	return b
 
 
-func note(text: String, color: Color = UiPalette.TEXT_DIM) -> Label:
+func note(text: String, color: Color = SLATE_DIM) -> Label:
 	return UiTheme.para(text, 21, color)
+
+
+## Section header: teal monospace caps + a hairline rule ("UPDATES ────────").
+func section_title(text: String) -> Control:
+	var r := UiTheme.hbox(14)
+	r.add_child(mono_label(text.to_upper(), 19, TEAL, 3))
+	var rule := ColorRect.new()
+	rule.color = Color(TEAL, 0.3)
+	rule.custom_minimum_size = Vector2(0, 2)
+	rule.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rule.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	r.add_child(rule)
+	return r
+
+
+## Monospace label (system mono font, Fredoka when the platform has none); `spacing` px
+## between glyphs for caps tags.
+static func mono_label(text: String, size: int, color: Color, spacing := 0) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var key := "%d|%s|%d" % [size, color.to_html(), spacing]
+	if not _mono_settings.has(key):
+		var ls := LabelSettings.new()
+		var f := mono_font()
+		if spacing != 0:
+			var v := FontVariation.new()
+			v.base_font = f
+			v.spacing_glyph = spacing
+			f = v
+		ls.font = f
+		ls.font_size = size
+		ls.font_color = color
+		_mono_settings[key] = ls
+	l.label_settings = _mono_settings[key]
+	return l
+
+
+static func mono_font() -> Font:
+	if _mono == null:
+		var f := SystemFont.new()
+		f.font_names = PackedStringArray(MONO_NAMES)
+		f.font_weight = 500
+		f.fallbacks = [UiTheme.body_font(600)]
+		_mono = f
+	return _mono
+
+
+# ---------------------------------------------------------------- dev skin
+
+## Swaps the base modal's yellow plaque for the slate dev plaque (same slot in the frame, so
+## the plaque still straddles the frame top; UiAudit allows that overlap).
+func _install_plaque() -> void:
+	var old := ribbon
+	var r := DevPlaque.new()
+	r.font_size = 38
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	r.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	r.z_index = old.z_index
+	r.set_meta(UiAudit.ALLOW, true)
+	var at := old.get_index()
+	_frame.remove_child(old)
+	old.free()
+	_frame.add_child(r)
+	_frame.move_child(r, at)
+	ribbon = r
+
+
+## The base picks the wood frame per canvas size; the dev menu then puts its slate frame on.
+func _apply_scale(view: Vector2) -> void:
+	super._apply_scale(view)
+	if _skin_lg != int(_large):
+		_skin_lg = int(_large)
+		panel.add_theme_stylebox_override("panel", dev_box("dev_panel_lg" if _large else "dev_panel"))
+
+
+## A dev_* piece with a slate flat fallback (checkouts without the pack).
+static func dev_box(piece: String) -> StyleBox:
+	var fb: StyleBoxFlat
+	match piece:
+		"dev_panel", "dev_panel_lg":
+			fb = UiTheme.box(SLATE_BG, 18, 6, SLATE_RIM)
+			fb.set_content_margin_all(30)
+		"dev_callout":
+			fb = UiTheme.box(SLATE_DEEP, 14, 2, TEAL)
+			fb.content_margin_left = 18
+			fb.content_margin_right = 18
+			fb.content_margin_top = 14
+			fb.content_margin_bottom = 14
+		"dev_chip":
+			fb = UiTheme.box(TEAL, 12, 0)
+			fb.content_margin_left = 12
+			fb.content_margin_right = 12
+			fb.content_margin_top = 2
+			fb.content_margin_bottom = 2
+		_:
+			fb = UiTheme.box(Color(SLATE_DEEP, 0.85), 12, 0)
+			fb.content_margin_left = 16
+			fb.content_margin_right = 16
+			fb.content_margin_top = 12
+			fb.content_margin_bottom = 12
+	return UiSkin.stylebox(piece, "normal", fb)
+
+
+static func dev_panel(piece: String) -> PanelContainer:
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", dev_box(piece))
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return p
+
+
+## Top row: the teal DEVELOPER tag + what this menu is.
+func _dev_tag() -> Control:
+	var r := UiTheme.hbox(12)
+	r.name = "DevTag"
+	var chip := dev_panel("dev_chip")
+	chip.name = "Tag"
+	chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	chip.add_child(mono_label("DEVELOPER", 17, UiPalette.INK_LABEL, 2))
+	r.add_child(chip)
+	var t := mono_label("internal tools, not part of play", 18, SLATE_MUTED)
+	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	t.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	t.clip_text = true
+	r.add_child(t)
+	return r
 
 
 # ---------------------------------------------------------------- updates section
@@ -160,12 +307,12 @@ func _channel_section() -> Control:
 	var col := UiTheme.vbox(10)
 	var r := UiTheme.hbox(10)
 	col.add_child(r)
-	r.add_child(Icons.rect("gear", 36, UiPalette.TEXT))
+	r.add_child(Icons.rect("gear", 34, TEAL))
 	var l := UiTheme.label("Channel", 28, UiPalette.TEXT, true, 0)
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	r.add_child(l)
 	for ch: String in Policy.CHANNELS:
-		var b := GameButton.make(ch.to_upper(), "", GameButton.Kind.SECONDARY, 24)
+		var b := DevButton.make_dev(ch.to_upper(), "", GameButton.Kind.SECONDARY, 24)
 		b.name = "Channel_" + ch
 		b.toggle_mode = true
 		b.toggle_primary = true
@@ -178,7 +325,8 @@ func _channel_section() -> Control:
 	_channel_note.name = "ChannelNote"
 	col.add_child(_channel_note)
 	# inline confirmation (beta -> stable while running a prerelease)
-	_confirm = UiTheme.panel("inset")
+	_confirm = dev_panel("dev_callout")
+	_confirm.mouse_filter = Control.MOUSE_FILTER_STOP
 	_confirm.name = "Confirm"
 	_confirm.visible = false
 	var cv := UiTheme.vbox(10)
@@ -188,7 +336,7 @@ func _channel_section() -> Control:
 	var cr := UiTheme.hbox(10)
 	cr.alignment = BoxContainer.ALIGNMENT_CENTER
 	cv.add_child(cr)
-	_confirm_ok = GameButton.make("SWITCH", "check", GameButton.Kind.PRIMARY, 24)
+	_confirm_ok = DevButton.make_dev("SWITCH", "check", GameButton.Kind.PRIMARY, 24)
 	_confirm_ok.icon_tint = UiPalette.TEXT_DARK
 	_confirm_ok.min_height = 68
 	_confirm_ok.pressed.connect(func() -> void:
@@ -196,7 +344,7 @@ func _channel_section() -> Control:
 		_hide_confirm()
 		_switch(ch))
 	cr.add_child(_confirm_ok)
-	_confirm_cancel = GameButton.make("CANCEL", "", GameButton.Kind.SECONDARY, 24)
+	_confirm_cancel = DevButton.make_dev("CANCEL", "", GameButton.Kind.SECONDARY, 24)
 	_confirm_cancel.name = "Cancel"
 	_confirm_cancel.min_height = 68
 	_confirm_cancel.pressed.connect(func() -> void:
@@ -206,7 +354,7 @@ func _channel_section() -> Control:
 	cr.add_child(_confirm_cancel)
 	cr.move_child(_confirm_cancel, 0)
 	col.add_child(_confirm)
-	_status = note("", UiPalette.GOLD_BRIGHT)
+	_status = note("", TEAL_BRIGHT)
 	_status.name = "Status"
 	_status.visible = false
 	col.add_child(_status)
@@ -225,7 +373,7 @@ func _actions_row() -> Control:
 
 
 func _build_section() -> Control:
-	var p := UiTheme.panel("inset")
+	var p := dev_panel("dev_inset")
 	var col := UiTheme.vbox(6)
 	p.add_child(col)
 	for k in [["version", "Version"], ["commit", "Commit"], ["channel", "Channel"],
@@ -428,3 +576,70 @@ func copy_diagnostics() -> void:
 ## Small toast at the bottom centre of `host`'s view that fades out on its own (Toast helper).
 static func toast(host: Node, text: String, seconds := 1.8) -> void:
 	Toast.show(host, text, "", UiPalette.TEXT_DIM, {"at": "bottom", "font": 22, "hold": seconds, "rise": 0.0})
+
+
+# ---------------------------------------------------------------- dev widgets
+
+## GameButton on the dev_* pieces: slate (SECONDARY), teal (PRIMARY / toggled on), dark
+## slate (toggle off). Round icon buttons keep the shared round art.
+class DevButton extends GameButton:
+	static func make_dev(p_text: String, p_icon := "", p_kind := GameButton.Kind.SECONDARY, p_font := 26) -> DevButton:
+		var b := DevButton.new()
+		b.kind = p_kind
+		b.font_size = p_font
+		b.text = p_text
+		b.icon_name = p_icon
+		return b
+
+	func piece() -> String:
+		if is_round():
+			return super.piece()
+		var n := "dev_button"
+		if toggle_mode and toggle_primary:
+			n = "dev_button_accent" if button_pressed else "dev_button_dark"
+		elif kind == GameButton.Kind.PRIMARY or kind == GameButton.Kind.SUCCESS:
+			n = "dev_button_accent"
+		return n + ("_sm" if min_height <= GameButton.SMALL_H else "")
+
+	func _ink_face() -> bool:
+		if is_round():
+			return super._ink_face()
+		return not piece().begins_with("dev_button_dark")
+
+	func _text_color() -> Color:
+		if not skinned():
+			return super._text_color()
+		if disabled:
+			return DevMenu.SLATE_DIM
+		return UiPalette.INK_LABEL if _ink_face() else UiPalette.TEXT
+
+	func _colors() -> Array[Color]:
+		# no pack: flat slate / teal instead of the game's yellow / blue
+		if disabled:
+			return [DevMenu.SLATE_RIM, DevMenu.SLATE_DEEP, Color(1, 1, 1, 0.06)]
+		if _effective_kind() == GameButton.Kind.PRIMARY or kind == GameButton.Kind.SUCCESS:
+			return [DevMenu.TEAL, Color("2c7f78"), DevMenu.TEAL_BRIGHT]
+		return [DevMenu.SLATE_RIM, DevMenu.SLATE_DEEP, DevMenu.SLATE_DIM]
+
+
+## The title plaque on the slate dev_plaque face (light ink title); without the pack, the
+## drawn ribbon in slate.
+class DevPlaque extends Ribbon:
+	func _init() -> void:
+		color = DevMenu.SLATE_RIM
+
+	func skinned() -> bool:
+		return UiSkin.has("dev_plaque")
+
+	func _draw() -> void:
+		if not skinned():
+			_draw_ribbon()
+			return
+		draw_style_box(UiSkin.stylebox("dev_plaque", "normal", StyleBoxEmpty.new()), Rect2(Vector2.ZERO, size))
+		var f := UiTheme.display_font()
+		var fs := fitted_font()
+		var t := shown_text()
+		var w := f.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		var face_mid := size.y * (4.0 + 46.0 * 0.5) / 64.0
+		var base := face_mid + (f.get_ascent(fs) - f.get_descent(fs)) * 0.5
+		draw_string(f, Vector2((size.x - w) * 0.5, base), t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UiPalette.INK_LABEL)
