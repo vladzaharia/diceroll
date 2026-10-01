@@ -253,7 +253,14 @@ class _Driver extends Node:
 			"game_forge":
 				await c.play_events(f.debug_open("forge"))
 			"game_event":
-				await c.play_events(f.debug_open("event", String(args.get("event", "duel"))))
+				if String(args.get("event", "")) == "ore":
+					# the Deep Mines ore vein (an "ore" offer, not an EventDefs event): needs the
+					# mines twist, so pass --biome=mines
+					var oev: Array[Dictionary] = []
+					f._open_ore(f.run.pos, oev)
+					await c.play_events(oev)
+				else:
+					await c.play_events(f.debug_open("event", String(args.get("event", "duel"))))
 			"game_portal":
 				await c.play_events(f.debug_open("portal"))
 			"route_card":
