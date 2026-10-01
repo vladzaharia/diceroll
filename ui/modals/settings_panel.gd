@@ -15,6 +15,8 @@ signal auto_settings_pressed
 const CFG := "user://settings.cfg"
 const SPEEDS := [1.0, 2.0, 4.0]
 const UI_SIZES := [0.9, 1.0, 1.15, 1.3]
+## Keycap height in Settings -> Controls (34 in the spec; 40 stays legible on the 0.75 phone frame).
+const CONTROLS_KEY_PX := 40.0
 const CREDITS := "Interface art and icons by RhosGFX (Cartoony UI Pack, Vector Icon Pack Pro, Vector Keyboard Controls). 3D models by KayKit. Sounds by Kenney."
 
 var _sliders: Dictionary = {}
@@ -125,7 +127,7 @@ func _build() -> void:
 		_controls = UiTheme.vbox(8)
 		_controls.name = "Controls"
 		_controls.add_child(UiModal.section_label("Controls"))
-		_controls.add_child(ControlsList.make())
+		_controls.add_child(ControlsList.make(CONTROLS_KEY_PX))
 		body.add_child(_controls)
 	# credits
 	var credits := UiTheme.vbox(4)

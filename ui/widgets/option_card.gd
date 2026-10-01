@@ -358,7 +358,12 @@ class Medallion:
 		var key := "%d|%s|%.2f" % [int(px), ring_c.to_html(), sat]
 		if _discs.has(key):
 			return _discs[key]
-		var o := {"tint": ring_c}
+		# the tint is multiplied after the art is desaturated, so grey the tint itself too
+		var tint := ring_c
+		if sat < 0.999:
+			var g := ring_c.get_luminance()
+			tint = Color(g, g, g, ring_c.a).lerp(ring_c, clampf(sat, 0.0, 1.0))
+		var o := {"tint": tint}
 		if sat < 0.999:
 			o["saturation"] = sat
 		var ls := UiSkin.layers("round_white", "normal", o)

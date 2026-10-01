@@ -16,7 +16,7 @@ const TAGS := {"gold": "GOLD", "crown": "META", "potion": "POTION", "potion_gold
 	"high_roller": "DICE"}
 
 var _medal: MgWidgets.Medal
-## The pack trophy (MgWidgets.trophy, slice e) in place of the drawn medal, when available.
+## The pack trophy (MgWidgets.trophy) shown in place of the drawn medal.
 var _trophy: Control
 var _top: HBoxContainer
 var _sub: Label
@@ -88,30 +88,14 @@ func refresh(flow: GameFlow) -> void:
 	relayout()
 
 
-## Swaps the drawn medal for the pack trophy (trophy_gold / silver / bronze at 96 px, spec 4.5)
-## once slice (e)'s MgWidgets.trophy(tier, px) exists; the medal stays otherwise.
+## The pack trophy (trophy_gold / silver / bronze at 96 px, spec 4.5) in place of the drawn medal.
 func _set_trophy(tier: String) -> void:
 	if _trophy != null and is_instance_valid(_trophy):
 		_trophy.queue_free()
-		_trophy = null
-	if not has_trophy():
-		_medal.visible = true
-		return
-	var t: Variant = (MgWidgets as Script).call("trophy", tier, 96)
-	if not t is Control:
-		_medal.visible = true
-		return
-	_trophy = t
+	_trophy = MgWidgets.trophy(tier, 96)
 	_medal.visible = false
 	_top.add_child(_trophy)
 	_top.move_child(_trophy, 0)
-
-
-static func has_trophy() -> bool:
-	for m in (MgWidgets as Script).get_script_method_list():
-		if String(m.get("name", "")) == "trophy":
-			return true
-	return false
 
 
 func select(i: int) -> void:

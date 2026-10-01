@@ -90,7 +90,8 @@ func names_text() -> String:
 
 static func _cell(e: Dictionary, px: int) -> Control:
 	var well := PanelContainer.new()
-	var sb := UiTheme.box(Color(0.02, 0.02, 0.07, 0.75), 14, 2, Color(1, 1, 1, 0.08))
+	# the round well behind a 3D thumbnail (plan d `well`; flat fallback without the pack)
+	var sb := UiTheme.well_box() if UiTheme.skinned("well") else UiTheme.box(Color(0.02, 0.02, 0.07, 0.75), 14, 2, Color(1, 1, 1, 0.08))
 	UiTheme.pad(sb, 2, 2)
 	well.add_theme_stylebox_override("panel", sb)
 	well.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -104,11 +105,12 @@ static func _cell(e: Dictionary, px: int) -> Control:
 	holder.add_child(th)
 	var t := int(e.tier)
 	if t > 0:
-		var b := PanelContainer.new()
-		var col: Color = TIER_COLORS[clampi(t, 0, 3)]
-		b.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(0.05, 0.05, 0.12, 0.95), 8, 2, col), 4, 0))
-		b.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		b.add_child(UiTheme.label(String(TIER_NAMES[t]), 15, col, true, 2))
+		# the Armory's tier badge (bronze / silver / gold star + numeral), inside the cell's
+		# bottom-right corner (spec 3.1: nothing hangs off a corner)
+		var b := CampArt.tier_badge(t, 14)
 		holder.add_child(b)
-		b.position = Vector2(px - 24 - (t - 1) * 6, px - 22)
+		# anchored to the corner, growing up / left: stays inside however wide the badge is
+		b.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE)
+		b.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+		b.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	return well

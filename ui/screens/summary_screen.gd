@@ -292,7 +292,7 @@ func _build_extra() -> void:
 		var row := CampUi.card(l1 > l0, CampInfo.PET_COLOR.get(pet, UiPalette.GOLD))
 		var h := UiTheme.hbox(12)
 		row.add_child(h)
-		h.add_child(OptionCard.Medallion.make(String(CampInfo.PET_ICON.get(pet, "heart")), 56, CampInfo.PET_COLOR.get(pet, UiPalette.GOLD), CampInfo.PET_COLOR.get(pet, UiPalette.GOLD)))
+		h.add_child(OptionCard.Medallion.make(CampInfo.glyph_of("pets", pet), 56, CampInfo.PET_COLOR.get(pet, UiPalette.GOLD), CampInfo.PET_COLOR.get(pet, UiPalette.GOLD)))
 		var c := UiTheme.vbox(4)
 		c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		h.add_child(c)
@@ -502,7 +502,7 @@ func _unlock_card(kind: String, id: String, why: String) -> Control:
 	if kind == "items":
 		row.add_child(ItemThumb.make(id, 72))
 	else:
-		row.add_child(OptionCard.Medallion.make(CampInfo.icon_of(kind, id), 64, null if kind == "biomes" else col, col))
+		row.add_child(OptionCard.Medallion.make(CampInfo.glyph_of(kind, id), 64, null if kind == "biomes" else col, col))
 	var v := UiTheme.vbox(0)
 	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(v)
