@@ -3,7 +3,8 @@ extends Control
 ## Shared top HUD: level/XP medallion, HP bar (+ hero block shield), gold, treasury,
 ## the biome twist chip (the 2026-09-29 biomes only: Moonlit moon phase, Ruins heat / oasis
 ## cool, Warcamp standing drums, Mines ore veins), lap chip ("LAP 6/15" + this biome's lap
-## pips, tinted per biome) and the pause button, with the passives bar (tap / hover an icon
+## pips, tinted per biome; on the final lap a skull and "BOSS NEXT": the final boss waits at the
+## Start) and the pause button, with the passives bar (tap / hover an icon
 ## for its name and effect) underneath.
 ## Anchored to the top edge inside the safe area; centred and width-capped in landscape.
 ##
@@ -37,6 +38,13 @@ var _tip_tween: Tween
 var _act_chip: PanelContainer
 var _act := 1
 var _lap := 1
+## The run's lap count (15; the Short Road's 10) and final boss name (lap chip hint).
+var _total := Balance.TOTAL_LAPS
+var _boss_name := ""
+## The finale (every tile a boss tile): the chip reads "FINAL ROLL".
+var _finale := false
+## Skull on the lap chip, shown on the final lap ("BOSS NEXT").
+var _boss_icon: TextureRect
 ## The run's biome ids per tier (lap chip colour and tooltip); empty = legacy act colours.
 var route: Array = []
 var _block_label: Label
@@ -168,6 +176,10 @@ func _init() -> void:
 	chips.add_child(act)
 	var ar := UiTheme.hbox(8)
 	act.add_child(ar)
+	_boss_icon = Icons.rect("boss", 28)
+	_boss_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_boss_icon.visible = false
+	ar.add_child(_boss_icon)
 	act_label = UiTheme.label("LAP 1/15", 22, UiPalette.GOLD, true, 5)
 	ar.add_child(act_label)
 	lap_pips = UiTheme.hbox(4)
@@ -321,6 +333,9 @@ func refresh(flow: GameFlow, animate := false) -> void:
 	var need := Balance.xp_for_level(run.level)
 	level_badge.set_level(run.level, float(run.xp - prev) / float(maxi(1, need - prev)), animate)
 	route = Array(run.route)
+	_total = run.total_laps()
+	_boss_name = String(EnemyDefs.def(run.boss_id).name)
+	_finale = run.finale
 	set_lap(run.act, run.lap)
 	set_block(run.block if flow.phase == GameFlow.Phase.COMBAT else 0, animate)
 	set_burn(flow.combat.hero_burn if flow.phase == GameFlow.Phase.COMBAT and flow.combat else 0)
@@ -351,6 +366,9 @@ func copy_from(o: HudTop) -> void:
 	treasury.set_value(o.treasury.value, false)
 	level_badge.set_level(o.level_badge.level, o.level_badge.xp_frac, false)
 	route = o.route
+	_total = o._total
+	_boss_name = o._boss_name
+	_finale = o._finale
 	set_lap(o._act, o._lap)
 	set_passives(o._passive_ids)
 	if o._twist_key != "":
@@ -372,16 +390,25 @@ func show_xp(xp: int, animate := true) -> void:
 
 
 func set_lap(act: int, lap: int) -> void:
+	var was_final := _lap >= _total and _boss_icon.visible
 	_act = act
 	_lap = lap
-	var final := lap >= Balance.TOTAL_LAPS
+	var final := lap >= _total
 	var bc := biome_color(act)
-	act_label.text = "FINAL LAP" if final else "LAP %d/%d" % [lap, Balance.TOTAL_LAPS]
+	# the final lap: the boss is next (it waits at the Start)
+	act_label.text = ("FINAL ROLL" if _finale else "BOSS NEXT") if final else "LAP %d/%d" % [lap, _total]
 	act_label.label_settings = UiTheme.label_settings(22, UiPalette.HP_BRIGHT if final else bc.lerp(UiPalette.GOLD_BRIGHT, 0.45), true, 5)
+	_boss_icon.visible = final
 	_act_chip.tooltip_text = "%s  ·  Tier %s  ·  Lap %d of %d" % [biome_name(act),
-		ROMAN[clampi(act - 1, 0, 3)], lap, Balance.TOTAL_LAPS]
-	_act_chip.add_theme_stylebox_override("panel", UiTheme.panel_box("pill", bc))
+		ROMAN[clampi(act - 1, 0, 3)], lap, _total]
+	if final:
+		var bn := _boss_name if _boss_name != "" else "the final boss"
+		_act_chip.tooltip_text = ("Every tile is %s's now: one last roll, and wherever you land, you fight." % bn) if _finale \
+			else "After the Last Camp, one final roll into %s." % bn
+	_act_chip.add_theme_stylebox_override("panel", UiTheme.chip_box("red") if final else UiTheme.panel_box("pill", bc))
 	_set_laps(act, lap)
+	if final and not was_final and is_inside_tree():
+		UiTheme.pop(_act_chip, 1.25, 0.4)
 
 
 ## Rebuilds the passives bar (ids in pickup order).
@@ -487,14 +514,15 @@ func biome_name(act: int) -> String:
 
 func _set_laps(act: int, lap: int) -> void:
 	UiTheme.clear(lap_pips)
-	var first := int(Balance.BIOME_LAPS[clampi(act - 1, 0, Balance.BIOME_LAPS.size() - 1)])
+	var bl: Array = Balance.SHORT_BIOME_LAPS if _total == Balance.SHORT_LAPS else Balance.BIOME_LAPS
+	var first := int(bl[clampi(act - 1, 0, bl.size() - 1)])
 	var bc := biome_color(act)
 	for i in Balance.LAPS_PER_ACT:
 		var n := first + i
 		var dot := _Pip.new()
 		dot.state = 2 if n < lap else (1 if n == lap else 0)
 		dot.color = bc
-		dot.boss = n == Balance.TOTAL_LAPS
+		dot.boss = n == _total
 		dot.custom_minimum_size = Vector2(16, 16)
 		lap_pips.add_child(dot)
 
@@ -623,6 +651,9 @@ func on_event(ev: Dictionary, flow: GameFlow) -> void:
 			class_badge.pulse()
 		"dice_rolled", "die_added", "die_tagged", "enemy_scared", "die_marked":
 			class_badge.sync(flow)
+		"finale_started":
+			_finale = true
+			set_lap(_act, _lap)
 		"act_started":
 			set_lap(int(ev.get("act", _act)), int(ev.get("lap", _lap)))
 			treasury.set_value(int(ev.get("treasury", flow.run.treasury)), false)

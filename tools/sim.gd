@@ -18,7 +18,11 @@ extends SceneTree
 ##           [--item=<item>.<key>=I/II/III | <variant>.<key>=v,...] override item numbers (analysis)
 ##           [--affixes=off|on|force:<id>] [--force] [--hero=<class>.<field>=<v>] [--cl=<KNOB>=<v>]
 ##           [--tune-hp= --tune-atk= --tune-boss= --tune-base= --tune-step= --tune-atk-step=
-##            --tune-gold= --tune-shop=1,3,5] [--danger=lo,hi] [--real-heur=p|scope:p,...] [--items]
+##            --tune-gold= --tune-shop=1,3,5 --tune-cap=N] [--danger=lo,hi] [--real-heur=p|scope:p,...] [--items]
+##           [--camp=on|off --camp-heal=0.35 --camp-asc-heal=0.25 --camp-boss=1.0 (scales every boss)] the Last Camp dials
+##           [--landings] fights / tiles / shops / minigames per lap and biome, and the lap-start tile mix
+##           [--mix=enemy:-2,chest:1,event:1] layout deltas · [--mg-refill=N] minigame refill every N laps
+##           [--event-refill=N] events top up every N laps · [--mut-enemy=N] extra tier-1 mutation enemies
 ## Each class row is also printed machine-readable ("#row class wins runs level_sum fights act_sum
 ## win_level_sum", "#up source count runs") so shards can be summed.
 ## Without --route each run draws its own route (one biome per tier) and bosses from its seed.
@@ -64,6 +68,12 @@ var force_classes := false
 var armory_specs: Array = []
 var variant_specs: Array = []
 var kit_mode := "default"
+## --landings: per lap (and per biome) what the hero landed on / did: "fight" (non-boss combats),
+## tile types (tile_triggered), "shop", "minigame"; plus the board's tile mix at each lap start.
+var track_landings := false
+var land := {}      # "lap|biome|kind" -> count
+var lap_runs := {}  # lap -> runs that played it
+var mix := {}       # "lap|type" -> count (board tiles at the lap's start)
 
 func _init() -> void:
 	var runs := 100
@@ -187,6 +197,28 @@ func _init() -> void:
 			Balance.tune_gold = arg.substr(12).to_float()
 		elif arg.begins_with("--tune-shop="):
 			Balance.tune_shop = arg.substr(12)
+		elif arg.begins_with("--mix="):
+			# --mix=enemy:-2,chest:1,event:1 (deltas on every Board layout; analysis)
+			for part in arg.substr(6).split(",", false):
+				Board.tune_mix[part.get_slice(":", 0)] = part.get_slice(":", 1).to_int()
+		elif arg.begins_with("--mg-refill="):
+			Balance.tune_mg_refill = arg.substr(12).to_int()
+		elif arg.begins_with("--event-refill="):
+			Balance.tune_event_refill = arg.substr(15).to_int()
+		elif arg.begins_with("--quiet-last="):
+			Balance.tune_quiet_last = arg.substr(13) != "0"
+		elif arg.begins_with("--mut-enemy="):
+			Balance.tune_mut_enemy = arg.substr(12).to_int()
+		elif arg.begins_with("--tune-cap="):
+			Balance.tune_cap = arg.substr(11).to_int()
+		elif arg.begins_with("--camp="):
+			Balance.camp_on = arg.substr(7) != "off"
+		elif arg.begins_with("--camp-heal="):
+			Balance.camp_heal = arg.substr(12).to_float()
+		elif arg.begins_with("--camp-asc-heal="):
+			Balance.camp_asc_heal = arg.substr(16).to_float()
+		elif arg.begins_with("--camp-boss="):
+			Balance.camp_boss_hp = arg.substr(12).to_float()
 		elif arg.begins_with("--danger="):
 			Bot.danger_lo = arg.substr(9).get_slice(",", 0).to_float()
 			Bot.danger_hi = arg.substr(9).get_slice(",", 1).to_float()
@@ -209,6 +241,8 @@ func _init() -> void:
 			kit_mode = arg.substr(6)
 		elif arg == "--items":
 			track_items = true
+		elif arg == "--landings":
+			track_landings = true
 		elif arg.begins_with("--affixes="):
 			# off | on | force:<id> (that affix on every elite leader, nothing else)
 			AffixDefs.sim_mode = arg.substr(10)
@@ -338,6 +372,7 @@ func _init() -> void:
 				upgrades[k] = int(upgrades.get(k, 0)) + int(up[k])
 		# machine-readable row for shard aggregation (tools: sum wins/runs over shards)
 		print("#row %s %d %d %d %d %d %d" % [c, wins, runs, level_sum, fights_won_sum, act_sum, win_level_sum])
+		print("#extra %s %d %d %d" % [c, crowns_sum, mg_sum, runs])
 		for k in deaths:
 			print("#death %s %s %d" % [c, k, int(deaths[k])])
 		all_wins += wins
@@ -381,6 +416,13 @@ func _init() -> void:
 	_upgrades_table(all_runs)
 	if track_items:
 		_items_table()
+	if track_landings:
+		for k in land:
+			print("#land %s %d" % [k, int(land[k])])
+		for k in lap_runs:
+			print("#lapn %d %d" % [int(k), int(lap_runs[k])])
+		for k in mix:
+			print("#mix %s %d" % [k, int(mix[k])])
 	print("")
 	if policy == "realistic":
 		print("realistic lapses: %s" % str(Bot.real_heur))
@@ -489,10 +531,35 @@ func _play(c: String, s: int, board: int, opts: Dictionary, verbose := false) ->
 	var last_fight := ""
 	var minis: Array = []
 	var crowns := 0
+	var seen_lap := 0
 	while not f.is_over() and n < MAX_COMMANDS:
+		if track_landings and f.run.lap != seen_lap:
+			seen_lap = f.run.lap
+			lap_runs[seen_lap] = int(lap_runs.get(seen_lap, 0)) + 1
+			for t in f.run.board.tiles:
+				var mk := "%d|%s" % [seen_lap, String(t.type)]
+				mix[mk] = int(mix.get(mk, 0)) + 1
 		var cmd := _next(f)
 		var ev := f.apply(cmd)
 		n += 1
+		if track_landings:
+			for e in ev:
+				var kind := ""
+				match String(e.type):
+					"combat_started":
+						kind = "boss" if bool(e.boss) else "fight"
+					"tile_triggered":
+						kind = String(e.tile_type)
+						if kind in ["enemy", "elite", "miniboss"]:
+							kind = ""
+					"minigame_started":
+						kind = "minigame_played"
+					"offer_opened":
+						if String(e.offer.get("kind", "")) in ["shop", "camp"] and not String(cmd[0]).begins_with("shop_"):
+							kind = String(e.offer.kind)
+				if kind != "":
+					var lk := "%d|%s|%s" % [f.run.lap, f.run.board.biome, kind]
+					land[lk] = int(land.get(lk, 0)) + 1
 		for e in ev:
 			if e.type == "error":
 				total_errors += 1

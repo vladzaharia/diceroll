@@ -24,7 +24,7 @@ var board_rerolls_left: int = 0
 ## Board rerolls refunded this board turn (Ninja Shadow Step; reset by roll_board).
 var board_refunds: int = 0
 ## Queue of steps still to resolve after the current modal/combat closes.
-## Step kinds: tile{idx}, shop, draft, rune_choice{source}, passive_choice{source, tier}, boss,
+## Step kinds: tile{idx}, shop, camp, finale, draft, rune_choice{source}, passive_choice{source, tier}, boss,
 ## bonus_move{steps}, victory.
 var pending: Array[Dictionary] = []
 ## Successful commands in order: [name, args...].
@@ -109,6 +109,8 @@ func roll_board() -> Array[Dictionary]:
 	_record(["roll_board"])
 	run.stats.board_turns = int(run.stats.get("board_turns", 0)) + 1
 	board_rerolls_left = run.board_rerolls + (1 if run.has_passive("pathfinder") else 0) + run.lap_rerolls
+	if run.finale:
+		board_rerolls_left = 0 # the final roll is a ceremony, not a choice
 	board_refunds = 0
 	phase = Phase.BOARD_ROLLED
 	return _do_board_roll()
@@ -147,7 +149,7 @@ func _do_board_roll() -> Array[Dictionary]:
 	# Doubles feed the Treasury bank: +pair value * TREASURY_PAIR_MULT.
 	var added := 0
 	var pv := board_pair_value()
-	if pv > 0:
+	if pv > 0 and not run.finale:
 		added = pv * Balance.TREASURY_PAIR_MULT
 		if run.has_pet("coin_mimic"):
 			added += 2
@@ -263,9 +265,14 @@ func is_board_double() -> bool:
 
 ## Landing tile of the current move (Start on the final lap if the move crosses it).
 func board_target() -> int:
-	if run.lap >= run.total_laps() and run.board.crosses_start(run.pos, board_move):
+	if not run.finale and _stops_at_start() and run.board.crosses_start(run.pos, board_move):
 		return 0
 	return run.board.landing(run.pos, board_move)
+
+## True on a lap whose crossing stops on Start: the final lap (the boss, camp off) and the Last
+## Camp's lap (the camp is on Start).
+func _stops_at_start() -> bool:
+	return run.lap >= run.total_laps() or run.is_camp_lap(run.lap)
 
 ## [target] for the current board roll (kept as an array for the old contract).
 func landing_preview() -> Array[int]:
@@ -278,6 +285,8 @@ func confirm_move() -> Array[Dictionary]:
 	if phase != Phase.BOARD_ROLLED:
 		return _err("confirm_move")
 	_record(["confirm_move"])
+	if run.finale:
+		return _final_roll()
 	var ev: Array[Dictionary] = []
 	var steps := board_move
 	for i in board_choice:
@@ -302,7 +311,7 @@ func confirm_move() -> Array[Dictionary]:
 	board_choice.clear()
 	board_move = 0
 	ev.append_array(_move(steps, false))
-	if doubles and steps > 0 and run.has_passive("fast_feet") and not _pending_has("boss"):
+	if doubles and steps > 0 and run.has_passive("fast_feet") and not _pending_has("boss") and not _pending_has("finale"):
 		pending.push_back({"kind": "bonus_move", "steps": hop})
 	_advance(ev)
 	return ev
@@ -330,8 +339,9 @@ func _move(steps: int, teleport: bool) -> Array[Dictionary]:
 	var crossing := run.board.crosses_start(run.pos, steps)
 	var p := run.board.path(run.pos, steps)
 	var final_lap := run.lap >= run.total_laps()
-	if crossing and final_lap:
-		# stop on Start: final boss
+	var camp := run.is_camp_lap(run.lap)
+	if crossing and (final_lap or camp):
+		# stop on Start: the final boss, or the Last Camp
 		var cut: Array[int] = []
 		for t in p:
 			cut.append(t)
@@ -367,9 +377,21 @@ func _move(steps: int, teleport: bool) -> Array[Dictionary]:
 		run.lap += 1
 		run.lap_rerolls = run.lap_reroll_refill(run.act_for_lap(run.lap) != run.act)
 		run.stats.laps_completed = int(run.stats.get("laps_completed", 0)) + 1
-		ev.append({"type": "lap_completed", "lap": completed, "healed": healed, "hp": run.hp, "boss": false})
+		ev.append({"type": "lap_completed", "lap": completed, "healed": healed, "hp": run.hp, "boss": false, "camp": camp})
 		ev.append({"type": "hp_changed", "amount": healed, "total": run.hp, "source": "lap", "max_hp": run.max_hp})
 		ev.append_array(ClassLogic.on_lap(run))
+		if camp:
+			# the Last Camp on Start, the last buy, then the finale: no final-lap board
+			if run.has_passive("piggy_bank"):
+				var pig := mini(Balance.PASSIVE_PIGGY_MAX, int(run.gold * Balance.PASSIVE_PIGGY_PCT))
+				if pig > 0:
+					ev.append(_passive_ev("piggy_bank", pig))
+					_gold(ev, pig, "piggy_bank")
+			pending.push_back({"kind": "camp"})
+			if run.is_shop_lap(completed):
+				pending.push_back({"kind": "shop"})
+			pending.push_back({"kind": "finale"})
+			return ev
 		if run.act_for_lap(run.lap) != run.act:
 			_new_biome(dest, ev)
 		else:
@@ -377,12 +399,17 @@ func _move(steps: int, teleport: bool) -> Array[Dictionary]:
 			if run.moon_phase() == "full":
 				# Moonlit Woods: the mutation into the Full lap spawns +1 Elite
 				extra.append("elite")
-			var changes := run.board.mutate(run.rng, run.act, run.eff_lap(), [dest], extra)
+			for k in (Balance.tune_mut_enemy if run.act == 1 else 0):
+				extra.append("enemy")
+			var ev_refill := (run.biome_lap_pos() - 1) % maxi(1, Balance.tune_event_refill) == 0
+			var quiet := Balance.tune_quiet_last and run.is_camp_lap(run.lap)
+			var changes := run.board.mutate(run.rng, run.act, run.eff_lap(), [dest], [] if quiet else extra, ev_refill, not quiet)
 			if run.lap == run.miniboss_lap():
 				_add_change(changes, run.board.spawn_miniboss(run.rng, run.miniboss_id, dest, [dest]))
 			run.roll_change_affixes(changes)
 			_twist_mutation(dest, changes, ev)
-			changes.append_array(run.place_minigames([dest]))
+			if (run.biome_lap_pos() - 1) % maxi(1, Balance.tune_mg_refill) == 0:
+				changes.append_array(run.place_minigames([dest]))
 			ev.append({"type": "board_mutated", "changes": changes})
 		_moon_event(ev)
 		if run.has_passive("piggy_bank"):
@@ -415,6 +442,10 @@ func _advance(ev: Array[Dictionary]) -> void:
 				_trigger_tile(int(step.idx), ev)
 			"shop":
 				_open_shop(ev)
+			"camp":
+				_open_camp(ev)
+			"finale":
+				_start_finale(ev)
 			"draft":
 				_open_draft(ev)
 			"rune_choice":
@@ -563,7 +594,7 @@ func _portal_tiles(from: int) -> Array:
 	var reach := run.board.portal_range() + ItemLogic.portal_bonus(run)
 	for t in run.board.path(from, reach):
 		out.append(t)
-		if t == 0 and run.lap >= run.total_laps():
+		if t == 0 and _stops_at_start():
 			break
 	return out
 
@@ -1304,6 +1335,11 @@ func event_choose(i: int) -> Array[Dictionary]:
 		_mine_ore(choice, ev)
 		_advance(ev)
 		return ev
+	if String(offer.get("kind", "")) == "camp":
+		_close_offer(ev)
+		_camp_pick(String(choice.id), ev)
+		_advance(ev)
+		return ev
 	var id := String(offer.id)
 	_close_offer(ev)
 	if (id == "shrine" and String(choice.get("blessing", "")) != "gold") or (id == "dicesmith" and choice.has("kind")) or (id == "idol" and i == 0):
@@ -1379,6 +1415,89 @@ func event_choose(i: int) -> Array[Dictionary]:
 		# Hollow twist: restless spirits mend you after every event.
 		var hh := run.heal(run.pct_of_max(Balance.HOLLOW_EVENT_HEAL_PCT))
 		ev.append({"type": "hp_changed", "amount": hh, "total": run.hp, "source": "hollow", "max_hp": run.max_hp})
+	_advance(ev)
+	return ev
+
+# ================================================================ the Last Camp
+
+## The Last Camp (once per run, finishing the second-to-last lap): the hero rests by a campfire on
+## Start (heal Balance.CAMP_HEAL_PCT of max HP; A2+ less), then picks one of CAMP_CHOICES. Emits
+## camp_opened {lap, healed, hp, max_hp, boss:{id, name}} + hp_changed {source:"camp"}, then the
+## offer {kind:"camp", id:"camp", title, text, healed, boss, choices:[{id, label, desc, enabled}]}
+## in phase EVENT, resolved with event_choose(i). The final boss then has x Balance.camp_boss_hp HP.
+func _open_camp(ev: Array[Dictionary]) -> void:
+	run.stats.camped = true
+	var healed := run.heal(run.pct_of_max(run.camp_heal_pct()))
+	var boss := {"id": run.boss_id, "name": String(EnemyDefs.def(run.boss_id).name)}
+	ev.append({"type": "camp_opened", "lap": run.camp_lap(), "healed": healed, "hp": run.hp, "max_hp": run.max_hp, "boss": boss})
+	ev.append({"type": "hp_changed", "amount": healed, "total": run.hp, "source": "camp", "max_hp": run.max_hp})
+	var choices: Array = []
+	for id in Balance.CAMP_CHOICES:
+		match String(id):
+			"potion":
+				var belt := run.potion_cap > 0 and run.potions < run.potion_cap
+				var share := run.potion_pct() if run.potion_cap > 0 else Balance.SHOP_POTION_PCT
+				choices.append({"id": "potion", "potion": "healing", "label": "Healing Draught",
+					"desc": "A potion for your belt, for the fight ahead." if belt else "Drink it now: heal %d%% of max HP." % int(round(share * 100.0)),
+					"enabled": true})
+			"rune":
+				choices.append({"id": "rune", "label": "Rune by the Fire", "desc": "Pick 1 of %d runes for your dice." % Balance.CAMP_RUNE_CHOICES, "enabled": true})
+			"steady":
+				choices.append({"id": "steady", "label": "Steady Hands", "desc": "+1 combat reroll every turn against %s." % String(boss.name), "enabled": true})
+	_set_offer({"kind": "camp", "id": "camp", "title": "The Last Camp",
+		"text": "You rest by the fire. At dawn every road leads to %s: one last roll, and wherever you land, you fight." % String(boss.name),
+		"healed": healed, "boss": boss, "choices": choices}, Phase.EVENT, ev)
+
+func _camp_pick(id: String, ev: Array[Dictionary]) -> void:
+	run.stats.camp_pick = id
+	ev.append({"type": "camp_picked", "id": id})
+	match id:
+		"potion":
+			if run.potion_cap > 0:
+				if not _gain_potion(ev, "camp", "healing"):
+					ev.append_array(_drink("healing", "camp"))
+			else:
+				var h := run.heal(run.pct_of_max(Balance.SHOP_POTION_PCT))
+				ev.append({"type": "hp_changed", "amount": h, "total": run.hp, "source": "potion", "max_hp": run.max_hp})
+		"rune":
+			_open_rune_choice("camp", ev, Balance.CAMP_RUNE_CHOICES)
+		"steady":
+			_upgrade("camp")
+			run.pet_state["steady"] = 1
+			ev.append({"type": "stat_changed", "stat": "steady", "value": 1})
+
+## The finale (after the Last Camp and its shop): every tile turns into a boss tile around the
+## hero on Start. Emits finale_started {boss:{id, name}, lap, changes:[board changes, in ring
+## order from Start]}; the phase returns to BOARD_READY for the one final roll.
+func _start_finale(ev: Array[Dictionary]) -> void:
+	run.finale = true
+	var gone := run.board.remove_minibosses()
+	var changes: Array = []
+	for i in run.board.size():
+		run.board.tiles[i] = Board.make_tile("boss")
+		changes.append(run.board.change(i))
+	var boss := {"id": run.boss_id, "name": String(EnemyDefs.def(run.boss_id).name)}
+	ev.append({"type": "finale_started", "lap": run.lap, "boss": boss, "changes": changes, "minibosses_gone": gone.size()})
+
+## The final roll: the hero moves the roll's total and fights the final boss wherever they land
+## (no tile effects, no rerolls). Completing the move counts as the final lap.
+func _final_roll() -> Array[Dictionary]:
+	var ev: Array[Dictionary] = []
+	var steps := board_move
+	var total := board_pair_value()
+	board_roll.clear()
+	board_choice.clear()
+	board_move = 0
+	var p := run.board.path(run.pos, steps)
+	var dest := run.board.landing(run.pos, steps)
+	run.pos = dest
+	if steps > 0:
+		ev.append({"type": "hero_moved", "path": p, "teleport": false})
+	else:
+		ev.append({"type": "hero_stayed", "pos": run.pos})
+	run.stats.laps_completed = int(run.stats.get("laps_completed", 0)) + 1
+	ev.append({"type": "final_landing", "idx": dest, "steps": steps, "doubles": total > 0})
+	_start_combat([run.boss_id], false, true, dest, ev)
 	_advance(ev)
 	return ev
 
@@ -1911,7 +2030,7 @@ func _second_potion() -> String:
 
 ## Jumps straight into a modal or fight for screenshot scenarios. Not recorded in `commands`,
 ## so a flow touched by this cannot be replayed from its log. kind: shop | draft | rune_choice |
-## rune_assign | passive | forge | event | portal | combat | boss | miniboss. arg: event id, rune
+## rune_assign | passive | forge | event | portal | combat | boss | miniboss | minigame | camp. arg: event id, rune
 ## id, or comma separated enemy ids for combat, or the passive source ("elite" | "miniboss" |
 ## "boss" = an elite's boss-tier roll), or a boss / mini-boss id (default: the run's).
 func debug_open(kind: String, arg := "") -> Array[Dictionary]:
@@ -1938,6 +2057,7 @@ func debug_open(kind: String, arg := "") -> Array[Dictionary]:
 		"boss": _start_combat([arg if EnemyDefs.BOSSES.has(arg) else run.boss_id], false, true, 0, ev)
 		"miniboss": _start_combat([arg if EnemyDefs.MINIBOSSES.has(arg) else run.miniboss_id], false, false, run.pos, ev, true)
 		"minigame": _start_minigame(arg if MinigameDefs.has(arg) else "fossil_hunter", ev)
+		"camp": _open_camp(ev)
 		_: return [_e("unknown debug kind " + kind)]
 	return ev
 

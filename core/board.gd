@@ -13,12 +13,15 @@ extends RefCounted
 
 const CORNER_TYPES := ["start", "forge", "treasury", "portal"]
 ## Edge tile counts per ring size. Mutation spawns MUTATE per lap and tops events back up to
-## LAYOUTS[size].event.
+## LAYOUTS[size].event. 2026-09-30 (fight-first): +2 Enemy, -1 Chest, -1 Event on every size
+## (28 was enemy 7, chest 4, event 4): about a third more fights in a biome's first laps.
 const LAYOUTS := {
-	24: {"enemy": 6, "chest": 3, "event": 3, "campfire": 2, "trap": 2, "empty": 4},
-	28: {"enemy": 7, "chest": 4, "event": 4, "campfire": 2, "trap": 2, "empty": 5},
-	32: {"enemy": 8, "chest": 4, "event": 4, "campfire": 3, "trap": 3, "empty": 6},
+	24: {"enemy": 8, "chest": 2, "event": 2, "campfire": 2, "trap": 2, "empty": 4},
+	28: {"enemy": 9, "chest": 3, "event": 3, "campfire": 2, "trap": 2, "empty": 5},
+	32: {"enemy": 10, "chest": 3, "event": 3, "campfire": 3, "trap": 3, "empty": 6},
 }
+## Sim-only analysis dial (tools/sim.gd --mix=enemy:-2,chest:1,...): deltas on every layout.
+static var tune_mix := {}
 const MUTATE := {
 	24: ["enemy", "enemy", "elite"],
 	28: ["enemy", "enemy", "elite"],
@@ -66,6 +69,10 @@ func portal_range() -> int:
 ## biome's mix deltas applied (Empty absorbs the difference; traps become the biome's trap tile).
 static func layout_for(ring_size: int, p_biome := "") -> Dictionary:
 	var base := _base_layout(ring_size)
+	if not tune_mix.is_empty():
+		base = base.duplicate()
+		for type in tune_mix:
+			base[type] = maxi(0, int(base.get(type, 0)) + int(tune_mix[type]))
 	if not BiomeDefs.has(p_biome):
 		return base
 	var def: Dictionary = BiomeDefs.DEFS[p_biome]
@@ -254,7 +261,7 @@ func change(idx: int) -> Dictionary:
 ## Lap mutation: cleared fight tiles become Empty, then mutate_spawns_for(size) (24: +2 Enemy
 ## +1 Elite; 32: +3 Enemy +1 Elite) go on random Empty tiles, then events are topped back up
 ## to the layout's event count. `protect` tiles are never changed.
-func mutate(rng: Rng, act: int, lap: int, protect: Array = [], extra: Array = []) -> Array[Dictionary]:
+func mutate(rng: Rng, act: int, lap: int, protect: Array = [], extra: Array = [], refill_events := true, spawn := true) -> Array[Dictionary]:
 	var changes: Array[Dictionary] = []
 	for i in size():
 		if _is_fight(tiles[i].type) and tiles[i].get("cleared", false):
@@ -266,14 +273,15 @@ func mutate(rng: Rng, act: int, lap: int, protect: Array = [], extra: Array = []
 			empties.append(i)
 	rng.shuffle(empties)
 	var spawns: Array[String] = []
-	spawns.assign(mutate_spawns_for(size(), biome))
+	if spawn:
+		spawns.assign(mutate_spawns_for(size(), biome))
 	for x in extra:
 		spawns.append(String(x))
 	var events := 0
 	for t in tiles:
 		if t.type == "event":
 			events += 1
-	for k in range(events, int(layout_for(size(), biome).event)):
+	for k in range(events, int(layout_for(size(), biome).event) if refill_events else 0):
 		spawns.append("event")
 	# biome refill (Deep Mines ore), unless the trap cap is reached
 	if BiomeDefs.has(biome) and BiomeDefs.twist_of(biome) != "":

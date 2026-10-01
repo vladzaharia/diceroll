@@ -80,16 +80,20 @@ func _one(ev: Dictionary) -> void:
 			Fx.heal_glow(c.board, c.board.hero.position)
 			Audio.play_sfx("heal")
 			var done := int(ev.lap)
+			var total := c.flow.run.total_laps()
 			if bool(ev.get("boss", false)):
 				c.overlay.vignette(0.55, 0.6)
-				c.overlay.announce("THE BOSS AWAITS", "Lap %d of %d complete" % [done, Balance.TOTAL_LAPS], UiPalette.DANGER, 1.2)
+				c.overlay.announce("THE BOSS AWAITS", "Lap %d of %d complete" % [done, total], UiPalette.DANGER, 1.2)
 				c.rig.shake(0.4, 0.8)
 				await _wait(1.4)
-			elif done + 1 == Balance.TOTAL_LAPS:
-				c.overlay.announce("FINAL LAP", "The Lich waits at the Start", UiPalette.DANGER.lightened(0.2), 1.1)
+			elif c.flow.run.is_camp_lap(done):
+				# the Last Camp beat (camp_opened, next) announces the final lap
+				await _wait(0.3)
+			elif done + 1 == total:
+				c.overlay.announce("FINAL LAP", "%s waits at the Start" % _boss_name(), UiPalette.DANGER.lightened(0.2), 1.1)
 				await _wait(1.2)
-			elif not Balance.BIOME_LAPS.has(done + 1):
-				c.overlay.popup(c.hero_screen(2.4), "LAP %d / %d" % [done + 1, Balance.TOTAL_LAPS], UiPalette.GOLD_BRIGHT, "flag", 34)
+			elif not c.flow.run.biome_laps().has(done + 1):
+				c.overlay.popup(c.hero_screen(2.4), "LAP %d / %d" % [done + 1, total], UiPalette.GOLD_BRIGHT, "flag", 34)
 				await _wait(0.6)
 			else:
 				await _wait(0.4)
@@ -160,7 +164,9 @@ func _one(ev: Dictionary) -> void:
 		"stat_changed":
 			var stat := String(ev.get("stat", ""))
 			var label := "+1 combat reroll" if stat == "combat_rerolls" else ("ATK %d" % int(ev.value) if stat == "atk" else stat)
-			c.overlay.toast(label, "reroll" if stat == "combat_rerolls" else "sword", UiPalette.GOLD_BRIGHT)
+			if stat == "steady":
+				label = "Steady Hands: +1 reroll vs the boss"
+			c.overlay.toast(label, "reroll" if stat in ["combat_rerolls", "steady"] else "sword", UiPalette.GOLD_BRIGHT)
 			Audio.play_sfx("buff")
 			await _wait(0.3)
 		"die_added":
@@ -230,6 +236,17 @@ func _one(ev: Dictionary) -> void:
 			await _wait(0.1)
 		"offer_closed":
 			c.close_modals()
+			if String(ev.get("kind", "")) == "camp":
+				Audio.play_music(c.flow.run.biome(), 1.2)
+		"camp_opened":
+			await _camp(ev)
+		"finale_started":
+			await _finale(ev)
+		"final_landing":
+			c.board.pulse_tile(int(ev.idx), Color(1.0, 0.25, 0.2))
+			c.rig.shake(0.5, 0.4)
+			Audio.play_sfx("swing")
+			await _wait(0.4)
 		"level_up", "potion_gained", "potion_used", "pet_charged", "pet_acted", "second_boss", "face_cursed", "item_triggered", "crowns_pending":
 			# meta-layer beats (auto level-ups, potions, pets, ascension events): game/pets/meta_beats.gd
 			await MetaBeats.play(c, ev)
@@ -526,6 +543,53 @@ func _tile_triggered(ev: Dictionary) -> void:
 		"oasis":
 			Audio.play_sfx("heal")
 	await _wait(0.3)
+
+
+func _boss_name() -> String:
+	return String(EnemyDefs.def(c.flow.run.boss_id).name)
+
+
+## The Last Camp (lap 14's finish): the camera settles on the Start corner, where a campfire
+## rises with log seats and a bedroll; warm music, then the rest heal (hp_changed) and the modal.
+func _camp(ev: Dictionary) -> void:
+	c.board.clear_targets()
+	var at := c.board.to_global(c.board.last_camp_position())
+	c.board.clear_area(at, 2.2)
+	c.board.show_last_camp(true, true)
+	Audio.play_music("calm", 0.8)
+	Audio.play_sfx("heal")
+	c.rig.follow(c.board.last_camp)
+	await _wait(0.5)
+	var boss: Dictionary = ev.get("boss", {})
+	c.overlay.announce("THE LAST CAMP", "Rest by the fire  ·  %s waits beyond the final lap" % String(boss.get("name", _boss_name())),
+		Color("ffb36a"), 1.3)
+	Fx.heal_glow(c.world_parent(), c.hero_pos())
+	await _wait(1.5)
+
+
+## The finale: the road turns. The camera pulls out over the whole ring, the boss looms up over
+## the island's heart and every tile flips to crimson boss ground in a wave from Start; then
+## the one final roll.
+func _finale(ev: Dictionary) -> void:
+	var boss: Dictionary = ev.get("boss", {})
+	var nm := String(boss.get("name", _boss_name()))
+	c.board.clear_targets()
+	c.board.restore_occluders()
+	c.rig.overview(c.board.ring_bounds())
+	Audio.play_music("boss", 1.5)
+	c.overlay.vignette(0.45, 0.8)
+	await _wait(0.5)
+	c.board.show_boss_looming(String(boss.get("id", c.flow.run.boss_id)), true, true)
+	Audio.play_sfx("portal")
+	c.rig.shake(0.6, 1.4)
+	var tiles: Array = []
+	for ch in ev.get("changes", []):
+		tiles.append({"type": String(ch.type), "enemies": [], "elite": false})
+	await c.board.finale_wave(tiles, c.board.hero_idx, c.speed)
+	Audio.play_sfx("fanfare")
+	c.overlay.announce("THE FINAL ROLL", "Every road leads to %s" % nm, UiPalette.DANGER.lightened(0.15), 1.4)
+	await _wait(1.6)
+	c.overlay.vignette(0.2, 0.6)
 
 
 func _trap(ev: Dictionary) -> void:

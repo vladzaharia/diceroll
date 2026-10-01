@@ -83,11 +83,19 @@ func begin(run: RunState, ids: Array, p_elite: bool, p_boss: bool, p_tile: int, 
 	if not run.meta.is_empty():
 		for e in enemies:
 			meta_enemy(run, e)
+	if bool(run.stats.get("camped", false)) and int(run.stats.get("boss_stage", 0)) == 0:
+		# the Last Camp moved the final stretch's danger into the final boss
+		for e in enemies:
+			if bool(e.boss):
+				e.hp = maxi(1, int(round(int(e.hp) * Balance.camp_boss_mult(String(e.id), run.mode == "short"))))
+				e.max_hp = e.hp
 	for k in enemies.size():
 		if k < affixes.size() and not (affixes[k] as Array).is_empty() and not bool(enemies[k].boss):
 			AffixDefs.apply(enemies[k], affixes[k], EnemyDefs.band(lap))
 	var bev := _biome_begin(run)
 	_note_seen(run)
+	if boss and int(run.pet_state.get("steady", 0)) > 0:
+		boost = true # the Last Camp's Steady Hands: +1 reroll every turn of the final boss fight
 	if not run.meta.is_empty():
 		if int(run.pet_state.get("boost", 0)) > 0:
 			boost = true
@@ -282,8 +290,9 @@ func start_turn(run: RunState) -> Array[Dictionary]:
 			run.block += extra
 			run.stats.block_gained = int(run.stats.get("block_gained", 0)) + extra
 			pev.append({"type": "block_gained", "target": "hero", "amount": extra, "total": run.block})
-		if boost:
-			rerolls_left += 1
+	if boost:
+		rerolls_left += 1
+	if not run.meta.is_empty():
 		pev.append_array(ItemLogic.turn_start(run, self, prev_block))
 	var n := pd.size()
 	marked.resize(n)
