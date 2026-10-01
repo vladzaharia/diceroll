@@ -13,6 +13,9 @@ signal open_station(id: String)
 ## Space kept free above the panel for the currency header.
 var top_inset := 96.0
 var profile: Profile
+## Purchases ready at this station (set by the CampScreen): shown as a line at the top of the
+## screen (the station tag only carries the badge).
+var ready_count := 0
 
 
 func _init() -> void:
@@ -27,6 +30,8 @@ func show_profile(p: Profile) -> void:
 	profile = p
 	var keep := _scroll.scroll_vertical
 	UiTheme.clear(body)
+	if ready_count > 0:
+		body.add_child(ready_line(ready_count))
 	rebuild(p)
 	relayout()
 	if is_inside_tree():
@@ -69,6 +74,15 @@ func _layout() -> void:
 
 
 # ---------------------------------------------------------------- shared rows
+
+## "3 ready to buy" under the title plaque: a green chip, centred.
+static func ready_line(n: int) -> Control:
+	var row := UiTheme.hbox(0)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.name = "ReadyLine"
+	row.add_child(CampArt.chip("%d READY TO BUY" % n, "green", "", 18))
+	return row
+
 
 ## Section heading inside a Camp screen.
 static func heading(text: String, sub := "") -> VBoxContainer:

@@ -228,32 +228,86 @@ func _draw() -> void:
 
 
 
+## Round medallion: the pack's 3D Round white disc tinted with `ring`, the icon in full colour
+## on its face (spec 4.3 / plan c). `saturation` 0 = locked (disc and icon greyed). Without
+## the pack it draws the pre-reskin disc with the icon.
 class Medallion:
 	extends Control
 	var icon := ""
 	var tint: Variant = null
 	var ring: Color = UiPalette.GOLD
+	## 1 = full colour, 0 = greyed out (locked stations, pets, minigames).
+	var saturation := 1.0:
+		set(v):
+			saturation = v
+			queue_redraw()
 
-	static func make(p_icon: String, px: float, p_tint: Variant, p_ring: Color) -> Medallion:
+	static func make(p_icon: String, px: float, p_tint: Variant, p_ring: Color, p_saturation := 1.0) -> Medallion:
 		var m := Medallion.new()
 		m.icon = p_icon
 		m.tint = p_tint
 		m.ring = p_ring
+		m.saturation = p_saturation
 		m.custom_minimum_size = Vector2(px, px)
 		m.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		return m
 
+	func _icon_opts() -> Dictionary:
+		var o := {"tint": tint}
+		if saturation < 0.999:
+			o["saturation"] = saturation
+		return o
+
+	func skinned() -> bool:
+		return UiSkin.has("round_white")
+
+	## The round disc at exactly `px` tall: the 3D Round art rescaled so its side slices meet
+	## (a true circle at any size; the piece's own scale is for 88 px buttons).
+	static var _discs: Dictionary = {}
+
+	static func disc_box(px: float, ring_c: Color, sat: float) -> StyleBox:
+		var key := "%d|%s|%.2f" % [int(px), ring_c.to_html(), sat]
+		if _discs.has(key):
+			return _discs[key]
+		var o := {"tint": ring_c}
+		if sat < 0.999:
+			o["saturation"] = sat
+		var ls := UiSkin.layers("round_white", "normal", o)
+		var sb: StyleBox = null
+		if not ls.is_empty():
+			var l: Dictionary = (ls[0] as Dictionary).duplicate()
+			l["scale"] = px / 64.0
+			sb = UiSkin._layer_box(l)
+		_discs[key] = sb
+		return sb
+
 	func _draw() -> void:
 		var s := minf(size.x, size.y)
+		if skinned():
+			var sb := disc_box(s, ring, saturation)
+			if sb != null:
+				var w := s * 55.0 / 64.0
+				var box := Rect2(Vector2((size.x - w) * 0.5, (size.y - s) * 0.5), Vector2(w, s))
+				draw_style_box(sb, box)
+				# the face is the top 54 of 64 units; the icon sits on its centre
+				var fc := Vector2(size.x * 0.5, box.position.y + s * 27.0 / 64.0)
+				var ip := s * 0.6
+				var t := Icons.texture(icon, int(ceil(ip)), _icon_opts())
+				if t != null:
+					var ts := t.get_size()
+					ts *= ip / maxf(maxf(ts.x, ts.y), 1.0)
+					draw_texture_rect(t, Rect2(fc - ts * 0.5, ts), false)
+				return
 		var c := size * 0.5
 		var r := s * 0.5
+		var rc := ring if saturation >= 0.999 else Color.from_hsv(ring.h, ring.s * saturation, ring.v, ring.a)
 		draw_circle(c + Vector2(0, s * 0.05), r, Color(0, 0, 0, 0.35))
 		draw_circle(c, r, UiPalette.OUTLINE)
-		draw_circle(c, r - 2.0, ring.darkened(0.15))
+		draw_circle(c, r - 2.0, rc.darkened(0.15))
 		draw_arc(c, r - s * 0.1, PI * 1.1, PI * 1.9, 16, Color(1, 1, 1, 0.3), s * 0.04, true)
 		var inner := r - s * 0.12
-		draw_circle(c, inner, UiPalette.INK.lerp(ring, 0.12))
+		draw_circle(c, inner, UiPalette.INK.lerp(rc, 0.12))
 		draw_circle(c - Vector2(0, inner * 0.3), inner * 0.7, Color(1, 1, 1, 0.04))
 		var gs := inner * 1.35
-		var tex := UiIcons.tex(icon, int(s * 1.6), tint)
+		var tex := Icons.tex(icon, int(s * 1.6), _icon_opts())
 		draw_texture_rect(tex, Rect2(c - Vector2(gs, gs) * 0.5, Vector2(gs, gs)), false)
