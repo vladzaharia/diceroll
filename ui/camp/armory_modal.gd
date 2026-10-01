@@ -18,14 +18,15 @@ extends CampModal
 ## piece also moves the look along with it unless the player picked another look on purpose.
 
 const ACCENT := Color("ff9a5a")
-const TIER_NAMES := ["", "I", "II", "III"]
-const TIER_COLORS := [Color("7d7896"), Color("c9d2e4"), Color("6fb8ff"), Color("ffc24a")]
+const TIER_NAMES := CampArt.TIER_NAMES
+## None, bronze, silver, gold (the tier stars' metals).
+const TIER_COLORS := CampArt.TIER_COLORS
 const SLOT_NAMES := {"weapon": "Weapon", "offhand": "Off-hand", "head": "Head", "body": "Body", "trinket": "Trinket",
 	"trinket2": "Belt Pouch", "back": "Back"}
 const SLOT_ICONS := {"weapon": "sword", "offhand": "shield", "head": "helmet", "body": "armor", "trinket": "ring",
 	"trinket2": "pouch", "back": "cape"}
 const GROUP_NAMES := {"weapon": "Weapon", "offhand": "Off-hand", "armor": "Armor", "trinket": "Trinket"}
-const GROUP_ICONS := {"weapon": "sword", "offhand": "shield", "armor": "armor", "trinket": "ring"}
+const GROUP_ICONS := CampInfo.GROUP_GLYPH
 const LEFT_SLOTS := ["head", "body", "back"]
 const RIGHT_SLOTS := ["weapon", "offhand", "trinket", "trinket2"]
 
@@ -53,6 +54,12 @@ func _build() -> void:
 		_fresh.clear()
 		focus = ""
 		chip = "")
+
+
+## A narrow content column (phones at 125% zoom and up): rank-card buttons stack.
+func _narrow() -> bool:
+	var v := get_viewport_rect().size if is_inside_tree() else Vector2(720, 1280)
+	return not _wide() and v.x < 660.0
 
 
 func _wide() -> bool:
@@ -140,8 +147,8 @@ func _classes(p: Profile) -> Control:
 		hold.custom_minimum_size = Vector2(64, 64)
 		hold.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		b.add_child(hold)
-		var med := OptionCard.Medallion.make(UiIcons.class_icon(cid), 64 if sel else 54, UiPalette.class_color(cid),
-			UiPalette.GOLD_BRIGHT if sel else Color(UiPalette.class_color(cid), 0.6))
+		var med := CampArt.medal(Icons.class_icon(cid), 64 if sel else 54, UiPalette.GOLD_BRIGHT if sel else UiPalette.class_color(cid),
+			false, UiPalette.class_color(cid))
 		med.position = Vector2.ZERO if sel else Vector2(5, 5)
 		med.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		hold.add_child(med)
@@ -167,7 +174,7 @@ func _doll(p: Profile, wide: bool) -> Control:
 	name_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_child(name_row)
 	name_row.add_child(UiTheme.label(String(HeroDefs.DATA[view_class].name), 32, col.lightened(0.25), true, 6))
-	name_row.add_child(CampUi.chip("KIT +1 TIER", Color(col, 0.35), UiPalette.TEXT, 14))
+	name_row.add_child(CampArt.chip("KIT +1 TIER", "green", "kit", 16))
 	var row := UiTheme.hbox(10)
 	v.add_child(row)
 	var tile_px := 92 if wide else 96
@@ -223,13 +230,7 @@ func _slot_tile(p: Profile, slot: String, px: int) -> Control:
 		id = dino
 	var t := _Tap.new()
 	var sel := slot == sel_slot
-	var sb: StyleBoxFlat
-	if sel:
-		sb = UiTheme.box(UiPalette.NAVY_3, 18, 3, UiPalette.GOLD_BRIGHT, 10, Color(0.95, 0.7, 0.2, 0.3), Vector2.ZERO)
-	else:
-		sb = UiTheme.box(Color(0.03, 0.03, 0.09, 0.7), 18, 2, Color(1, 1, 1, 0.1))
-	UiTheme.pad(sb, 6, 6)
-	t.add_theme_stylebox_override("panel", sb)
+	t.add_theme_stylebox_override("panel", select_box("selected" if sel else "normal", 6))
 	var v := UiTheme.vbox(2)
 	t.add_child(v)
 	var holder := Control.new()
@@ -243,33 +244,27 @@ func _slot_tile(p: Profile, slot: String, px: int) -> Control:
 		holder.add_child(th)
 		var tier := _tier(p, id, slot)
 		if tier > 0:
-			var badge := _tier_badge(tier, 16)
-			badge.position = Vector2(px - 30, px - 26)
-			holder.add_child(badge)
+			holder.add_child(CampArt.pin(_tier_badge(tier, 16), "br", 2.0))
 		if slot in ["head", "body"] and not ItemDefs.LOCKED_ARMOR.has(view_class):
 			var look := ArmoryLook.shown_look(p, view_class, slot)
 			if look != id and not (look == "own" and id == ArmoryLook.kit_piece(view_class, slot)):
 				var lb := PanelContainer.new()
-				lb.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color("5a3f8a"), 10, 2, Color("c79bff")), 3, 1))
+				lb.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.chip_box("purple") if UiTheme.skinned("chip_purple")
+					else UiTheme.box(Color("5a3f8a"), 10, 2, Color("c79bff")), 5, 1))
 				lb.mouse_filter = Control.MOUSE_FILTER_IGNORE
 				lb.tooltip_text = "Shows another look"
 				lb.add_child(UiIcons.rect("mirror", 18, Color("f0e0ff")))
-				lb.position = Vector2(2, 2)
-				holder.add_child(lb)
+				holder.add_child(CampArt.pin(lb, "tl", 2.0))
 	else:
-		var g := UiIcons.rect(String(SLOT_ICONS[slot]), int(px * 0.5), Color(1, 1, 1, 0.22))
+		# an empty slot: its glyph as a grey ghost
+		var g := CampArt.icon(String(CampInfo.SLOT_GLYPH[slot]), int(px * 0.5), Color(1, 1, 1, 1), true)
+		g.modulate = Color(1, 1, 1, 0.22)
 		g.position = Vector2(px * 0.25, px * 0.25)
 		holder.add_child(g)
 		if locked_pouch:
-			var lk := CampUi.LockGlyph.new()
-			lk.size = Vector2(26, 26)
-			lk.position = Vector2(px - 30, 4)
-			holder.add_child(lk)
+			holder.add_child(CampArt.pin(CampArt.lock_icon(26), "tr", 2.0))
 	if _slot_has_new(slot):
-		var dot := WardrobeModal._Dot.new()
-		dot.size = Vector2(18, 18)
-		dot.position = Vector2(px - 16, -4)
-		holder.add_child(dot)
+		holder.add_child(CampArt.pin(CampArt.new_dot(18), "tr", 2.0))
 	var cap := UiTheme.label(String(SLOT_NAMES[slot]).to_upper(), 16, UiPalette.GOLD_BRIGHT if sel else UiPalette.TEXT_DIM, false, 0, false, 800)
 	cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	cap.custom_minimum_size.x = px
@@ -300,15 +295,37 @@ func _tier(p: Profile, id: String, slot: String) -> int:
 	return ItemDefs.tier_for(id, sl, view_class, p.rank(String(ItemDefs.GROUP_OF.get(sl, "weapon"))))
 
 
+## The slot-tile corner badge: the bronze / silver / gold star + the numeral.
 static func _tier_badge(tier: int, font := 16) -> Control:
-	var p := PanelContainer.new()
-	var col: Color = TIER_COLORS[clampi(tier, 0, 3)]
-	p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(0.05, 0.05, 0.12, 0.95), 10, 2, col), 6, 0))
-	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var l := UiTheme.label(String(TIER_NAMES[clampi(tier, 0, 3)]), font, col, true, 3)
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	p.add_child(l)
-	return p
+	return CampArt.tier_badge(tier, font)
+
+
+## A selectable tile / chip box (slot tiles, picker cards, variant and look chips):
+## state "normal" | "selected" | "worn" | "on" | "craftable" | "owned" | "locked" | "dim"
+## (card_box states) with a small content margin `pad` (the card's lip adds to the bottom).
+static func select_box(state: String, pad := 8, accent: Variant = null) -> StyleBox:
+	if not UiTheme.skinned("panel_card"):
+		var sb: StyleBoxFlat
+		match state:
+			"selected", "worn":
+				sb = UiTheme.box(UiPalette.NAVY_3, 18, 3, UiPalette.GOLD_BRIGHT, 10, Color(0.95, 0.7, 0.2, 0.3), Vector2.ZERO)
+			"on":
+				sb = UiTheme.box(Color(0.12, 0.08, 0.22, 0.95), 14, 3, Color("c79bff"))
+			"craftable":
+				sb = UiTheme.box(Color(0.1, 0.08, 0.03, 0.8), 16, 2, Color(UiPalette.GOLD, 0.7))
+			"owned":
+				sb = UiTheme.box(Color(0.03, 0.03, 0.09, 0.7), 16, 2, Color(ACCENT, 0.35))
+			"locked", "dim":
+				sb = UiTheme.box(Color(0.03, 0.03, 0.08, 0.45), 16, 2, Color(1, 1, 1, 0.06))
+			_:
+				sb = UiTheme.box(Color(0.03, 0.03, 0.09, 0.7), 18, 2, Color(1, 1, 1, 0.1) if accent == null else Color(accent as Color, 0.85))
+		return UiTheme.pad(sb, pad, pad)
+	var box := UiTheme.card_box(state, accent if state in ["normal", "hover"] else null)
+	box.content_margin_left = pad
+	box.content_margin_right = pad
+	box.content_margin_top = pad
+	box.content_margin_bottom = pad + 8
+	return box
 
 
 # ================================================================ picker
@@ -379,37 +396,32 @@ func _none_card(_p: Profile, is_eq: bool) -> Control:
 	var row := UiTheme.hbox(12)
 	t.add_child(row)
 	var holder := _thumb_box(56)
-	holder.add_child(UiIcons.rect("close", 30, UiPalette.TEXT_MUTED))
+	holder.add_child(CampArt.icon("look_hidden", 34, UiPalette.TEXT_MUTED))
 	row.add_child(holder)
 	var nm := UiTheme.label("Nothing" if sel_slot != "back" else "No back piece", 22, UiPalette.TEXT if not is_eq else UiPalette.GOLD_BRIGHT, true, 4)
 	nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(nm)
 	if is_eq:
-		row.add_child(CampUi.chip("EQUIPPED", UiPalette.HEAL.darkened(0.35), UiPalette.TEXT, 15))
+		row.add_child(CampArt.chip("EQUIPPED", "purple", "", 16))
 	t.pressed.connect(func() -> void:
 		if not is_eq:
 			_equip("", ""))
 	return t
 
 
-func _card_box(equipped: bool, is_focus: bool, owned := true) -> StyleBoxFlat:
-	var sb: StyleBoxFlat
+## Picker card: equipped = the worn rim, focused = the accent rim, owned = plain, else dim.
+func _card_box(equipped: bool, is_focus: bool, owned := true) -> StyleBox:
 	if equipped:
-		sb = UiTheme.box(UiPalette.NAVY_3, 20, 3, UiPalette.GOLD_BRIGHT, 12, Color(0.95, 0.7, 0.2, 0.25), Vector2.ZERO)
-	elif is_focus:
-		sb = UiTheme.box(Color(0.09, 0.07, 0.18, 0.92), 20, 3, Color(ACCENT, 0.85))
-	elif owned:
-		sb = UiTheme.box(Color(0.03, 0.03, 0.09, 0.62), 20, 2, Color(ACCENT, 0.3))
-	else:
-		sb = UiTheme.box(Color(0.03, 0.03, 0.08, 0.45), 20, 2, Color(1, 1, 1, 0.06))
-	UiTheme.pad(sb, 12, 10)
-	return sb
+		return select_box("worn", 12)
+	if is_focus:
+		return select_box("normal", 12, ACCENT)
+	return select_box("normal" if owned else "dim", 12)
 
 
-## A dark rounded well for a thumbnail.
+## A dark well for a 3D thumbnail (a flat inset: its rim stays thin inside the card).
 static func _thumb_box(px: int) -> PanelContainer:
 	var b := PanelContainer.new()
-	var sb := UiTheme.box(Color(0.02, 0.02, 0.07, 0.8), 16, 2, Color(1, 1, 1, 0.06))
+	var sb: StyleBox = UiTheme.inset_box() if UiTheme.skinned("panel_inset") else UiTheme.box(Color(0.02, 0.02, 0.07, 0.8), 16, 2, Color(1, 1, 1, 0.06))
 	UiTheme.pad(sb, 2, 2)
 	b.add_theme_stylebox_override("panel", sb)
 	b.custom_minimum_size = Vector2(px, px)
@@ -454,14 +466,9 @@ func _item_card(p: Profile, id: String) -> Control:
 		th.modulate = Color(0.55, 0.52, 0.62, 0.85)
 	holder.add_child(th)
 	if not owned:
-		var lk := CampUi.LockGlyph.new()
-		lk.size = Vector2(26, 26)
-		lk.position = Vector2(66, 66)
-		holder.add_child(lk)
+		holder.add_child(CampArt.pin(CampArt.lock_icon(26), "br", 2.0))
 	if _is_new(id):
-		var nw := CampUi.chip("NEW", UiPalette.HP, UiPalette.TEXT, 13)
-		nw.position = Vector2(-2, -4)
-		holder.add_child(nw)
+		holder.add_child(CampArt.pin(CampArt.new_dot(18), "tr", 2.0))
 	# text
 	var col := UiTheme.vbox(4)
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -474,16 +481,18 @@ func _item_card(p: Profile, id: String) -> Control:
 	var nm := UiTheme.label(ItemDefs.name_of(id), 25, UiPalette.GOLD_BRIGHT if is_eq else (UiPalette.TEXT if owned else UiPalette.TEXT_DIM), true, 4)
 	head.add_child(nm)
 	var tier := _tier(p, id, sel_slot)
+	if _is_new(id):
+		head.add_child(CampArt.chip("NEW", "red", "", 16))
 	if cosmetic:
-		head.add_child(CampUi.chip("STYLE", Color("5a3f8a"), UiPalette.TEXT, 14))
+		head.add_child(CampArt.chip("STYLE", "purple", "", 16))
 	elif owned or tier > 0:
 		head.add_child(_tier_chip(tier))
 	if ItemDefs.affinity(id, view_class):
-		head.add_child(CampUi.chip("★ KIT", Color(UiPalette.class_color(view_class), 0.5), UiPalette.TEXT, 14))
+		head.add_child(CampArt.chip("KIT", "green", "kit", 16))
 	if ItemDefs.slot_of(id) == "weapon" and ItemDefs.hands(id, String(eq[1]) if is_eq else id) >= 2:
-		head.add_child(CampUi.chip("2H", Color(0.25, 0.25, 0.4), UiPalette.TEXT_DIM, 14))
+		head.add_child(CampArt.chip("2H", "grey", "", 16))
 	if is_eq:
-		head.add_child(CampUi.chip("EQUIPPED", UiPalette.HEAL.darkened(0.35), UiPalette.TEXT, 14))
+		head.add_child(CampArt.chip("EQUIPPED", "purple", "", 16))
 	# the rule at this class's tier (tier I numbers while the rank is 0)
 	if cosmetic:
 		col.add_child(UiTheme.para("Style: a look to wear. No stats.", 18, Color("c79bff"), 600))
@@ -548,10 +557,7 @@ func _item_card(p: Profile, id: String) -> Control:
 
 
 func _tier_chip(tier: int) -> Control:
-	if tier <= 0:
-		return CampUi.chip("RANK 0", Color(0.3, 0.12, 0.16), UiPalette.HP_BRIGHT, 14)
-	var col: Color = TIER_COLORS[tier]
-	return CampUi.chip("TIER " + String(TIER_NAMES[tier]), Color(col, 0.28), col.lightened(0.3), 14)
+	return CampArt.tier_chip(tier, 16)
 
 
 ## "Mastery 12 fights · 3 to the Knight's Sword blueprint" with a bar (items with blueprints).
@@ -581,7 +587,7 @@ func _mastery_line(p: Profile, id: String) -> Control:
 	l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	l.custom_minimum_size.x = 60
 	box.add_child(l)
-	var b := CampUi.bar(m, next, Color("e0a84a"), 12.0)
+	var b := CampUi.bar(m, next, UiPalette.GOLD, 16.0)
 	box.add_child(b)
 	return box
 
@@ -653,19 +659,8 @@ func _variant_chip(p: Profile, item: String, ch: Dictionary, worn: bool) -> Cont
 	var st := String(ch.state)
 	var t := _Tap.new()
 	var sel := chip == vid
-	var sb: StyleBoxFlat
-	if worn:
-		sb = UiTheme.box(Color(0.12, 0.1, 0.05, 0.9), 16, 3, UiPalette.GOLD_BRIGHT)
-	elif sel:
-		sb = UiTheme.box(Color(0.1, 0.08, 0.2, 0.95), 16, 3, Color(ACCENT, 0.9))
-	elif st == "craftable":
-		sb = UiTheme.box(Color(0.1, 0.08, 0.03, 0.8), 16, 2, Color(UiPalette.GOLD, 0.7))
-	elif st == "owned":
-		sb = UiTheme.box(Color(0.03, 0.03, 0.09, 0.7), 16, 2, Color(ACCENT, 0.35))
-	else:
-		sb = UiTheme.box(Color(0.03, 0.03, 0.08, 0.5), 16, 2, Color(1, 1, 1, 0.05))
-	UiTheme.pad(sb, 6, 6)
-	t.add_theme_stylebox_override("panel", sb)
+	var state := "worn" if worn else ("normal" if sel else ("craftable" if st == "craftable" else ("owned" if st == "owned" else "dim")))
+	t.add_theme_stylebox_override("panel", select_box(state, 6, ACCENT if sel and not worn else null))
 	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var v := UiTheme.vbox(2)
 	t.add_child(v)
@@ -679,9 +674,7 @@ func _variant_chip(p: Profile, item: String, ch: Dictionary, worn: bool) -> Cont
 		th.modulate = Color(0.5, 0.48, 0.58, 0.8)
 	holder.add_child(th)
 	if _fresh.has(vid):
-		var nw := CampUi.chip("NEW", UiPalette.HP, UiPalette.TEXT, 12)
-		nw.position = Vector2(0, -2)
-		holder.add_child(nw)
+		holder.add_child(CampArt.pin(CampArt.new_dot(16), "tr", 2.0))
 	var nm := UiTheme.label(String(ch.name), 18, UiPalette.GOLD_BRIGHT if worn else (UiPalette.TEXT if st != "locked" else UiPalette.TEXT_DIM), false, 0, false, 800)
 	nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -704,7 +697,7 @@ func _variant_chip(p: Profile, item: String, ch: Dictionary, worn: bool) -> Cont
 	v.add_child(ll)
 	if st == "locked" and int((ch.get("mastery", [0, 0]) as Array)[1]) > 0:
 		var ms2: Array = ch.mastery
-		v.add_child(CampUi.bar(float(ms2[0]), float(ms2[1]), Color("e0a84a"), 8.0))
+		v.add_child(CampUi.bar(float(ms2[0]), float(ms2[1]), UiPalette.GOLD, 12.0))
 	t.pressed.connect(func() -> void:
 		if st == "owned" and not worn:
 			chip = vid
@@ -724,12 +717,15 @@ func _variant_detail(p: Profile, item: String, ch: Dictionary, worn: bool) -> Co
 	c.add_child(v)
 	var head := UiTheme.hbox(8)
 	v.add_child(head)
+	head.add_child(CampArt.icon("blueprint" if st != "owned" else "craft", 34))
 	var nm := UiTheme.label(String(ch.name), 24, UiPalette.GOLD_BRIGHT, true, 4)
 	nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	nm.custom_minimum_size.x = 60
 	head.add_child(nm)
 	var sec := String(ItemDefs.VARIANTS.get(vid, {}).get("sec_name", ""))
 	var tag := "STANDARD" if vid == item else sec.to_upper()
-	head.add_child(CampUi.chip(tag, Color(ACCENT, 0.35), UiPalette.TEXT, 13))
+	head.add_child(CampArt.chip(tag, "grey", "", 16))
 	v.add_child(UiTheme.para(String(ch.desc), 18, UiPalette.TEXT, 600))
 	var hands := ItemDefs.hands(item, vid)
 	if ItemDefs.slot_of(item) == "weapon" and hands != ItemDefs.hands(item, item):
@@ -737,7 +733,7 @@ func _variant_detail(p: Profile, item: String, ch: Dictionary, worn: bool) -> Co
 	match st:
 		"owned":
 			if worn:
-				v.add_child(CampUi.chip("WORN", UiPalette.HEAL.darkened(0.3), UiPalette.TEXT, 15))
+				v.add_child(CampArt.chip("WORN", "purple", "", 16))
 		"craftable":
 			var src := "Blueprint earned" + (": " + String(ch.unlock) if String(ch.unlock) != "" else "")
 			v.add_child(UiTheme.para(src, 16, UiPalette.HEAL, 600))
@@ -752,6 +748,7 @@ func _variant_detail(p: Profile, item: String, ch: Dictionary, worn: bool) -> Co
 				var cost: Dictionary = ch.cost
 				var b := CampUi.buy_button("CRAFT", cost, p.can_afford(cost), 22)
 				b.pressed.connect(cmd.bind(["craft_variant", item, vid, "crowns"]))
+				b.name = "CraftCrowns"
 				row.add_child(b)
 				var sc := ItemDefs.craft_cost(vid, true)
 				var bs := CampUi.buy_button("", sc, p.can_afford(sc), 22)
@@ -761,11 +758,11 @@ func _variant_detail(p: Profile, item: String, ch: Dictionary, worn: bool) -> Co
 			v.add_child(CampUi.lock_line("Blueprint: " + String(ch.unlock), 16))
 			var ms: Array = ch.get("mastery", [0, 0])
 			if int(ms[1]) > 0:
-				v.add_child(CampUi.bar(float(ms[0]), float(ms[1]), Color("e0a84a"), 14.0))
+				v.add_child(CampUi.bar(float(ms[0]), float(ms[1]), UiPalette.GOLD, 18.0))
 			var cc := ItemDefs.craft_cost(vid)
 			if not cc.is_empty():
-				v.add_child(UiTheme.label("Then craft it for %d Crowns or %d Sigils." % [int(cc.get("crowns", 0)), ItemDefs.CRAFT_SIGILS],
-					15, UiPalette.TEXT_MUTED, false, 0, false, 600))
+				v.add_child(UiTheme.para("Then craft it for %d Crowns or %d Sigils." % [int(cc.get("crowns", 0)), ItemDefs.CRAFT_SIGILS],
+					16, UiPalette.TEXT_MUTED, 600))
 	return c
 
 
@@ -848,20 +845,14 @@ func _look_row(p: Profile, slot: String) -> Control:
 
 func _look_chip(slot: String, value: String, on: bool, is_eq: bool, bad: bool) -> Control:
 	var t := _Tap.new()
-	var sb: StyleBoxFlat
-	if on:
-		sb = UiTheme.box(Color(0.12, 0.08, 0.22, 0.95), 14, 3, Color("c79bff"))
-	else:
-		sb = UiTheme.box(Color(0.03, 0.03, 0.09, 0.6), 14, 2, Color(1, 1, 1, 0.08))
-	UiTheme.pad(sb, 4, 4)
-	t.add_theme_stylebox_override("panel", sb)
+	t.add_theme_stylebox_override("panel", select_box("on" if on else "normal", 6))
 	t.tooltip_text = "Own look" if value == "own" else ("Hidden" if value == "hidden" else ItemDefs.name_of(value))
 	var holder := Control.new()
 	holder.custom_minimum_size = Vector2(64, 64)
 	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	t.add_child(holder)
 	if value == "own":
-		var m := OptionCard.Medallion.make(UiIcons.class_icon(view_class), 48, UiPalette.class_color(view_class), UiPalette.class_color(view_class))
+		var m := CampArt.medal(Icons.class_icon(view_class), 48, UiPalette.class_color(view_class))
 		m.position = Vector2(8, 2)
 		m.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		holder.add_child(m)
@@ -871,7 +862,7 @@ func _look_chip(slot: String, value: String, on: bool, is_eq: bool, bad: bool) -
 		l.size = Vector2(64, 22)
 		holder.add_child(l)
 	elif value == "hidden":
-		var g := UiIcons.rect("close", 34, UiPalette.TEXT_MUTED)
+		var g := CampArt.icon("look_hidden", 34, UiPalette.TEXT_MUTED)
 		g.position = Vector2(15, 8)
 		holder.add_child(g)
 		var l2 := UiTheme.label("HIDE", 16, UiPalette.TEXT_DIM, false, 3, false, 800)
@@ -888,13 +879,12 @@ func _look_chip(slot: String, value: String, on: bool, is_eq: bool, bad: bool) -
 		if is_eq:
 			var d := _EqDot.new()
 			d.size = Vector2(14, 14)
-			d.position = Vector2(48, 2)
-			holder.add_child(d)
+			holder.add_child(CampArt.pin(d, "tr", 2.0))
 		if bad:
-			var i := UiTheme.label("i", 17, UiPalette.HP_BRIGHT, true, 4)
-			i.position = Vector2(4, 40)
+			var i: Control = CampArt.icon("bad_fit", 22) if CampArt.is_pack("bad_fit") else UiTheme.label("i", 17, UiPalette.HP_BRIGHT, true, 4)
 			i.tooltip_text = "Doesn't fit this hero: shown hidden"
-			holder.add_child(i)
+			i.mouse_filter = Control.MOUSE_FILTER_PASS
+			holder.add_child(CampArt.pin(i, "bl", 2.0))
 	t.pressed.connect(func() -> void:
 		if not on:
 			cmd(["set_appearance", view_class, slot, value]))
@@ -935,8 +925,8 @@ func _rank_card(p: Profile, group: String, compact: bool) -> Control:
 	c.add_child(v)
 	var head := UiTheme.hbox(10)
 	v.add_child(head)
-	var tr := CampUi.title_row(String(GROUP_ICONS[group]), ACCENT if owned else UiPalette.TEXT_MUTED,
-		"%s rank" % String(GROUP_NAMES[group]), _rank_text(group, r), 48 if compact else 56)
+	var tr := CampArt.title_row(String(GROUP_ICONS[group]), ACCENT, "%s rank" % String(GROUP_NAMES[group]), _rank_text(group, r),
+		48 if compact else 56, not owned)
 	tr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(tr)
 	if not owned:
@@ -944,24 +934,46 @@ func _rank_card(p: Profile, group: String, compact: bool) -> Control:
 		v.add_child(CampUi.lock_line(String(m.get("desc", "Locked")), 16))
 		return c
 	var cost := ItemDefs.rank_cost(r)
+	# narrow cards (the picker's compact card, phones at 125%+ zoom): the button goes under
+	# the title so "Weapon rank" never truncates
+	var stack := compact or _narrow()
+	var btn: GameButton = null
 	if cost.is_empty():
-		head.add_child(CampUi.chip("MAX", UiPalette.GOLD_DEEP, UiPalette.TEXT, 18))
+		head.add_child(CampArt.chip("MAX", "yellow", "tier_3", 18))
 	else:
-		var b := CampUi.buy_button("RANK UP" if r > 0 else "FORGE", cost, p.can_afford(cost), 20)
-		b.min_height = 64
-		b.pad_x = 14
-		b.pressed.connect(cmd.bind(["rank_up", group]))
-		head.add_child(b)
+		btn = CampUi.buy_button("RANK UP" if r > 0 else "FORGE", cost, p.can_afford(cost), 20)
+		btn.min_height = 64
+		btn.pad_x = 14
+		btn.name = "RankUp"
+		btn.pressed.connect(cmd.bind(["rank_up", group]))
+		if not stack:
+			head.add_child(btn)
+	# pips + what the next rank does; when stacked the button sits to their right, under the
+	# title, so the title keeps the card's full width
 	var prow := UiTheme.hbox(10)
 	v.add_child(prow)
-	prow.add_child(CampUi.pips(r, ItemDefs.RANK_MAX, ACCENT, [1, 4, 8]))
+	var info := UiTheme.vbox(4)
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info.alignment = BoxContainer.ALIGNMENT_CENTER
+	var pips := CampUi.pips(r, ItemDefs.RANK_MAX, ACCENT, [1, 4, 8])
 	var nxt := _next_text(group, r)
+	var nl: Label = null
 	if nxt != "":
-		var nl := UiTheme.label(nxt, 16, UiPalette.HEAL if r < ItemDefs.RANK_MAX else UiPalette.TEXT_DIM, false, 0, false, 700)
+		nl = UiTheme.label(nxt, 16, UiPalette.HEAL if r < ItemDefs.RANK_MAX else UiPalette.TEXT_DIM, false, 0, false, 700)
 		nl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		nl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		nl.custom_minimum_size.x = 60
-		prow.add_child(nl)
+	if stack and btn != null:
+		prow.add_child(info)
+		info.add_child(pips)
+		if nl:
+			info.add_child(nl)
+		btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		prow.add_child(btn)
+	else:
+		prow.add_child(pips)
+		if nl:
+			prow.add_child(nl)
 	return c
 
 
@@ -1000,18 +1012,22 @@ func _pouch_card(p: Profile) -> Control:
 	c.add_child(v)
 	var row := UiTheme.hbox(12)
 	v.add_child(row)
-	var tr := CampUi.title_row("pouch", UiPalette.GOLD if (owned or ready) else UiPalette.TEXT_MUTED, "Belt Pouch",
-		"A 2ND TRINKET, ONE TIER LOWER" if not owned else "OWNED  ·  2ND TRINKET SLOT", 56)
+	var tr := CampArt.title_row("slot_trinket2", UiPalette.GOLD, "Belt Pouch",
+		"A 2ND TRINKET, ONE TIER LOWER" if not owned else "OWNED  ·  2ND TRINKET SLOT", 56, not (owned or ready))
 	tr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(tr)
 	if owned:
-		row.add_child(CampUi.chip("OWNED", UiPalette.HEAL.darkened(0.35), UiPalette.TEXT, 16))
+		row.add_child(CampArt.chip("OWNED", "green", "", 16))
 	elif ready:
 		var cost := {"crowns": ItemDefs.POUCH_COST}
 		var b := CampUi.buy_button("BUY", cost, p.can_afford(cost), 20)
 		b.min_height = 64
 		b.pressed.connect(cmd.bind(["buy_pouch"]))
-		row.add_child(b)
+		if _narrow():
+			b.size_flags_horizontal = Control.SIZE_SHRINK_END
+			v.add_child(b)
+		else:
+			row.add_child(b)
 	else:
 		v.add_child(CampUi.lock_line("Needs Trinket rank %d (now %d)." % [ItemDefs.POUCH_RANK, p.rank("trinket")], 16))
 	return c
@@ -1033,7 +1049,9 @@ func _flash(c: Control, text: String) -> void:
 		tag.top_level = true
 		tag.z_index = 5
 		tag.reset_size()
-		tag.global_position = c.get_global_rect().get_center() - tag.size * 0.5 + Vector2(40, -10)
+		# rises off the card's top edge (clear of the section heading above it)
+		var cr := c.get_global_rect()
+		tag.global_position = Vector2(cr.get_center().x - tag.size.x * 0.5 + 40.0, cr.position.y + 6.0)
 		UiTheme.pop(c, 1.05, 0.3)
 		var t := tag.create_tween()
 		t.tween_property(tag, "global_position:y", tag.global_position.y - 40.0, 1.1).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)

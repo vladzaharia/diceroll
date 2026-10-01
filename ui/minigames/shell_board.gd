@@ -366,6 +366,19 @@ func scripted_input(args: Array, drv: Node) -> bool:
 	return true
 
 
+## Keyboard: 1 / 2 / 3 pick the left / middle / right cup (a click on it, like the scripted
+## pick but without the harness's settle delay).
+func key_input(event: InputEvent, drv: Node) -> bool:
+	var n := InputActions.pressed_index(event, InputActions.MG_PICK)
+	if n < 0:
+		return false
+	if _phase == "pick" and not locked:
+		var p := get_global_rect().position + Vector2(_xs[n], _gy - _ch * 0.5)
+		drv.call("move", p, false)
+		drv.call("click", p)
+	return true
+
+
 func _scripted_tick() -> void:
 	if _script_tap.is_empty() or _phase != "pick" or locked:
 		return
