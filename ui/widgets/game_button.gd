@@ -43,6 +43,7 @@ var text: String = "":
 		if _label:
 			_label.text = v
 			_label.visible = v != ""
+			_sync_text_col()
 			update_minimum_size()
 var sub_text: String = "":
 	set(v):
@@ -50,6 +51,7 @@ var sub_text: String = "":
 		if _sub:
 			_sub.text = v
 			_sub.visible = v != ""
+			_sync_text_col()
 			update_minimum_size()
 var icon_name: String = "":
 	set(v):
@@ -112,6 +114,16 @@ static func round_icon(p_icon: String, px := 88.0) -> GameButton:
 	return b
 
 
+## Text column (label + sub). Hidden when both are empty so the HBox's separation doesn't push
+## the icon of an icon-only button off centre.
+var _text_col: Control
+
+
+func _sync_text_col() -> void:
+	if _text_col:
+		_text_col.visible = text != "" or sub_text != ""
+
+
 func _ready() -> void:
 	focus_mode = Control.FOCUS_NONE
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
@@ -132,6 +144,7 @@ func _ready() -> void:
 	var col := UiTheme.vbox(-4)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	_content.add_child(col)
+	_text_col = col
 	_label = UiTheme.label(text, font_size, _text_color(), true, 0, not skinned())
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_label.visible = text != ""
@@ -140,6 +153,7 @@ func _ready() -> void:
 	_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_sub.visible = sub_text != ""
 	col.add_child(_sub)
+	_sync_text_col()
 	_apply_icon()
 	button_down.connect(_on_down)
 	button_up.connect(_on_up)
