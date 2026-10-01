@@ -137,6 +137,8 @@ func _layout() -> void:
 	var avail_w := view.x - safe.left - safe.right
 	var w := minf(max_width, avail_w)
 	var lw := w
+	if w < MIN_W:
+		wrap_wide_labels(_inner, w - 140.0)
 	_frame.custom_minimum_size.x = lw
 	_frame.size = Vector2(lw, 0)
 	_fit_plaque(lw)

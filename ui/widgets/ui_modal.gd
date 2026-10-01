@@ -357,6 +357,8 @@ func _layout() -> void:
 	# put text under 16 px and taps under 80 px
 	var floor_k := _shrink_floor()
 	var lw := w
+	if w < MIN_W:
+		wrap_wide_labels(_inner, w - 140.0)
 	_frame.custom_minimum_size.x = lw
 	_frame.size = Vector2(lw, 0)
 	_fit_plaque(lw)
@@ -517,6 +519,18 @@ static func section_label(text: String) -> Label:
 	l.custom_minimum_size.y = ceilf(UiTheme.body_font(700).get_height(20)) + float(GAP_SECTION - GAP_ITEM)
 	l.set_meta("section_gap", true)
 	return l
+
+
+## Narrow canvases: single-line labels wider than `limit` (detail lines, chips' long names)
+## wrap instead of widening the panel. Trimmed (ellipsis) labels are left alone.
+static func wrap_wide_labels(root: Node, limit: float) -> void:
+	for n in root.find_children("*", "Label", true, false):
+		var l := n as Label
+		if l.autowrap_mode != TextServer.AUTOWRAP_OFF or l.text_overrun_behavior != TextServer.OVERRUN_NO_TRIMMING:
+			continue
+		if l.get_combined_minimum_size().x > limit:
+			l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			l.custom_minimum_size.x = minf(maxf(l.custom_minimum_size.x, 120.0), limit)
 
 
 ## Columns for a grid of `item_w`-wide tiles (die chips) in this modal's body: `want`, fewer
