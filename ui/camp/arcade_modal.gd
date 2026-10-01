@@ -8,7 +8,7 @@ const ACCENT := Color("ff6fd0")
 
 
 func _build() -> void:
-	set_title("ARCADE", ACCENT)
+	set_title("ARCADE", PLAQUE_DEFAULT)
 
 
 func rebuild(p: Profile) -> void:
@@ -56,7 +56,7 @@ func _third_slot(p: Profile) -> Control:
 	hr.add_child(CampArt.icon("upgrade_loadout_slot", 28, null, not p.owns("features", "loadout_slot")))
 	hr.add_child(UiTheme.label("3RD SLOT", 20, UiPalette.TEXT_MUTED, true, 4))
 	if p.owns("features", "loadout_slot"):
-		var b := CampUi.buy_button("", d.cost, p.can_afford(d.cost), 20)
+		var b := CampUi.buy_button("BUY", d.cost, p.can_afford(d.cost), 20)
 		b.pressed.connect(cmd.bind(["buy_upgrade", "arcade", "loadout_slot"]))
 		v.add_child(b)
 	else:
@@ -76,7 +76,8 @@ func _game_card(p: Profile, id: String) -> Control:
 	var head := UiTheme.hbox(10)
 	v.add_child(head)
 	var mastery := p.mastery(id)
-	var sub := "SKILL : LUCK  %s" % String(d.skill)
+	var sk := String(d.skill).split(":")
+	var sub := ("SKILL %s%%  ·  LUCK %s%%" % [sk[0], sk[1]]) if sk.size() == 2 else String(d.skill)
 	if owned:
 		sub += "  ·  MASTERY %d" % mastery
 	var tr := CampArt.title_row(String(CampInfo.MINIGAME_GLYPH.get(id, "station_arcade")), col, String(d.name), sub, 64, not owned)
@@ -84,13 +85,18 @@ func _game_card(p: Profile, id: String) -> Control:
 	head.add_child(tr)
 	if owned:
 		if equipped:
-			var b := GameButton.make("EQUIPPED", "check", GameButton.Kind.SUCCESS, 20)
+			# state = the purple EQUIPPED chip (as in the Armory); the action = a ghost REMOVE
+			var col2 := UiTheme.vbox(6)
+			col2.alignment = BoxContainer.ALIGNMENT_CENTER
+			col2.add_child(CampArt.chip("EQUIPPED", "purple", "", 16))
+			var b := GameButton.make("REMOVE", "", GameButton.Kind.GHOST, 20)
 			b.min_height = 64
 			b.pad_x = 14
 			var rest := mg.duplicate()
 			rest.erase(id)
 			b.pressed.connect(cmd.bind(["set_loadout", rest, String(p.loadout.get("pet", ""))]))
-			head.add_child(b)
+			col2.add_child(b)
+			head.add_child(col2)
 		else:
 			var full := mg.size() >= p.loadout_slots()
 			var b := GameButton.make("SWAP IN" if full else "EQUIP", "", GameButton.Kind.PRIMARY, 22)
@@ -119,7 +125,7 @@ func _game_card(p: Profile, id: String) -> Control:
 		mrow.add_child(UiTheme.label("MASTERY", 16, UiPalette.GOLD, false, 0, false, 700))
 		mrow.add_child(CampUi.pips(mastery, MinigameDefs.MAX_MASTERY, col))
 		var plays := int(p.minigame_plays.get(id, 0))
-		var nxt := "max" if mastery >= MinigameDefs.MAX_MASTERY else "%d / %d plays" % [plays, int(MinigameDefs.MASTERY_PLAYS[mastery - 1])]
+		var nxt := "max" if mastery >= MinigameDefs.MAX_MASTERY else "%d/%d plays" % [plays, int(MinigameDefs.MASTERY_PLAYS[mastery - 1])]
 		mrow.add_child(UiTheme.label("+%d%% gold  ·  %s" % [int(round((MinigameDefs.mastery_mult(mastery) - 1.0) * 100.0)), nxt], 17,
 			UiPalette.TEXT_DIM, false, 0, false, 600))
 	else:

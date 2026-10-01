@@ -12,6 +12,35 @@ extends Control
 ## dialogs set `cancel_action` (Esc presses it) and keep their explicit cancel button.
 ## `primary_action` is pressed by Enter. Keys go to the top-most open modal only.
 
+## Plaque colour legend (modal pass 2026-10-01): the plaque colour carries meaning, never a
+## station / event / item identity (that lives in medallions, rims and icons).
+##   yellow  every modal by default (places, tools, choices, rewards, settings, pause)
+##   purple  LEVEL UP! only (the hero levels)
+##   green   VICTORY! only
+##   red     DEFEATED and destructive confirms (ABANDON RUN?)
+const PLAQUE_DEFAULT := "yellow"
+const PLAQUE_LEVEL := "purple"
+const PLAQUE_WIN := "green"
+const PLAQUE_DANGER := "red"
+const PLAQUE_FAMILIES := [PLAQUE_DEFAULT, PLAQUE_LEVEL, PLAQUE_WIN, PLAQUE_DANGER]
+
+## Spacing scale (modal pass 2026-10-01; logical px on the 1280-tall canvas, scaled down on
+## short canvases by spacing_k(): landscape phones, small windows):
+##   GAP_SECTION  between sections (header-separated groups; cards vs the action row)
+##   GAP_ITEM     between items inside a section (the body's separation)
+##   GAP_HEAD     between a section header and its content (composite headers)
+##   GAP_TOP      under the plaque, above the first section
+##   GAP_ACTIONS  above the bottom action row (TAKE, BUY, BEGIN...): action_gap()
+const GAP_SECTION := 36
+const GAP_ITEM := 18
+const GAP_HEAD := 12
+const GAP_TOP := 30
+const GAP_ACTIONS := 36
+## Canvas height the spacing scale is designed for.
+const GAP_REF_H := 1280.0
+## Canvas width assumed before the modal has a size.
+const MODAL_REF_W := 720.0
+
 signal opened
 signal closed
 ## The player dismissed the modal (close button, Esc or backdrop), just before it closes.
@@ -50,7 +79,8 @@ var cancel_action: BaseButton
 var _frame: VBoxContainer
 ## Panel scale when its content is wider / taller than the screen allows (1 = natural size).
 var _fit := 1.0
-## Narrowest layout width; narrower screens shrink the panel instead of squeezing it.
+## Narrowest comfortable layout width. Narrower canvases reflow at their real width (modal
+## pass 2026-10-01: shrinking broke the 16 px / 80 px floors); grids use grid_columns().
 const MIN_W := 620.0
 ## Canvas size (both sides) from which the frame and plaque use their desktop scale.
 const LARGE_CANVAS := 1000.0
@@ -58,6 +88,9 @@ const LARGE_CANVAS := 1000.0
 const CLOSE_PX := 64.0
 const CLOSE_PX_LG := 72.0
 const CLOSE_GAP := 12.0
+## Audit floors (tools/shot.gd --audit): text px and tap-target px on the canvas.
+const TEXT_MIN := 16.0
+const TAP_MIN := 80.0
 var _center: Control
 var _scroll: ScrollContainer
 var _inner: MarginContainer
@@ -95,9 +128,9 @@ func _init() -> void:
 	_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	_scroll.mouse_filter = Control.MOUSE_FILTER_PASS
 	panel.add_child(_scroll)
-	body = UiTheme.vbox(18)
+	body = UiTheme.vbox(GAP_ITEM)
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_inner = UiTheme.margin(body, 0, 22, 0, 0)
+	_inner = UiTheme.margin(body, 0, GAP_TOP, 0, 0)
 	_inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_scroll.add_child(_inner)
 	_inner.minimum_size_changed.connect(relayout)
@@ -315,11 +348,17 @@ func _layout() -> void:
 	if view.x <= 0.0:
 		return
 	_apply_scale(view)
+	_apply_spacing()
 	var safe := UiTheme.safe_margins(self)
 	var avail_w := view.x - safe.left - safe.right
 	var w := minf(max_width, avail_w)
-	# never lay out narrower than MIN_W (cards would wrap word by word): shrink instead
-	var lw := maxf(w, minf(MIN_W, max_width))
+	# lay out at the real width: a canvas narrower than MIN_W (UI zoom on a phone) reflows
+	# (option cards, chips and grids flow) instead of shrinking the panel, because a shrink
+	# put text under 16 px and taps under 80 px
+	var floor_k := _shrink_floor()
+	var lw := w
+	if w < MIN_W:
+		wrap_wide_labels(_inner, w - 140.0)
 	_frame.custom_minimum_size.x = lw
 	_frame.size = Vector2(lw, 0)
 	_fit_plaque(lw)
@@ -329,7 +368,9 @@ func _layout() -> void:
 	# a little too tall (short landscape, big UI size): shrink up to ~20% when that avoids
 	# scrolling; content that would scroll anyway scrolls at full size instead of shrinking too
 	var kh := avail_h / maxf(natural + chrome, 1.0)
-	var k := minf(w / lw, kh if kh >= 0.8 and kh < 1.0 else 1.0)
+	# ...but never below the scale that keeps text >= 16 px and tap targets >= 80 px (the
+	# audit floors): past that the body scrolls at full size instead
+	var k := minf(w / lw, kh if kh >= maxf(0.8, floor_k) and kh < 1.0 else 1.0)
 	_scroll.custom_minimum_size.y = minf(natural, avail_h / k - chrome)
 	_update_gutter(natural > _scroll.custom_minimum_size.y + 0.5)
 	_frame.reset_size()
@@ -338,6 +379,9 @@ func _layout() -> void:
 	k = minf(k, avail_w / maxf(_frame.size.x, 1.0))
 	var was := _fit
 	_fit = clampf(k, 0.6, 1.0)
+	# float noise (0.9997) is not a shrink: it put 16 px text at 15.99
+	if _fit > 0.995:
+		_fit = 1.0
 	if not is_equal_approx(was, _fit) and is_equal_approx(_frame.scale.x, was):
 		_frame.scale = Vector2.ONE * _fit
 	var fh := _frame.size.y * _fit
@@ -346,6 +390,45 @@ func _layout() -> void:
 	_frame.pivot_offset = _frame.size * 0.5
 	_frame.position = c - _frame.size * 0.5
 	_place_close()
+
+
+## Scales the body gap, the top gap and every section spacer / header pad by spacing_k().
+func _apply_spacing() -> void:
+	var k := spacing_k()
+	if not body.has_meta("gap_custom"):
+		body.add_theme_constant_override("separation", int(round(GAP_ITEM * k)))
+	_inner.add_theme_constant_override("margin_top", int(round(GAP_TOP * k)))
+	var pad := float(GAP_SECTION - GAP_ITEM) * k
+	for n in body.find_children("*", "Control", true, false):
+		if not (n as Control).has_meta("section_gap"):
+			continue
+		if n is Label:
+			(n as Control).custom_minimum_size.y = ceilf(UiTheme.body_font(700).get_height(20)) + round(pad)
+		elif n.get_child_count() == 0:
+			(n as Control).custom_minimum_size.y = round(pad)
+
+
+## Smallest panel scale that keeps every visible label at TEXT_MIN px and every small
+## button at TAP_MIN px (1.0 = no shrink allowed).
+func _shrink_floor() -> float:
+	var need := 0.0
+	var stack: Array[Node] = [_inner]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		var c := n as Control
+		if c != null and not c.visible:
+			continue
+		if n is Label:
+			var l := n as Label
+			var fs := l.label_settings.font_size if l.label_settings else l.get_theme_font_size("font_size")
+			if fs > 0 and l.text.strip_edges() != "":
+				need = maxf(need, TEXT_MIN / float(fs))
+		elif n is BaseButton:
+			var h := (n as Control).get_combined_minimum_size().y
+			if h > 1.0 and h < 200.0:
+				need = maxf(need, TAP_MIN / h)
+		stack.append_array(n.get_children())
+	return minf(need, 1.0)
 
 
 ## Frame + plaque scale by canvas size (phone 0.75 frame / 72 px plaque; >= 1000 both ways:
@@ -426,10 +509,65 @@ func _deferred_layout() -> void:
 
 # ---------------------------------------------------------------- small shared builders
 
+## Section header (convention): UPPERCASE, gold, 20 px, centred, no "!" and no colon. It
+## carries the section gap above itself (GAP_SECTION - GAP_ITEM, the text sits at the bottom
+## of a taller label), so every header-separated group gets the same breathing room.
 static func section_label(text: String) -> Label:
 	var l := UiTheme.label(text.to_upper(), 20, UiPalette.GOLD, false, 0, false, 700)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	l.custom_minimum_size.y = ceilf(UiTheme.body_font(700).get_height(20)) + float(GAP_SECTION - GAP_ITEM)
+	l.set_meta("section_gap", true)
 	return l
+
+
+## Narrow canvases: single-line labels wider than `limit` (detail lines, chips' long names)
+## wrap instead of widening the panel. Trimmed (ellipsis) labels are left alone.
+static func wrap_wide_labels(root: Node, limit: float) -> void:
+	for n in root.find_children("*", "Label", true, false):
+		var l := n as Label
+		if l.autowrap_mode != TextServer.AUTOWRAP_OFF or l.text_overrun_behavior != TextServer.OVERRUN_NO_TRIMMING:
+			continue
+		if l.get_combined_minimum_size().x > limit:
+			l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			l.custom_minimum_size.x = minf(maxf(l.custom_minimum_size.x, 120.0), limit)
+
+
+## Columns for a grid of `item_w`-wide tiles (die chips) in this modal's body: `want`, fewer
+## on a canvas too narrow for them (UI zoom on a phone), at least 1.
+func grid_columns(want: int, item_w: float, gap := 12.0) -> int:
+	var safe := UiTheme.safe_margins(self)
+	var view := size.x if size.x > 0.0 else MODAL_REF_W
+	var avail := minf(max_width, view - safe.left - safe.right) - 92.0
+	return clampi(int(floor((avail + gap) / (item_w + gap))), 1, want)
+
+
+## Spacer above the bottom action row (TAKE, BUY, BEGIN...): with the body's own separation
+## it makes GAP_ACTIONS.
+static func action_gap() -> Control:
+	var s := UiTheme.spacer(float(GAP_ACTIONS - GAP_ITEM))
+	s.set_meta("section_gap", true)
+	return s
+
+
+## Spacer between two header-less sections (e.g. an event's text vs its choices).
+static func section_gap() -> Control:
+	var s := UiTheme.spacer(float(GAP_SECTION - GAP_ITEM))
+	s.set_meta("section_gap", true)
+	return s
+
+
+## Spacing factor for this canvas: 1 on the 1280-tall portrait canvas, down to 0.6 on short
+## (landscape / small window) canvases so extra air never forces a scroll.
+func spacing_k() -> float:
+	var h := size.y if size.y > 0.0 else GAP_REF_H
+	return clampf(h / GAP_REF_H, 0.6, 1.0)
+
+
+## Group header inside a section (e.g. the Controls list's RUN / COMBAT): UPPERCASE, muted,
+## 18 px, left-aligned, so it never reads as a second section header.
+static func subsection_label(text: String) -> Label:
+	return UiTheme.label(text.to_upper(), 18, UiPalette.TEXT_MUTED, false, 0, false, 700)
 
 
 ## While the body scrolls, keep content clear of the vertical scrollbar (right-aligned values

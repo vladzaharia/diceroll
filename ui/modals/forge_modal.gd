@@ -31,7 +31,6 @@ var _src_btns: Array[_FaceButton] = []
 
 
 func _build() -> void:
-	body.add_theme_constant_override("separation", 14)
 	dismissible = true
 	close_tooltip = "Skip the forge"
 	_skip = close_button
@@ -77,6 +76,7 @@ func _build() -> void:
 	_preview.alignment = BoxContainer.ALIGNMENT_CENTER
 	_preview.custom_minimum_size.y = 104
 	pv.add_child(_preview)
+	body.add_child(UiModal.action_gap())
 	var foot := UiTheme.hbox(14)
 	body.add_child(foot)
 	_apply = GameButton.make("FORGE", "anvil", GameButton.Kind.PRIMARY, 36)
@@ -99,10 +99,7 @@ func refresh(flow: GameFlow) -> void:
 	_flow = flow
 	_ops = flow.offer.get("ops", ["raise", "mirror"])
 	var draft := String(flow.offer.get("source", "tile")) == "draft"
-	set_title("FACE RAISE" if draft or not _ops.has("mirror") else "FORGE", Color("aab4c8"))
-	# a colour without a native plaque family (steel, silver...): the white plaque x colour
-	if not ribbon.skinned():
-		ribbon.family = "white"
+	set_title("FACE RAISE" if draft or not _ops.has("mirror") else "FORGE", PLAQUE_DEFAULT)
 	_mirror_btn.visible = _ops.has("mirror")
 	UiTheme.clear(_dice_row)
 	_die_tabs.clear()
@@ -283,14 +280,14 @@ class _DieTab:
 	func _draw() -> void:
 		var r := Rect2(Vector2.ZERO, size)
 		if OptionCard.skinned():
-			draw_style_box(UiTheme.card_box("selected" if selected else ("hover" if is_hovered() else "normal")), r)
+			draw_style_box(UiTheme.tile_box("selected" if selected else ("hover" if is_hovered() else "normal")), r)
 		else:
 			if selected:
 				draw_style_box(UiTheme.box(Color(0, 0, 0, 0), 18, 0, Color.TRANSPARENT, 14, Color(1, 0.75, 0.25, 0.45), Vector2.ZERO), r)
 			draw_style_box(UiTheme.box(UiPalette.NAVY_3 if selected else UiPalette.NAVY_2, 18, 3 if selected else 2,
 				UiPalette.GOLD_BRIGHT if selected else Color(1, 1, 1, 0.08)), r)
-		# the card's 3D lip takes the bottom of the tab: the die and name sit above it
-		var lip := 8.0 if OptionCard.skinned() else 0.0
+		# flat tile (no lip): the die and name use the full height
+		var lip := 0.0
 		var s := minf(size.x - 20.0, size.y - 44.0 - lip)
 		var br := Rect2(Vector2((size.x - s) * 0.5, 8), Vector2(s, s))
 		# mini die body in rune tint with its best face

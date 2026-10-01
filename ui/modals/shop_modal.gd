@@ -10,6 +10,8 @@ signal shop_buy(index: int, die_idx: int)
 signal shop_reroll_pressed
 signal shop_leave_pressed
 
+## A DieChip's width (grid_columns: 2 columns on a narrow canvas).
+const DIE_CHIP_W := 166.0
 const ICONS := {"die": "dice", "potion": "3d:potion_red", "face_raise": "anvil", "combat_reroll": "reroll"}
 
 var gold: Counter
@@ -30,7 +32,7 @@ var _die := -1
 
 func _build() -> void:
 	ScrollFade.attach(self, _scroll, UiPalette.NAVY_2, _frame)
-	set_title("SHOP")
+	set_title("SHOP", PLAQUE_DEFAULT)
 	dismissible = true
 	close_tooltip = "Leave shop"
 	_leave = close_button
@@ -39,7 +41,7 @@ func _build() -> void:
 	gold = Counter.make("3d:coins", 0, 34, UiPalette.TEXT, "pill")
 	head.add_child(gold)
 	head.add_child(UiTheme.spacer(0, true))
-	_restock = GameButton.make("RESTOCK", "reroll", GameButton.Kind.SECONDARY, 26)
+	_restock = GameButton.make("RESTOCK", "coin", GameButton.Kind.SECONDARY, 26)
 	_restock.min_height = 80
 	_restock.pad_x = 20
 	_restock.pressed.connect(func() -> void: shop_reroll_pressed.emit())
@@ -57,6 +59,7 @@ func _build() -> void:
 	_pick_grid.add_theme_constant_override("v_separation", 12)
 	_pick_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_picker.add_child(_pick_grid)
+	body.add_child(UiModal.action_gap())
 	var foot := UiTheme.hbox(14)
 	body.add_child(foot)
 	_buy = GameButton.make("BUY", "coin", GameButton.Kind.PRIMARY, 34)
@@ -71,7 +74,8 @@ func refresh(flow: GameFlow) -> void:
 	_flow = flow
 	var run := flow.run
 	gold.set_value(run.gold, visible)
-	_restock.sub_text = "%d gold" % Balance.SHOP_RESTOCK_PRICE
+	# a price reads the same everywhere: verb + currency icon + number ("BUY  50")
+	_restock.text = "RESTOCK  %d" % Balance.SHOP_RESTOCK_PRICE
 	_restock.set_enabled(run.gold >= Balance.SHOP_RESTOCK_PRICE)
 	UiTheme.clear(_list)
 	_cards.clear()
@@ -141,6 +145,7 @@ func begin_pick(i: int) -> void:
 			_cards[k].selected = k == i
 	var it: Dictionary = _flow.offer.items[i]
 	_pick_title.text = ("Which die gets the rune?" if String(it.id) == "rune" else "Raise the lowest face of which die?").to_upper()
+	_pick_grid.columns = grid_columns(3, DIE_CHIP_W)
 	UiTheme.clear(_pick_grid)
 	_chips.clear()
 	for d in _flow.run.dice.size():

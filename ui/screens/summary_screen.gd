@@ -10,7 +10,8 @@ extends UiModal
 ##   {stats: game_over stats, events: Camp.bank_run() events, before: Profile.to_dict() before
 ##    banking, after: Profile}
 ## Without `results` (legacy scenarios) only the run half is shown.
-## Emits new_run_pressed (= go to Camp) and title_pressed.
+## Emits new_run_pressed (= go to Camp). title_pressed is kept for callers but no longer
+## has a button on this screen.
 
 signal new_run_pressed
 signal title_pressed
@@ -62,15 +63,9 @@ func _build() -> void:
 	var row := UiTheme.hbox(14)
 	_footer = UiTheme.margin(row, 12, 38, 12, 0)
 	_frame.add_child(_footer)
-	# forced (spec 3.2): no close / Esc / backdrop. TO CAMP is the main choice (full width,
-	# Enter); home is a round utility button
-	var title := GameButton.round_icon("home", 88)
-	title.round_family = "grey"
-	title.icon_tint = UiPalette.TEXT
-	title.tooltip_text = "Title screen"
-	title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	title.pressed.connect(func() -> void: title_pressed.emit())
-	row.add_child(title)
+	# forced (spec 3.2): no close / Esc / backdrop. TO CAMP is the one exit (full width,
+	# Enter). There is no round Home: the Camp has its own, and two exits to two places
+	# (title vs camp) confused players (user, modal pass 2026-10-01)
 	_camp_btn = GameButton.make("TO CAMP", "campfire", GameButton.Kind.PRIMARY, 38)
 	_camp_btn.min_height = 100
 	_camp_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -87,7 +82,7 @@ func refresh(flow: GameFlow) -> void:
 	if st.is_empty():
 		st = flow._summary()
 	var won := flow.phase == GameFlow.Phase.VICTORY or bool(st.get("victory", false))
-	set_title("VICTORY!" if won else "DEFEATED", "green" if won else "red")
+	set_title("VICTORY!" if won else "DEFEATED", PLAQUE_WIN if won else PLAQUE_DANGER)
 	var info := flow.route_info()
 	var boss_name := String(info.boss.name)
 	var last := BiomeDefs.name_of(String(r.route.back())) if not r.route.is_empty() else String(ACT_NAMES[2])
@@ -126,9 +121,9 @@ func open() -> void:
 	_animate()
 
 
-## UiModal's layout (MIN_W floor, shrink-to-fit via _fit), with the footer's height kept free
-## under the scrolling panel. Narrow canvases (iPhone at 125 % UI size: 576 px) scale the whole
-## frame down instead of letting wide rows (route strip, first chips) push it off-screen.
+## UiModal's layout with the footer's height kept free under the scrolling panel. Narrow
+## canvases (iPhone at 125 % UI size: 576 px) lay out at their real width and reflow, as in
+## UiModal (a shrink put text under 16 px).
 func _layout() -> void:
 	if _frame == null or _footer == null:
 		super._layout()
@@ -137,11 +132,13 @@ func _layout() -> void:
 	if view.x <= 0.0:
 		return
 	_apply_scale(view)
+	_apply_spacing()
 	var safe := UiTheme.safe_margins(self)
 	var avail_w := view.x - safe.left - safe.right
 	var w := minf(max_width, avail_w)
-	# never lay out narrower than MIN_W: shrink instead (as UiModal does)
-	var lw := maxf(w, minf(MIN_W, max_width))
+	var lw := w
+	if w < MIN_W:
+		wrap_wide_labels(_inner, w - 140.0)
 	_frame.custom_minimum_size.x = lw
 	_frame.size = Vector2(lw, 0)
 	_fit_plaque(lw)
@@ -157,6 +154,8 @@ func _layout() -> void:
 	k = minf(k, (view.y - safe.top - safe.bottom) / maxf(_frame.size.y, 1.0))
 	var was := _fit
 	_fit = clampf(k, 0.6, 1.0)
+	if _fit > 0.995:
+		_fit = 1.0
 	if not is_equal_approx(was, _fit) and is_equal_approx(_frame.scale.x, was):
 		_frame.scale = Vector2.ONE * _fit
 	var fh := _frame.size.y * _fit
@@ -303,7 +302,7 @@ func _build_extra() -> void:
 			var br := UiTheme.hbox(8)
 			c.add_child(br)
 			br.add_child(CampUi.bar(float(xb[0]), float(xb[1]), UiPalette.XP, 16))
-			br.add_child(UiTheme.label("%d / %d to L%d" % [int(xb[0]), int(xb[1]), l1 + 1], 17, UiPalette.TEXT_DIM, false, 0, false, 700))
+			br.add_child(UiTheme.label("%d/%d to L%d" % [int(xb[0]), int(xb[1]), l1 + 1], 17, UiPalette.TEXT_DIM, false, 0, false, 700))
 		else:
 			c.add_child(UiTheme.label("Level %d  ·  more levels at the Pet Den" % l1, 17, UiPalette.TEXT_DIM, false, 0, false, 700))
 		row.modulate.a = 0.0
@@ -336,7 +335,7 @@ func _build_extra() -> void:
 			"run_banked":
 				asc_up = int(e.get("ascension_unlocked", -1))
 	if not ms.is_empty() or asc_up > 0:
-		_extra.add_child(UiModal.section_label("Unlocked!"))
+		_extra.add_child(UiModal.section_label("Unlocked"))
 		for e in ms:
 			for u in e.unlocks:
 				var card: Control
@@ -358,7 +357,7 @@ func _build_extra() -> void:
 		if String(e.type) == "skin_unlocked":
 			skins.append(e)
 	if not skins.is_empty():
-		_extra.add_child(UiModal.section_label("New skins!"))
+		_extra.add_child(UiModal.section_label("New skins"))
 		for e in skins:
 			var card := _skin_card(String(e["class"]), String(e.skin))
 			card.modulate.a = 0.0
@@ -409,7 +408,7 @@ func _items_block(_evs: Array, _before: Profile, after: Profile) -> Control:
 			var br := UiTheme.hbox(8)
 			col.add_child(br)
 			br.add_child(CampUi.bar(float(m), float(nxt[1]), Color("e0a84a"), 12.0))
-			var bl := UiTheme.label("%d / %d  %s" % [m, int(nxt[1]), ItemDefs.name_of(String(nxt[0]))], 15, Color("e0c28a"), false, 0, false, 700)
+			var bl := UiTheme.label("%d/%d  %s" % [m, int(nxt[1]), ItemDefs.name_of(String(nxt[0]))], 16, Color("e0c28a"), false, 0, false, 700)
 			br.add_child(bl)
 	if v.get_child_count() == 0:
 		return null

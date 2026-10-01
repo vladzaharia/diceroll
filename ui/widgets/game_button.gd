@@ -27,6 +27,8 @@ const ROUND_FACE := 54.0 / 64.0
 const KEYCAP_ALPHA := 0.6
 const KEYCAP_IN := 0.12
 const KEYCAP_OUT := 0.08
+## Smallest hover keycap height in real screen pixels.
+const KEYCAP_MIN_SCREEN := 22.0
 
 var kind: Kind = Kind.PRIMARY:
 	set(v):
@@ -494,6 +496,11 @@ func keycap_allowed() -> bool:
 func keycap_rect(glyph_w_over_h: float = 1.0) -> Rect2:
 	var b := box_rect()
 	var kh := 26.0 if b.size.y >= 80.0 else 22.0
+	# never under KEYCAP_MIN_SCREEN real pixels (a 1366x768 window draws the canvas at ~0.6x:
+	# a 26 px cap was ~15 px and its "ENTER" unreadable); capped to fit the face
+	var k := get_viewport().get_final_transform().get_scale().y if is_inside_tree() else 1.0
+	if k > 0.0:
+		kh = clampf(KEYCAP_MIN_SCREEN / k, kh, maxf(kh, b.size.y * 0.42))
 	var edge := 6.0 + (4.0 * (1.25 if b.size.y >= 80.0 else 1.0))
 	var kw := kh * glyph_w_over_h
 	return Rect2(b.end.x - edge - kw, b.position.y + edge, kw, kh)

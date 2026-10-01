@@ -10,8 +10,8 @@ signal reward_picked(index: int)
 const ICONS := {"gold": "coin", "crown": "crown", "potion": "potion", "potion_gold": "potion", "face_raise": "anvil",
 	"rune_choice": "star", "reroll_boost": "reroll", "passive_common": "trophy", "sharpshooter": "sword", "rare_rune": "star",
 	"heart_gem": "heart", "mirror_forge": "mirror", "potion_pair": "potion", "passive_uncommon": "trophy", "high_roller": "up"}
-const TAGS := {"gold": "GOLD", "crown": "META", "potion": "POTION", "potion_gold": "POTION", "face_raise": "FORGE",
-	"rune_choice": "RUNE", "new_die": "DIE", "reroll_boost": "BOOST", "passive_common": "PASSIVE", "sharpshooter": "ATK",
+const TAGS := {"gold": "GOLD", "crown": "CROWNS", "potion": "POTION", "potion_gold": "POTION", "face_raise": "FORGE",
+	"rune_choice": "RUNE", "new_die": "DIE", "reroll_boost": "REROLLS", "passive_common": "PASSIVE", "sharpshooter": "ATTACK",
 	"rare_rune": "RUNE", "heart_gem": "MAX HP", "mirror_forge": "FORGE", "potion_pair": "POTIONS", "passive_uncommon": "PASSIVE",
 	"high_roller": "DICE"}
 
@@ -40,7 +40,7 @@ func _build() -> void:
 	top.add_child(_sub)
 	_list = UiTheme.vbox(14)
 	body.add_child(_list)
-	body.add_child(UiTheme.spacer(2))
+	body.add_child(UiModal.action_gap())
 	# forced modal (spec 3.2): no close, no Esc; TAKE is the decision (Enter)
 	_take = GameButton.make("TAKE", "check", GameButton.Kind.SUCCESS, 38)
 	_take.icon_tint = UiPalette.TEXT_DARK
@@ -55,10 +55,7 @@ func refresh(flow: GameFlow) -> void:
 	var offer := flow.offer
 	var tier := String(offer.get("tier", "silver"))
 	var col: Color = MgLogic.TIER_COLORS.get(tier, UiPalette.GOLD)
-	set_title("%s PRIZE" % tier.to_upper(), col.darkened(0.1) if tier != "silver" else Color("8e9bb8"))
-	# a colour without a native plaque family (steel, silver...): the white plaque x colour
-	if not ribbon.skinned():
-		ribbon.family = "white"
+	set_title("%s PRIZE" % tier.to_upper(), UiModal.PLAQUE_DEFAULT)
 	_medal.tier = tier
 	_set_trophy(tier)
 	_sub.text = "%s\nChoose one reward" % MinigameDefs.name_of(String(offer.get("id", "")))

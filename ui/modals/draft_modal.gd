@@ -23,7 +23,7 @@ func _build() -> void:
 	body.add_child(_sub)
 	_list = UiTheme.vbox(14)
 	body.add_child(_list)
-	body.add_child(UiTheme.spacer(2))
+	body.add_child(UiModal.action_gap())
 	# forced modal (spec 3.2): no close, no Esc; TAKE is the decision (Enter)
 	_take = GameButton.make("TAKE", "check", GameButton.Kind.SUCCESS, 38)
 	_take.icon_tint = UiPalette.TEXT_DARK
@@ -37,7 +37,7 @@ func _build() -> void:
 func refresh(flow: GameFlow) -> void:
 	var offer := flow.offer
 	var source := String(offer.get("source", "level"))
-	set_title(TITLES.get(source, "REWARD"), UiPalette.XP if source == "level" else UiPalette.GOLD)
+	set_title(TITLES.get(source, "REWARD"), PLAQUE_LEVEL if source == "level" else PLAQUE_DEFAULT)
 	_sub.text = SUBS.get(source, "Choose one")
 	UiTheme.clear(_list)
 	_cards.clear()

@@ -16,8 +16,8 @@ var entries: Array = []
 
 
 ## The class's equipped items in a profile, with this class's tiers.
-## `badge_font`: the tier badge numeral size (run setup passes 16: no text under 16 px).
-static func of_profile(p: Profile, class_id: String, px := 56, badge_font := 14) -> KitStrip:
+## `badge_font`: the tier badge numeral size (16 by default: no text under 16 px).
+static func of_profile(p: Profile, class_id: String, px := 56, badge_font := 16) -> KitStrip:
 	var lo := p.loadout_for(class_id)
 	var out: Array = []
 	for slot in ORDER:
@@ -69,7 +69,7 @@ static func of_kit(class_id: String, px := 56) -> KitStrip:
 	return make(out, px)
 
 
-static func make(p_entries: Array, px := 56, badge_font := 14) -> KitStrip:
+static func make(p_entries: Array, px := 56, badge_font := 16) -> KitStrip:
 	var s := KitStrip.new()
 	s.entries = p_entries
 	s.alignment = FlowContainer.ALIGNMENT_CENTER
@@ -89,7 +89,7 @@ func names_text() -> String:
 	return "  ·  ".join(n)
 
 
-static func _cell(e: Dictionary, px: int, badge_font := 14) -> Control:
+static func _cell(e: Dictionary, px: int, badge_font := 16) -> Control:
 	var well := PanelContainer.new()
 	# the round well behind a 3D thumbnail (plan d `well`; flat fallback without the pack)
 	var sb := UiTheme.well_box() if UiTheme.skinned("well") else UiTheme.box(Color(0.02, 0.02, 0.07, 0.75), 14, 2, Color(1, 1, 1, 0.08))

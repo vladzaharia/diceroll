@@ -42,7 +42,7 @@ func _build() -> void:
 	body.add_child(_sub)
 	_list = UiTheme.vbox(14)
 	body.add_child(_list)
-	body.add_child(UiTheme.spacer(2))
+	body.add_child(UiModal.action_gap())
 	# forced modal (spec 3.2): no close, no Esc; TAKE is the decision (Enter)
 	_take = GameButton.make("TAKE", "check", GameButton.Kind.SUCCESS, 38)
 	_take.icon_tint = UiPalette.TEXT_DARK
@@ -61,7 +61,7 @@ func refresh(flow: GameFlow) -> void:
 	for o: Dictionary in options:
 		if String(o.get("rarity", "")) == "boss":
 			boss_tier = true
-	set_title(TITLES.get(source, "PASSIVE"), UiPalette.BOSS if boss_tier else UiPalette.UNCOMMON.darkened(0.1))
+	set_title(TITLES.get(source, "PASSIVE"), PLAQUE_DEFAULT)
 	_sub.text = "Choose a boss-tier passive. It lasts the whole run." if boss_tier else "Choose a passive. It lasts the whole run."
 	_glow.visible = boss_tier
 	UiTheme.clear(_list)

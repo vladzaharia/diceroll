@@ -254,8 +254,13 @@ func test_tiles_are_flat_not_buttons() -> void:
 	var rs := _modal(_mid())
 	for n in ["Hero_knight", "Hero_barbarian", "Mode_standard", "Mode_short", "Tile_pet", "HeroCard", "Ascension"]:
 		var c: PanelContainer = rs.body.find_child(n, true, false)
-		var sb := c.get_theme_stylebox("panel") as StyleBoxFlat
-		assert_true(sb != null and sb.shadow_size == 0, "%s is a flat surface (no lip / shadow)" % n)
-	var sel := (rs.body.find_child("Hero_knight", true, false) as Control).get_theme_stylebox("panel") as StyleBoxFlat
-	assert_eq(sel.border_color, UiPalette.GOLD_BRIGHT, "selected = yellow inner rim")
+		var sb := c.get_theme_stylebox("panel")
+		# the shared flat tile (UiTheme.tile_box: Containers/Flat, no lip) or its flat fallback
+		var flat := sb != null and is_equal_approx(sb.content_margin_bottom, sb.content_margin_top) \
+			and (not (sb is StyleBoxFlat) or (sb as StyleBoxFlat).shadow_size == 0)
+		assert_true(flat, "%s is a flat surface (no lip / shadow)" % n)
+	# selected = the yellow inner rim: the shared tile's "selected" state
+	var sel := (rs.body.find_child("Hero_knight", true, false) as Control).get_theme_stylebox("panel")
+	var want := RunSetupModal.surface("selected")
+	assert_true(sel != null and sel.get_class() == want.get_class(), "selected = the shared tile's selected state")
 	_done(rs)

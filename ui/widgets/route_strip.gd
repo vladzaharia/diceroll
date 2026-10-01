@@ -67,7 +67,7 @@ func _stop(b: Dictionary, tier: int) -> Control:
 	var past := current > 0 and tier < current
 	var col := UiTheme.vbox(2 if compact else 4)
 	col.alignment = BoxContainer.ALIGNMENT_BEGIN
-	col.custom_minimum_size.x = 140 if compact else 172
+	col.custom_minimum_size.x = 120 if compact else 172
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var px := 64 if compact else 104
 	var med := OptionCard.Medallion.make(Icons.biome_icon(id), px, null, bc if (here or current == 0) else bc.darkened(0.35))
@@ -77,7 +77,7 @@ func _stop(b: Dictionary, tier: int) -> Control:
 	var first := int(Balance.BIOME_LAPS[clampi(tier - 1, 0, Balance.BIOME_LAPS.size() - 1)])
 	var last := first + Balance.LAPS_PER_ACT - 1
 	var cap := UiTheme.label("TIER %s  ·  LAPS %d–%d" % [["I", "II", "III"][clampi(tier - 1, 0, 2)], first, last] if not compact
-		else "LAPS %d–%d" % [first, last], 16 if compact else 18, bc.lightened(0.25) if here or current == 0 else UiPalette.TEXT_MUTED, false, 0, false, 800)
+		else "LAPS %d–%d" % [first, last], 17 if compact else 18, bc.lightened(0.25) if here or current == 0 else UiPalette.TEXT_MUTED, false, 0, false, 800)
 	cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(cap)
 	var nm := UiTheme.label(String(b.get("name", id)).to_upper(), 20 if compact else 28,
@@ -108,7 +108,7 @@ func _stop(b: Dictionary, tier: int) -> Control:
 func _boss_chip(icon: String, caption: String, name: String, color: Color, done: bool) -> Control:
 	var p := PanelContainer.new()
 	# a card with a rim in the boss colour (pack art; flat fallback)
-	var sb := UiTheme.card_box("normal", color)
+	var sb := UiTheme.tile_box("normal", color)
 	sb.content_margin_left = 14 if compact else 18
 	sb.content_margin_right = 14 if compact else 18
 	sb.content_margin_top = maxf(sb.content_margin_top, 8)
@@ -119,6 +119,6 @@ func _boss_chip(icon: String, caption: String, name: String, color: Color, done:
 	row.add_child(Icons.rect("check" if done else icon, 34 if compact else 44, UiPalette.HEAL if done else color))
 	var col := UiTheme.vbox(-2)
 	row.add_child(col)
-	col.add_child(UiTheme.label(caption, 16 if compact else 17, color.lightened(0.2), false, 0, false, 800))
+	col.add_child(UiTheme.label(caption, 17, color.lightened(0.2), false, 0, false, 800))
 	col.add_child(UiTheme.label(name.to_upper(), 20 if compact else 26, UiPalette.TEXT, true, 5))
 	return p

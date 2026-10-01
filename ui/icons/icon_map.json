@@ -2389,6 +2389,12 @@
    "note": "Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint. Update available.",
    "group": "ui"
   },
+  "controls": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Technology/Keyboard Key/Keyboard Key Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Action glyph: Flat White tinted ink on button faces. Pause CONTROLS (Settings -> Controls list, desktop).",
+   "group": "ui"
+  },
   "copy": {
    "svg": "rhosgfx/vector-icon-pack-pro/General/Clipboard/Clipboard Outline.svg",
    "tint": null,

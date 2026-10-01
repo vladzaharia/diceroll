@@ -29,8 +29,12 @@ static func make(text: String, icon := "", color: Color = UiPalette.TEXT, font :
 	var row := UiTheme.hbox(10)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	p.add_child(row)
+	# every toast leads with an icon (convention): callers without one get their type's
+	if icon == "" or not Icons.exists(icon):
+		icon = type_icon(r)
 	if icon != "" and Icons.exists(icon):
-		var ic := Icons.rect(icon, int(font * 1.5))
+		# TEXT reaches Flat White glyphs only (ink would vanish on the dark callout)
+		var ic := Icons.rect(icon, int(font * 1.5), UiPalette.TEXT)
 		ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(ic)
 	var l := UiTheme.label(text, font, color, true, 0, not UiTheme.skinned("toast"))
@@ -105,6 +109,24 @@ static func show(host: Node, text: String, icon := "", color: Color = UiPalette.
 		if root != host and root.get_child_count() <= 1:
 			root.queue_free())
 	return p
+
+
+## The default icon of a toast type (its rim): danger = warning sign, heal = heart,
+## reward = star, info = the info glyph.
+static func type_icon(rim: Variant) -> String:
+	var kind := ""
+	if rim is String or rim is StringName:
+		kind = String(rim)
+	elif rim is Color:
+		kind = String(_rim_for(rim as Color)) if _rim_for(rim as Color) is String else ""
+	match kind:
+		"danger", "damage", "red":
+			return "warning"
+		"heal", "success", "green":
+			return "heart"
+		"reward", "unlock", "gold":
+			return "star"
+	return "info"
 
 
 ## Rim for a text colour: the nearest of gold / red / green / blue (the rim is the meaning).

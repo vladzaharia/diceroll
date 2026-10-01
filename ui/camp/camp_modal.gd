@@ -62,6 +62,7 @@ func _layout() -> void:
 	var top := safe.top + top_inset
 	var avail_h := view.y - top - safe.bottom
 	_apply_scale(view)
+	_apply_spacing()
 	_fit_plaque(w)
 	var chrome := chrome_height()
 	var natural := _inner.get_combined_minimum_size().y

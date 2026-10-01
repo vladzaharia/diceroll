@@ -11,8 +11,9 @@ extends BaseButton
 ##   c.set_price(50, can_afford)
 ##   c.selected = true
 
-## Icon size on the left (spec 4.3: card art 96-128 px).
-const ICON_PX := 96.0
+## Icon size on the left: a compact 60 px icon top-aligned with the title (user, modal pass
+## 2026-10-01: choice icons must not fill the card's height; the text gets the width).
+const ICON_PX := 60.0
 const ICON_PX_SMALL := 72.0
 
 var selected := false:
@@ -31,7 +32,7 @@ var premium := false:
 		premium = v
 		_apply_margins()
 		queue_redraw()
-var _faces_row: HBoxContainer
+var _faces_row: HFlowContainer
 var _hover := false
 var _margin: MarginContainer
 var _title: Label
@@ -68,20 +69,26 @@ func _build(title: String, desc: String) -> void:
 	UiTheme.full_rect(_margin)
 	add_child(_margin)
 	_apply_margins()
-	var row := UiTheme.hbox(18)
+	var row := UiTheme.hbox(14)
 	_margin.add_child(row)
 	_medal_holder = CenterContainer.new()
 	_medal_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_medal_holder.custom_minimum_size = Vector2(ICON_PX, ICON_PX) if skinned() else Vector2(84, 84)
+	# top-aligned with the title row, never stretched down the card
+	_medal_holder.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	row.add_child(_medal_holder)
 	var col := UiTheme.vbox(4)
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.alignment = BoxContainer.ALIGNMENT_BEGIN
 	row.add_child(col)
-	var tr := UiTheme.hbox(10)
+	# title + tag flow: on a narrow card the tag drops under the title instead of forcing the
+	# card (and the modal) wider than the screen
+	var tr := HFlowContainer.new()
+	tr.add_theme_constant_override("h_separation", 10)
+	tr.add_theme_constant_override("v_separation", 4)
+	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(tr)
 	_title = UiTheme.label(title, 30, UiPalette.TEXT, true, 0, true)
-	_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tr.add_child(_title)
 	_tag_panel = PanelContainer.new()
@@ -93,7 +100,11 @@ func _build(title: String, desc: String) -> void:
 	_tag_panel.add_child(_tag)
 	_desc = UiTheme.para(desc, 22, UiPalette.TEXT_DIM, 500)
 	col.add_child(_desc)
-	_faces_row = UiTheme.hbox(5)
+	# a flow, so a narrow card wraps the six faces instead of widening the modal
+	_faces_row = HFlowContainer.new()
+	_faces_row.add_theme_constant_override("h_separation", 5)
+	_faces_row.add_theme_constant_override("v_separation", 5)
+	_faces_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_faces_row.visible = false
 	col.add_child(_faces_row)
 	_right = UiTheme.vbox(0)
@@ -122,14 +133,14 @@ func _build(title: String, desc: String) -> void:
 
 ## A bare full-colour icon on the left (spec 4.3); `tint` only reaches tinted (Flat White)
 ## map entries. Without the pack: the pre-reskin medallion.
-## Content inset: the card's own margins (its 3D lip at the bottom), wider inside the boss
+## Content inset: the flat tile's own margins, wider inside the boss
 ## tier's Ornate frame so nothing sits on the gold.
 func _apply_margins() -> void:
 	if _margin == null:
 		return
 	var m := [18.0, 14.0, 18.0, 14.0]
 	if skinned():
-		m[3] = maxf(14.0, UiTheme.card_box("normal").get_content_margin(SIDE_BOTTOM))
+		m[3] = maxf(14.0, UiTheme.tile_box("normal").get_content_margin(SIDE_BOTTOM))
 		if premium:
 			m = [32.0, 28.0, 32.0, 32.0]
 	for i in 4:
@@ -137,6 +148,10 @@ func _apply_margins() -> void:
 
 
 func set_icon(icon: String, tint: Variant = null) -> void:
+	# cards are navy: a Flat White action glyph (arrow, check...) is drawn in TEXT, never in
+	# its default button-face ink (it vanished on the card); object icons ignore the tint
+	if tint == null:
+		tint = UiPalette.TEXT
 	UiTheme.clear(_medal_holder)
 	_medal_holder.visible = true
 	if skinned():
@@ -165,7 +180,7 @@ func set_die(kind: String, rune := "") -> void:
 	var best := 0
 	for v in faces:
 		best = maxi(best, v)
-	var big := DieFace.make(best, rune, false, 74)
+	var big := DieFace.make(best, rune, false, ICON_PX - 4.0)
 	big.kind = kind
 	_medal_holder.add_child(big)
 	UiTheme.clear(_faces_row)
@@ -260,12 +275,12 @@ func _get_minimum_size() -> Vector2:
 ## The card box for the current state (pack art; flat fallback inside the factories).
 func _box() -> StyleBox:
 	if selected:
-		return UiTheme.card_box("selected")
+		return UiTheme.tile_box("selected")
 	var st := "hover" if _hover and not disabled else "normal"
 	if disabled and not sold:
 		st = "dim"
 	# the boss tier's Ornate overlay is its rim: no second accent frame under it
-	return UiTheme.card_box(st, accent if accent_rim and st != "dim" and not premium else null)
+	return UiTheme.tile_box(st, accent if accent_rim and st != "dim" and not premium else null)
 
 
 func _draw() -> void:
@@ -380,7 +395,8 @@ class Medallion:
 		if skinned():
 			var sb := disc_box(s, ring, saturation)
 			if sb != null:
-				var w := s * 55.0 / 64.0
+				# 60 of 64 units wide: the disc plus its lip reads round (55 / 64 read as an egg)
+				var w := s * 60.0 / 64.0
 				var box := Rect2(Vector2((size.x - w) * 0.5, (size.y - s) * 0.5), Vector2(w, s))
 				draw_style_box(sb, box)
 				# the face is the top 54 of 64 units; the icon sits on its centre

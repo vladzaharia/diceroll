@@ -8,7 +8,7 @@ const ACCENT := Color("ffb45a")
 
 
 func _build() -> void:
-	set_title("PET DEN", ACCENT)
+	set_title("PET DEN", PLAQUE_DEFAULT)
 
 
 func rebuild(p: Profile) -> void:
@@ -38,11 +38,16 @@ func _pet_card(p: Profile, id: String) -> Control:
 	head.add_child(tr)
 	if owned:
 		if equipped:
-			var b := GameButton.make("EQUIPPED", "check", GameButton.Kind.SUCCESS, 20)
+			# state = the purple EQUIPPED chip (as in the Armory); the action = a ghost REMOVE
+			var col2 := UiTheme.vbox(6)
+			col2.alignment = BoxContainer.ALIGNMENT_CENTER
+			col2.add_child(CampArt.chip("EQUIPPED", "purple", "", 16))
+			var b := GameButton.make("REMOVE", "", GameButton.Kind.GHOST, 20)
 			b.min_height = 64
 			b.pad_x = 14
 			b.pressed.connect(cmd.bind(["set_loadout", (p.loadout.minigames as Array).duplicate(), ""]))
-			head.add_child(b)
+			col2.add_child(b)
+			head.add_child(col2)
 		else:
 			var b := GameButton.make("EQUIP", "", GameButton.Kind.PRIMARY, 22)
 			b.min_height = 64
@@ -79,7 +84,7 @@ func _pet_card(p: Profile, id: String) -> Control:
 		var xb := CampUi.bar(float(xpb[0]), float(xpb[1]), UiPalette.XP, 24)
 		xb.kind = "xp"
 		row.add_child(xb)
-		row.add_child(UiTheme.label("%d / %d fights to L%d" % [int(xpb[0]), int(xpb[1]), lvl + 1], 18, UiPalette.TEXT_DIM, false, 0, false, 700))
+		row.add_child(UiTheme.label("%d/%d fights to L%d" % [int(xpb[0]), int(xpb[1]), lvl + 1], 18, UiPalette.TEXT_DIM, false, 0, false, 700))
 	else:
 		var row := UiTheme.hbox(10)
 		v.add_child(row)
@@ -88,9 +93,9 @@ func _pet_card(p: Profile, id: String) -> Control:
 		row.add_child(sp)
 		var cost := PetDefs.level_cost(lvl)
 		if cost.is_empty():
-			row.add_child(CampArt.chip("MAX LEVEL", "yellow", "crown", 18))
+			row.add_child(CampArt.chip("MAX LEVEL", "yellow", "star", 18))
 		else:
-			var b := CampUi.buy_button("LEVEL %d" % (lvl + 1), cost, p.can_afford(cost), 21)
+			var b := CampUi.buy_button("LEVEL UP", cost, p.can_afford(cost), 21)
 			b.pressed.connect(cmd.bind(["level_pet", id]))
 			row.add_child(b)
 	return c

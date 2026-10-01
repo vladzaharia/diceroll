@@ -1074,13 +1074,13 @@
    }
   },
   "panel_main": {
-   "note": "Modal frame (UiModal): Container 3D white x NAVY_2 inset 8 px under the Nailed darkbrown-dark frame, scale 0.75 (720-wide canvas), plank edges tile_fit.",
+   "note": "Modal frame (UiModal): Container 3D white x NAVY_2 inset 8 px under the Nailed darkbrown-dark frame, scale 1.0 like desktop (0.75 read as a thin rust-red line on phones, modal pass 2026-10-01), plank edges tile_fit.",
    "fallback": "panel:main",
    "content": [
-    38,
-    36,
-    38,
-    42
+    40,
+    42,
+    40,
+    48
    ],
    "states": {
     "normal": {
@@ -1110,7 +1110,7 @@
         24,
         34
        ],
-       "scale": 0.75,
+       "scale": 1.0,
        "axis": "tile_fit",
        "draw_center": false,
        "runtime_tint": false
@@ -1511,7 +1511,7 @@
    }
   },
   "panel_card": {
-   "note": "Card (CampUi.card, OptionCard, tiles): Container 3D white x NAVY_2, scale 0.8. States: hover NAVY_3; selected / worn = NAVY_3 + yellow Thin rim (inside the card); on = purple rim; craftable = yellow-dark rim; owned = NAVY_3 no rim; locked = INK at .7; dim = NAVY_2 at .6.",
+   "note": "Card (CampUi.card, OptionCard, tiles): Container 3D white x NAVY_2, scale 0.8. States: hover NAVY_3; selected / worn = NAVY_3 + yellow Thin rim (inside the card); on = purple rim; craftable = yellow-dark rim; owned = NAVY_3 no rim; locked = INK at .7; dim = NAVY_2 at .6. Rims (selected / worn / on / craftable) are the card art itself in the rim colour under the face art inset 3-4 px, so the rim follows the card's rounded corners (modal pass 2026-10-01; the square Thin frame overlay did not).",
    "fallback": "panel:card",
    "fit": true,
    "slice": [
@@ -1540,17 +1540,18 @@
      "layers": [
       {
        "svg": "rhosgfx/cartoony-ui-pack-full/Containers/3D/0. White/container-3d-white.svg",
-       "tint": "palette:NAVY_3"
+       "tint": "palette:PACK_YELLOW",
+       "runtime_tint": false
       },
       {
-       "svg": "rhosgfx/cartoony-ui-pack-full/Frames/Thin/3. Yellow/frame-thin-yellow.svg",
-       "slice": [
-        22,
-        22,
-        22,
-        22
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/3D/0. White/container-3d-white.svg",
+       "tint": "palette:NAVY_3",
+       "expand": [
+        -4,
+        -4,
+        -4,
+        -4
        ],
-       "scale": 0.4,
        "runtime_tint": false
       }
      ]
@@ -1559,17 +1560,18 @@
      "layers": [
       {
        "svg": "rhosgfx/cartoony-ui-pack-full/Containers/3D/0. White/container-3d-white.svg",
-       "tint": "palette:NAVY_3"
+       "tint": "palette:PACK_YELLOW",
+       "runtime_tint": false
       },
       {
-       "svg": "rhosgfx/cartoony-ui-pack-full/Frames/Thin/3. Yellow/frame-thin-yellow.svg",
-       "slice": [
-        22,
-        22,
-        22,
-        22
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/3D/0. White/container-3d-white.svg",
+       "tint": "palette:NAVY_3",
+       "expand": [
+        -4,
+        -4,
+        -4,
+        -4
        ],
-       "scale": 0.4,
        "runtime_tint": false
       }
      ]
@@ -1578,17 +1580,18 @@
      "layers": [
       {
        "svg": "rhosgfx/cartoony-ui-pack-full/Containers/3D/0. White/container-3d-white.svg",
-       "tint": "palette:NAVY_3"
+       "tint": "palette:PACK_PURPLE",
+       "runtime_tint": false
       },
       {
-       "svg": "rhosgfx/cartoony-ui-pack-full/Frames/Thin/7. Purple/frame-thin-purple.svg",
-       "slice": [
-        22,
-        22,
-        22,
-        22
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/3D/0. White/container-3d-white.svg",
+       "tint": "palette:NAVY_3",
+       "expand": [
+        -4,
+        -4,
+        -4,
+        -4
        ],
-       "scale": 0.4,
        "runtime_tint": false
       }
      ]
@@ -1597,17 +1600,18 @@
      "layers": [
       {
        "svg": "rhosgfx/cartoony-ui-pack-full/Containers/3D/0. White/container-3d-white.svg",
-       "tint": "palette:NAVY_2"
+       "tint": "palette:GOLD_DEEP",
+       "runtime_tint": false
       },
       {
-       "svg": "rhosgfx/cartoony-ui-pack-full/Frames/Thin/3. Yellow/frame-thin-yellow-dark.svg",
-       "slice": [
-        22,
-        22,
-        22,
-        22
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/3D/0. White/container-3d-white.svg",
+       "tint": "palette:NAVY_2",
+       "expand": [
+        -3,
+        -3,
+        -3,
+        -3
        ],
-       "scale": 0.4,
        "runtime_tint": false
       }
      ]
@@ -1629,7 +1633,7 @@
    }
   },
   "card_accent": {
-   "note": "Accent card (rarity / class / biome): card + Thin white rim x accent (per-use tint), alpha .6, scale 0.35.",
+   "note": "Accent card (rarity / class / biome): the card art x accent (per-use tint, alpha .65) under the navy card art inset 3 px: a rim that follows the card's rounded corners.",
    "fallback": "panel:card",
    "fit": true,
    "slice": [
@@ -1650,19 +1654,19 @@
      "layers": [
       {
        "svg": "rhosgfx/cartoony-ui-pack-full/Containers/3D/0. White/container-3d-white.svg",
-       "tint": "palette:NAVY_2",
-       "runtime_tint": false
+       "tint": "#ffffff",
+       "modulate": "#ffffffa6"
       },
       {
-       "svg": "rhosgfx/cartoony-ui-pack-full/Frames/Thin/0. White/frame-thin-white.svg",
-       "slice": [
-        22,
-        22,
-        22,
-        22
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/3D/0. White/container-3d-white.svg",
+       "tint": "palette:NAVY_2",
+       "expand": [
+        -3,
+        -3,
+        -3,
+        -3
        ],
-       "scale": 0.35,
-       "modulate": "#ffffff99"
+       "runtime_tint": false
       }
      ]
     },
@@ -1670,19 +1674,277 @@
      "layers": [
       {
        "svg": "rhosgfx/cartoony-ui-pack-full/Containers/3D/0. White/container-3d-white.svg",
+       "tint": "#ffffff",
+       "modulate": "#ffffffd9"
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/3D/0. White/container-3d-white.svg",
        "tint": "palette:NAVY_3",
+       "expand": [
+        -3,
+        -3,
+        -3,
+        -3
+       ],
+       "runtime_tint": false
+      }
+     ]
+    }
+   }
+  },
+  "tile": {
+   "note": "Flat tile (modal pass 2026-10-01, user rule: tiles never look like buttons): Containers/Flat, no lip, no shadow. Only buttons carry the 3D lip. A rim layer (the flat art in the rim colour) under the face layer inset 2-3 px, so rims follow the rounded corners. normal = a navy a shade above the panel; hover (selectable tiles only) = NAVY_3 + a lighter rim; selected / worn = the yellow rim; on = purple; craftable = gold; owned = NAVY_3; locked = INK; dim = faded. Factory: UiTheme.tile_box(state, accent).",
+   "fallback": "panel:card",
+   "slice": [
+    10,
+    10,
+    10,
+    10
+   ],
+   "scale": 1.4,
+   "content": [
+    18,
+    14,
+    18,
+    14
+   ],
+   "states": {
+    "normal": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "#353a70",
        "runtime_tint": false
       },
       {
-       "svg": "rhosgfx/cartoony-ui-pack-full/Frames/Thin/0. White/frame-thin-white.svg",
-       "slice": [
-        22,
-        22,
-        22,
-        22
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "#24284f",
+       "expand": [
+        -2,
+        -2,
+        -2,
+        -2
        ],
-       "scale": 0.35,
-       "modulate": "#ffffffcc"
+       "runtime_tint": false
+      }
+     ]
+    },
+    "hover": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "#4d5598",
+       "runtime_tint": false
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "palette:NAVY_3",
+       "expand": [
+        -2,
+        -2,
+        -2,
+        -2
+       ],
+       "runtime_tint": false
+      }
+     ]
+    },
+    "selected": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "palette:PACK_YELLOW",
+       "runtime_tint": false
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "palette:NAVY_3",
+       "expand": [
+        -3,
+        -3,
+        -3,
+        -3
+       ],
+       "runtime_tint": false
+      }
+     ]
+    },
+    "worn": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "palette:PACK_YELLOW",
+       "runtime_tint": false
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "palette:NAVY_3",
+       "expand": [
+        -3,
+        -3,
+        -3,
+        -3
+       ],
+       "runtime_tint": false
+      }
+     ]
+    },
+    "on": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "palette:PACK_PURPLE",
+       "runtime_tint": false
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "palette:NAVY_3",
+       "expand": [
+        -3,
+        -3,
+        -3,
+        -3
+       ],
+       "runtime_tint": false
+      }
+     ]
+    },
+    "craftable": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "palette:GOLD_DEEP",
+       "runtime_tint": false
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "#24284f",
+       "expand": [
+        -3,
+        -3,
+        -3,
+        -3
+       ],
+       "runtime_tint": false
+      }
+     ]
+    },
+    "owned": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "#353a70",
+       "runtime_tint": false
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "palette:NAVY_3",
+       "expand": [
+        -2,
+        -2,
+        -2,
+        -2
+       ],
+       "runtime_tint": false
+      }
+     ]
+    },
+    "locked": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "#1a1c38",
+       "runtime_tint": false
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "#121428",
+       "expand": [
+        -2,
+        -2,
+        -2,
+        -2
+       ],
+       "runtime_tint": false
+      }
+     ]
+    },
+    "dim": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "#262a52",
+       "runtime_tint": false
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "#1f2246",
+       "expand": [
+        -2,
+        -2,
+        -2,
+        -2
+       ],
+       "runtime_tint": false
+      }
+     ]
+    }
+   }
+  },
+  "tile_accent": {
+   "note": "Flat tile with an accent rim (rarity / class / biome / event colour, per-use tint, alpha .7) under the face inset 2 px. hover = NAVY_3 face, rim at full alpha. Factory: UiTheme.tile_box(state, accent).",
+   "fallback": "panel:card",
+   "slice": [
+    10,
+    10,
+    10,
+    10
+   ],
+   "scale": 1.4,
+   "content": [
+    18,
+    14,
+    18,
+    14
+   ],
+   "states": {
+    "normal": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "#ffffff",
+       "modulate": "#ffffffb3"
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "#24284f",
+       "expand": [
+        -2,
+        -2,
+        -2,
+        -2
+       ],
+       "runtime_tint": false
+      }
+     ]
+    },
+    "hover": {
+     "layers": [
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "#ffffff",
+       "modulate": "#ffffffff"
+      },
+      {
+       "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+       "tint": "palette:NAVY_3",
+       "expand": [
+        -2,
+        -2,
+        -2,
+        -2
+       ],
+       "runtime_tint": false
       }
      ]
     }
@@ -1891,7 +2153,7 @@
    }
   },
   "frame_ornate": {
-   "note": "Boss-tier overlay only (boss passives, boss unlocks): Ornate yellow at scale 0.45, no centre. Draw over a card.",
+   "note": "Boss-tier overlay only (boss passives, boss unlocks): Ornate yellow at scale 0.45, no centre. Draw over a card. Scale 0.3 (was 0.45: the stretched straight edges read as thick orange bars).",
    "fallback": "empty",
    "slice": [
     59,
@@ -1899,7 +2161,7 @@
     59,
     59
    ],
-   "scale": 0.45,
+   "scale": 0.3,
    "draw_center": false,
    "states": {
     "normal": {

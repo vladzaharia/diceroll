@@ -183,6 +183,30 @@ static func card_box(state: String = "normal", accent: Variant = null) -> StyleB
 	return UiSkin.stylebox("panel_card", state, fb)
 
 
+## Flat tile / card (user rule, modal pass 2026-10-01: tiles never look like buttons, only
+## buttons carry the 3D lip). States: "normal", "hover" (selectable tiles only), "selected",
+## "worn", "on", "craftable", "owned", "locked", "dim"; `accent` = a rim in that colour (normal /
+## hover). Pieces "tile" / "tile_accent" in ui_pack.json. Use this for every content tile in a
+## modal; card_box() (the 3D card) stays for screens that still want it.
+static func tile_box(state: String = "normal", accent: Variant = null) -> StyleBox:
+	var fb := flat_box("card_hi" if state in ["selected", "worn", "on", "craftable"] else "card")
+	match state:
+		"hover", "owned":
+			fb.bg_color = UiPalette.NAVY_3
+		"on":
+			fb.border_color = UiPalette.XP
+		"locked":
+			fb.bg_color = Color(0.06, 0.06, 0.13, 0.9)
+			fb.border_color = Color(1, 1, 1, 0.06)
+		"dim":
+			fb.bg_color = Color(UiPalette.NAVY_2, 0.6)
+	if accent is Color and state in ["normal", "hover"]:
+		fb.border_color = Color(accent as Color, 0.55)
+		fb.set_border_width_all(2)
+		return UiSkin.stylebox("tile_accent", state, {"fallback": fb, "tint": accent})
+	return UiSkin.stylebox("tile", state, fb)
+
+
 ## Chip / pill / tag / badge background. `color_or_family`: a pack family name (FAMILIES:
 ## "red" = NEW, "purple" = EQUIPPED, "green" = level / KIT, "grey" = HUD counter,
 ## "yellow" = AUTO on / active tab) drawn natively, or any Color (white art x colour).
@@ -292,7 +316,9 @@ static func toast_color(kind: String) -> Color:
 ## ("yellow", "red" GAME OVER, "purple" LEVEL UP, "green" VICTORY, ...) or a Color (white x colour).
 static func plaque_box(color_or_family: Variant = "yellow") -> StyleBox:
 	var fam := family_of(color_or_family)
-	if fam == "white" and color_or_family is Color:
+	# a colour whose nearest family has no plaque art (grey: steel, silver) is the white
+	# plaque x that colour; it used to resolve to the missing plaque_grey and draw nothing
+	if color_or_family is Color and (fam == "white" or not UiSkin.has("plaque_" + fam)):
 		return UiSkin.stylebox("plaque_white", "normal", {"fallback": StyleBoxEmpty.new(), "tint": color_or_family})
 	return UiSkin.stylebox("plaque_" + fam, "normal", StyleBoxEmpty.new())
 

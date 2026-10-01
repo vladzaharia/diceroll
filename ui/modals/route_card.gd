@@ -13,7 +13,7 @@ var _timer: SceneTreeTimer
 
 
 func _build() -> void:
-	set_title("YOUR ROUTE", UiPalette.GOLD)
+	set_title("YOUR ROUTE", PLAQUE_DEFAULT)
 	max_width = 680.0
 	_sub = UiTheme.label("", 22, UiPalette.TEXT_DIM, false, 0, false, 600)
 	_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -21,6 +21,7 @@ func _build() -> void:
 	body.add_child(_sub)
 	_strip_holder = UiTheme.vbox(0)
 	body.add_child(_strip_holder)
+	body.add_child(UiModal.action_gap())
 	var go := GameButton.make("BEGIN", "arrow_right", GameButton.Kind.PRIMARY, 38)
 	go.icon_tint = UiPalette.TEXT_DARK
 	go.pressed.connect(_begin)

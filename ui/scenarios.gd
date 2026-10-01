@@ -100,6 +100,9 @@ static func build(name: String) -> Node:
 			ui.add_child(p)
 			p.refresh(flow)
 			p.show_now()
+			# --confirm=1: the abandon confirm step
+			if _arg("confirm", "0") == "1":
+				p._ask()
 		"ui_settings":
 			var s := SettingsPanel.new()
 			ui.add_child(s)

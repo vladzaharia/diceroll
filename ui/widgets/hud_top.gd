@@ -171,7 +171,7 @@ func _init() -> void:
 	_twist_moon.custom_minimum_size = Vector2(30, 30)
 	_twist_moon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	tr.add_child(_twist_moon)
-	_twist_label = UiTheme.label("", 20, UiPalette.TEXT, true, 5)
+	_twist_label = UiTheme.label("", 22, UiPalette.TEXT, true, 5)
 	tr.add_child(_twist_label)
 	chips.add_child(act)
 	var ar := UiTheme.hbox(8)
@@ -222,6 +222,17 @@ func _layout() -> void:
 	var group := w + reserve
 	# too narrow for the row's natural width (small phones, big UI size): shrink it to fit
 	_row.scale = Vector2.ONE
+	# a twist chip that would make the row shrink (text under 16 px, buttons under 80) drops
+	# its word first: the moon / sun / drum glyph alone still reads, the word is in its tooltip
+	if _twist_label != null and twist_chip.visible:
+		_twist_label.visible = true
+		if _row.get_combined_minimum_size().x > w:
+			_twist_label.visible = false
+	# ...then the lap pips (the lap number / BOSS NEXT stays; the pips are in its tooltip)
+	if lap_pips != null:
+		lap_pips.visible = true
+		if _row.get_combined_minimum_size().x > w:
+			lap_pips.visible = false
 	var need := _row.get_combined_minimum_size().x
 	_fit = clampf(w / maxf(need, 1.0), 0.6, 1.0)
 	var lw := w / _fit

@@ -1,5 +1,5 @@
 {
-  "lock_hash": "93484bdaba359c2e",
+  "lock_hash": "6b61076f152227f6",
   "schema": 1,
   "units": {
     "fonts": {
@@ -300,13 +300,13 @@
       "sha256": "9d574cdc03e8bd531fe332951b3583a3b85f83ec03bebc83f86e94e8f3c482d9"
     },
     "ui-icons-vector-icon-pack-pro": {
-      "bundle_bytes": 163705,
-      "bundle_sha256": "938ef30b928ea7b72798286a3d6e327dab829a005161162bb18eda179bb3be7f",
+      "bundle_bytes": 164077,
+      "bundle_sha256": "296d7d30ef4b91f667b9739734da9b9df3f965ab8c6830d387c0c0cde79dac2c",
       "dest": "assets/ui/icons/vector-icon-pack-pro",
-      "file": "bundles/ui-icons-vector-icon-pack-pro/ui-icons-vector-icon-pack-pro-3aba631bfd42de71.tar.zst.age",
-      "files": 570,
-      "plain_bytes": 656930,
-      "sha256": "3aba631bfd42de71b98a6617b4b63d2752dd71de23a46d2f9393d46f1c19cba1"
+      "file": "bundles/ui-icons-vector-icon-pack-pro/ui-icons-vector-icon-pack-pro-ef57125782d4ad4e.tar.zst.age",
+      "files": 572,
+      "plain_bytes": 658375,
+      "sha256": "ef57125782d4ad4eacd21479b59defeab5170991d3c5c9479a4e4d445f458d99"
     },
     "ui-icons-vector-keyboard-controls": {
       "bundle_bytes": 13262,
@@ -318,13 +318,13 @@
       "sha256": "b0da7f3a76ba5fefdd5b60c18e09114d2ac2da3c529ed98a41e02326ff862877"
     },
     "ui-pack-cartoony-ui-pack-full": {
-      "bundle_bytes": 10613,
-      "bundle_sha256": "44b4025780f0eeac01a1ee5362e533219c49bb82918003733b1534552c49260b",
+      "bundle_bytes": 10443,
+      "bundle_sha256": "d511c078fe05bd5b9747de4269524a4377f3ad859023117cf79cffa0e1328505",
       "dest": "assets/ui/pack/cartoony-ui-pack-full",
-      "file": "bundles/ui-pack-cartoony-ui-pack-full/ui-pack-cartoony-ui-pack-full-f34f681334528989.tar.zst.age",
-      "files": 232,
-      "plain_bytes": 104332,
-      "sha256": "f34f681334528989070d446a6353c35920d2eb7f7be9108519215b48c6031df2"
+      "file": "bundles/ui-pack-cartoony-ui-pack-full/ui-pack-cartoony-ui-pack-full-44241eb71773a22d.tar.zst.age",
+      "files": 226,
+      "plain_bytes": 100931,
+      "sha256": "44241eb71773a22db95a9e21d1862cb0b08bb02320f3e880925f97ac151a8f57"
     }
   }
 }

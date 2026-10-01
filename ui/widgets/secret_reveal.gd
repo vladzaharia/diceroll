@@ -69,9 +69,9 @@ func _build() -> void:
 
 func _style(on: bool) -> void:
 	# a card like the other unlock cards (accent rim: BOO green once revealed, violet before)
-	var sb := UiTheme.card_box("normal", BOO_GREEN if on else Color(0.55, 0.45, 0.75))
+	var sb := UiTheme.tile_box("normal", BOO_GREEN if on else Color(0.55, 0.45, 0.75))
 	UiTheme.pad(sb, 16, 14)
-	sb.content_margin_bottom = maxf(sb.content_margin_bottom, 22.0 if UiTheme.skinned("card_accent") else 14.0)
+	sb.content_margin_bottom = maxf(sb.content_margin_bottom, 14.0)
 	add_theme_stylebox_override("panel", sb)
 
 

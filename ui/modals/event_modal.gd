@@ -15,8 +15,10 @@ const ART := {
 ## Frame colour per event id (default violet); the Deep Mines ore vein is teal.
 const RIM := {"ore": Color("3fb8aa"), "camp": Color("ff9a4a")}
 const CAMP_ICONS := {"potion": "potion_healing", "rune": "rune_wild", "steady": "reroll"}
+## The decline choice of every event (core label): always the same arrow.
+const WALK_AWAY := "Walk away"
 const CHOICE_ICONS := {
-	"atk": "sword", "max_hp": "heart", "gold": "3d:coins", "face": "anvil",
+	"atk": "sword", "max_hp": "heart", "gold": "coin", "face": "anvil",
 }
 
 var _art: CenterContainer
@@ -45,7 +47,7 @@ func _build() -> void:
 	_text = UiTheme.para("", 26, UiPalette.TEXT, 500)
 	_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	body.add_child(_text)
-	body.add_child(UiTheme.spacer(4))
+	body.add_child(UiModal.section_gap())
 	_choices = UiTheme.vbox(12)
 	body.add_child(_choices)
 
@@ -56,12 +58,9 @@ func refresh(flow: GameFlow) -> void:
 	var rim: Color = RIM.get(id, Color("9a7ae0"))
 	if id == "camp":
 		dismissible = false
-		set_title(String(o.get("title", "The Last Camp")).to_upper(), "yellow") # forced: one gift, no close
+		set_title(String(o.get("title", "The Last Camp")).to_upper(), PLAQUE_DEFAULT) # forced: one gift, no close
 	else:
-		set_title(String(o.get("title", "Event")).to_upper(), rim)
-	# a colour without a native plaque family (steel, silver...): the white plaque x colour
-	if not ribbon.skinned():
-		ribbon.family = "white"
+		set_title(String(o.get("title", "Event")).to_upper(), PLAQUE_DEFAULT)
 	UiTheme.clear(_art)
 	var art: Array = ART.get(id, ["star", UiPalette.GOLD])
 	_art.add_child(OptionCard.Medallion.make(art_icon(id, String(art[0])), 128, art[1], rim))
@@ -74,10 +73,14 @@ func refresh(flow: GameFlow) -> void:
 	for i in choices.size():
 		var ch: Dictionary = choices[i]
 		var c := OptionCard.make(String(ch.get("label", "")), String(ch.get("desc", "")))
-		var icon := _choice_icon(id, ch, i)
-		if icon != "":
-			c.set_icon(icon)
-		c.set_tag("", rim)
+		if ch.has("passive") and Passives.DEFS.has(String(ch.passive)):
+			# a shrine passive reads like every other passive card: its icon + rarity tag
+			c.set_passive(String(ch.passive))
+		elif ch.has("kind"):
+			c.set_die(String(ch.kind))
+		else:
+			c.set_icon(_choice_icon(id, ch, i))
+			c.set_tag("", rim)
 		c.set_enabled(bool(ch.get("enabled", true)))
 		if not bool(ch.get("enabled", true)):
 			c.set_tag("LOCKED", UiPalette.TEXT_MUTED)
@@ -92,14 +95,16 @@ static func _choice_icon(id: String, ch: Dictionary, i: int) -> String:
 	if ch.has("blessing"):
 		return CHOICE_ICONS.get(String(ch.blessing), "star")
 	if ch.has("ore"):
-		return "3d:coins" if String(ch.ore) == "gold" else "anvil"
+		return "coin" if String(ch.ore) == "gold" else "anvil"
+	if String(ch.get("label", "")) == WALK_AWAY:
+		return "arrow_right"
 	match id:
 		"duel":
-			return "coin" if int(ch.get("bet", 0)) > 0 else "arrow_right"
+			return "coin"
 		"merchant":
-			return "rune_wild" if i == 0 else "arrow_right"
+			return "rare_rune"
 		"idol":
-			return "heart" if i == 0 else "arrow_right"
+			return "heart"
 		"outbreak":
 			return "skull"
 		"garden":

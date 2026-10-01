@@ -31,7 +31,8 @@ func _build() -> void:
 	_note = UiTheme.label(" ", 22, UiPalette.TEXT_DIM, false, 0, false, 600)
 	_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	body.add_child(_note)
-	_bind = GameButton.make("BIND RUNE", "check", GameButton.Kind.PRIMARY, 38)
+	body.add_child(UiModal.action_gap())
+	_bind = GameButton.make("BIND RUNE", "check", GameButton.Kind.SUCCESS, 38)
 	_bind.icon_tint = UiPalette.TEXT_DARK
 	_bind.pressed.connect(func() -> void:
 		if _choice >= 0:
@@ -46,10 +47,10 @@ func refresh(flow: GameFlow) -> void:
 	_rune = String(flow.offer.get("rune", "blade"))
 	_dice = flow.run.dice
 	var def: Dictionary = Runes.DEFS.get(_rune, {"name": _rune, "desc": ""})
-	set_title("BIND %s" % String(def.name).to_upper(), UiPalette.GOLD)
+	set_title("BIND %s" % String(def.name).to_upper(), PLAQUE_DEFAULT)
 	UiTheme.clear(_hero)
 	# the rune card: a card with a rim in the rune's colour (spec 4.3)
-	_hero.add_theme_stylebox_override("panel", UiTheme.card_box("normal", UiPalette.rune_color(_rune)))
+	_hero.add_theme_stylebox_override("panel", UiTheme.tile_box("normal", UiPalette.rune_color(_rune)))
 	var row := UiTheme.hbox(18)
 	_hero.add_child(row)
 	row.add_child(RuneBadge.make(_rune, 96))
@@ -69,6 +70,7 @@ func refresh(flow: GameFlow) -> void:
 	OptionCard.style_tag(tp, tag, UiPalette.rarity_color(rarity))
 	nr.add_child(tp)
 	col.add_child(UiTheme.para(String(def.desc), 24, UiPalette.TEXT, 500))
+	_grid.columns = grid_columns(3, ShopModal.DIE_CHIP_W)
 	UiTheme.clear(_grid)
 	_chips.clear()
 	for i in _dice.size():
