@@ -42,7 +42,7 @@ const DEFS := {
 		"minibosses": ["mini_bone_champion"], "bosses": [],
 	},
 	"hollow": {
-		"name": "The Hollow", "tier": 2, "enemy_hp": 1.05,
+		"name": "The Hollow", "tier": 2, "enemy_hp": 1.06,
 		"desc": "Restless spirits: events are twice as common, and finishing one heals 3% of your max HP.",
 		"mix": {"event": 2},
 		"pools": [["werewolf", "cultist", "hollow_wisp", "bandit"],
@@ -72,7 +72,7 @@ const DEFS := {
 		"minibosses": ["mini_bone_champion"], "bosses": ["boss_lich", "boss_bone_warden"],
 	},
 	"magma": {
-		"name": "Magma Depths", "tier": 3,
+		"name": "Magma Depths", "tier": 3, "enemy_hp": 1.02,
 		"desc": "Lava tiles scorch you for 3% max HP when you pass over them and 10% when you land on them.",
 		"mix": {"lava": 3},
 		"pools": [["ember_imp", "ember_imp", "skeleton_warrior", "orc_raider"],
@@ -82,7 +82,7 @@ const DEFS := {
 	},
 	# --- 2026-09-29 new biomes (docs/design/2026-09-29-new-biomes.md)
 	"mines": {
-		"name": "Deep Mines", "tier": 1, "twist": "ore", "look": "mines", "enemy_hp": 0.92,
+		"name": "Deep Mines", "tier": 1, "twist": "ore", "look": "mines", "enemy_hp": 0.94,
 		"desc": "Ore veins pay out gold or a Face Raise, but each vein you mine caves in and becomes a trap.",
 		"mix": {"ore": 3}, "refill": {"ore": 3},
 		"pools": [["skeleton_minion", "skeleton_minion", "skeleton_archer", "bone_cutthroat"],
@@ -91,7 +91,7 @@ const DEFS := {
 		"minibosses": ["mini_bone_champion"], "bosses": [],
 	},
 	"warcamp": {
-		"name": "Orc Warcamp", "tier": 2, "twist": "drums", "look": "warcamp", "enemy_hp": 0.92,
+		"name": "Orc Warcamp", "tier": 2, "twist": "drums", "look": "warcamp", "enemy_hp": 0.9,
 		"desc": "War drums rally every orc in earshot: enemies gain +1 attack per standing drum. Land on a drum to smash it.",
 		"mix": {"drum": 1}, # drum count = WARCAMP_DRUMS (Board.layout_for)
 		"pools": [["orc_raider", "wolf_bandit", "bandit", "skeleton_archer"],
@@ -101,7 +101,7 @@ const DEFS := {
 		"short_bosses": ["boss_cinder_king", "boss_magma_golem"], "short_boss_hp": 0.80,
 	},
 	"ruins": {
-		"name": "Sunscorched Ruins", "tier": 3, "twist": "heat", "look": "ruins", "enemy_hp": 0.97,
+		"name": "Sunscorched Ruins", "tier": 3, "twist": "heat", "look": "ruins", "enemy_hp": 0.95,
 		"desc": "The heat costs 8% of your max HP at the end of every lap unless you landed on an oasis during it. Oases heal 5%.",
 		"mix": {"oasis": 3, "campfire": -1},
 		"pools": [["bone_cutthroat", "skeleton_warrior", "bone_knight", "cultist"],

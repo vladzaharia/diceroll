@@ -31,7 +31,7 @@ const CAMP_ASC_HEAL_PCT := 0.25
 const CAMP_BOSS_HP := 1.5
 const CAMP_BOSS_HP_BY_ID := {
 	"boss_lich": 1.54, "boss_bone_warden": 1.68, "boss_cinder_king": 1.52, "boss_magma_golem": 1.46,
-	"boss_moon_king": 1.23, "boss_sand_colossus": 1.36,
+	"boss_moon_king": 1.23, "boss_sand_colossus": 1.29,
 }
 ## The Short Road's finale bosses after its camp (lap 9), on top of their short_boss_hp.
 const CAMP_BOSS_HP_SHORT_BY_ID := {
