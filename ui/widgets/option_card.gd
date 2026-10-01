@@ -137,6 +137,10 @@ func _apply_margins() -> void:
 
 
 func set_icon(icon: String, tint: Variant = null) -> void:
+	# cards are navy: a Flat White action glyph (arrow, check...) is drawn in TEXT, never in
+	# its default button-face ink (it vanished on the card); object icons ignore the tint
+	if tint == null:
+		tint = UiPalette.TEXT
 	UiTheme.clear(_medal_holder)
 	_medal_holder.visible = true
 	if skinned():
@@ -380,7 +384,8 @@ class Medallion:
 		if skinned():
 			var sb := disc_box(s, ring, saturation)
 			if sb != null:
-				var w := s * 55.0 / 64.0
+				# 60 of 64 units wide: the disc plus its lip reads round (55 / 64 read as an egg)
+				var w := s * 60.0 / 64.0
 				var box := Rect2(Vector2((size.x - w) * 0.5, (size.y - s) * 0.5), Vector2(w, s))
 				draw_style_box(sb, box)
 				# the face is the top 54 of 64 units; the icon sits on its centre

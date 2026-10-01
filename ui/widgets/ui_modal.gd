@@ -12,6 +12,18 @@ extends Control
 ## dialogs set `cancel_action` (Esc presses it) and keep their explicit cancel button.
 ## `primary_action` is pressed by Enter. Keys go to the top-most open modal only.
 
+## Plaque colour legend (modal pass 2026-10-01): the plaque colour carries meaning, never a
+## station / event / item identity (that lives in medallions, rims and icons).
+##   yellow  every modal by default (places, tools, choices, rewards, settings, pause)
+##   purple  LEVEL UP! only (the hero levels)
+##   green   VICTORY! only
+##   red     DEFEATED and destructive confirms (ABANDON RUN?)
+const PLAQUE_DEFAULT := "yellow"
+const PLAQUE_LEVEL := "purple"
+const PLAQUE_WIN := "green"
+const PLAQUE_DANGER := "red"
+const PLAQUE_FAMILIES := [PLAQUE_DEFAULT, PLAQUE_LEVEL, PLAQUE_WIN, PLAQUE_DANGER]
+
 signal opened
 signal closed
 ## The player dismissed the modal (close button, Esc or backdrop), just before it closes.
@@ -58,6 +70,9 @@ const LARGE_CANVAS := 1000.0
 const CLOSE_PX := 64.0
 const CLOSE_PX_LG := 72.0
 const CLOSE_GAP := 12.0
+## Audit floors (tools/shot.gd --audit): text px and tap-target px on the canvas.
+const TEXT_MIN := 16.0
+const TAP_MIN := 80.0
 var _center: Control
 var _scroll: ScrollContainer
 var _inner: MarginContainer
@@ -329,7 +344,9 @@ func _layout() -> void:
 	# a little too tall (short landscape, big UI size): shrink up to ~20% when that avoids
 	# scrolling; content that would scroll anyway scrolls at full size instead of shrinking too
 	var kh := avail_h / maxf(natural + chrome, 1.0)
-	var k := minf(w / lw, kh if kh >= 0.8 and kh < 1.0 else 1.0)
+	# ...but never below the scale that keeps text >= 16 px and tap targets >= 80 px (the
+	# audit floors): past that the body scrolls at full size instead
+	var k := minf(w / lw, kh if kh >= maxf(0.8, _shrink_floor()) and kh < 1.0 else 1.0)
 	_scroll.custom_minimum_size.y = minf(natural, avail_h / k - chrome)
 	_update_gutter(natural > _scroll.custom_minimum_size.y + 0.5)
 	_frame.reset_size()
@@ -346,6 +363,29 @@ func _layout() -> void:
 	_frame.pivot_offset = _frame.size * 0.5
 	_frame.position = c - _frame.size * 0.5
 	_place_close()
+
+
+## Smallest panel scale that keeps every visible label at TEXT_MIN px and every small
+## button at TAP_MIN px (1.0 = no shrink allowed).
+func _shrink_floor() -> float:
+	var need := 0.0
+	var stack: Array[Node] = [_inner]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		var c := n as Control
+		if c != null and not c.visible:
+			continue
+		if n is Label:
+			var l := n as Label
+			var fs := l.label_settings.font_size if l.label_settings else l.get_theme_font_size("font_size")
+			if fs > 0 and l.text.strip_edges() != "":
+				need = maxf(need, TEXT_MIN / float(fs))
+		elif n is BaseButton:
+			var h := (n as Control).get_combined_minimum_size().y
+			if h > 1.0 and h < 200.0:
+				need = maxf(need, TAP_MIN / h)
+		stack.append_array(n.get_children())
+	return minf(need, 1.0)
 
 
 ## Frame + plaque scale by canvas size (phone 0.75 frame / 72 px plaque; >= 1000 both ways:
@@ -426,10 +466,17 @@ func _deferred_layout() -> void:
 
 # ---------------------------------------------------------------- small shared builders
 
+## Section header (convention): UPPERCASE, gold, 20 px, centred, no "!" and no colon.
 static func section_label(text: String) -> Label:
 	var l := UiTheme.label(text.to_upper(), 20, UiPalette.GOLD, false, 0, false, 700)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	return l
+
+
+## Group header inside a section (e.g. the Controls list's RUN / COMBAT): UPPERCASE, muted,
+## 18 px, left-aligned, so it never reads as a second section header.
+static func subsection_label(text: String) -> Label:
+	return UiTheme.label(text.to_upper(), 18, UiPalette.TEXT_MUTED, false, 0, false, 700)
 
 
 ## While the body scrolls, keep content clear of the vertical scrollbar (right-aligned values

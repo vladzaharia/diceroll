@@ -36,7 +36,7 @@ func rebuild() -> void:
 	for row in InputActions.list():
 		if String(row.group) != group:
 			group = String(row.group)
-			add_child(UiModal.section_label(group))
+			add_child(UiModal.subsection_label(group))
 		add_child(_row(row))
 
 

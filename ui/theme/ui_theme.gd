@@ -292,7 +292,9 @@ static func toast_color(kind: String) -> Color:
 ## ("yellow", "red" GAME OVER, "purple" LEVEL UP, "green" VICTORY, ...) or a Color (white x colour).
 static func plaque_box(color_or_family: Variant = "yellow") -> StyleBox:
 	var fam := family_of(color_or_family)
-	if fam == "white" and color_or_family is Color:
+	# a colour whose nearest family has no plaque art (grey: steel, silver) is the white
+	# plaque x that colour; it used to resolve to the missing plaque_grey and draw nothing
+	if color_or_family is Color and (fam == "white" or not UiSkin.has("plaque_" + fam)):
 		return UiSkin.stylebox("plaque_white", "normal", {"fallback": StyleBoxEmpty.new(), "tint": color_or_family})
 	return UiSkin.stylebox("plaque_" + fam, "normal", StyleBoxEmpty.new())
 

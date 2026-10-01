@@ -65,7 +65,7 @@ func _draw() -> void:
 	if label_text == "" or glyph_id.begins_with("mouse"):
 		return
 	var f := UiTheme.display_font()
-	var fs := int(px * (0.46 if label_text.length() <= 1 else 0.34))
+	var fs := int(px * (0.46 if label_text.length() <= 1 else 0.38))
 	var tw := f.get_string_size(label_text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 	var maxw := size.x * 0.78
 	if tw > maxw and tw > 0.0:
