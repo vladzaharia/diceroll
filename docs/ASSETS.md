@@ -9,7 +9,9 @@ No third-party asset is committed to this repo. All KayKit packs are CC0, but th
   - `kenney/`: Kenney CC0 SFX packs
   - `fonts/`: Fredoka and Lilita One (OFL)
   - `tiny_rpg/`: Tiny RPG character sprite packs (currently unused)
-- **`assets/kaykit/`, `assets/audio/`, `assets/fonts/`** (git-ignored) are the runtime subsets the game loads. `tools/import_assets.sh` builds them from `third_party/`.
+  - `rhosgfx/`: RhosGFX vector packs (UI reskin, see below): `cartoony-ui-pack-full/`, `vector-icon-pack-pro/`, `vector-keyboard-controls/`, `vector-emojis/`, `vector-hats/`
+  - `quaternius/ultimate-platformer-pack/`: Quaternius Ultimate Platformer Pack (CC0 3D models)
+- **`assets/kaykit/`, `assets/audio/`, `assets/fonts/`, `assets/ui/icons/`, `assets/ui/pack/`** (git-ignored) are the runtime subsets the game loads. `tools/import_assets.sh` builds them from `third_party/`.
 - **`assets/icon/` and `assets/CREDITS.md`** are the project's own files and stay tracked.
 
 ## Fresh clone / new machine
@@ -17,6 +19,44 @@ No third-party asset is committed to this repo. All KayKit packs are CC0, but th
 2. Run `tools/import_assets.sh` (needs `ffmpeg`: it normalises the music to -16 LUFS). From a git worktree, point it at the main checkout's store with `THIRD_PARTY=/path/to/diceroll/third_party`. Add `--fetch` to download the fonts and Kenney SFX into `third_party/` if they're missing.
 3. Run `godot --headless --path . --import`.
 4. Run `tools/render_icons.sh` to render the "rendered" UI icons (coin pile, chests, gems, potions, key) from the KayKit props into `ui/icons/rendered/*.png`. They derive from paid models, so they are ignored by git like the models. Without them the UI falls back to the vector glyphs.
+
+## RhosGFX UI packs and Quaternius
+
+The 2026-09-30 UI reskin uses vector (SVG) packs by **RhosGFX** (https://rhosgfx.itch.io).
+The game uses the SVG version of each piece, never the PNG exports.
+
+| `third_party/rhosgfx/` folder | Pack | Licence |
+|---|---|---|
+| `cartoony-ui-pack-full/` | [Cartoony UI Pack](https://rhosgfx.itch.io/cartoony-ui-pack) (Full): buttons, frames, containers, bars, widgets | RhosGFX licence (paid). You may use and modify it in a project. You may not resell or redistribute it, or use it in commissions |
+| `vector-icon-pack-pro/` | Vector Icon Pack (Pro), about 3,674 SVG icons | RhosGFX licence (paid), same terms |
+| `vector-keyboard-controls/` | Vector Keyboard Controls | CC0 1.0 |
+| `vector-emojis/` | Vector Emojis | CC0 1.0 |
+| `vector-hats/` | Vector Hats | RhosGFX licence (https://rhosgfx.com/license) |
+
+`third_party/quaternius/ultimate-platformer-pack/` holds the
+[Ultimate Platformer Pack](https://quaternius.com) by Quaternius: CC0 1.0 3D models, and no runtime
+subset yet.
+
+**Paid packs never go into the public repo.**
+- The **whole packs** are encrypted in the private assets repo `vladzaharia/diceroll-assets` under
+  `packs/`.
+- To restore them on a new machine:
+  `tools/ci/assets.py unseal <diceroll-assets>/packs/rhosgfx/<pack>.tar.zst.age third_party/rhosgfx/<pack>`
+  (and `packs/quaternius/…`; `packs/packs.json` lists them). This needs `ASSETS_AGE_KEY`.
+- Only the SVGs the game references are copied to `assets/ui/`:
+  - `tools/import_ui_svgs.py`, which `tools/import_assets.sh` calls, reads `ui/icons/icon_map.json` and `ui/theme/ui_pack.json`.
+  - It writes sanitised names, and deletes stale files.
+- Those copies travel to CI as the `ui-icons-*` / `ui-pack-*` bundle units.
+- The pipeline and the APIs are described in `docs/design/2026-09-30-svg-ui-pipeline.md`.
+
+**The RhosGFX "no AI input" clause.** The RhosGFX licence says the assets may not be used "as
+input, reference material, or training data for any AI or generative art system". On
+**2026-09-30 the owner (Vlad) decided to go ahead with AI-assisted integration anyway**:
+AI coding agents write the import pipeline, pick icons and wire the files into the game. He
+reads the clause as aimed at generative and training use: producing AI art derived from the packs,
+or training models on them. Integrating the purchased files unchanged into a game does neither.
+No AI-generated art is derived from the packs, and the packs are not used to train anything.
+Revisit this decision if RhosGFX clarifies the clause.
 
 ## Adding assets from a new pack
 The optional KayKit EXTRA subsets (ResourceBits, RPGToolsBits, Dungeon, Adventurers potions into `assets/kaykit/resources`, `tools_x`, `dungeon_x`, `potions`) are copied by `xsync` lines and skipped when a pack is absent; the tile props then fall back to the FREE models.
@@ -38,7 +78,9 @@ age-encrypted bundles** from the private repo `vladzaharia/diceroll-assets`
 (`tools/ci/assets.py`):
 
 - **Unit**: one runtime folder: each `assets/kaykit/<name>`, each `assets/audio/sfx/<pack>`,
-  `assets/audio/music`, `assets/fonts`, and the rendered UI icons (31 units, ~28 MB encrypted).
+  `assets/audio/music`, `assets/fonts`, the rendered UI icons, and the referenced RhosGFX SVGs
+  (`ui-icons-<pack>` for each `assets/ui/icons/<pack>`, and `ui-pack-<pack>` for each
+  `assets/ui/pack/<pack>`).
   Runtime subsets are much smaller than the raw packs (~110 MB vs ~800 MB), and Godot's `.import`
   / `.uid` sidecars travel with them so resource UIDs stay stable.
 - **Hash**: SHA-256 over the sorted `<relative path>\t<sha256>` lines of the unit's files.

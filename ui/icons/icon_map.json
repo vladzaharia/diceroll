@@ -1,0 +1,2730 @@
+{
+ "version": 1,
+ "default_variant": "Outline",
+ "root": "third_party/",
+ "schema": {
+  "svg": "path relative to third_party/",
+  "tint": "null = authored colours (caller tint ignored) | #hex | palette:NAME[.key] | palette:auto (legacy per-id colour); baked multiply, caller Color overrides",
+  "saturation": "optional 0..1, applied after tint (locked states pass 0 at call time; plan e)",
+  "badge": "optional {svg, corner:\"br\", scale}: a second pack icon composited at the corner (combined icons); registries that ignore it show the base icon",
+  "group": "category for review sheets",
+  "note": "free text"
+ },
+ "icons": {
+  "coin": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Currency/Coin/Coin Outline.svg",
+   "tint": null,
+   "note": "Gold (run money). Replaces 3d:coins too.",
+   "group": "currency"
+  },
+  "3d:coins": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Currency/Coin Stack/Coin Stack Gold Outline.svg",
+   "tint": null,
+   "note": "Gold pile (HUD gold counter, shrine gold, ore gold): coin stack reads as \"a lot of gold\".",
+   "group": "currency"
+  },
+  "crown": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Clothing/Crown/Crown Outline.svg",
+   "tint": null,
+   "note": "Crowns meta currency ONLY (was also boss/throne/gilded; those now have their own icons).",
+   "group": "currency"
+  },
+  "sigil": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Currency/Star Gem/Star Gem Purple Outline.svg",
+   "tint": null,
+   "note": "Sigils meta currency (was star tinted c79bff). New id; CampUi.SIGIL_ICON -> \"sigil\".",
+   "group": "currency"
+  },
+  "treasury": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Piggy Bank/Piggy Bank Gold Outline.svg",
+   "tint": null,
+   "note": "Treasury bank + Treasury corner tile (was 3d:chest).",
+   "group": "currency"
+  },
+  "3d:chest": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Piggy Bank/Piggy Bank Gold Outline.svg",
+   "tint": null,
+   "note": "Alias of treasury (hud_top treasury counter).",
+   "group": "currency"
+  },
+  "pet_xp": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/XP Orb/XP Orb Outline.svg",
+   "tint": null,
+   "note": "Pet XP.",
+   "group": "currency"
+  },
+  "blueprint": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Scroll 2/Scroll 2 Outline.svg",
+   "tint": null,
+   "note": "Armory blueprint unlock (text-only today).",
+   "group": "currency"
+  },
+  "gem": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Currency/Gem/Gem Outline.svg",
+   "tint": null,
+   "note": "Generic gem (minigame prizes, 3d:gem).",
+   "group": "currency"
+  },
+  "3d:gem": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Currency/Gem/Gem Outline.svg",
+   "tint": null,
+   "note": "Alias.",
+   "group": "currency"
+  },
+  "3d:gems": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Currency/Gem/Gem Blue Outline.svg",
+   "tint": null,
+   "note": "Alias.",
+   "group": "currency"
+  },
+  "3d:gold_bars": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Currency/Ingots/Gold Outline.svg",
+   "tint": null,
+   "note": "Gold bars prize.",
+   "group": "currency"
+  },
+  "3d:key": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Key 2/Key 2 Gold Outline.svg",
+   "tint": null,
+   "note": "Key prize.",
+   "group": "currency"
+  },
+  "heart": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Heart/Heart Outline.svg",
+   "tint": null,
+   "note": "HP / max HP / heal amounts.",
+   "group": "stat"
+  },
+  "heart_empty": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Heart/Heart Empty Outline.svg",
+   "tint": null,
+   "note": "Lost HP / empty heart (new).",
+   "group": "stat"
+  },
+  "shield": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Shield/Shield Blue Outline.svg",
+   "tint": null,
+   "note": "Block.",
+   "group": "stat"
+  },
+  "sword": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Sword/Sword Outline.svg",
+   "tint": null,
+   "note": "ATK / attack / enemy tile.",
+   "group": "stat"
+  },
+  "xp": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/XP Orb/XP Orb Outline.svg",
+   "tint": null,
+   "note": "Hero XP / level.",
+   "group": "stat"
+  },
+  "level": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/XP/XP Purple Outline.svg",
+   "tint": null,
+   "note": "LEVEL n popup / level badge centre (new).",
+   "group": "stat"
+  },
+  "reroll": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Recycle/Recycle Outline.svg",
+   "tint": null,
+   "note": "Combat/board rerolls, RESTOCK, Defaults.",
+   "group": "stat"
+  },
+  "dice": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Dice/Dice Outline.svg",
+   "tint": null,
+   "note": "ROLL, new die, Dice Workshop, packs.",
+   "group": "stat"
+  },
+  "anvil": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Anvil/Anvil Outline.svg",
+   "tint": null,
+   "note": "Face Raise / Forge.",
+   "group": "stat"
+  },
+  "up": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Arrow/Arrow Up Outline.svg",
+   "tint": null,
+   "note": "Raise +1, bonus, buff arrow.",
+   "group": "stat"
+  },
+  "star": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Star/Star Gold Outline.svg",
+   "tint": null,
+   "note": "Generic star / Wild face / drafts. No longer the fallback for Sigils or runes.",
+   "group": "stat"
+  },
+  "trophy": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Trophy/Trophy Outline.svg",
+   "tint": null,
+   "note": "Victory, passive rewards.",
+   "group": "stat"
+  },
+  "trophy_gold": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Trophy/Trophy Outline.svg",
+   "tint": null,
+   "note": "Minigame GOLD tier medal (replaces MgWidgets.Medal).",
+   "group": "stat"
+  },
+  "trophy_silver": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Trophy/Trophy Silver Outline.svg",
+   "tint": null,
+   "note": "SILVER tier.",
+   "group": "stat"
+  },
+  "trophy_bronze": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Trophy/Trophy Bronze Outline.svg",
+   "tint": null,
+   "note": "BRONZE tier.",
+   "group": "stat"
+  },
+  "hourglass": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Hourglass/Hourglass Outline.svg",
+   "tint": null,
+   "note": "Moves/time left (minigames), cooldowns.",
+   "group": "stat"
+  },
+  "skull": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Skull/Skull Outline.svg",
+   "tint": null,
+   "note": "Mini-boss, danger, death, abandon-confirm.",
+   "group": "stat"
+  },
+  "bolt": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Lightning Bolt/Lightning Bolt Yellow Outline.svg",
+   "tint": null,
+   "note": "Energy / SFX volume / pet \"fires\".",
+   "group": "stat"
+  },
+  "flag": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Flag/Flag Checkered Outline.svg",
+   "tint": null,
+   "note": "Start tile, laps, board scope, abandon.",
+   "group": "stat"
+  },
+  "lap_pip": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Star/Star Flat White.svg",
+   "tint": "palette:GOLD",
+   "note": "Lap pip (replaces procedural diamond). Boss lap: Horned Skull Red at pip size.",
+   "group": "stat"
+  },
+  "combo": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Deck of Cards/Deck of Cards Outline.svg",
+   "tint": null,
+   "note": "Combo table / combos help (new).",
+   "group": "stat"
+  },
+  "multiplier": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Sparkle/Sparkle Outline.svg",
+   "tint": null,
+   "note": "Multiplier pops (x1.5).",
+   "group": "stat"
+  },
+  "ascension": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Horned Skull/Horned Skull Red Outline.svg",
+   "tint": null,
+   "note": "Ascension level / NEW CHALLENGE medallion.",
+   "group": "stat"
+  },
+  "mastery": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Stats/Stats Outline.svg",
+   "tint": null,
+   "note": "Minigame / item mastery.",
+   "group": "stat"
+  },
+  "rank": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Upgrade/Upgrade Outline.svg",
+   "tint": null,
+   "note": "Armory rank R0..R8 rank-up.",
+   "group": "stat"
+  },
+  "potion": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Potion 1/Potion Outline.svg",
+   "tint": null,
+   "note": "Generic potion (unlocks, rewards).",
+   "group": "stat"
+  },
+  "3d:potion_red": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Potion 2/Potion 2 Red Outline.svg",
+   "tint": null,
+   "note": "Shop potion item.",
+   "group": "stat"
+  },
+  "3d:potion_blue": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Potion 2/Potion 2 Blue Outline.svg",
+   "tint": null,
+   "note": "Alias.",
+   "group": "stat"
+  },
+  "3d:potion_green": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Potion 2/Potion 2 Green Outline.svg",
+   "tint": null,
+   "note": "Alias.",
+   "group": "stat"
+  },
+  "poison": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Poison/Poison Outline.svg",
+   "tint": null,
+   "note": "Poison status / venom.",
+   "group": "status"
+  },
+  "flame": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Fire/Fire Outline.svg",
+   "tint": null,
+   "note": "Burn status.",
+   "group": "status"
+  },
+  "burn": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Fire/Fire Outline.svg",
+   "tint": null,
+   "note": "Alias of flame (status id).",
+   "group": "status"
+  },
+  "curse": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Holiday/Monkey's Paw/Monkey's Paw Outline.svg",
+   "tint": null,
+   "note": "Curse status + cursed die overlay (was a padlock; padlock now means \"locked\").",
+   "group": "status"
+  },
+  "snowflake": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Snowflake/Snowflake Outline.svg",
+   "tint": null,
+   "note": "Chill / cold.",
+   "group": "status"
+  },
+  "chill": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Materials/Ice/Ice Outline.svg",
+   "tint": null,
+   "note": "Chill status on hero dice (frozen die block). New id.",
+   "group": "status"
+  },
+  "frozen": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Frozen Clock/Frozen Clock Outline.svg",
+   "tint": null,
+   "note": "Enemy skips next action (Frost rune, Frost Mote). New id.",
+   "group": "status"
+  },
+  "block": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Shield/Shield Blue Outline.svg",
+   "tint": null,
+   "note": "Alias of shield.",
+   "group": "status"
+  },
+  "buff": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Player/Strong Arm/Strong Arm Outline.svg",
+   "tint": null,
+   "note": "Enemy powered up.",
+   "group": "status"
+  },
+  "chaos": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Tornado/Tornado Outline.svg",
+   "tint": null,
+   "note": "Random effect.",
+   "group": "status"
+  },
+  "scorch": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Explosion/Explosion Outline.svg",
+   "tint": null,
+   "note": "Burned die face.",
+   "group": "status"
+  },
+  "cleansed": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Materials/Water/Water Outline.svg",
+   "tint": null,
+   "note": "Cleanse removed debuffs.",
+   "group": "status"
+  },
+  "cower": {
+   "svg": "rhosgfx/vector-emojis/SVG/Outline/Fearful face.svg",
+   "tint": null,
+   "note": "BOO! reaction: one of the two sanctioned emoji uses.",
+   "group": "status"
+  },
+  "brave": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Player/Fist/Fist Outline.svg",
+   "tint": null,
+   "note": "Immune to BOO!",
+   "group": "status"
+  },
+  "weakened": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Broken Heart/Broken Heart Outline.svg",
+   "tint": null,
+   "note": "SPOOKED: next attack weakened.",
+   "group": "status"
+  },
+  "fled": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Dust Cloud/Dust Cloud Outline.svg",
+   "tint": null,
+   "note": "Ran away.",
+   "group": "status"
+  },
+  "frenzy": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Player/Boost/Boost Red Outline.svg",
+   "tint": null,
+   "note": "Frenzy stacks (rage flame).",
+   "group": "status"
+  },
+  "thorns": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Cactus/Cactus Outline.svg",
+   "tint": null,
+   "note": "Reflect damage.",
+   "group": "status"
+  },
+  "marked": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Crosshair/Crosshair Outline.svg",
+   "tint": null,
+   "note": "Die marked for reroll (optional marker).",
+   "group": "status"
+  },
+  "oath": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Halo/Halo Outline.svg",
+   "tint": null,
+   "note": "Paladin Oath value (same as mech_oath).",
+   "group": "status"
+  },
+  "seed": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Seeds/Seeds Outline.svg",
+   "tint": null,
+   "note": "Druid seed die tag.",
+   "group": "status"
+  },
+  "bone": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Bone/Bone Outline.svg",
+   "tint": null,
+   "note": "Necromancer bone die.",
+   "group": "status"
+  },
+  "rally": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Megaphone/Megaphone Outline.svg",
+   "tint": null,
+   "note": "All enemies +ATK.",
+   "group": "status"
+  },
+  "bury": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Shovel/Shovel Stone Outline.svg",
+   "tint": null,
+   "note": "Buried dice.",
+   "group": "status"
+  },
+  "moon": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Moon 2/Moon 2 Outline.svg",
+   "tint": null,
+   "note": "Moon meter / blood moon.",
+   "group": "status"
+  },
+  "lava": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Volcano/Volcano Outline.svg",
+   "tint": null,
+   "note": "Lava tile hazard.",
+   "group": "status"
+  },
+  "die_locked": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Lock/Lock Outline.svg",
+   "tint": null,
+   "note": "Locked/buried die overlay (DieFace): a padlock, distinct from curse (plan b).",
+   "group": "status"
+  },
+  "moon_new": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Moon Phases/Moon New Outline.svg",
+   "tint": null,
+   "note": "Moonlit twist chip by phase (replaces hud_top _MoonGlyph; plan b).",
+   "group": "status"
+  },
+  "moon_crescent": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Moon Phases/Moon Waxing Crescent Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "status"
+  },
+  "moon_half": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Moon Phases/Moon First Quarter Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "status"
+  },
+  "moon_gibbous": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Moon Phases/Moon Waxing Gibbous Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "status"
+  },
+  "moon_full": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Moon Phases/Moon Full Outline.svg",
+   "tint": null,
+   "note": "Also the moon_tex sample for the moon meter shader.",
+   "group": "status"
+  },
+  "intent_attack": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Sword/Sword Outline.svg",
+   "tint": null,
+   "note": "Deals N damage. Chip bg = palette INTENT colour.",
+   "group": "intent"
+  },
+  "intent_block": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Shield/Shield Blue Outline.svg",
+   "tint": null,
+   "note": "Gains block.",
+   "group": "intent"
+  },
+  "intent_buff": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Player/Strong Arm/Strong Arm Outline.svg",
+   "tint": null,
+   "note": "Raises own attack.",
+   "group": "intent"
+  },
+  "intent_curse": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Holiday/Monkey's Paw/Monkey's Paw Outline.svg",
+   "tint": null,
+   "note": "Curses a die.",
+   "group": "intent"
+  },
+  "intent_summon": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Holiday/Zombie Hand/Zombie Hand Outline.svg",
+   "tint": null,
+   "note": "Raises a minion.",
+   "group": "intent"
+  },
+  "intent_chaos": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Tornado/Tornado Outline.svg",
+   "tint": null,
+   "note": "Random effect.",
+   "group": "intent"
+  },
+  "intent_aim": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Crosshair/Crosshair Outline.svg",
+   "tint": null,
+   "note": "Aiming; big shot next.",
+   "group": "intent"
+  },
+  "intent_heal": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Medpack/Medpack Red Outline.svg",
+   "tint": null,
+   "note": "Heals.",
+   "group": "intent"
+  },
+  "intent_drain": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Materials/Blood/Blood Outline.svg",
+   "tint": null,
+   "note": "Lifesteal attack.",
+   "group": "intent"
+  },
+  "intent_burn": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Fire/Fire Outline.svg",
+   "tint": null,
+   "note": "Applies Burn.",
+   "group": "intent"
+  },
+  "intent_chill": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Snowflake/Snowflake Outline.svg",
+   "tint": null,
+   "note": "Attack + chill.",
+   "group": "intent"
+  },
+  "intent_scorch": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Explosion/Explosion Outline.svg",
+   "tint": null,
+   "note": "Burns a die face.",
+   "group": "intent"
+  },
+  "intent_rally": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Megaphone/Megaphone Outline.svg",
+   "tint": null,
+   "note": "Everyone +ATK.",
+   "group": "intent"
+  },
+  "intent_bury": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Shovel/Shovel Stone Outline.svg",
+   "tint": null,
+   "note": "Buries dice + block.",
+   "group": "intent"
+  },
+  "intent_moonfall": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Moon Phases/Moon Full Outline.svg",
+   "tint": null,
+   "note": "Next blow ignores Block.",
+   "group": "intent"
+  },
+  "intent_cower": {
+   "svg": "rhosgfx/vector-emojis/SVG/Outline/Fearful face.svg",
+   "tint": null,
+   "note": "Scared (replaces intent).",
+   "group": "intent"
+  },
+  "intent_unknown": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Question Mark/Question Mark Outline.svg",
+   "tint": null,
+   "note": "Unknown intent (shader kind 5).",
+   "group": "intent"
+  },
+  "trait_armor": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Shield/Shield Silver Outline.svg",
+   "tint": null,
+   "note": "Block never expires.",
+   "group": "trait"
+  },
+  "trait_thorns": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Cactus/Cactus Outline.svg",
+   "tint": null,
+   "note": "Reflects damage.",
+   "group": "trait"
+  },
+  "trait_ward": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Overshield/OvershieldBlue Outline.svg",
+   "tint": null,
+   "note": "Half damage while a minion stands.",
+   "group": "trait"
+  },
+  "trait_pierce": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Arrow/Arrow Outline.svg",
+   "tint": null,
+   "note": "Ignores Block.",
+   "group": "trait"
+  },
+  "trait_brave": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Player/Fist/Fist Outline.svg",
+   "tint": null,
+   "note": "Cannot be scared again.",
+   "group": "trait"
+  },
+  "trait_frenzy": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Player/Boost/Boost Red Outline.svg",
+   "tint": null,
+   "note": "Same art as affix_frenzied.",
+   "group": "trait"
+  },
+  "trait_ward_allies": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Overshield/OvershieldGreen Outline.svg",
+   "tint": null,
+   "note": "Warded (allies).",
+   "group": "trait"
+  },
+  "affix_armored": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Clothing/Armor Chestplate/Armor Chestplate Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "affix"
+  },
+  "affix_thorned": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Cactus/Cactus Outline.svg",
+   "tint": null,
+   "note": "Same concept as trait_thorns.",
+   "group": "affix"
+  },
+  "affix_warded": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Overshield/OvershieldGreen Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "affix"
+  },
+  "affix_piercing": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Spear/Spear Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "affix"
+  },
+  "affix_frenzied": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Player/Boost/Boost Red Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "affix"
+  },
+  "affix_regenerating": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Bandaid/Bandaid Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "affix"
+  },
+  "affix_vampiric": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Dragon Tooth/Dragon Tooth Outline.svg",
+   "tint": null,
+   "note": "Fang.",
+   "group": "affix"
+  },
+  "affix_hexing": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Crystal Ball/Crystal Ball Purple Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "affix"
+  },
+  "affix_frostbound": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Materials/Ice/Ice Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "affix"
+  },
+  "affix_gilded": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Currency/Coin Stack/Coin Stack Gold Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "affix"
+  },
+  "rune_blade": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Sword/Sword 2 Silver Outline.svg",
+   "tint": null,
+   "note": "Runes sit on a rune-colour ring (palette rune colour) so the rarity/colour code survives.",
+   "group": "rune"
+  },
+  "rune_guard": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Shield/Shield Gold Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "rune"
+  },
+  "rune_venom": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Poison/Poison Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "rune"
+  },
+  "rune_gilded": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Currency/Coin 2/Coin 2 Gold Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "rune"
+  },
+  "rune_heavy": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Sports/Kettlebell/Kettlebell Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "rune"
+  },
+  "rune_ember": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Fire/Fire Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "rune"
+  },
+  "rune_vampire": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Holiday/Bat/Bat Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "rune"
+  },
+  "rune_lucky": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Luck/Luck Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "rune"
+  },
+  "rune_frost": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Snowflake 2/Snowflake 2 Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "rune"
+  },
+  "rune_thunder": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Lightning Bolt/Lightning Bolt Yellow Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "rune"
+  },
+  "rune_echo": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Music/Tuning Fork/Tuning Fork Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "rune"
+  },
+  "rune_wild": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Sparkle/Sparkle Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "rune"
+  },
+  "rune_choice": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Card/Card Blue Outline.svg",
+   "tint": null,
+   "note": "\"Pick a rune\" reward (was star).",
+   "group": "rune"
+  },
+  "rare_rune": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Card/Card Diamond Outline.svg",
+   "tint": null,
+   "note": "Rare rune reward.",
+   "group": "rune"
+  },
+  "rune_face_blade": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Sword/Sword Flat White.svg",
+   "tint": "#e04848",
+   "note": "Die-face rune glyph: Flat White x Runes.DEFS colour.",
+   "group": "rune"
+  },
+  "rune_face_guard": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Shield/Shield Flat White.svg",
+   "tint": "#4a8be0",
+   "note": "Die-face rune glyph: Flat White x Runes.DEFS colour.",
+   "group": "rune"
+  },
+  "rune_face_venom": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Poison/Poison Flat White.svg",
+   "tint": "#58c060",
+   "note": "Die-face rune glyph: Flat White x Runes.DEFS colour.",
+   "group": "rune"
+  },
+  "rune_face_gilded": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Currency/Coin/Coin Flat White.svg",
+   "tint": "#e0a030",
+   "note": "Die-face rune glyph: Flat White x Runes.DEFS colour.",
+   "group": "rune"
+  },
+  "rune_face_heavy": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Sports/Kettlebell/Kettlebell Flat White.svg",
+   "tint": "#8a8a90",
+   "note": "Die-face rune glyph: Flat White x Runes.DEFS colour.",
+   "group": "rune"
+  },
+  "rune_face_ember": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Fire/Fire Flat White.svg",
+   "tint": "#f08030",
+   "note": "Die-face rune glyph: Flat White x Runes.DEFS colour.",
+   "group": "rune"
+  },
+  "rune_face_vampire": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Holiday/Bat/Bat Flat White.svg",
+   "tint": "#a01830",
+   "note": "Die-face rune glyph: Flat White x Runes.DEFS colour.",
+   "group": "rune"
+  },
+  "rune_face_lucky": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Luck/Luck Flat White.svg",
+   "tint": "#f0d040",
+   "note": "Die-face rune glyph: Flat White x Runes.DEFS colour.",
+   "group": "rune"
+  },
+  "rune_face_frost": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Snowflake 2/Snowflake 2 Flat White.svg",
+   "tint": "#9ad8f0",
+   "note": "Die-face rune glyph: Flat White x Runes.DEFS colour.",
+   "group": "rune"
+  },
+  "rune_face_thunder": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Lightning Bolt/Lightning Bolt Flat White.svg",
+   "tint": "#f0e040",
+   "note": "Die-face rune glyph: Flat White x Runes.DEFS colour.",
+   "group": "rune"
+  },
+  "rune_face_echo": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Music/Tuning Fork/Tuning Fork Flat White.svg",
+   "tint": "#9a60e0",
+   "note": "Die-face rune glyph: Flat White x Runes.DEFS colour.",
+   "group": "rune"
+  },
+  "rune_face_wild": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Sparkle/Sparkle Flat White.svg",
+   "tint": "#f2b84b",
+   "note": "Die-face rune glyph (~20 px on the die body): Flat White tinted with the Runes.DEFS colour (lead call on plan c). Wild uses GOLD because its white would vanish on the ivory die.",
+   "group": "rune"
+  },
+  "kind_standard": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Shapes/Gaming Dice/D6 Outline.svg",
+   "tint": null,
+   "note": "Die kinds: Flat White D6 tinted with the UiPalette.KIND accent (hex copied here because KIND entries are arrays) and ALWAYS composited with the procedural corner mark (DieFace.draw_kind_mark) so kinds never differ by hue alone (colour-blind safe; plan b).",
+   "group": "die_kind"
+  },
+  "kind_low": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Shapes/Gaming Dice/D6 Flat White.svg",
+   "tint": "#5aa7ff",
+   "note": "",
+   "group": "die_kind"
+  },
+  "kind_high": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Shapes/Gaming Dice/D6 Flat White.svg",
+   "tint": "#ff7a45",
+   "note": "",
+   "group": "die_kind"
+  },
+  "kind_even": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Shapes/Gaming Dice/D6 Flat White.svg",
+   "tint": "#39c9b4",
+   "note": "",
+   "group": "die_kind"
+  },
+  "kind_odd": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Shapes/Gaming Dice/D6 Flat White.svg",
+   "tint": "#c07aff",
+   "note": "",
+   "group": "die_kind"
+  },
+  "kind_loaded": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Shapes/Gaming Dice/D6 Flat White.svg",
+   "tint": "#e0a82e",
+   "note": "",
+   "group": "die_kind"
+  },
+  "kind_twin": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Shapes/Gaming Dice/D6 Flat White.svg",
+   "tint": "#ff6fae",
+   "note": "",
+   "group": "die_kind"
+  },
+  "kind_gambler": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Lucky Block/Lucky Block Green Outline.svg",
+   "tint": null,
+   "note": "Gambler 0/6 die.",
+   "group": "die_kind"
+  },
+  "kind_giant": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Shapes/Gaming Dice/D20 Outline.svg",
+   "tint": null,
+   "note": "Giant 4-9 die.",
+   "group": "die_kind"
+  },
+  "kind_pretend": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Shapes/Gaming Dice/D6 Flat White.svg",
+   "tint": "#8ee35a",
+   "note": "Pretend (Monster Kid).",
+   "group": "die_kind"
+  },
+  "kind_bone": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Bone/Bone Outline.svg",
+   "tint": null,
+   "note": "Bone die (Necromancer).",
+   "group": "die_kind"
+  },
+  "die_wild_face": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Star/Star Gold Outline.svg",
+   "tint": null,
+   "note": "Wild / Pretend star face.",
+   "group": "die_kind"
+  },
+  "class_knight": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Shield/Shield Silver Outline.svg",
+   "tint": null,
+   "note": "New id (was shield fallback).",
+   "group": "class"
+  },
+  "class_barbarian": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Battleaxe/Battleaxe Outline.svg",
+   "tint": null,
+   "note": "New id (was axe).",
+   "group": "class"
+  },
+  "class_mage": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Wizard Staff/Wizard Staff Outline.svg",
+   "tint": null,
+   "note": "New id (was staff). Hats are reserved for the Wardrobe category (lead call).",
+   "group": "class"
+  },
+  "class_rogue": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Dagger/Dagger Outline.svg",
+   "tint": null,
+   "note": "New id.",
+   "group": "class"
+  },
+  "class_paladin": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Warhammer/Warhammer Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "class"
+  },
+  "class_ranger": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Bow/Bow Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "class"
+  },
+  "class_ninja": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Shuriken/Shuriken Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "class"
+  },
+  "class_druid": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Leaf/Leaf Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "class"
+  },
+  "class_engineer": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Wrench/Wrench Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "class"
+  },
+  "class_necromancer": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Scythe/Scythe Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "class"
+  },
+  "class_monster_kid": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Holiday/Ghost/Ghost Green Outline.svg",
+   "tint": null,
+   "note": "BOO! green ghost (plan e). No emoji for class art.",
+   "group": "class"
+  },
+  "class_locked": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Question Mark/Question Mark Outline.svg",
+   "tint": null,
+   "note": "Secret class.",
+   "group": "class"
+  },
+  "axe": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Axe/Axe Outline.svg",
+   "tint": null,
+   "note": "Legacy glyph ids kept as aliases.",
+   "group": "class"
+  },
+  "staff": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Wizard Staff/Wizard Staff Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "class"
+  },
+  "dagger": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Dagger/Dagger Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "class"
+  },
+  "mech_oath": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Halo/Halo Flat White.svg",
+   "tint": "palette:auto",
+   "note": "Mechanic medallion: Flat White tinted with the mechanic colour (palette:auto = ClassInfo.mechanic_color), per plan e / lead.",
+   "group": "mechanic"
+  },
+  "mech_aim": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Target/Target Flat White.svg",
+   "tint": "palette:auto",
+   "note": "Mechanic medallion: Flat White tinted with the mechanic colour (palette:auto = ClassInfo.mechanic_color), per plan e / lead.",
+   "group": "mechanic"
+  },
+  "mech_shadow_step": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Moon/Moon Flat White.svg",
+   "tint": "palette:auto",
+   "note": "Mechanic medallion: Flat White tinted with the mechanic colour (palette:auto = ClassInfo.mechanic_color), per plan e / lead.",
+   "group": "mechanic"
+  },
+  "mech_overgrowth": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Sprout/Sprout Flat White.svg",
+   "tint": "palette:auto",
+   "note": "Mechanic medallion: Flat White tinted with the mechanic colour (palette:auto = ClassInfo.mechanic_color), per plan e / lead.",
+   "group": "mechanic"
+  },
+  "mech_turret": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Technology/Satellite Dish/Satellite Dish Flat White.svg",
+   "tint": "palette:auto",
+   "note": "Mechanic medallion: Flat White tinted with the mechanic colour (palette:auto = ClassInfo.mechanic_color), per plan e / lead. Weak fit; see missing.",
+   "group": "mechanic"
+  },
+  "mech_bone_harvest": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Bone/Bone Flat White.svg",
+   "tint": "palette:auto",
+   "note": "Mechanic medallion: Flat White tinted with the mechanic colour (palette:auto = ClassInfo.mechanic_color), per plan e / lead.",
+   "group": "mechanic"
+  },
+  "mech_boo": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Holiday/Ghost/Ghost Flat White.svg",
+   "tint": "palette:auto",
+   "note": "Mechanic medallion: Flat White tinted with the mechanic colour (palette:auto = ClassInfo.mechanic_color), per plan e / lead.",
+   "group": "mechanic"
+  },
+  "biome_glade": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Tree/Tree Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "biome"
+  },
+  "biome_crypt": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Holiday/Tombstone/Tombstone Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "biome"
+  },
+  "biome_mines": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Pickaxe/Pickaxe Stone Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "biome"
+  },
+  "biome_hollow": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Jack O Lantern/Jack O Lantern Lit Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "biome"
+  },
+  "biome_frost": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Holiday/Snowman/Snowman Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "biome"
+  },
+  "biome_warcamp": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Fight Cloud/Fight Cloud Outline.svg",
+   "tint": null,
+   "note": "Orc Warcamp.",
+   "group": "biome"
+  },
+  "biome_throne": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Clothing/Crown/Crown 2 Purple Outline.svg",
+   "tint": null,
+   "note": "Bone Throne.",
+   "group": "biome"
+  },
+  "biome_magma": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Volcano/Volcano Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "biome"
+  },
+  "biome_ruins": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Sun 2/Sun 2 Outline.svg",
+   "tint": null,
+   "note": "Sunscorched Ruins.",
+   "group": "biome"
+  },
+  "biome_moonlit": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Moon Phases/Moon Waxing Crescent Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "biome"
+  },
+  "tile_start": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Flag/Flag Checkered Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "tile"
+  },
+  "tile_forge": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Anvil/Anvil Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "tile"
+  },
+  "tile_treasury": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Piggy Bank/Piggy Bank Gold Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "tile"
+  },
+  "tile_portal": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Transport/Portal/Portal Purple Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "tile"
+  },
+  "portal": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Transport/Portal/Portal Purple Outline.svg",
+   "tint": null,
+   "note": "Existing id.",
+   "group": "tile"
+  },
+  "tile_enemy": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/PVP/PVP Outline.svg",
+   "tint": null,
+   "note": "Crossed swords.",
+   "group": "tile"
+  },
+  "tile_elite": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Horned Skull/Horned Skull Black Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "tile"
+  },
+  "tile_miniboss": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Skull/Skull Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "tile"
+  },
+  "tile_boss": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Horned Skull/Horned Skull Red Outline.svg",
+   "tint": null,
+   "note": "Boss (was crown).",
+   "group": "tile"
+  },
+  "boss": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Horned Skull/Horned Skull Red Outline.svg",
+   "tint": null,
+   "note": "Alias for bosses unlock kind / auto stop.",
+   "group": "tile"
+  },
+  "tile_chest": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Chest/Chest 1/Chest Medium 1 Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "tile"
+  },
+  "chest": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Chest/Chest 1/Chest Medium 1 Outline.svg",
+   "tint": null,
+   "note": "Existing id.",
+   "group": "tile"
+  },
+  "tile_moon_chest": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Chest/Chest 3/Chest Medium 3 Outline.svg",
+   "tint": null,
+   "note": "Moonlit rune chest; add moon pip badge (see missing). Chest + moon badge.",
+   "group": "tile",
+   "badge": {
+    "svg": "rhosgfx/vector-icon-pack-pro/Nature/Moon 2/Moon 2 Outline.svg",
+    "corner": "br",
+    "scale": 0.45
+   }
+  },
+  "tile_event": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Question Mark/Question Mark Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "tile"
+  },
+  "tile_campfire": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Bonfire/Bonfire Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "tile"
+  },
+  "campfire": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Bonfire/Bonfire Outline.svg",
+   "tint": null,
+   "note": "Existing id (also PLAY / TO CAMP).",
+   "group": "tile"
+  },
+  "tile_trap": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Town & City/Warning Sign/Warning Sign Outline.svg",
+   "tint": null,
+   "note": "Spike trap / cave-in.",
+   "group": "tile"
+  },
+  "tile_ice": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Materials/Ice/Ice Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "tile"
+  },
+  "tile_lava": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Volcano/Volcano Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "tile"
+  },
+  "tile_ore": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Materials/Ore/Ore Emerald Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "tile"
+  },
+  "ore": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Materials/Ore/Ore Emerald Outline.svg",
+   "tint": null,
+   "note": "Existing id.",
+   "group": "tile"
+  },
+  "tile_drum": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Music/Drum/Drum Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "tile"
+  },
+  "drum": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Music/Drum/Drum Outline.svg",
+   "tint": null,
+   "note": "Existing id.",
+   "group": "tile"
+  },
+  "tile_oasis": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Palm Tree/Palm Tree Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "tile"
+  },
+  "oasis": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Palm Tree/Palm Tree Outline.svg",
+   "tint": null,
+   "note": "Existing id (ruins COOL).",
+   "group": "tile"
+  },
+  "sun": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Sun/Sun Outline.svg",
+   "tint": null,
+   "note": "Ruins HOT.",
+   "group": "tile"
+  },
+  "tile_minigame": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Technology/Joystick/Joystick Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "tile"
+  },
+  "tile_shop": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Shop/Shop Outline.svg",
+   "tint": null,
+   "note": "Shop lap / shop scope.",
+   "group": "tile"
+  },
+  "event_shrine": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Halo/Halo Outline.svg",
+   "tint": null,
+   "note": "Blessing Shrine.",
+   "group": "event"
+  },
+  "event_duel": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Dice/Dice Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "event"
+  },
+  "event_outbreak": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Holiday/Zombie Hand/Zombie Hand Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "event"
+  },
+  "event_garden": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Flower/Flower Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "event"
+  },
+  "event_merchant": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Pouch/Pouch Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "event"
+  },
+  "event_idol": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Holiday/Monkey's Paw/Monkey's Paw Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "event"
+  },
+  "event_dicesmith": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Hammer/Hammer Outline.svg",
+   "tint": null,
+   "note": "Had no art.",
+   "group": "event"
+  },
+  "potion_healing": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Potion 2/Potion 2 Red Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "potion"
+  },
+  "potion_stoneskin": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Potion 3/Potion 3 White Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "potion"
+  },
+  "potion_reroll_tonic": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Potion 4/Potion 4 Yellow Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "potion"
+  },
+  "potion_cleanse": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Potion 1/Potion 1 Blue Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "potion"
+  },
+  "petg_pumpkin_sprite": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Pumpkin/Pumpkin outline.svg",
+   "tint": null,
+   "note": "Pack pet GLYPHS use petg_<id> so the existing pet_<id> portrait SVGs (meta_hud, meta_beats) keep their ids and art (plan d collision fix). CampInfo.PET_ICON -> petg_<id> for all 12 pets.",
+   "group": "pet"
+  },
+  "petg_skull_buddy": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Skull 2/Skull 2 Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "pet"
+  },
+  "petg_lantern_ghost": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Lantern 2/Lantern 2 Green Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "pet"
+  },
+  "petg_crystal_wisp": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Currency/Crystal/Crystal Blue Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "pet"
+  },
+  "petg_guard_die": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Shapes/Gaming Dice/D6 Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "pet"
+  },
+  "petg_coin_mimic": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Chest/Chest 2/Chest Small 2 Red Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "pet"
+  },
+  "petg_pebble_golem": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Materials/Rock/Rock Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "pet"
+  },
+  "petg_frost_mote": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Snowflake 2/Snowflake 2 Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "pet"
+  },
+  "petg_wick": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Torch/Torch Outline.svg",
+   "tint": null,
+   "note": "Candle creature; torch is the nearest flame-on-stick.",
+   "group": "pet"
+  },
+  "petg_tinker_gear": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Settings 2/Gear 2 Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "pet"
+  },
+  "petg_grimoire": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Book/Book Purple Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "pet"
+  },
+  "petg_cauldron": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Holiday/Cauldron/Cauldron Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "pet"
+  },
+  "pet_charge": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Lightning Bolt/Lightning Bolt Purple Outline.svg",
+   "tint": null,
+   "note": "Pet charge / \"Fires\".",
+   "group": "pet"
+  },
+  "passive_pair_master": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Card/Card Heart Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_full_house_party": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Party Popper/Party Popper Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_straight_shooter": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Target/Target 2 Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_triple_threat": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Trident/Trident Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_snake_eyes": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Eye/eye Blue Outline.svg",
+   "tint": null,
+   "note": "Eye + die badge.",
+   "group": "passive",
+   "badge": {
+    "svg": "rhosgfx/vector-icon-pack-pro/Items/Dice/Dice Outline.svg",
+    "corner": "br",
+    "scale": 0.45
+   }
+  },
+  "passive_boxcars": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Dice/Dice Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_gold_tooth": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Teeth/Teeth Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_steady_hand": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Player/Hand/Hand Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_loaded_hands": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Lucky Block/Lucky Block Yellow Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_double_trouble": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Deck of Cards/Deck of Cards Blue Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_rune_echo": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Music/Tuning Fork/Tuning Fork Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_collector": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Currency/Gem/Gem Red Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_pathfinder": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Compass/Compass Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_treasure_sense": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Magnifying Glass/Magnifying Glass Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_piggy_bank": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Piggy Bank/Piggy Bank Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_haggler": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Tag/Tag Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_scholar": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Book/Book Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_blacksmith": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Hammer/Hammer Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_thorns": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Cactus/Cactus Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_iron_skin": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Currency/Ingots/Iron Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_bloodthirst": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Materials/Blood/Blood Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_opening_salvo": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Dynamite/Dynamite Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_second_wind": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Revive/Revive Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_glass_cannon": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Bomb/Bomb Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_extra_hand": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Player/Hand 2/Hand 2 Yellow Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_crowd_pleaser": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Applause/Applause Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_encore": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Music/Microphone/Microphone Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_rune_bloom": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Flower/Flower Purple Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_fast_feet": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Player/Run/Run Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_resonance": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Music/Cymbal/Cymbal Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_phoenix": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Feather/Feather Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "passive_midas_fist": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Player/Fist 2/Fist 2 Yellow Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "passive"
+  },
+  "slot_weapon": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Sword/Sword Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "armory"
+  },
+  "slot_offhand": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Shield/Shield Wood Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "armory"
+  },
+  "slot_head": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Clothing/Armor Helmet/Armor Helmet Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "armory"
+  },
+  "helmet": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Clothing/Armor Helmet/Armor Helmet Outline.svg",
+   "tint": null,
+   "note": "Existing id.",
+   "group": "armory"
+  },
+  "slot_body": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Clothing/Armor Chestplate/Armor Chestplate Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "armory"
+  },
+  "armor": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Clothing/Armor Chestplate/Armor Chestplate Outline.svg",
+   "tint": null,
+   "note": "Existing id.",
+   "group": "armory"
+  },
+  "slot_trinket": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Clothing/Ring/Ring Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "armory"
+  },
+  "ring": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Clothing/Ring/Ring Outline.svg",
+   "tint": null,
+   "note": "Existing id.",
+   "group": "armory"
+  },
+  "slot_trinket2": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Pouch/Pouch Outline.svg",
+   "tint": null,
+   "note": "Belt Pouch.",
+   "group": "armory"
+  },
+  "pouch": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Pouch/Pouch Outline.svg",
+   "tint": null,
+   "note": "Existing id.",
+   "group": "armory"
+  },
+  "kit": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Star/Star Gold Outline.svg",
+   "tint": null,
+   "note": "KIT chip (replaces \"★\").",
+   "group": "armory"
+  },
+  "tier_1": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Star/Star Bronze Outline.svg",
+   "tint": null,
+   "note": "Item tier I (plan d): bronze/silver/gold metal language; roman numeral stays as chip text.",
+   "group": "armory"
+  },
+  "tier_2": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Star/Star Silver Outline.svg",
+   "tint": null,
+   "note": "Tier II.",
+   "group": "armory"
+  },
+  "tier_3": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Star/Star Gold Outline.svg",
+   "tint": null,
+   "note": "Tier III.",
+   "group": "armory"
+  },
+  "look_hidden": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Blocked/Blocked Outline.svg",
+   "tint": null,
+   "note": "Wardrobe/Armory HIDE look chip (close means dismiss elsewhere).",
+   "group": "armory"
+  },
+  "bad_fit": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Info/Info Outline.svg",
+   "tint": null,
+   "note": "Full-colour info badge for \"bad fit\" item hint (replaces the drawn red i).",
+   "group": "armory"
+  },
+  "feat": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Trophy/Trophy Silver Outline.svg",
+   "tint": null,
+   "note": "Feat unlock.",
+   "group": "armory"
+  },
+  "craft": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Hammer/Hammer Outline.svg",
+   "tint": null,
+   "note": "Craft.",
+   "group": "armory"
+  },
+  "preview_attack": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Spectate/Spectate Outline.svg",
+   "tint": null,
+   "note": "Preview attack.",
+   "group": "armory"
+  },
+  "item_sword": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Sword/Sword Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_greatsword": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Sword/Sword 2 Silver Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_hand_axe": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Axe/Axe Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_great_axe": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Battleaxe/Battleaxe Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_warhammer": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Warhammer/Warhammer Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_spear": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Spear/Spear Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_scythe": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Scythe/Scythe Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_dagger": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Dagger/Dagger Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_katana": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Cutlass/Cutlass Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_arcane_staff": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Wizard Staff/Wizard Staff Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_druid_staff": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Wizard Staff/Wizard Staff 2.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_wand": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Wand/Wand Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_hunting_bow": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Bow/Bow Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_crossbow": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Bow/Bow Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_claws": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Slap Hand/Slap Hand Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_wrench": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Wrench/Wrench Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_round_shield": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Shield/Shield Wood Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_spiked_shield": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Shield/Shield Bronze Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_oath_shield": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Shield/Shield Gold Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_parrying_dagger": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Dagger 2/Dagger 2 Gold Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_spellbook": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Book/Book Purple Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_quiver": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Quiver/Quiver Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_smoke_bomb": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Bomb/Bomb Black Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_shuriken": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Shuriken/Shuriken Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_knight_helm": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Clothing/Armor Helmet/Armor Helmet Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_paladin_helm": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Clothing/Armor Helmet/Armor Helmet Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_wizard_hat": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Holiday/Wizard Hat/Wizard Hat Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_goggles": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Clothing/Glasses/Glasses Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_bone_crown": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Clothing/Crown/Crown 2 Purple Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_knight_plate": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Clothing/Armor Chestplate/Armor Chestplate Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_engineer_overalls": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Clothing/Pants/Pants Blue Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_hooded_robe": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Clothing/Sweater/Sweater Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_tankard": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Glass Cup/Glass Cup Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_compass": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Compass/Compass Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_lantern": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Lantern/Lantern Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_coin_purse": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Pouch/Pouch Yellow Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_traders_map": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Map/Map Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_healers_flask": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Potion 1/Potion 1 Pink Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_skeleton_key": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Key 2/Key 2 Silver Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "item_loaded_die": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Dice/Dice Outline.svg",
+   "tint": null,
+   "note": "Fallback glyph; the 3D thumbnail stays primary.",
+   "group": "item"
+  },
+  "wardrobe": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Clothing/Outfits/Outfits Outline.svg",
+   "tint": null,
+   "note": "Wardrobe button / NEW SKIN.",
+   "group": "wardrobe"
+  },
+  "wardrobe_hats": {
+   "svg": "rhosgfx/vector-hats/Cavalier Hat/cavalier-hat-purple-outline.svg",
+   "tint": null,
+   "note": "The one sanctioned vector-hats use: Wardrobe head/hat category icon.",
+   "group": "wardrobe"
+  },
+  "skin_prestige": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Clothing/Crown/Crown Outline.svg",
+   "tint": null,
+   "note": "Prestige medallion.",
+   "group": "wardrobe"
+  },
+  "cape": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Clothing/Outfits/Outfits PB Outline.svg",
+   "tint": null,
+   "note": "Back/Style slot glyph; weak (see missing).",
+   "group": "wardrobe"
+  },
+  "station_armory": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Anvil/Anvil Outline.svg",
+   "tint": null,
+   "note": "Armory station keeps the anvil (plan d): the 3D station is a forge, and the helmet is slot_head inside it.",
+   "group": "camp"
+  },
+  "station_setup": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Flag/Flag Checkered Outline.svg",
+   "tint": null,
+   "note": "Run setup (START RUN).",
+   "group": "camp"
+  },
+  "station_workshop": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Dice/Dice Outline.svg",
+   "tint": null,
+   "note": "Dice Workshop.",
+   "group": "camp"
+  },
+  "station_pet_den": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Paw/Paw Outline.svg",
+   "tint": null,
+   "note": "Pet Den (was heart).",
+   "group": "camp"
+  },
+  "station_arcade": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Technology/Joystick/Joystick Outline.svg",
+   "tint": null,
+   "note": "Arcade (was star).",
+   "group": "camp"
+  },
+  "station_wardrobe": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Clothing/Outfits/Outfits Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "camp"
+  },
+  "unlock_feature": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Plus/Plus Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "camp"
+  },
+  "pack": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Gift Box/Gift Box Outline.svg",
+   "tint": null,
+   "note": "Generic Workshop pack unlock.",
+   "group": "camp"
+  },
+  "pack_starter": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Shapes/Gaming Dice/D6 Outline.svg",
+   "tint": null,
+   "note": "Per-pack card icons (plan d). They echo pack contents, so they may share art with runes/statuses.",
+   "group": "camp"
+  },
+  "pack_gamblers_kit": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Lucky Block/Lucky Block Green Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "camp"
+  },
+  "pack_cold_steel": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Materials/Ice/Ice Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "camp"
+  },
+  "pack_pyromancy": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Fire/Fire Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "camp"
+  },
+  "pack_storm": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Storm/Storm Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "camp"
+  },
+  "pack_numerology": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Numbers/7/7 Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "camp"
+  },
+  "pack_resonance": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Music/Tuning Fork/Tuning Fork Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "camp"
+  },
+  "pack_colossus": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Shapes/Gaming Dice/D20 Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "camp"
+  },
+  "upgrade_potion_belt": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Potion 1/Potion 1 Yellow Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "camp"
+  },
+  "upgrade_loadout_slot": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Technology/Game Console/Game Console Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "camp"
+  },
+  "upgrade_whetstone": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Materials/Rock/Rock Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "camp"
+  },
+  "upgrade_starter_kit": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Storage Box/Storage Box Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "camp"
+  },
+  "mg_fossil_hunter": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Shovel/Shovel Gold Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "minigame"
+  },
+  "mg_bubble_breaker": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Nature/Bubble/Bubble Blue Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "minigame"
+  },
+  "mg_scratch_off": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Ticket/Ticket Yellow Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "minigame"
+  },
+  "mg_claw_machine": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Player/Grab/Grab Yellow Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "minigame"
+  },
+  "mg_bubble_shooter": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Water Pistol/Water Pistol Blue Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "minigame"
+  },
+  "mg_plinko": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Sports/Pétanque Boule/Pétanque Boule Outline.svg",
+   "tint": null,
+   "note": "Pétanque ball dropping (lead: combine for a stronger read).",
+   "group": "minigame",
+   "badge": {
+    "svg": "rhosgfx/vector-icon-pack-pro/UI/Chevrons Down/Chevrons Down Outline.svg",
+    "corner": "br",
+    "scale": 0.45
+   }
+  },
+  "mg_shell_game": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Plastic Cup/Plastic Cup Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "minigame"
+  },
+  "mg_memory_match": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Card/Card Spade Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "minigame"
+  },
+  "mg_fishing": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Fishing Rod/Fishing Rod Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "minigame"
+  },
+  "mg_lucky_wheel": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Spinner/Spinner Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "minigame"
+  },
+  "mg_high_low": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Tools/Ladder/Ladder Outline.svg",
+   "tint": null,
+   "note": "Ladder + up arrow = higher/lower climb.",
+   "group": "minigame",
+   "badge": {
+    "svg": "rhosgfx/vector-icon-pack-pro/UI/Arrow 2/Arrow 2 Up Outline.svg",
+    "corner": "br",
+    "scale": 0.45
+   }
+  },
+  "mg_fish": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Fish/Fish Outline.svg",
+   "tint": null,
+   "note": "In-board prize fallback.",
+   "group": "minigame"
+  },
+  "mg_ticket": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Items/Ticket/Ticket Pink Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "minigame"
+  },
+  "home": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Home/Home Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint.",
+   "group": "ui"
+  },
+  "gear": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Settings/Gear Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint. Settings.",
+   "group": "ui"
+  },
+  "close": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/X/X Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Close = plain X glyph on a red 3D round button (planner a). Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint.",
+   "group": "ui"
+  },
+  "cross": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/X/X Outline.svg",
+   "tint": null,
+   "note": "Inline wrong / OFF mark (full colour).",
+   "group": "ui"
+  },
+  "back": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Arrow/Arrow Left Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint. Straight arrow, not the U-turn Arrow Back (reads as undo and clashes with auto=Redo).",
+   "group": "ui"
+  },
+  "arrow_left": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Arrow/Arrow Left Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint.",
+   "group": "ui"
+  },
+  "arrow_right": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Arrow/Arrow Right Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint. Next / continue / GO.",
+   "group": "ui"
+  },
+  "arrow_up": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Arrow/Arrow Up Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint.",
+   "group": "ui"
+  },
+  "arrow_down": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Arrow/Arrow Down Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint.",
+   "group": "ui"
+  },
+  "chevron_left": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Chevrons Left/Chevrons Left Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint. Pager / stepper.",
+   "group": "ui"
+  },
+  "chevron_right": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Chevrons Right/Chevrons Right Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint.",
+   "group": "ui"
+  },
+  "pause": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Pause/Pause Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint.",
+   "group": "ui"
+  },
+  "play": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Arrow 2/Arrow 2 Right Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint. The pack has no triangle play glyph.",
+   "group": "ui"
+  },
+  "speed": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Double Arrows/Double Arrows Right Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint.",
+   "group": "ui"
+  },
+  "auto": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Redo/Redo Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint.",
+   "group": "ui"
+  },
+  "attack": {
+   "svg": "rhosgfx/vector-icon-pack-pro/Weapons/Sword/Sword Outline.svg",
+   "tint": null,
+   "note": "ATTACK button: full-colour concept icon.",
+   "group": "ui"
+  },
+  "info": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Info/Info Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint.",
+   "group": "ui"
+  },
+  "question": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Question Mark/Question Mark Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint. Help. (Unknown intent / event tile use their own full-colour ids.)",
+   "group": "ui"
+  },
+  "lock": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Lock/Lock Outline.svg",
+   "tint": null,
+   "note": "Locked (replaces procedural LockGlyph, 14 lock_line calls).",
+   "group": "ui"
+  },
+  "unlock": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Lock/Unlock Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "ui"
+  },
+  "new": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Sparkle/Sparkle Outline.svg",
+   "tint": null,
+   "note": "\"New unlock\" moments only; the NEW marker itself is a red text chip + radio-on-red dot (planner a).",
+   "group": "ui"
+  },
+  "check": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Check Mark/Check Mark Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint. TAKE / DONE / EQUIPPED.",
+   "group": "ui"
+  },
+  "plus": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Plus/Plus Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint.",
+   "group": "ui"
+  },
+  "minus": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Minus/Minus Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint.",
+   "group": "ui"
+  },
+  "speaker": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Sound/Sound Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint. Master volume row (navy: tint TEXT).",
+   "group": "ui"
+  },
+  "sound_off": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Sound Off/Sound Off Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint.",
+   "group": "ui"
+  },
+  "music": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Music/Music Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint.",
+   "group": "ui"
+  },
+  "music_off": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Music Off/Music Off Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint.",
+   "group": "ui"
+  },
+  "sfx": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Lightning Bolt/Lightning Bolt Yellow Outline.svg",
+   "tint": null,
+   "note": "SFX slider row.",
+   "group": "ui"
+  },
+  "ui_size": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Arrows Expand/Arrows Expand Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint. UI size (was plus).",
+   "group": "ui"
+  },
+  "menu": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Hamburger Menu/Hamburger Menu Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint.",
+   "group": "ui"
+  },
+  "trash": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Trash/Trash Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint.",
+   "group": "ui"
+  },
+  "warning": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Warning/Warning Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "ui"
+  },
+  "bell": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Bell/Bell Outline.svg",
+   "tint": null,
+   "note": "Update banner.",
+   "group": "ui"
+  },
+  "download": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Download/Download Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint. Update available.",
+   "group": "ui"
+  },
+  "copy": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Clipboard/Clipboard Outline.svg",
+   "tint": null,
+   "note": "Copy diagnostics.",
+   "group": "ui"
+  },
+  "loading": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Loading Wheel/Loading Wheel Outline.svg",
+   "tint": null,
+   "note": "Spinner.",
+   "group": "ui"
+  },
+  "hint": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Pointing Hand/Pointing Hand Outline.svg",
+   "tint": null,
+   "note": "Tap/drag hint on touch.",
+   "group": "ui"
+  },
+  "tap": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Pointing Hand/Pointing Hand Outline.svg",
+   "tint": null,
+   "note": "Touch verb glyph for instruction cards (plan e).",
+   "group": "ui"
+  },
+  "skip": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Skip Forward/Skip Forward Flat White.svg",
+   "tint": "palette:TEXT_DARK",
+   "note": "Action glyph: Flat White tinted ink (TEXT_DARK) on button faces; on navy/ghost pass UiPalette.TEXT as the caller tint. TAP TO SKIP.",
+   "group": "ui"
+  },
+  "calendar": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Calendar/Calendar Outline.svg",
+   "tint": null,
+   "note": "",
+   "group": "ui"
+  },
+  "stats": {
+   "svg": "rhosgfx/vector-icon-pack-pro/General/Stats/Stats 2 Outline.svg",
+   "tint": null,
+   "note": "Results breakdown.",
+   "group": "ui"
+  },
+  "crit": {
+   "svg": "rhosgfx/vector-icon-pack-pro/UI/Exclamation Mark/Exclamation Mark Outline.svg",
+   "tint": null,
+   "note": "Crit damage-pop prefix (slice b). Explosion stays scorch / intent_scorch and Volcano is magma / lava, so crit takes the unused red Exclamation Mark (one meaning per icon).",
+   "group": "status"
+  },
+  "mg_face_gold": {
+   "svg": "rhosgfx/vector-emojis/SVG/Outline/Star-struck.svg",
+   "tint": null,
+   "group": "emoji",
+   "note": "minigame result-beat face (spec §5 rule 8)"
+  },
+  "mg_face_silver": {
+   "svg": "rhosgfx/vector-emojis/SVG/Outline/Smiling face with sunglasses.svg",
+   "tint": null,
+   "group": "emoji",
+   "note": "minigame result-beat face (spec §5 rule 8)"
+  },
+  "mg_face_bronze": {
+   "svg": "rhosgfx/vector-emojis/SVG/Outline/Grinning face.svg",
+   "tint": null,
+   "group": "emoji",
+   "note": "minigame result-beat face (spec §5 rule 8)"
+  },
+  "mg_face_bust": {
+   "svg": "rhosgfx/vector-emojis/SVG/Outline/Face with spiral eyes.svg",
+   "tint": null,
+   "group": "emoji",
+   "note": "minigame result-beat face (spec §5 rule 8)"
+  },
+  "mg_face_jackpot": {
+   "svg": "rhosgfx/vector-emojis/SVG/Outline/Money mouth face.svg",
+   "tint": null,
+   "group": "emoji",
+   "note": "minigame result-beat face (spec §5 rule 8)"
+  }
+ },
+ "input_glyphs": {
+  "key_space": {
+   "svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/Outline/SVG/space_md.svg",
+   "compact_svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/White/SVG/space_md_white.svg",
+   "label": "SPACE",
+   "strip_text": true,
+   "note": "Keycap: strip the SVG <text> (ThorVG drops it) and draw the label in Lilita One, colour #476475, centred at 0.40 of the height (KeyGlyph, plan e). Compact (<=22 px inline) = White set tinted TEXT."
+  },
+  "key_enter": {
+   "svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/Outline/SVG/enter.svg",
+   "compact_svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/White/SVG/enter_white.svg",
+   "label": "ENTER",
+   "strip_text": true,
+   "note": "Keycap: strip the SVG <text> (ThorVG drops it) and draw the label in Lilita One, colour #476475, centred at 0.40 of the height (KeyGlyph, plan e). Compact (<=22 px inline) = White set tinted TEXT."
+  },
+  "key_esc": {
+   "svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/Outline/SVG/escape.svg",
+   "compact_svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/White/SVG/escape_white.svg",
+   "label": "ESC",
+   "strip_text": true,
+   "note": "Keycap: strip the SVG <text> (ThorVG drops it) and draw the label in Lilita One, colour #476475, centred at 0.40 of the height (KeyGlyph, plan e). Compact (<=22 px inline) = White set tinted TEXT."
+  },
+  "key_p": {
+   "svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/Outline/SVG/p.svg",
+   "compact_svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/White/SVG/p_white.svg",
+   "label": "P",
+   "strip_text": true,
+   "note": "Keycap: strip the SVG <text> (ThorVG drops it) and draw the label in Lilita One, colour #476475, centred at 0.40 of the height (KeyGlyph, plan e). Compact (<=22 px inline) = White set tinted TEXT."
+  },
+  "key_r": {
+   "svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/Outline/SVG/r.svg",
+   "compact_svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/White/SVG/r_white.svg",
+   "label": "R",
+   "strip_text": true,
+   "note": "Keycap: strip the SVG <text> (ThorVG drops it) and draw the label in Lilita One, colour #476475, centred at 0.40 of the height (KeyGlyph, plan e). Compact (<=22 px inline) = White set tinted TEXT."
+  },
+  "key_c": {
+   "svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/Outline/SVG/c.svg",
+   "compact_svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/White/SVG/c_white.svg",
+   "label": "C",
+   "strip_text": true,
+   "note": "Keycap: strip the SVG <text> (ThorVG drops it) and draw the label in Lilita One, colour #476475, centred at 0.40 of the height (KeyGlyph, plan e). Compact (<=22 px inline) = White set tinted TEXT."
+  },
+  "key_f1": {
+   "svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/Outline/SVG/f1.svg",
+   "compact_svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/White/SVG/f1_white.svg",
+   "label": "F1",
+   "strip_text": true,
+   "note": "Keycap: strip the SVG <text> (ThorVG drops it) and draw the label in Lilita One, colour #476475, centred at 0.40 of the height (KeyGlyph, plan e). Compact (<=22 px inline) = White set tinted TEXT."
+  },
+  "key_1": {
+   "svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/Outline/SVG/1.svg",
+   "compact_svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/White/SVG/1_white.svg",
+   "label": "1",
+   "strip_text": true,
+   "note": "Keycap: strip the SVG <text> (ThorVG drops it) and draw the label in Lilita One, colour #476475, centred at 0.40 of the height (KeyGlyph, plan e). Compact (<=22 px inline) = White set tinted TEXT."
+  },
+  "key_2": {
+   "svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/Outline/SVG/2.svg",
+   "compact_svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/White/SVG/2_white.svg",
+   "label": "2",
+   "strip_text": true,
+   "note": "Keycap: strip the SVG <text> (ThorVG drops it) and draw the label in Lilita One, colour #476475, centred at 0.40 of the height (KeyGlyph, plan e). Compact (<=22 px inline) = White set tinted TEXT."
+  },
+  "key_3": {
+   "svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/Outline/SVG/3.svg",
+   "compact_svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/White/SVG/3_white.svg",
+   "label": "3",
+   "strip_text": true,
+   "note": "Keycap: strip the SVG <text> (ThorVG drops it) and draw the label in Lilita One, colour #476475, centred at 0.40 of the height (KeyGlyph, plan e). Compact (<=22 px inline) = White set tinted TEXT."
+  },
+  "key_4": {
+   "svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/Outline/SVG/4.svg",
+   "compact_svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/White/SVG/4_white.svg",
+   "label": "4",
+   "strip_text": true,
+   "note": "Keycap: strip the SVG <text> (ThorVG drops it) and draw the label in Lilita One, colour #476475, centred at 0.40 of the height (KeyGlyph, plan e). Compact (<=22 px inline) = White set tinted TEXT."
+  },
+  "key_5": {
+   "svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/Outline/SVG/5.svg",
+   "compact_svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/White/SVG/5_white.svg",
+   "label": "5",
+   "strip_text": true,
+   "note": "Keycap: strip the SVG <text> (ThorVG drops it) and draw the label in Lilita One, colour #476475, centred at 0.40 of the height (KeyGlyph, plan e). Compact (<=22 px inline) = White set tinted TEXT."
+  },
+  "key_6": {
+   "svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/Outline/SVG/6.svg",
+   "compact_svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/White/SVG/6_white.svg",
+   "label": "6",
+   "strip_text": true,
+   "note": "Keycap: strip the SVG <text> (ThorVG drops it) and draw the label in Lilita One, colour #476475, centred at 0.40 of the height (KeyGlyph, plan e). Compact (<=22 px inline) = White set tinted TEXT."
+  },
+  "key_tab": {
+   "svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/Outline/SVG/tab.svg",
+   "compact_svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/White/SVG/tab_white.svg",
+   "label": "TAB",
+   "strip_text": true,
+   "note": "Keycap: strip the SVG <text> (ThorVG drops it) and draw the label in Lilita One, colour #476475, centred at 0.40 of the height (KeyGlyph, plan e). Compact (<=22 px inline) = White set tinted TEXT."
+  },
+  "key_shift": {
+   "svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/Outline/SVG/shift.svg",
+   "compact_svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/White/SVG/shift_white.svg",
+   "label": "SHIFT",
+   "strip_text": true,
+   "note": "Keycap: strip the SVG <text> (ThorVG drops it) and draw the label in Lilita One, colour #476475, centred at 0.40 of the height (KeyGlyph, plan e). Compact (<=22 px inline) = White set tinted TEXT."
+  },
+  "key_left": {
+   "svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/Outline/SVG/arrow-left.svg",
+   "compact_svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/White/SVG/arrow-left_white.svg",
+   "label": null,
+   "strip_text": false,
+   "note": "Keycap: strip the SVG <text> (ThorVG drops it) and draw the label in Lilita One, colour #476475, centred at 0.40 of the height (KeyGlyph, plan e). Compact (<=22 px inline) = White set tinted TEXT."
+  },
+  "key_right": {
+   "svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/Outline/SVG/arrow-right.svg",
+   "compact_svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/White/SVG/arrow-right_white.svg",
+   "label": null,
+   "strip_text": false,
+   "note": "Keycap: strip the SVG <text> (ThorVG drops it) and draw the label in Lilita One, colour #476475, centred at 0.40 of the height (KeyGlyph, plan e). Compact (<=22 px inline) = White set tinted TEXT."
+  },
+  "key_up": {
+   "svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/Outline/SVG/arrow-up.svg",
+   "compact_svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/White/SVG/arrow-up_white.svg",
+   "label": null,
+   "strip_text": false,
+   "note": "Keycap: strip the SVG <text> (ThorVG drops it) and draw the label in Lilita One, colour #476475, centred at 0.40 of the height (KeyGlyph, plan e). Compact (<=22 px inline) = White set tinted TEXT."
+  },
+  "key_down": {
+   "svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/Outline/SVG/arrow-down.svg",
+   "compact_svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/White/SVG/arrow-down_white.svg",
+   "label": null,
+   "strip_text": false,
+   "note": "Keycap: strip the SVG <text> (ThorVG drops it) and draw the label in Lilita One, colour #476475, centred at 0.40 of the height (KeyGlyph, plan e). Compact (<=22 px inline) = White set tinted TEXT."
+  },
+  "key_blank": {
+   "svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/Outline/SVG/blank_sm.svg",
+   "compact_svg": "rhosgfx/vector-keyboard-controls/Keyboard Keys/White/SVG/blank_sm_white.svg",
+   "label": null,
+   "strip_text": false,
+   "note": "Keycap: strip the SVG <text> (ThorVG drops it) and draw the label in Lilita One, colour #476475, centred at 0.40 of the height (KeyGlyph, plan e). Compact (<=22 px inline) = White set tinted TEXT."
+  },
+  "mouse_left": {
+   "svg": "rhosgfx/vector-keyboard-controls/Mouse Controls/Outline/SVG/LeftClick-Blue.svg",
+   "compact_svg": "rhosgfx/vector-keyboard-controls/Mouse Controls/White/SVG/LeftClick_White.svg",
+   "label": null,
+   "strip_text": false,
+   "note": "Mouse glyph (paths only)."
+  },
+  "mouse_right": {
+   "svg": "rhosgfx/vector-keyboard-controls/Mouse Controls/Outline/SVG/RightClick-Blue.svg",
+   "compact_svg": "rhosgfx/vector-keyboard-controls/Mouse Controls/White/SVG/RightClick_White.svg",
+   "label": null,
+   "strip_text": false,
+   "note": "Mouse glyph (paths only)."
+  },
+  "mouse_scroll": {
+   "svg": "rhosgfx/vector-keyboard-controls/Mouse Controls/Outline/SVG/Scroll-Blue.svg",
+   "compact_svg": "rhosgfx/vector-keyboard-controls/Mouse Controls/White/SVG/Scroll_White.svg",
+   "label": null,
+   "strip_text": false,
+   "note": "Mouse glyph (paths only)."
+  },
+  "mouse_move": {
+   "svg": "rhosgfx/vector-keyboard-controls/Mouse Controls/Outline/SVG/Move.svg",
+   "compact_svg": "rhosgfx/vector-keyboard-controls/Mouse Controls/White/SVG/Move_White.svg",
+   "label": null,
+   "strip_text": false,
+   "note": "Mouse glyph (paths only)."
+  },
+  "mouse": {
+   "svg": "rhosgfx/vector-keyboard-controls/Mouse Controls/Outline/SVG/Mouse.svg",
+   "compact_svg": "rhosgfx/vector-keyboard-controls/Mouse Controls/White/SVG/Mouse_White.svg",
+   "label": null,
+   "strip_text": false,
+   "note": "Mouse glyph (paths only)."
+  }
+ },
+ "missing": [
+  {
+   "id": "mirror",
+   "note": "Forge Mirror op / Appearance (transmog): no pack match (Shield Mirror reads as a shield). Keep ui/icons/mirror.svg (lead call).",
+   "fallback": "ui/icons/mirror.svg"
+  },
+  {
+   "id": "two_handed",
+   "note": "2H tag: no pack icon. Keep a text chip \"2H\".",
+   "fallback": "text"
+  },
+  {
+   "id": "mech_turret",
+   "note": "No turret/cannon. Mapped to Satellite Dish (weak). Alternative: keep current mech_turret.svg.",
+   "fallback": "ui/icons/mech_turret.svg"
+  },
+  {
+   "id": "cape",
+   "note": "No cape/cloak in the pack. Keep ui/icons/cape.svg restyled to the Outline look, or use Clothing/Outfits PB.",
+   "fallback": "ui/icons/cape.svg"
+  },
+  {
+   "id": "item_back_*",
+   "note": "13 back/cosmetic items (capes, backpacks, pelts): only Clothing/Backpack fits the two backpacks; others keep the 3D thumbnail + cape glyph.",
+   "fallback": "3d thumbnail"
+  },
+  {
+   "id": "item_bear_hat",
+   "note": "No bear hat. 3D thumbnail + slot glyph.",
+   "fallback": "3d thumbnail"
+  },
+  {
+   "id": "item_ninja_headband",
+   "note": "No headband. 3D thumbnail.",
+   "fallback": "3d thumbnail"
+  },
+  {
+   "id": "item_bandit_mask",
+   "note": "No mask. 3D thumbnail.",
+   "fallback": "3d thumbnail"
+  },
+  {
+   "id": "item_body_class_armour",
+   "note": "paladin_cuirass, barbarian_harness, mage_robe, rogue_leathers, ranger_tunic, ninja_gi, druid_robe, dino_suit: no matching clothing; 3D thumbnail + Armor Chestplate slot glyph.",
+   "fallback": "3d thumbnail"
+  },
+  {
+   "id": "item_variants",
+   "note": "All Armory variants stay 3D-thumbnail only.",
+   "fallback": "3d thumbnail"
+  },
+  {
+   "id": "kind_marks",
+   "note": "Die-kind corner marks (chevrons, diamond, ring, weight, bars, spark, crown, bone, dino print) stay procedural in die.gdshader/die_face.gd: they must read at 10 px on a die.",
+   "fallback": "procedural"
+  },
+  {
+   "id": "intent_shader",
+   "note": "In-world SDF intents (intent_icon.gdshader) can be replaced by the SVGs above rendered into the unit HUD chip; keep the SDF path as fallback for perf on web.",
+   "fallback": "shader"
+  },
+  {
+   "id": "combo_ids",
+   "note": "Combos (pair..six_kind) have no icons today; keep text.",
+   "fallback": "text"
+  },
+  {
+   "id": "pet_portraits",
+   "note": "pet_<id> ids stay UNMAPPED on purpose: they are our own portrait SVGs (in-run pet HUD, pet beats). Pack glyphs live under petg_<id>.",
+   "fallback": "ui/icons/pet_*.svg"
+  },
+  {
+   "id": "rarity_ring",
+   "note": "Passive rarity ring stays procedural (colour ring), drawn by passive_icon.gd around the pack glyph.",
+   "fallback": "procedural"
+  },
+  {
+   "id": "level_badge",
+   "note": "Level medallion + XP ring stays procedural.",
+   "fallback": "procedural"
+  }
+ ]
+}

@@ -10,6 +10,8 @@
 #          height, so @3x phones can't render off-screen; the UI is vector, @2x covers it)
 #   zoom = UI zoom via content_scale_factor (--ui-scale), like OS scaling / a UI-size option
 #   e.g. tools/shoot_matrix.sh game_rolled /tmp/shots/m quick --wait=3
+#   --audit adds the no-spillover findings (AUDIT_OVERFLOW / AUDIT_SAFE / AUDIT_CLIP, see
+#   ui/theme/ui_audit.gd) under each device line; none printed = the gate passes.
 # iPhone 17 and 17 Pro share 402x874 pt, so one entry covers both.
 # Writes <out_dir>/<scenario>__<device>.png and prints one line per device.
 set -e
@@ -79,9 +81,12 @@ echo "$list" | while read -r name res safe scale; do
 	[ -n "$name" ] || continue
 	png="$out/${scenario}__${name}.png"
 	zoom=""; [ -n "$scale" ] && zoom="--ui-scale=$scale"
-	if "$here/shoot.sh" "$scenario" "$png" "$res" --safe="$safe" $zoom "$@" 2>&1 | grep -q "SHOT_SAVED"; then
+	log="$("$here/shoot.sh" "$scenario" "$png" "$res" --safe="$safe" $zoom "$@" 2>&1 || true)"
+	if echo "$log" | grep -q "SHOT_SAVED"; then
 		echo "ok   $name ($res) -> $png"
 	else
 		echo "FAIL $name ($res)"
 	fi
+	# --audit: the no-spillover gate's findings, one line each, prefixed with the device
+	echo "$log" | grep -E "^AUDIT_(OVERFLOW|SAFE|CLIP)" | sed "s/^/     $name /" || true
 done

@@ -54,3 +54,21 @@ integrated (-1.5 dBTP) and encodes LAME VBR MP3. Originals, the CC0 legal code a
 From https://github.com/google/fonts (license texts next to the fonts):
 - Fredoka (variable, wdth+wght), The Fredoka Project Authors: `fonts/Fredoka-Variable.ttf`, `fonts/OFL-Fredoka.txt`
 - Lilita One by Juan Montoreano: `fonts/LilitaOne-Regular.ttf`, `fonts/OFL-LilitaOne.txt`
+
+## UI art: RhosGFX (https://rhosgfx.itch.io)
+
+Only the SVGs referenced by `ui/icons/icon_map.json` and `ui/theme/ui_pack.json` are copied here
+(`tools/import_ui_svgs.py`). Thanks to RhosGFX. Please support the packs at https://rhosgfx.itch.io.
+
+| Folder | Source pack | Licence |
+|---|---|---|
+| ui/pack/cartoony-ui-pack-full | Cartoony UI Pack (Full), https://rhosgfx.itch.io/cartoony-ui-pack | RhosGFX licence (paid; no redistribution) |
+| ui/icons/vector-icon-pack-pro | Vector Icon Pack Pro, https://rhosgfx.itch.io | RhosGFX licence (paid; no redistribution) |
+| ui/icons/vector-keyboard-controls | Vector Keyboard Controls, https://rhosgfx.itch.io | CC0 1.0 |
+| ui/icons/vector-emojis | Vector Emojis, https://rhosgfx.itch.io | CC0 1.0 |
+| ui/icons/vector-hats | Vector Hats, https://rhosgfx.itch.io | RhosGFX licence |
+
+## 3D models: Quaternius (CC0 1.0)
+
+Ultimate Platformer Pack by Quaternius (https://quaternius.com), CC0 1.0. Kept in
+`third_party/quaternius/`, and not used at runtime yet.

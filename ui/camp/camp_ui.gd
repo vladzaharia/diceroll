@@ -3,8 +3,9 @@ extends RefCounted
 ## Small builders shared by the Camp screens and the results screen (same look as the rest of
 ## the UI: navy cards, gold rims, Lilita headings, Fredoka body).
 
-## Sigils are drawn as a violet star next to the gold Crown.
-const SIGIL_ICON := "star"
+## Sigils: the pack's purple Star Gem (icon_map "sigil"; its own colours, no tint). Without
+## the pack the legacy violet star is drawn (sigil_icon()).
+const SIGIL_ICON := "sigil"
 const SIGIL_COLOR := Color("c79bff")
 const CROWN_COLOR := UiPalette.GOLD_BRIGHT
 
@@ -12,11 +13,7 @@ const CROWN_COLOR := UiPalette.GOLD_BRIGHT
 ## A card panel; `hi` = the selected / equipped look.
 static func card(hi := false, accent: Variant = null) -> PanelContainer:
 	var p := PanelContainer.new()
-	var sb := UiTheme.panel_box("card_hi" if hi else "card")
-	if accent is Color and not hi:
-		sb.border_color = Color(accent as Color, 0.55)
-		sb.set_border_width_all(2)
-	p.add_theme_stylebox_override("panel", sb)
+	p.add_theme_stylebox_override("panel", UiTheme.card_box("selected" if hi else "normal", accent))
 	p.mouse_filter = Control.MOUSE_FILTER_PASS
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return p
@@ -25,9 +22,7 @@ static func card(hi := false, accent: Variant = null) -> PanelContainer:
 ## A dimmed card for locked content.
 static func locked_card() -> PanelContainer:
 	var p := PanelContainer.new()
-	var sb := UiTheme.box(Color(0.06, 0.06, 0.13, 0.9), 24, 2, Color(1, 1, 1, 0.06))
-	UiTheme.pad(sb, 20, 16)
-	p.add_theme_stylebox_override("panel", sb)
+	p.add_theme_stylebox_override("panel", UiTheme.card_box("locked"))
 	p.mouse_filter = Control.MOUSE_FILTER_PASS
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return p
@@ -37,7 +32,7 @@ static func locked_card() -> PanelContainer:
 static func amount(icon: String, value: int, color: Color, size := 26) -> HBoxContainer:
 	var row := UiTheme.hbox(6)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_child(UiIcons.rect(icon, int(size * 1.15), color))
+	row.add_child(Icons.rect(_icon_id(icon), int(size * 1.15), color))
 	row.add_child(UiTheme.label(_num(value), size, UiPalette.TEXT, true, 5))
 	return row
 
@@ -55,7 +50,7 @@ static func sigils(value: int, size := 26) -> HBoxContainer:
 static func buy_button(verb: String, cost: Dictionary, affordable: bool, font := 26) -> GameButton:
 	var is_sigil := cost.has("sigils")
 	var price := int(cost.get("sigils", cost.get("crowns", 0)))
-	var b := GameButton.make("%s  %d" % [verb, price] if verb != "" else str(price), SIGIL_ICON if is_sigil else "crown",
+	var b := GameButton.make("%s  %d" % [verb, price] if verb != "" else str(price), sigil_icon() if is_sigil else "crown",
 		GameButton.Kind.PRIMARY if affordable else GameButton.Kind.SECONDARY, font)
 	b.icon_tint = (SIGIL_COLOR if is_sigil else UiPalette.TEXT_DARK) if affordable else (SIGIL_COLOR if is_sigil else UiPalette.GOLD)
 	b.min_height = 72
@@ -69,7 +64,12 @@ static func chip(text: String, bg: Color, fg: Color = UiPalette.TEXT, size := 17
 	var p := PanelContainer.new()
 	# never under 16 canvas px (about 9 pt on a phone): the old 12-15 px chips were unreadable
 	var fs := maxi(size, 16)
-	p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(bg, 12, 0), 8 if size < 16 else 10, 2 if size < 16 else 3))
+	var skin := UiTheme.skinned("chip_white")
+	p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.chip_box(bg) if skin else UiTheme.box(bg, 12, 0),
+		(12 if skin else 8) if size < 16 else (14 if skin else 10), 2 if size < 16 else 3))
+	if skin:
+		# pack chips are opaque colour faces: ink or TEXT, whichever reads
+		fg = UiPalette.on(Color(bg, 1.0)) if bg.a > 0.6 else fg
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -80,10 +80,15 @@ static func chip(text: String, bg: Color, fg: Color = UiPalette.TEXT, size := 17
 ## A padlock line: "🔒 Reach lap 5." in muted text.
 static func lock_line(text: String, size := 20) -> HBoxContainer:
 	var row := UiTheme.hbox(8)
-	var lk := LockGlyph.new()
-	lk.custom_minimum_size = Vector2(size * 1.1, size * 1.1)
-	lk.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(lk)
+	if Icons.is_mapped("lock"):
+		var ic := Icons.rect("lock", int(size * 1.1))
+		ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(ic)
+	else:
+		var lk := LockGlyph.new()
+		lk.custom_minimum_size = Vector2(size * 1.1, size * 1.1)
+		lk.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(lk)
 	var l := UiTheme.para(text, size, UiPalette.TEXT_DIM, 600)
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(l)
@@ -132,6 +137,15 @@ static func title_row(icon: String, color: Color, title: String, sub := "", px :
 	return row
 
 
+## Icon id for Sigils: the pack gem when mapped, else the legacy star glyph.
+static func sigil_icon() -> String:
+	return SIGIL_ICON if Icons.is_mapped(SIGIL_ICON) or UiIcons.exists(SIGIL_ICON) else "star"
+
+
+static func _icon_id(id: String) -> String:
+	return sigil_icon() if id == SIGIL_ICON else id
+
+
 static func _num(n: int) -> String:
 	if absi(n) >= 1000:
 		return "%d,%03d" % [n / 1000, absi(n) % 1000]
@@ -159,28 +173,31 @@ class Tile:
 		size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		mouse_filter = Control.MOUSE_FILTER_STOP
 		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if en else Control.CURSOR_ARROW
-		var sb: StyleBoxFlat
-		if sel:
-			sb = UiTheme.box(UiPalette.NAVY_3, 20, 3, UiPalette.GOLD_BRIGHT, 12, Color(0.95, 0.7, 0.2, 0.3), Vector2.ZERO)
+		var sb: StyleBox
+		if UiTheme.skinned("panel_card"):
+			sb = UiTheme.card_box("selected" if sel else ("normal" if en else "dim"), accent if en and not sel else null)
+			UiTheme.pad(sb, 14, 10)
+			sb.content_margin_bottom = 18
+		elif sel:
+			sb = UiTheme.pad(UiTheme.box(UiPalette.NAVY_3, 20, 3, UiPalette.GOLD_BRIGHT, 12, Color(0.95, 0.7, 0.2, 0.3), Vector2.ZERO), 14, 10)
 		elif en:
-			sb = UiTheme.box(Color(0.03, 0.03, 0.09, 0.55), 20, 2, Color(accent, 0.3))
+			sb = UiTheme.pad(UiTheme.box(Color(0.03, 0.03, 0.09, 0.55), 20, 2, Color(accent, 0.3)), 14, 10)
 		else:
-			sb = UiTheme.box(Color(0.03, 0.03, 0.09, 0.35), 20, 2, Color(1, 1, 1, 0.04))
-		UiTheme.pad(sb, 14, 10)
+			sb = UiTheme.pad(UiTheme.box(Color(0.03, 0.03, 0.09, 0.35), 20, 2, Color(1, 1, 1, 0.04)), 14, 10)
 		add_theme_stylebox_override("panel", sb)
 		var col := UiTheme.vbox(2)
 		add_child(col)
 		var row := UiTheme.hbox(8)
 		col.add_child(row)
 		if icon != "":
-			row.add_child(UiIcons.rect(icon, 26, accent if en else UiPalette.TEXT_MUTED))
+			row.add_child(Icons.rect(CampUi._icon_id(icon), 26, accent if en else UiPalette.TEXT_MUTED))
 		var tl := UiTheme.label(title, 23, (UiPalette.GOLD_BRIGHT if sel else UiPalette.TEXT) if en else UiPalette.TEXT_MUTED, true, 4)
 		tl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		tl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		tl.custom_minimum_size.x = 40
 		row.add_child(tl)
 		if sel:
-			row.add_child(UiIcons.rect("check", 24, UiPalette.GOLD_BRIGHT))
+			row.add_child(Icons.rect("check", 24, UiPalette.GOLD_BRIGHT))
 		if desc != "":
 			var d := UiTheme.para(desc, 18, UiPalette.TEXT_DIM if en else UiPalette.TEXT_MUTED, 500)
 			col.add_child(d)
@@ -213,7 +230,23 @@ class ProgressPill:
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 
+	## Pack bar kind for the fill ("xp", "mastery", ...); "" = from the fill colour.
+	var kind := ""
+
 	func _draw() -> void:
+		var k := kind
+		if k == "":
+			k = "xp" if fill == UiPalette.XP else ("hp" if fill == UiPalette.HP else "mastery")
+		var bx := UiTheme.bar_boxes(k)
+		if bool(bx.skinned):
+			draw_style_box(bx.bg, Rect2(Vector2.ZERO, size))
+			if ratio > 0.0:
+				var fb: StyleBox = bx.fill
+				if k == "mastery" and fill != UiPalette.GOLD and UiSkin.has("bar_mastery", "fill"):
+					# any other accent: the fill art stays, tinted towards the colour
+					fb = UiSkin.stylebox("bar_mastery", "fill", {"saturation": 0.0, "modulate": Color(fill.lightened(0.25), 1.0)})
+				draw_style_box(fb, Rect2(0, 0, maxf(size.y, size.x * ratio), size.y))
+			return
 		var r := int(size.y * 0.5)
 		draw_style_box(UiTheme.box(Color(0.02, 0.02, 0.07, 0.85), r, 2, Color(1, 1, 1, 0.06)), Rect2(Vector2.ZERO, size))
 		if ratio <= 0.0:
@@ -239,6 +272,19 @@ class LevelPips:
 		var step := size.x / float(max_level)
 		var cy := size.y * 0.5
 		var rad := minf(step * 0.34, size.y * 0.42)
+		if Icons.is_mapped("star"):
+			# spec 2.12: gold star pips (filled), greyed stars (empty), the gold tier star at
+			# trait tiers; each star fits its slot, so nothing spills.
+			var px := minf(step * 0.92, size.y)
+			for i in max_level:
+				var on := i < level
+				var id := "tier_3" if marks.has(i + 1) and Icons.is_mapped("tier_3") else "star"
+				var k := 1.0 if marks.has(i + 1) else 0.86
+				var sz := px * k
+				var t := Icons.texture(id, int(ceil(sz)), null if on else {"saturation": 0.0})
+				var r := Rect2(Vector2(step * (i + 0.5), cy) - Vector2(sz, sz) * 0.5, Vector2(sz, sz))
+				draw_texture_rect(t, r, false, Color.WHITE if on else Color(1, 1, 1, 0.35))
+			return
 		for i in max_level:
 			var c := Vector2(step * (i + 0.5), cy)
 			var on := i < level

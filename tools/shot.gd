@@ -8,7 +8,10 @@ extends Node
 ## --frames=N         additionally saves N more shots 0.25 s apart as <png>_1.._N
 ## --ui-scale=F       multiplies the window's content_scale_factor (UI zoom / OS scaling tests)
 ## --audit           after the shot, prints AUDIT_TEXT lines for visible text under 16 canvas px
-##                   and AUDIT_TAP lines for buttons under 80 canvas px tall (44 pt on a phone)
+##                   and AUDIT_TAP lines for buttons under 80 canvas px tall (44 pt on a phone),
+##                   plus the no-spillover gate (UiAudit): AUDIT_OVERFLOW (rect outside its
+##                   frame), AUDIT_SAFE (content outside the safe area), AUDIT_CLIP (text
+##                   wider than its label); opt out per node with meta "allow_overflow"
 ## Without --shot the scenario just runs (handy for manual poking).
 ## --timeout=S      safety timer: force-quits S seconds after start (default wait + frames*0.25 + 10;
 ##                   CI software rendering (lavapipe) compiles shaders slowly, so tools/ci/shoot_ci.sh raises it)
@@ -75,6 +78,10 @@ func _run(name: String, wait: float, frames: int) -> void:
 	if args.has("audit"):
 		print("AUDIT_BEGIN")
 		_audit(tree.root)
+		# no-spillover gate: AUDIT_OVERFLOW / AUDIT_SAFE / AUDIT_CLIP (ui/theme/ui_audit.gd)
+		for line in UiAudit.run(tree.root):
+			print(line)
+		print("AUDIT_END")
 	for i in frames:
 		await tree.create_timer(FRAME_GAP, true, false, true).timeout
 		await _save("%s_%d.%s" % [path.get_basename(), i + 1, path.get_extension()])

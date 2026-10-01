@@ -401,9 +401,7 @@ func set_lap(act: int, lap: int) -> void:
 		var bn := _boss_name if _boss_name != "" else "the final boss"
 		_act_chip.tooltip_text = ("Every tile is %s's now: one last roll, and wherever you land, you fight." % bn) if _finale \
 			else "After the Last Camp, one final roll into %s." % bn
-	var sb := UiTheme.panel_box("pill").duplicate() as StyleBoxFlat
-	sb.border_color = Color(UiPalette.HP_BRIGHT, 0.85) if final else Color(bc, 0.7)
-	_act_chip.add_theme_stylebox_override("panel", sb)
+	_act_chip.add_theme_stylebox_override("panel", UiTheme.panel_box("pill", UiPalette.HP_BRIGHT if final else bc))
 	_set_laps(act, lap)
 	if final and not was_final and is_inside_tree():
 		UiTheme.pop(_act_chip, 1.25, 0.4)
@@ -609,9 +607,7 @@ func _show_twist(key: String, animate := false) -> void:
 	_twist_label.text = text
 	_twist_label.label_settings = UiTheme.label_settings(20, col.lerp(Color.WHITE, 0.15), true, 5)
 	twist_chip.tooltip_text = tip
-	var sb := UiTheme.pad(UiTheme.panel_box("pill"), 10, 2).duplicate() as StyleBoxFlat
-	sb.border_color = Color(col, 0.75)
-	twist_chip.add_theme_stylebox_override("panel", sb)
+	twist_chip.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.panel_box("pill", col), 10, 2))
 	if animate and changed and is_inside_tree():
 		UiTheme.pop(twist_chip, 1.3, 0.35)
 

@@ -1,5 +1,5 @@
 {
-  "lock_hash": "da33571ef6b790c3",
+  "lock_hash": "d369af502a57c895",
   "schema": 1,
   "units": {
     "fonts": {
@@ -280,6 +280,51 @@
       "files": 103,
       "plain_bytes": 748978,
       "sha256": "07e092ff98330d8c03e70526eea8db2fd1f1baf121d2b30fb981bb73d4f34f1d"
+    },
+    "ui-icons-vector-emojis": {
+      "bundle_bytes": 4751,
+      "bundle_sha256": "28ad842d8eb40dc380ebd2c159fc3e590d9d69b014223028706a66325f21555c",
+      "dest": "assets/ui/icons/vector-emojis",
+      "file": "bundles/ui-icons-vector-emojis/ui-icons-vector-emojis-676f8d01965540f6.tar.zst.age",
+      "files": 12,
+      "plain_bytes": 19697,
+      "sha256": "676f8d01965540f641ed1adb43448e2af735d3b1ba24d655f513a928e274f868"
+    },
+    "ui-icons-vector-hats": {
+      "bundle_bytes": 1598,
+      "bundle_sha256": "8188031c1e1ec6c814cebe2f0e59d5990d63b2c904857b62edc5e4757688b777",
+      "dest": "assets/ui/icons/vector-hats",
+      "file": "bundles/ui-icons-vector-hats/ui-icons-vector-hats-9d574cdc03e8bd53.tar.zst.age",
+      "files": 2,
+      "plain_bytes": 2813,
+      "sha256": "9d574cdc03e8bd531fe332951b3583a3b85f83ec03bebc83f86e94e8f3c482d9"
+    },
+    "ui-icons-vector-icon-pack-pro": {
+      "bundle_bytes": 163705,
+      "bundle_sha256": "938ef30b928ea7b72798286a3d6e327dab829a005161162bb18eda179bb3be7f",
+      "dest": "assets/ui/icons/vector-icon-pack-pro",
+      "file": "bundles/ui-icons-vector-icon-pack-pro/ui-icons-vector-icon-pack-pro-3aba631bfd42de71.tar.zst.age",
+      "files": 570,
+      "plain_bytes": 656930,
+      "sha256": "3aba631bfd42de71b98a6617b4b63d2752dd71de23a46d2f9393d46f1c19cba1"
+    },
+    "ui-icons-vector-keyboard-controls": {
+      "bundle_bytes": 13262,
+      "bundle_sha256": "e836c8e15a67c545ea7b67773e8b5d1e887123c5e4fb2bb17375e1a36976a246",
+      "dest": "assets/ui/icons/vector-keyboard-controls",
+      "file": "bundles/ui-icons-vector-keyboard-controls/ui-icons-vector-keyboard-controls-b0da7f3a76ba5fef.tar.zst.age",
+      "files": 100,
+      "plain_bytes": 59273,
+      "sha256": "b0da7f3a76ba5fefdd5b60c18e09114d2ac2da3c529ed98a41e02326ff862877"
+    },
+    "ui-pack-cartoony-ui-pack-full": {
+      "bundle_bytes": 9791,
+      "bundle_sha256": "bb5a15f85b99e1c408bc3e79691f24cc8ae3600507aff1a48ed035bbb786c7d0",
+      "dest": "assets/ui/pack/cartoony-ui-pack-full",
+      "file": "bundles/ui-pack-cartoony-ui-pack-full/ui-pack-cartoony-ui-pack-full-907a2f6545c5bcf5.tar.zst.age",
+      "files": 206,
+      "plain_bytes": 91796,
+      "sha256": "907a2f6545c5bcf5dfbc5d027f9b03b36796509ac25d91b02b1c27b7aaa8d079"
     }
   }
 }
