@@ -2502,26 +2502,25 @@
     }
    }
   },
-  "dev_plaque": {
-   "note": "Developer menu title plaque: 3D Square 2.5 grey-light (slate, not the game's yellow), 84 px nominal (72 on phone via fit), ink title.",
-   "fallback": "empty",
-   "fit": true,
+  "dev_header": {
+   "note": "Developer menu header bar (full-screen dev surface: DEVELOPER tag, title, close): Flat white x #1b2d38 (deep slate).",
+   "fallback": "panel:inset",
    "slice": [
-    9,
-    9,
-    9,
-    19
+    10,
+    10,
+    10,
+    10
    ],
-   "scale": 1.3125,
    "content": [
-    48,
+    22,
+    4,
     8,
-    48,
-    24
+    4
    ],
    "states": {
     "normal": {
-     "svg": "rhosgfx/cartoony-ui-pack-full/Buttons/3D/Square/1. Grey/button-square-3d-2.5-grey-light_standard.svg"
+     "svg": "rhosgfx/cartoony-ui-pack-full/Containers/Flat/0. White/container-flat-white.svg",
+     "tint": "#1b2d38"
     }
    }
   },
