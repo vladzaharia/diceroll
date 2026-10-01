@@ -121,9 +121,9 @@ func open() -> void:
 	_animate()
 
 
-## UiModal's layout (MIN_W floor, shrink-to-fit via _fit), with the footer's height kept free
-## under the scrolling panel. Narrow canvases (iPhone at 125 % UI size: 576 px) scale the whole
-## frame down instead of letting wide rows (route strip, first chips) push it off-screen.
+## UiModal's layout with the footer's height kept free under the scrolling panel. Narrow
+## canvases (iPhone at 125 % UI size: 576 px) lay out at their real width and reflow, as in
+## UiModal (a shrink put text under 16 px).
 func _layout() -> void:
 	if _frame == null or _footer == null:
 		super._layout()
@@ -132,11 +132,11 @@ func _layout() -> void:
 	if view.x <= 0.0:
 		return
 	_apply_scale(view)
+	_apply_spacing()
 	var safe := UiTheme.safe_margins(self)
 	var avail_w := view.x - safe.left - safe.right
 	var w := minf(max_width, avail_w)
-	# never lay out narrower than MIN_W: shrink instead (as UiModal does)
-	var lw := maxf(w, minf(MIN_W, max_width))
+	var lw := w
 	_frame.custom_minimum_size.x = lw
 	_frame.size = Vector2(lw, 0)
 	_fit_plaque(lw)
@@ -152,6 +152,8 @@ func _layout() -> void:
 	k = minf(k, (view.y - safe.top - safe.bottom) / maxf(_frame.size.y, 1.0))
 	var was := _fit
 	_fit = clampf(k, 0.6, 1.0)
+	if _fit > 0.995:
+		_fit = 1.0
 	if not is_equal_approx(was, _fit) and is_equal_approx(_frame.scale.x, was):
 		_frame.scale = Vector2.ONE * _fit
 	var fh := _frame.size.y * _fit

@@ -10,6 +10,8 @@ signal shop_buy(index: int, die_idx: int)
 signal shop_reroll_pressed
 signal shop_leave_pressed
 
+## A DieChip's width (grid_columns: 2 columns on a narrow canvas).
+const DIE_CHIP_W := 166.0
 const ICONS := {"die": "dice", "potion": "3d:potion_red", "face_raise": "anvil", "combat_reroll": "reroll"}
 
 var gold: Counter
@@ -143,6 +145,7 @@ func begin_pick(i: int) -> void:
 			_cards[k].selected = k == i
 	var it: Dictionary = _flow.offer.items[i]
 	_pick_title.text = ("Which die gets the rune?" if String(it.id) == "rune" else "Raise the lowest face of which die?").to_upper()
+	_pick_grid.columns = grid_columns(3, DIE_CHIP_W)
 	UiTheme.clear(_pick_grid)
 	_chips.clear()
 	for d in _flow.run.dice.size():

@@ -38,6 +38,8 @@ const GAP_TOP := 30
 const GAP_ACTIONS := 36
 ## Canvas height the spacing scale is designed for.
 const GAP_REF_H := 1280.0
+## Canvas width assumed before the modal has a size.
+const MODAL_REF_W := 720.0
 
 signal opened
 signal closed
@@ -77,7 +79,8 @@ var cancel_action: BaseButton
 var _frame: VBoxContainer
 ## Panel scale when its content is wider / taller than the screen allows (1 = natural size).
 var _fit := 1.0
-## Narrowest layout width; narrower screens shrink the panel instead of squeezing it.
+## Narrowest comfortable layout width. Narrower canvases reflow at their real width (modal
+## pass 2026-10-01: shrinking broke the 16 px / 80 px floors); grids use grid_columns().
 const MIN_W := 620.0
 ## Canvas size (both sides) from which the frame and plaque use their desktop scale.
 const LARGE_CANVAS := 1000.0
@@ -349,13 +352,11 @@ func _layout() -> void:
 	var safe := UiTheme.safe_margins(self)
 	var avail_w := view.x - safe.left - safe.right
 	var w := minf(max_width, avail_w)
-	# never lay out narrower than MIN_W (cards would wrap word by word): shrink instead, but
-	# only while that keeps text >= 16 px and taps >= 80 px; past that lay out at the real
-	# width (cards wrap a little more) rather than shrink under the audit floors
+	# lay out at the real width: a canvas narrower than MIN_W (UI zoom on a phone) reflows
+	# (option cards, chips and grids flow) instead of shrinking the panel, because a shrink
+	# put text under 16 px and taps under 80 px
 	var floor_k := _shrink_floor()
-	var lw := maxf(w, minf(MIN_W, max_width))
-	if w / lw < floor_k - 0.001:
-		lw = w
+	var lw := w
 	_frame.custom_minimum_size.x = lw
 	_frame.size = Vector2(lw, 0)
 	_fit_plaque(lw)
@@ -516,6 +517,15 @@ static func section_label(text: String) -> Label:
 	l.custom_minimum_size.y = ceilf(UiTheme.body_font(700).get_height(20)) + float(GAP_SECTION - GAP_ITEM)
 	l.set_meta("section_gap", true)
 	return l
+
+
+## Columns for a grid of `item_w`-wide tiles (die chips) in this modal's body: `want`, fewer
+## on a canvas too narrow for them (UI zoom on a phone), at least 1.
+func grid_columns(want: int, item_w: float, gap := 12.0) -> int:
+	var safe := UiTheme.safe_margins(self)
+	var view := size.x if size.x > 0.0 else MODAL_REF_W
+	var avail := minf(max_width, view - safe.left - safe.right) - 92.0
+	return clampi(int(floor((avail + gap) / (item_w + gap))), 1, want)
 
 
 ## Spacer above the bottom action row (TAKE, BUY, BEGIN...): with the body's own separation

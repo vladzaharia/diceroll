@@ -70,6 +70,7 @@ func refresh(flow: GameFlow) -> void:
 	OptionCard.style_tag(tp, tag, UiPalette.rarity_color(rarity))
 	nr.add_child(tp)
 	col.add_child(UiTheme.para(String(def.desc), 24, UiPalette.TEXT, 500))
+	_grid.columns = grid_columns(3, ShopModal.DIE_CHIP_W)
 	UiTheme.clear(_grid)
 	_chips.clear()
 	for i in _dice.size():
