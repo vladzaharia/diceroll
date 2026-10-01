@@ -119,6 +119,15 @@ func _gui_input(e: InputEvent) -> void:
 		drop()
 
 
+## Keyboard: Space drops (a click on the cabinet, the same as tapping it).
+func key_input(event: InputEvent, drv: Node) -> bool:
+	if not InputActions.pressed(event, InputActions.MG_ACTION):
+		return false
+	if not locked and _mode == "swing":
+		drv.call("click", get_global_rect().get_center())
+	return true
+
+
 func _head() -> Vector2:
 	return Vector2(floor_x(_claw), _rail_y + 30.0 * _unit() + _cable)
 

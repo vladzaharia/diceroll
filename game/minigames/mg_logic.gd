@@ -37,9 +37,22 @@ const HINTS := {
 const UNITS := {"fossil_hunter": "DIGS", "bubble_breaker": "TAPS", "scratch_off": "SCRATCHES", "claw_machine": "GRABS",
 	"bubble_shooter": "SHOTS", "plinko": "DROPS", "shell_game": "ROUNDS", "memory_match": "MISSES", "fishing": "CASTS",
 	"lucky_wheel": "SPINS", "high_low": "RUNGS"}
-const ICONS := {"fossil_hunter": "shovel", "bubble_breaker": "bubble", "scratch_off": "ticket", "claw_machine": "claw",
-	"bubble_shooter": "bubble", "plinko": "peg", "shell_game": "cup", "memory_match": "card", "fishing": "rod", "lucky_wheel": "wheel",
-	"high_low": "ladder"}
+## Desktop (keyboard / mouse) instruction copy: keys named in TEXT only, no key art (spec 6).
+## {action} tokens become the action's current key name (MinigameScreen.hint_text). Games
+## without keyboard play just say "Click". Touch uses HINTS ("Tap ...").
+const KEY_HINTS := {
+	"fossil_hunter": "Click a mound to dig for 3 fossils and hidden treasure. Hit a bone? Dig beside it!",
+	"bubble_breaker": "Only 3 clicks! Pop groups of 3+; groups of 5+ and chains of big pops score extra.",
+	"scratch_off": "Click or drag to scratch 3 faces: win their pips. A pair adds 4, three alike adds 10, three 6s: JACKPOT!",
+	"claw_machine": "{mg_action} or click to drop. Every capsule hides a prize: gold ones are rare and deep!",
+	"bubble_shooter": "{mg_left} / {mg_right} to aim, {mg_action} to shoot (or drag). Match 3+ to pop; what hangs below falls for double!",
+	"plinko": "{mg_left} / {mg_right} to pick a slot, {mg_action} to drop. Aim above the rich buckets; the golden peg doubles a drop!",
+	"shell_game": "Watch the gem, follow the cups, then press {mg_pick_1}, {mg_pick_2} or {mg_pick_3} (or click its cup). Pick fast for a Sharp Eye bonus!",
+	"memory_match": "Click two cards a turn. Pairs stay up. Remember what you saw: 6 misses and it's over!",
+	"fishing": "Cast with {mg_pick_1} shallows, {mg_pick_2} reeds, {mg_pick_3} deep (or click a spot). {mg_action} to strike when the bobber plunges, not on a nibble!",
+	"lucky_wheel": "Three spins! {mg_action} to spin; as it slows, {mg_action} once to brake on a better prize.",
+	"high_low": "Higher or lower? {mg_up} / {mg_down} to call, {mg_cash_out} to cash out. Each right call climbs the ladder!",
+}
 
 
 static func claw_x(t: float) -> float:

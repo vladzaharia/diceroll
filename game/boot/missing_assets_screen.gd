@@ -7,13 +7,37 @@ extends Control
 ## the explanation, a "Read the build guide" button (README) and Quit. Respects safe areas.
 ## Hosts the hidden DevGesture (bottom-right corner, 5 taps): the Developer menu uses UiTheme,
 ## which falls back to the engine font when the third-party fonts are missing.
+##
+## UI reskin (docs/design/2026-09-30-ui-reskin.md 4.5): this screen is EXEMPT from the RhosGFX
+## pack because it shows exactly when packs are missing. It never touches the icon registry,
+## the skin manifest or the imported pack folders: the buttons are engine Buttons whose drawn face copies the pack's yellow
+## (primary) and blue (secondary) 3D button colours, the card echoes the Nailed wood frame,
+## and its icons are tracked files in game/boot/icons/ (hand-drawn book / door / warning, plus
+## two CC0 key glyphs from the RhosGFX keyboard pack, which may be redistributed).
+## Keys: Enter = Read the build guide, Esc = Quit; on desktop the key shows as a faded keycap
+## inside the button's top-right corner only while the mouse hovers it (no permanent badges).
 
 const LOGO_PATH := "res://assets/icon/logo_doubles.png"
 
 const BG_CENTER := Color("#272c6b")
 const BG_MID := Color("#14173a")
 const BG_EDGE := Color("#07081a")
-const CARD := Color(0.075, 0.082, 0.19, 0.96)
+const CARD := Color(0.075, 0.082, 0.19, 0.97)
+## Nailed-frame wood (the pack's darkbrown frame) around the card.
+const WOOD := Color("#5a3a22")
+const WOOD_DARK := Color("#3a2414")
+## Pack 3D button colours (button-square-3d-2.5-<family>-regular_*.svg): face, hover face,
+## lip, outline.
+const PACK_YELLOW := [Color("#fdaf18"), Color("#fec92b"), Color("#fc9504"), Color("#f15a24")]
+const PACK_BLUE := [Color("#37b9ff"), Color("#96dbff"), Color("#1778ff"), Color("#0049c7")]
+const LABEL_INK := Color("#1a2530")
+## Tracked icons (loaded straight from the files, never through the icon registry).
+const ICON_DIR := "res://game/boot/icons/"
+## Touch-target floor for the two buttons.
+const BUTTON_H := 88.0
+## Hover keycap height and opacity (spec 6).
+const KEYCAP_H := 24.0
+const KEYCAP_ALPHA := 0.6
 const INK := Color("#0b0c1a")
 const GOLD := Color("#f6c453")
 const GOLD_HI := Color("#ffd97a")
@@ -35,6 +59,9 @@ var _logo: Control
 var _dice: Label
 var _roll: Label
 var _card: PanelContainer
+var _buttons: BoxContainer
+var readme_button: Button
+var quit_button: Button
 
 
 func _init() -> void:
@@ -143,9 +170,10 @@ func _card_panel() -> Control:
 	_card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = CARD
-	sb.set_corner_radius_all(28)
-	sb.set_border_width_all(2)
-	sb.border_color = Color(1, 1, 1, 0.08)
+	sb.set_corner_radius_all(22)
+	sb.set_border_width_all(7)
+	sb.border_width_bottom = 10
+	sb.border_color = WOOD
 	sb.shadow_color = Color(0, 0, 0, 0.45)
 	sb.shadow_size = 36
 	sb.shadow_offset = Vector2(0, 14)
@@ -159,27 +187,40 @@ func _card_panel() -> Control:
 	box.add_theme_constant_override("separation", 0)
 	_card.add_child(box)
 
+	var brow := HBoxContainer.new()
+	brow.add_theme_constant_override("separation", 10)
+	var warn := _icon_rect("warning", 30.0)
+	if warn:
+		brow.add_child(warn)
 	var eyebrow := _text("SETUP NEEDED", 17, GOLD, 1)
 	eyebrow.label_settings.font = _font(1.0, 4)
-	box.add_child(eyebrow)
+	eyebrow.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	eyebrow.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	eyebrow.autowrap_mode = TextServer.AUTOWRAP_OFF
+	brow.add_child(eyebrow)
+	box.add_child(brow)
 	box.add_child(_gap(12))
 	box.add_child(_text("Required game assets are missing", 32, CREAM, 0.6))
 	box.add_child(_gap(20))
 	box.add_child(_body())
 	box.add_child(_gap(32))
 
-	var buttons := HBoxContainer.new()
+	var buttons := BoxContainer.new()
+	buttons.name = "Buttons"
 	buttons.add_theme_constant_override("separation", 16)
-	var guide := _button("Read the build guide", true)
+	_buttons = buttons
+	var guide := _button("Read the build guide", true, "book", "key_enter")
 	guide.name = "Readme"
 	guide.tooltip_text = AssetCheck.README_URL
 	guide.pressed.connect(func() -> void: OS.shell_open(AssetCheck.README_URL))
 	buttons.add_child(guide)
-	var quit := _button("Quit", false)
+	var quit := _button("Quit", false, "door", "key_esc")
 	quit.name = "Quit"
 	quit.size_flags_stretch_ratio = 0.55
 	quit.pressed.connect(func() -> void: get_tree().quit())
 	buttons.add_child(quit)
+	readme_button = guide
+	quit_button = quit
 	box.add_child(buttons)
 	box.add_child(_gap(18))
 
@@ -253,42 +294,155 @@ func _gap(h: float) -> Control:
 	return c
 
 
-func _button(text: String, primary: bool) -> Button:
+func _button(text: String, primary: bool, icon := "", key := "") -> Button:
 	var b := Button.new()
 	b.text = text
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	b.custom_minimum_size = Vector2(0, 64)
-	b.add_theme_font_override("font", _font(0.7))
-	b.add_theme_font_size_override("font_size", 22)
-	var base := GOLD if primary else Color(1, 1, 1, 0.06)
-	var hover := GOLD_HI if primary else Color(1, 1, 1, 0.12)
-	var down := GOLD_LO if primary else Color(1, 1, 1, 0.03)
-	var fg := INK if primary else CREAM
-	for st: String in ["normal", "hover", "pressed", "disabled"]:
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = {"normal": base, "hover": hover, "pressed": down, "disabled": base}[st]
-		sb.set_corner_radius_all(16)
-		# Same border geometry on both kinds so their labels share a baseline.
-		sb.set_border_width_all(2)
-		sb.border_width_bottom = 2 if st == "pressed" else 5
-		if primary:
-			sb.border_color = GOLD_LO.darkened(0.3) if st != "pressed" else down
-		else:
-			sb.border_color = Color(1, 1, 1, 0.16 if st != "hover" else 0.28)
-		sb.content_margin_left = 20
-		sb.content_margin_right = 20
+	b.custom_minimum_size = Vector2(0, BUTTON_H)
+	b.add_theme_font_override("font", _font(0.9))
+	b.add_theme_font_size_override("font_size", 24)
+	b.add_theme_constant_override("h_separation", 10)
+	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var tex := _icon_texture(icon, 40.0)
+	if tex:
+		b.icon = tex
+		b.expand_icon = false
+	# the face is drawn by a child behind the label (pack colours); the label sits on the face
+	for st: String in ["normal", "hover", "pressed", "disabled", "focus", "hover_pressed"]:
+		var sb := StyleBoxEmpty.new()
+		sb.content_margin_left = 22
+		sb.content_margin_right = 22
+		sb.content_margin_top = 8 if st != "pressed" else 14
+		sb.content_margin_bottom = 20 if st != "pressed" else 14
 		b.add_theme_stylebox_override(st, sb)
-	var focus := StyleBoxFlat.new()
-	focus.draw_center = false
-	focus.set_corner_radius_all(20)
-	focus.set_border_width_all(3)
-	focus.border_color = CREAM
-	focus.set_expand_margin_all(5)
-	b.add_theme_stylebox_override("focus", focus)
 	for c: String in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color",
 			"font_hover_pressed_color"]:
-		b.add_theme_color_override(c, fg)
+		b.add_theme_color_override(c, LABEL_INK)
+	var face := _Face.new()
+	face.colors = PACK_YELLOW if primary else PACK_BLUE
+	face.button = b
+	face.show_behind_parent = true
+	face.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	face.set_anchors_preset(Control.PRESET_FULL_RECT)
+	b.add_child(face)
+	if key != "":
+		var cap := _Keycap.new()
+		cap.button = b
+		cap.texture = _icon_texture(key, KEYCAP_H, Color("#dfe6ea"))
+		cap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cap.visible = false
+		cap.name = "Keycap"
+		b.add_child(cap)
+		b.mouse_entered.connect(cap.set_hover.bind(true))
+		b.mouse_exited.connect(cap.set_hover.bind(false))
 	return b
+
+
+## A tracked boot icon as a texture `px` tall (null when missing: the button still works).
+## Raw SVG through FileAccess when the source is there (crisp at any size), else the imported
+## texture (exported builds ship imported resources only).
+func _icon_texture(id: String, px: float, tint: Variant = null) -> Texture2D:
+	if id == "":
+		return null
+	var path := ICON_DIR + id + ".svg"
+	if FileAccess.file_exists(path):
+		var src := FileAccess.get_file_as_string(path)
+		if tint is Color:
+			src = src.replace("#fff;", "#%s;" % (tint as Color).to_html(false)).replace("#fff\"", "#%s\"" % (tint as Color).to_html(false))
+		var m := RegEx.create_from_string("viewBox=\"[\\d.]+ [\\d.]+ ([\\d.]+) ([\\d.]+)\"").search(src)
+		var vh := float(m.get_string(2)) if m else 48.0
+		var img := Image.new()
+		var ds := DisplayServer.screen_get_scale() if DisplayServer.get_name() != "headless" else 1.0
+		if img.load_svg_from_string(src, px / vh * maxf(2.0, ds)) == OK:
+			var t := ImageTexture.create_from_image(img)
+			t.set_size_override(Vector2i(roundi(px * img.get_width() / float(img.get_height())), roundi(px)))
+			return t
+	if ResourceLoader.exists(path):
+		return load(path) as Texture2D
+	return null
+
+
+func _icon_rect(id: String, px: float) -> TextureRect:
+	var t := _icon_texture(id, px)
+	if t == null:
+		return null
+	var r := TextureRect.new()
+	r.texture = t
+	r.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	r.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	r.custom_minimum_size = Vector2(px, px)
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return r
+
+
+## Enter = Read the build guide, Esc = Quit (InputMap actions when registered, else the keys).
+func _unhandled_key_input(event: InputEvent) -> void:
+	var k := event as InputEventKey
+	if k == null or not k.pressed or k.echo:
+		return
+	if _is(event, "menu_confirm", [KEY_ENTER, KEY_KP_ENTER]):
+		get_viewport().set_input_as_handled()
+		readme_button.pressed.emit()
+	elif _is(event, "menu_back", [KEY_ESCAPE]):
+		get_viewport().set_input_as_handled()
+		quit_button.pressed.emit()
+
+
+static func _is(event: InputEvent, action: String, keys: Array) -> bool:
+	if InputMap.has_action(action):
+		return event.is_action_pressed(action, false, true)
+	return (event as InputEventKey).keycode in keys
+
+
+## The pack 3D button look in plain draw calls: outline, lip, face (hover = lighter face;
+## pressed = the face sinks onto the lip).
+class _Face:
+	extends Control
+	var colors: Array = []
+	var button: Button
+
+	func _ready() -> void:
+		for sig in ["mouse_entered", "mouse_exited", "button_down", "button_up"]:
+			button.connect(sig, queue_redraw)
+
+	func _draw() -> void:
+		var r := Rect2(Vector2.ZERO, size)
+		var k := size.y / 64.0
+		var down := button.is_pressed() or button.button_pressed
+		var hover := button.is_hovered() and InputMode.is_kbm()
+		var o := 4.0 * k
+		var lip := (10.0 if not down else 4.0) * k
+		var sb := StyleBoxFlat.new()
+		sb.set_corner_radius_all(int(9.0 * k))
+		sb.bg_color = colors[3]
+		draw_style_box(sb, r)
+		sb.set_corner_radius_all(int(5.0 * k))
+		sb.bg_color = colors[2]
+		var inner := r.grow(-o)
+		draw_style_box(sb, inner)
+		sb.bg_color = colors[1] if hover and not down else colors[0]
+		var top := inner.position.y + (6.0 * k if down else 0.0)
+		draw_style_box(sb, Rect2(inner.position.x, top, inner.size.x, inner.end.y - lip - top))
+
+
+## The desktop hover keycap: a faded key glyph inside the top-right of the face, only while
+## the mouse hovers the button in keyboard / mouse mode.
+class _Keycap:
+	extends TextureRect
+	var button: Button
+
+	func set_hover(on: bool) -> void:
+		visible = on and texture != null and InputMode.is_kbm()
+		if not visible:
+			return
+		var ts := texture.get_size()
+		var h := KEYCAP_H
+		var w := h * ts.x / maxf(ts.y, 1.0)
+		expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
+		size = Vector2(w, h)
+		position = Vector2(button.size.x - w - 12.0, 9.0)
+		modulate.a = KEYCAP_ALPHA
 
 
 ## Fallback emblem when the logo texture can't load: a gold die showing three.
@@ -324,6 +478,8 @@ func _layout() -> void:
 	var k := clampf(avail / _lockup_width(), 0.4, 1.0)
 	_size_lockup(k)
 	_card.custom_minimum_size.x = minf(CARD_W, avail)
+	# the two 88 px buttons stack on narrow cards so neither label is squeezed
+	_buttons.vertical = _card.custom_minimum_size.x < 520.0
 	_logo.queue_redraw()
 
 

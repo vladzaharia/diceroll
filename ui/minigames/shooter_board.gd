@@ -209,6 +209,26 @@ func scripted_input(args: Array, drv: Node) -> bool:
 	return true
 
 
+## Keyboard: Left / Right step the aim, Space shoots along it (scripted_input: the same
+## press-drag-release a player makes).
+func key_input(event: InputEvent, drv: Node) -> bool:
+	var d := 0
+	if InputActions.pressed(event, InputActions.MG_LEFT):
+		d = -1
+	elif InputActions.pressed(event, InputActions.MG_RIGHT):
+		d = 1
+	if d != 0:
+		_aim_idx = clampi(_aim_idx + d, 0, BubbleShooter.ANGLES - 1)
+		_hover = true
+		queue_redraw()
+		return true
+	if InputActions.pressed(event, InputActions.MG_ACTION):
+		if _can_shoot() and not _animating and is_inside_tree():
+			scripted_input([_aim_idx], drv)
+		return true
+	return false
+
+
 ## Press above the cannon, drag to the aim point for angle step idx, hold a beat, release.
 func _scripted_drag(idx: int, drv: Node) -> void:
 	var guard := 0
@@ -631,7 +651,7 @@ func _draw_board() -> void:
 	elif not _touched and _can_shoot() and int(state.get("actions_left", 0)) == BubbleShooter.SHOTS:
 		var cp := P(Vector2(4.0, 8.2))
 		var a := 0.55 + 0.35 * sin(time * 3.0)
-		text_c(cp, "DRAG TO AIM  -  RELEASE TO SHOOT", maxi(12, int(_u * 0.32)), Color(1, 1, 1, a), maxi(4, int(_u * 0.1)))
+		text_c(cp, "%s / %s AIM  -  %s SHOOTS" % [MgBoard.key_name(InputActions.MG_LEFT), MgBoard.key_name(InputActions.MG_RIGHT), MgBoard.key_name(InputActions.MG_ACTION)] if InputMode.is_kbm() else "DRAG TO AIM  -  RELEASE TO SHOOT", maxi(12, int(_u * 0.32)), Color(1, 1, 1, a), maxi(4, int(_u * 0.1)))
 
 
 func _draw_chest() -> void:

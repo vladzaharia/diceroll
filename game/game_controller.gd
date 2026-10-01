@@ -652,33 +652,36 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		_tap(mb.position)
 		return
-	var k := event as InputEventKey
-	if k and k.pressed and not k.echo:
-		_key(k.keycode)
+	if event is InputEventKey:
+		_key(event)
 
 
-func _key(code: int) -> void:
-	if code == KEY_ESCAPE or code == KEY_P:
+## Run shortcuts, routed through the InputMap actions of ui/input/input_actions.gd
+## (pause = Esc / P, primary = Space / Enter, reroll = R, die_1..die_6 = 1-6).
+func _key(event: InputEvent) -> void:
+	if InputActions.pressed(event, InputActions.PAUSE):
 		pause()
 		return
 	if busy or ui.pause.visible or any_modal_open():
 		return
 	var ph := flow.phase
-	if code == KEY_SPACE or code == KEY_ENTER:
+	if InputActions.pressed(event, InputActions.PRIMARY):
 		if ph == GameFlow.Phase.BOARD_READY:
 			run_command("roll_board")
 		elif ph == GameFlow.Phase.BOARD_ROLLED:
 			run_command("confirm_move")
 		elif ph == GameFlow.Phase.COMBAT:
 			run_command("combat_attack")
-	elif code == KEY_R:
+	elif InputActions.pressed(event, InputActions.REROLL):
 		if ph == GameFlow.Phase.BOARD_ROLLED:
 			run_command("board_reroll")
 		elif ph == GameFlow.Phase.COMBAT:
 			run_command("combat_reroll")
-	elif code >= KEY_1 and code <= KEY_6 and ph == GameFlow.Phase.COMBAT:
+	elif ph == GameFlow.Phase.COMBAT:
 		# combat only: mark / unmark die N for a reroll (the board move is automatic)
-		run_command("combat_toggle", [code - KEY_1])
+		var n := InputActions.pressed_index(event, InputActions.DIE)
+		if n >= 0:
+			run_command("combat_toggle", [n])
 
 
 func _tap(pos: Vector2) -> void:
@@ -865,6 +868,10 @@ func show_camp() -> void:
 ## A Camp toast: low on the screen, so it never lands on the station heading or the row the
 ## player just tapped (the rank-up toast sat on the Ranks heading at mid-screen).
 func _camp_toast(text: String, icon := "", color: Color = UiPalette.TEXT) -> void:
+	# on the Camp screen itself: above its bottom panel and over its station screens
+	if ui and ui.camp and ui.camp.visible and ui.camp.is_inside_tree():
+		ui.camp.toast(text, icon, color)
+		return
 	overlay.toast(text, icon, color, CAMP_TOAST_Y)
 
 
@@ -881,19 +888,19 @@ func camp_command(cmd: Array) -> void:
 		match String(e.get("type", "")):
 			"upgrade_bought":
 				Audio.play_sfx("levelup")
-				_camp_toast(_upgrade_text(e), "up", UiPalette.HEAL)
+				_camp_toast(_upgrade_text(e), "rank", UiPalette.HEAL)
 			"unlocked":
 				Audio.play_sfx("fanfare")
 				_camp_toast("Unlocked: %s" % CampInfo.name_of(String(e.kind), String(e.id)),
-					CampInfo.icon_of(String(e.kind), String(e.id)), UiPalette.GOLD_BRIGHT)
+					CampInfo.glyph_of(String(e.kind), String(e.id)), UiPalette.GOLD_BRIGHT)
 			"pool_toggled", "starter_kind_set", "ascension_changed", "loadout_changed":
 				Audio.play_sfx("dice_select")
 			"item_unlocked":
 				Audio.play_sfx("fanfare")
-				_camp_toast("New item: %s" % ItemDefs.name_of(String(e.id)), CampInfo.icon_of("items", String(e.id)), UiPalette.GOLD_BRIGHT)
+				_camp_toast("New item: %s" % ItemDefs.name_of(String(e.id)), CampInfo.item_icon(String(e.id)), UiPalette.GOLD_BRIGHT)
 			"variant_crafted":
 				Audio.play_sfx("levelup")
-				_camp_toast("Crafted: %s" % ItemDefs.name_of(String(e.variant)), "anvil", UiPalette.GOLD_BRIGHT)
+				_camp_toast("Crafted: %s" % ItemDefs.name_of(String(e.variant)), "craft", UiPalette.GOLD_BRIGHT)
 			"item_equipped":
 				Audio.play_sfx("buff")
 			"appearance_set":
@@ -903,7 +910,7 @@ func camp_command(cmd: Array) -> void:
 			"skin_unlocked":
 				Audio.play_sfx("fanfare")
 				_camp_toast("New skin: %s, %s" % [CampInfo.name_of("classes", String(e["class"])), String(SkinDefs.NAMES.get(String(e.skin), e.skin))],
-					"wardrobe", Color("c79bff"))
+					"wardrobe_hats", Color("c79bff"))
 	if camp_scene:
 		camp_scene.apply_profile(profile)
 	ui.camp.show_profile(profile, TitleScreen.has_save())
@@ -1019,6 +1026,9 @@ func _camp_reveal() -> void:
 
 
 func _camp_input(event: InputEvent) -> void:
+	if event is InputEventKey:
+		_camp_key(event)
+		return
 	var mb := event as InputEventMouseButton
 	if mb == null or not mb.pressed or mb.button_index != MOUSE_BUTTON_LEFT or camp_scene == null:
 		return
@@ -1030,3 +1040,23 @@ func _camp_input(event: InputEvent) -> void:
 	var id := camp_scene.pick_station(mb.position)
 	if id != "":
 		ui.camp.open_station(id)
+
+
+## Camp keys (no station or modal open): Enter = START RUN (opens run setup), Esc = home
+## (back to the title). Open stations and modals handle their own Enter / Esc (UiModal).
+func _camp_key(event: InputEvent) -> void:
+	if camp_scene == null or get_tree().paused or ui.camp.any_open():
+		return
+	if camp_scene.revealing:
+		if InputActions.pressed(event, InputActions.CONFIRM) or InputActions.pressed(event, InputActions.BACK):
+			camp_scene.skip_reveal()
+			get_viewport().set_input_as_handled()
+		return
+	if InputActions.pressed(event, InputActions.CONFIRM) and ui.camp.start_btn.is_visible_in_tree() \
+			and not ui.camp.start_btn.disabled:
+		get_viewport().set_input_as_handled()
+		ui.camp.start_btn.pressed.emit()
+	elif InputActions.pressed(event, InputActions.BACK) and ui.camp.home_btn.is_visible_in_tree():
+		get_viewport().set_input_as_handled()
+		ui.camp.home_btn.pressed.emit()
+

@@ -9,6 +9,14 @@ extends Control
 ## everything stacked; landscape: the board left, the panel right. There is no AUTO here: the
 ## player plays every minigame (user decision 2026-09-29; AUTO pauses at minigames).
 ##
+## Reskin (spec 4.5): the header is the pack plaque in the game's own colour family with its
+## mg_* icon; the instruction sits in its own card at 26 px in TEXT (touch: led by the `tap`
+## glyph and "Tap ..."; desktop: keys named in text only, "Space to drop"); pills are pack
+## chips with hourglass / star unit icons; the result beat is the Nailed frame with the pack
+## trophy (150 px) and one flavour emoji. Keyboard play (desktop): keys go to the board's
+## key_input (claw, wheel, fishing, shell, high-low, plinko, shooter); Space / Enter skips
+## the result beat.
+##
 ## It renders the core's public state only (flow.offer.state and event states) and never
 ## calls GameFlow: taps become signals that UiRoot turns into commands.
 ##
@@ -26,12 +34,17 @@ var speed := 1.0
 var game_id := ""
 var board: MgBoard
 var drop_btn: GameButton
-var ribbon: Ribbon
+var ribbon: MgWidgets.Plaque
 
 var _flow: GameFlow
 var _open := false
 var _in_result := false
 var _hint: Label
+var _hint_card: PanelContainer
+var _hint_icon: TextureRect
+var _driver: MgBoard.Driver
+## Instruction text size (logical px, spec 4.5) and the least it may be scaled to on screen.
+const HINT_FONT := 26
 var _stats: HBoxContainer
 var _act_num: Label
 var _act_unit: Label
@@ -61,20 +74,35 @@ func _init() -> void:
 	_content = Control.new()
 	_content.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(UiTheme.full_rect(_content))
-	ribbon = Ribbon.make("", 42, UiPalette.GOLD)
+	ribbon = MgWidgets.Plaque.new()
 	_content.add_child(ribbon)
-	_hint = UiTheme.para("", 22, UiPalette.TEXT_DIM, 600)
+	# instruction card: its own panel, 26 px TEXT; on touch it leads with the tap glyph
+	_hint_card = PanelContainer.new()
+	_hint_card.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.panel_box("hud"), 16, 10))
+	_hint_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_content.add_child(_hint_card)
+	var hrow := UiTheme.hbox(10)
+	hrow.alignment = BoxContainer.ALIGNMENT_CENTER
+	_hint_card.add_child(hrow)
+	_hint_icon = Icons.rect("tap", 36)
+	_hint_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	hrow.add_child(_hint_icon)
+	_hint = UiTheme.para("", HINT_FONT, UiPalette.TEXT, 600)
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_content.add_child(_hint)
+	_hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hrow.add_child(_hint)
+	_driver = MgBoard.Driver.new()
+	_driver.name = "KeyDriver"
+	add_child(_driver)
 	_stats = UiTheme.hbox(12)
 	_stats.alignment = BoxContainer.ALIGNMENT_CENTER
 	_content.add_child(_stats)
-	var a := _pill("DIGS", "7")
+	var a := _pill("DIGS", "7", "hourglass")
 	_act_unit = a[0]
 	_act_num = a[1]
-	var s := _pill("SCORE", "0")
+	var s := _pill("SCORE", "0", "star")
 	_score_num = s[1]
-	_status_pill = UiTheme.panel("pill")
+	_status_pill = _chip()
 	_status = UiTheme.label("", 22, UiPalette.GOLD_BRIGHT, true, 5)
 	_status_pill.add_child(_status)
 	_stats.add_child(_status_pill)
@@ -89,7 +117,8 @@ func _init() -> void:
 	_buttons.alignment = BoxContainer.ALIGNMENT_CENTER
 	_content.add_child(_buttons)
 	drop_btn = GameButton.make("DROP!", "", GameButton.Kind.PRIMARY, 40)
-	drop_btn.custom_minimum_size = Vector2(250, 84)
+	drop_btn.custom_minimum_size = Vector2(250, 88)
+	drop_btn.shortcut_hint = InputActions.glyph_for(InputActions.MG_ACTION)
 	drop_btn.pressed.connect(func() -> void:
 		if board is ClawBoard:
 			(board as ClawBoard).drop())
@@ -105,16 +134,73 @@ func _init() -> void:
 	resized.connect(_layout)
 
 
-func _pill(unit: String, value: String) -> Array:
-	var p := UiTheme.panel("pill")
+## A stats pill (pack grey chip): unit icon, unit, number.
+func _pill(unit: String, value: String, icon := "") -> Array:
+	var p := _chip()
 	var row := UiTheme.hbox(8)
 	p.add_child(row)
+	if icon != "":
+		var ic := Icons.rect(icon, 30)
+		ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(ic)
 	var u := UiTheme.label(unit, 20, UiPalette.TEXT_DIM, false, 0, false, 700)
 	row.add_child(u)
 	var n := UiTheme.label(value, 34, UiPalette.TEXT, true, 6)
 	row.add_child(n)
 	_stats.add_child(p)
 	return [u, n]
+
+
+func _chip() -> PanelContainer:
+	var p := PanelContainer.new()
+	var sb := UiTheme.chip_box("grey")
+	sb.content_margin_left = 22
+	sb.content_margin_right = 22
+	sb.content_margin_top = 6
+	sb.content_margin_bottom = 6
+	p.add_theme_stylebox_override("panel", sb)
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return p
+
+
+func _ready() -> void:
+	var im := InputMode.instance(get_tree())
+	if im != null:
+		im.changed.connect(func(_kbm: bool) -> void: _apply_hint())
+
+
+## The instruction for `id` in the current input mode: touch "Tap ..." (MgLogic.HINTS) or,
+## on desktop, keys named in text (MgLogic.KEY_HINTS, {action} -> its current key name).
+static func hint_text(id: String, kbm: bool) -> String:
+	if not kbm:
+		return String(MgLogic.HINTS.get(id, ""))
+	var t := String(MgLogic.KEY_HINTS.get(id, MgLogic.HINTS.get(id, "")))
+	for a in InputActions.actions():
+		if t.contains("{" + a + "}"):
+			t = t.replace("{" + a + "}", InputActions.key_label(a))
+	return t
+
+
+func _apply_hint() -> void:
+	var kbm := InputMode.is_kbm()
+	_hint.text = hint_text(game_id, kbm)
+	_hint_icon.visible = not kbm and Icons.is_mapped("tap")
+	if is_inside_tree():
+		_layout()
+
+
+## Desktop keyboard play: keys go to the board (its key_input acts through the real input
+## path); during the result beat Space / Enter skips it.
+func _unhandled_key_input(event: InputEvent) -> void:
+	if not visible or not _open or board == null:
+		return
+	if _in_result:
+		if InputActions.pressed(event, InputActions.MG_ACTION) or InputActions.pressed(event, InputActions.CONFIRM):
+			_skip = true
+			get_viewport().set_input_as_handled()
+		return
+	if board.key_input(event, _driver):
+		get_viewport().set_input_as_handled()
 
 
 func is_open() -> bool:
@@ -151,8 +237,10 @@ func _ensure(id: String, title: String) -> void:
 	board.kick.connect(_on_kick)
 	_glow_col = MgLogic.GAME_COLORS.get(id, UiPalette.GOLD)
 	ribbon.text = title.to_upper()
+	ribbon.icon = "mg_" + id if Icons.exists("mg_" + id) else ""
+	ribbon.family = String(MgWidgets.PLAQUE_FAMILY.get(id, "yellow"))
 	ribbon.color = _glow_col.darkened(0.15)
-	_hint.text = MgLogic.HINTS.get(id, "")
+	_apply_hint()
 	_act_unit.text = MgLogic.UNITS.get(id, "MOVES")
 	drop_btn.visible = id == "claw_machine"
 	_layout()
@@ -318,14 +406,21 @@ func play_result(ev: Dictionary) -> void:
 	var col_box := UiTheme.vbox(10)
 	col_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	card.add_child(col_box)
-	var medal := MgWidgets.Medal.new()
-	medal.tier = tier
-	medal.custom_minimum_size = Vector2(170, 190)
-	medal.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var medal := MgWidgets.trophy(tier, 150)
 	col_box.add_child(medal)
+	var trow := UiTheme.hbox(12)
+	trow.alignment = BoxContainer.ALIGNMENT_CENTER
+	col_box.add_child(trow)
 	var title := UiTheme.label(MgLogic.tier_label(tier), 64, col, true, 12, true)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	col_box.add_child(title)
+	trow.add_child(title)
+	# one flavour face, popped once (the only emoji in minigames, spec 5 rule 8)
+	var score0 := float(ev.get("score", 0.0))
+	var face := MgWidgets.face(tier, score0 <= 0.0 and not auto, bool(ev.get("jackpot", false)), 64)
+	if face != null:
+		face.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		face.modulate.a = 0.0
+		trow.add_child(face)
 	var game := UiTheme.label(MinigameDefs.name_of(String(ev.get("id", game_id))).to_upper(), 20, UiPalette.TEXT_MUTED, false, 0, false, 700)
 	game.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col_box.add_child(game)
@@ -342,10 +437,11 @@ func play_result(ev: Dictionary) -> void:
 	var crow := UiTheme.hbox(10)
 	crow.alignment = BoxContainer.ALIGNMENT_CENTER
 	col_box.add_child(crow)
-	crow.add_child(UiIcons.rect("crown", 40))
+	crow.add_child(Icons.rect("crown", 40))
 	var cl := UiTheme.label("+%d Crown%s" % [int(ev.get("crowns", 0)), "" if int(ev.get("crowns", 0)) == 1 else "s"], 32, UiPalette.GOLD_BRIGHT, true, 6)
 	crow.add_child(cl)
-	var tap := UiTheme.label("Tap to continue", 20, UiPalette.TEXT_MUTED, false, 0, false, 600)
+	var cont := ("Click or press %s to continue" % InputActions.key_label(InputActions.MG_ACTION)) if InputMode.is_kbm() else "Tap to continue"
+	var tap := UiTheme.label(cont, 20, UiPalette.TEXT_MUTED, false, 0, false, 600)
 	tap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col_box.add_child(tap)
 	_result.visible = true
@@ -353,7 +449,7 @@ func play_result(ev: Dictionary) -> void:
 	card.reset_size()
 	card.position = (vs - card.size) * 0.5
 	card.pivot_offset = card.size * 0.5
-	medal.pivot_offset = medal.custom_minimum_size * 0.5
+	medal.pivot_offset = medal.size * 0.5
 	# the beat
 	_skip = false
 	card.modulate.a = 0.0
@@ -377,6 +473,11 @@ func play_result(ev: Dictionary) -> void:
 	var tt := create_tween()
 	tt.tween_property(title, "modulate:a", 1.0, 0.15 / speed)
 	UiTheme.pop(title, 1.25, 0.3)
+	if face != null:
+		face.pivot_offset = face.size * 0.5
+		var ft := create_tween()
+		ft.tween_property(face, "modulate:a", 1.0, 0.12 / speed)
+		UiTheme.pop(face, 1.4, 0.35)
 	meter.set_value(float(ev.get("ratio", 0.0)), true, 0.7 / speed)
 	UiTheme.pop(cl, 1.3, 0.35)
 	var hold := float(get_meta("hold", 2.2)) / speed
@@ -401,11 +502,12 @@ func _layout() -> void:
 	var safe := UiTheme.safe_margins(self)
 	var land := vs.x > vs.y * 1.1
 	var top := safe.top + 6.0
+	ribbon.max_width = minf(vs.x - safe.left - safe.right - 32.0, 640.0)
 	ribbon.reset_size()
 	var rs := ribbon.get_combined_minimum_size()
 	ribbon.size = rs
 	var board_r: Rect2
-	var side_ctl: Array[Control] = [ribbon, _hint, _stats, _meter_box, _buttons]
+	var side_ctl: Array[Control] = [ribbon, _hint_card, _stats, _meter_box, _buttons]
 	# the button row only holds the claw's DROP button; other boards take the space
 	var btn_h := 88.0 if drop_btn.visible else 0.0
 	if land:
@@ -420,14 +522,25 @@ func _layout() -> void:
 		var cx := x0 + side + 60.0
 		for ctl in side_ctl:
 			ctl.scale = Vector2(k, k)
-		_hint.custom_minimum_size = Vector2(cw, 0)
-		_hint.size = Vector2(cw, 0)
-		var hint_h := _hint.get_combined_minimum_size().y
+		ribbon.max_width = cw
+		ribbon.reset_size()
+		rs = ribbon.get_combined_minimum_size()
+		ribbon.size = rs
+		var hint_h := _size_hint(cw)
 		var total := (rs.y + 10.0 + hint_h + 24.0 + 88.0 + 100.0 + btn_h) * k
+		var room := vs.y - top - safe.bottom - 8.0
+		if total > room:
+			# too tall: shrink the column a little (never below 0.85: the 26 px hint stays
+			# readable) rather than push it off screen
+			var k2 := maxf(0.85, k * room / total)
+			for ctl in side_ctl:
+				ctl.scale = Vector2(k2, k2)
+			total *= k2 / k
+			k = k2
 		var y := maxf(top, (vs.y - total) * 0.5)
 		ribbon.position = Vector2(cx + (col_w - rs.x * k) * 0.5, y)
 		y += (rs.y + 10.0) * k
-		_hint.position = Vector2(cx, y)
+		_hint_card.position = Vector2(cx, y)
 		y += (hint_h + 24.0) * k
 		_stats.position = Vector2(cx, y)
 		_stats.size = Vector2(cw, 64)
@@ -443,11 +556,10 @@ func _layout() -> void:
 			ctl.scale = Vector2.ONE
 		ribbon.position = Vector2((vs.x - rs.x) * 0.5, top)
 		var y := top + rs.y + 2.0
-		var hw := minf(vs.x - 60.0, 640.0)
-		_hint.custom_minimum_size = Vector2(hw, 0)
-		_hint.size = Vector2(hw, 0)
-		_hint.position = Vector2((vs.x - hw) * 0.5, y)
-		y += _hint.get_combined_minimum_size().y + 12.0
+		var hw := minf(vs.x - safe.left - safe.right - 32.0, 660.0)
+		var hh := _size_hint(hw)
+		_hint_card.position = Vector2((vs.x - hw) * 0.5, y + 6.0)
+		y += hh + 18.0
 		_stats.position = Vector2(0, y)
 		_stats.size = Vector2(vs.x, 64)
 		y += 78.0
@@ -466,6 +578,20 @@ func _layout() -> void:
 		board.position = Vector2.ZERO
 		board.size = board_r.size
 		board.pivot_offset = board.size * 0.5
+
+
+## Sizes the instruction card `w` wide (the label wraps inside it); returns its height.
+func _size_hint(w: float) -> float:
+	var sb := _hint_card.get_theme_stylebox("panel")
+	var inner := w - (sb.get_margin(SIDE_LEFT) + sb.get_margin(SIDE_RIGHT) if sb else 32.0)
+	if _hint_icon.visible:
+		inner -= 36.0 + 10.0
+	_hint.custom_minimum_size = Vector2(maxf(inner, 80.0), 0)
+	_hint_card.custom_minimum_size = Vector2(w, 0)
+	_hint_card.reset_size()
+	var h := _hint_card.get_combined_minimum_size().y
+	_hint_card.size = Vector2(w, h)
+	return h
 
 
 func _draw() -> void:

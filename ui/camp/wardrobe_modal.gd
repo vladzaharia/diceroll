@@ -102,9 +102,9 @@ func _stand(p: Profile) -> Control:
 	row.add_child(UiTheme.label(String(HeroDefs.DATA[view_class].name), 32, UiPalette.class_color(view_class).lightened(0.25), true, 6))
 	row.add_child(UiTheme.label(String(SkinDefs.NAMES[shown]), 26, UiPalette.TEXT, true, 5))
 	if not owned:
-		row.add_child(CampUi.chip("PREVIEW  ·  LOCKED", Color(0.25, 0.2, 0.35), UiPalette.TEXT_DIM, 16))
+		row.add_child(CampArt.chip("PREVIEW", "grey", "lock", 16))
 	elif shown == eq:
-		row.add_child(CampUi.chip("WORN", UiPalette.HEAL.darkened(0.3), UiPalette.TEXT, 16))
+		row.add_child(CampArt.chip("WORN", "purple", "", 16))
 	return c
 
 
@@ -115,15 +115,7 @@ func _swatch(p: Profile, skin: String) -> Control:
 	var shown := (preview_skin if preview_skin != "" else p.equipped_skin(view_class)) == skin
 	var is_new := _fresh.has("%s:%s" % [view_class, skin])
 	var card := _Swatch.new()
-	var sb: StyleBoxFlat
-	if worn:
-		sb = UiTheme.box(UiPalette.NAVY_3, 20, 3, UiPalette.GOLD_BRIGHT, 12, Color(0.95, 0.7, 0.2, 0.3), Vector2.ZERO)
-	elif shown:
-		sb = UiTheme.box(Color(0.1, 0.08, 0.2, 0.9), 20, 3, Color("c79bff"))
-	else:
-		sb = UiTheme.box(Color(0.03, 0.03, 0.09, 0.6), 20, 2, Color(1, 1, 1, 0.08) if not owned else Color(UiPalette.class_color(view_class), 0.4))
-	UiTheme.pad(sb, 10, 10)
-	card.add_theme_stylebox_override("panel", sb)
+	card.add_theme_stylebox_override("panel", swatch_box(worn, shown, owned, UiPalette.class_color(view_class)))
 	card.size_flags_vertical = Control.SIZE_FILL
 	var col := UiTheme.vbox(6)
 	card.add_child(col)
@@ -140,17 +132,14 @@ func _swatch(p: Profile, skin: String) -> Control:
 	var head := UiTheme.hbox(6)
 	col.add_child(head)
 	if not owned:
-		var lk := CampUi.LockGlyph.new()
-		lk.custom_minimum_size = Vector2(22, 22)
-		lk.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		head.add_child(lk)
+		head.add_child(CampArt.lock_icon(24))
 	var nm := UiTheme.label(String(SkinDefs.NAMES[skin]), 24, UiPalette.GOLD_BRIGHT if worn else (UiPalette.TEXT if owned else UiPalette.TEXT_DIM), true, 4)
 	nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(nm)
 	if is_new:
-		head.add_child(CampUi.chip("NEW", UiPalette.HP, UiPalette.TEXT, 14))
+		head.add_child(CampArt.chip("NEW", "red", "", 16))
 	if worn:
-		col.add_child(CampUi.chip("WORN", UiPalette.HEAL.darkened(0.3), UiPalette.TEXT, 15))
+		col.add_child(CampArt.chip("WORN", "purple", "", 16))
 	elif owned:
 		col.add_child(UiTheme.label("Tap to wear", 17, UiPalette.HEAL, false, 0, false, 700))
 	else:
@@ -182,8 +171,7 @@ func _prestige(p: Profile) -> Control:
 	var c := CampUi.card(owned and p.prestige_on(view_class), UiPalette.GOLD)
 	var row := UiTheme.hbox(12)
 	c.add_child(row)
-	row.add_child(OptionCard.Medallion.make("crown", 60, UiPalette.GOLD_BRIGHT if owned else UiPalette.TEXT_MUTED,
-		UiPalette.GOLD if owned else Color(0.4, 0.4, 0.5)))
+	row.add_child(CampArt.medal("skin_prestige", 60, UiPalette.GOLD, not owned, UiPalette.GOLD_BRIGHT))
 	var col := UiTheme.vbox(2)
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(col)
@@ -192,11 +180,11 @@ func _prestige(p: Profile) -> Control:
 	if owned:
 		col.add_child(UiTheme.para("Shown over any skin you wear.", 17, UiPalette.TEXT_DIM, 500))
 		var on := p.prestige_on(view_class)
-		var t := GameButton.make("ON" if on else "OFF", "check" if on else "close", GameButton.Kind.PRIMARY if on else GameButton.Kind.SECONDARY, 24)
-		t.min_height = 68
-		t.pad_x = 18
+		var t := ToggleSwitch.make(on)
+		t.name = "PrestigeToggle"
+		t.tooltip_text = "Prestige look on / off"
 		t.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		t.pressed.connect(cmd.bind(["set_prestige", view_class, not on]))
+		t.toggled.connect(func(v: bool) -> void: cmd(["set_prestige", view_class, v]))
 		row.add_child(t)
 	else:
 		col.add_child(UiTheme.para(SkinDefs.cond_text(view_class, "prestige") + " Never for sale.", 17, UiPalette.TEXT_DIM, 500))
@@ -231,6 +219,26 @@ static func progress_text(p: Profile, class_id: String, skin: String) -> String:
 	return ""
 
 
+## A skin swatch's card: worn = the yellow rim, previewed = purple, owned = the class accent,
+## locked = the locked card.
+static func swatch_box(worn: bool, shown: bool, owned: bool, accent: Color) -> StyleBox:
+	var sb: StyleBox
+	if UiTheme.skinned("panel_card"):
+		sb = UiTheme.card_box("worn" if worn else ("on" if shown else ("normal" if owned else "locked")), accent if owned and not worn and not shown else null)
+		sb.content_margin_left = 12
+		sb.content_margin_right = 12
+		sb.content_margin_top = 12
+		sb.content_margin_bottom = 20
+		return sb
+	if worn:
+		sb = UiTheme.box(UiPalette.NAVY_3, 20, 3, UiPalette.GOLD_BRIGHT, 12, Color(0.95, 0.7, 0.2, 0.3), Vector2.ZERO)
+	elif shown:
+		sb = UiTheme.box(Color(0.1, 0.08, 0.2, 0.9), 20, 3, Color("c79bff"))
+	else:
+		sb = UiTheme.box(Color(0.03, 0.03, 0.09, 0.6), 20, 2, Color(1, 1, 1, 0.08) if not owned else Color(accent, 0.4))
+	return UiTheme.pad(sb, 10, 10)
+
+
 ## A class medallion in the carousel.
 class _Pick:
 	extends VBoxContainer
@@ -248,18 +256,14 @@ class _Pick:
 		holder.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(holder)
-		var icon := "question" if secret else UiIcons.class_icon(id)
-		var med := OptionCard.Medallion.make(icon, 72 if sel else 64, col if owned else UiPalette.TEXT_MUTED,
-			UiPalette.GOLD_BRIGHT if sel else (col if owned else Color(0.3, 0.3, 0.4)))
+		var icon := "question" if secret else Icons.class_icon(id)
+		var med := CampArt.medal(icon, 72 if sel else 64, UiPalette.GOLD_BRIGHT if sel else col, not owned, col)
 		med.position = Vector2.ZERO if sel else Vector2(4, 4)
 		if not owned:
-			med.modulate = Color(0.55, 0.55, 0.65, 0.8)
+			med.modulate = Color(1, 1, 1, 0.75)
 		holder.add_child(med)
 		if has_new:
-			var dot := _Dot.new()
-			dot.size = Vector2(20, 20)
-			dot.position = Vector2(54, 0)
-			holder.add_child(dot)
+			holder.add_child(CampArt.pin(CampArt.new_dot(18), "tr", 2.0))
 		var name := "???" if secret else String(HeroDefs.DATA[id].name)
 		var l := UiTheme.label(name, 16, (UiPalette.GOLD_BRIGHT if sel else UiPalette.TEXT) if owned else UiPalette.TEXT_MUTED, false, 0, false, 700)
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
