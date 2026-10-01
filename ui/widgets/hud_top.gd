@@ -136,7 +136,7 @@ func _init() -> void:
 	pause_btn.size_flags_horizontal = Control.SIZE_SHRINK_END
 	pause_btn.tooltip_text = "Pause"
 	# round button: no keycap; the shortcut goes in its tooltip ("Pause (Esc)", spec 6)
-	pause_btn.shortcut_hint = "key_esc"
+	pause_btn.shortcut_hint = InputActions.glyph_for(InputActions.PAUSE)
 	pause_btn.pressed.connect(func() -> void: pause_pressed.emit())
 	right.add_child(pause_btn)
 

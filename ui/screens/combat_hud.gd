@@ -114,14 +114,14 @@ func _init() -> void:
 	reroll_btn = GameButton.make("REROLL", "reroll", GameButton.Kind.SECONDARY, 32)
 	reroll_btn.icon_tint = UiPalette.GOLD_BRIGHT
 	reroll_btn.min_height = 112
-	reroll_btn.shortcut_hint = "key_r"
+	reroll_btn.shortcut_hint = InputActions.glyph_for(InputActions.REROLL)
 	reroll_btn.pad_x = 22
 	reroll_btn.pressed.connect(func() -> void: reroll_pressed.emit())
 	br.add_child(reroll_btn)
 	attack_btn = GameButton.make("ATTACK", "sword", GameButton.Kind.PRIMARY, 50)
 	attack_btn.icon_tint = UiPalette.TEXT
 	attack_btn.min_height = 112
-	attack_btn.shortcut_hint = "key_space"
+	attack_btn.shortcut_hint = InputActions.glyph_for(InputActions.PRIMARY)
 	attack_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	attack_btn.sfx_id = "swing"
 	attack_btn.pressed.connect(func() -> void: attack_pressed.emit())

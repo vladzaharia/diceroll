@@ -53,7 +53,7 @@ func _init() -> void:
 	roll_btn.min_height = 120
 	roll_btn.pad_x = 64
 	roll_btn.sfx_id = "dice_shake"
-	roll_btn.shortcut_hint = "key_space"
+	roll_btn.shortcut_hint = InputActions.glyph_for(InputActions.PRIMARY)
 	roll_btn.pressed.connect(func() -> void: roll_pressed.emit())
 	_bar.add_child(roll_btn)
 
@@ -61,7 +61,7 @@ func _init() -> void:
 	reroll_btn.icon_tint = UiPalette.GOLD_BRIGHT
 	reroll_btn.min_height = 110
 	reroll_btn.pad_x = 26
-	reroll_btn.shortcut_hint = "key_r"
+	reroll_btn.shortcut_hint = InputActions.glyph_for(InputActions.REROLL)
 	reroll_btn.pressed.connect(func() -> void: reroll_pressed.emit())
 	_bar.add_child(reroll_btn)
 
@@ -70,7 +70,7 @@ func _init() -> void:
 	go_btn.min_height = 120
 	go_btn.pad_x = 70
 	go_btn.sfx_id = "step"
-	go_btn.shortcut_hint = "key_space"
+	go_btn.shortcut_hint = InputActions.glyph_for(InputActions.PRIMARY)
 	go_btn.pressed.connect(func() -> void: go_pressed.emit())
 	_bar.add_child(go_btn)
 
