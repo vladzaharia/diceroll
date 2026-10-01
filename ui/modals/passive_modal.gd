@@ -32,6 +32,8 @@ func _build() -> void:
 	_glow.stretch_mode = TextureRect.STRETCH_SCALE
 	_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_glow.visible = false
+	# a deliberate full-bleed backdrop glow (spec 3.2 acceptance exemption), not content
+	_glow.set_meta(UiAudit.SKIP, true)
 	add_child(UiTheme.full_rect(_glow))
 	move_child(_glow, 1)
 	_sub = UiTheme.label("", 24, UiPalette.TEXT_DIM, false, 0, false, 600)
@@ -41,12 +43,14 @@ func _build() -> void:
 	_list = UiTheme.vbox(14)
 	body.add_child(_list)
 	body.add_child(UiTheme.spacer(2))
-	_take = GameButton.make("TAKE", "check", GameButton.Kind.PRIMARY, 38)
+	# forced modal (spec 3.2): no close, no Esc; TAKE is the decision (Enter)
+	_take = GameButton.make("TAKE", "check", GameButton.Kind.SUCCESS, 38)
 	_take.icon_tint = UiPalette.TEXT_DARK
 	_take.pressed.connect(func() -> void:
 		if _choice >= 0:
 			passive_picked.emit(_choice))
 	body.add_child(_take)
+	primary_action = _take
 
 
 func refresh(flow: GameFlow) -> void:

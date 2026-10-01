@@ -1,7 +1,9 @@
 class_name ShopModal
 extends UiModal
-## Shop (offer {kind:"shop", items}). Gold header, item cards with prices, restock, leave.
+## Shop (offer {kind:"shop", items}). Gold header, item cards with prices, restock, BUY.
 ## Items with needs_die open an inline die picker before buying.
+## One exit (spec 3.2): the header close button (tooltip "Leave shop"), Esc and the backdrop
+## leave the shop; there is no LEAVE button. Enter = BUY.
 ## Emits shop_buy(i, die_idx), shop_reroll_pressed, shop_leave_pressed.
 
 signal shop_buy(index: int, die_idx: int)
@@ -17,6 +19,7 @@ var _picker: VBoxContainer
 var _pick_title: Label
 var _pick_grid: GridContainer
 var _buy: GameButton
+## The leave control (= the header close button; AUTO highlights it).
 var _leave: GameButton
 var _cards: Array[OptionCard] = []
 var _chips: Array[DieChip] = []
@@ -26,14 +29,17 @@ var _die := -1
 
 
 func _build() -> void:
+	ScrollFade.attach(self, _scroll, UiPalette.NAVY_2, _frame)
 	set_title("SHOP")
+	dismissible = true
+	close_tooltip = "Leave shop"
+	_leave = close_button
 	var head := UiTheme.hbox(12)
 	body.add_child(head)
 	gold = Counter.make("3d:coins", 0, 34, UiPalette.TEXT, "pill")
 	head.add_child(gold)
 	head.add_child(UiTheme.spacer(0, true))
 	_restock = GameButton.make("RESTOCK", "reroll", GameButton.Kind.SECONDARY, 26)
-	_restock.icon_tint = UiPalette.GOLD_BRIGHT
 	_restock.min_height = 80
 	_restock.pad_x = 20
 	_restock.pressed.connect(func() -> void: shop_reroll_pressed.emit())
@@ -53,15 +59,12 @@ func _build() -> void:
 	_picker.add_child(_pick_grid)
 	var foot := UiTheme.hbox(14)
 	body.add_child(foot)
-	_leave = GameButton.make("LEAVE", "arrow_right", GameButton.Kind.SECONDARY, 32)
-	_leave.icon_tint = UiPalette.TEXT
-	_leave.pressed.connect(func() -> void: shop_leave_pressed.emit())
-	foot.add_child(_leave)
 	_buy = GameButton.make("BUY", "coin", GameButton.Kind.PRIMARY, 34)
 	_buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_buy.sfx_id = "coin"
 	_buy.pressed.connect(_on_buy)
 	foot.add_child(_buy)
+	primary_action = _buy
 
 
 func refresh(flow: GameFlow) -> void:
@@ -83,15 +86,16 @@ func refresh(flow: GameFlow) -> void:
 			c.set_die(String(it.get("kind", "standard")))
 		elif id == "passive" and it.has("passive"):
 			c.set_passive(String(it.passive))
-		elif id == "potion" and it.has("potion") and UiIcons.exists("potion_" + String(it.potion)):
+		elif id == "potion" and it.has("potion") and Icons.exists("potion_" + String(it.potion)):
 			# the potion's type: its own bottle icon and a tag
-			c.set_icon("potion_" + String(it.potion), Color.WHITE)
+			c.set_icon("potion_" + String(it.potion))
 			c.set_tag("POTION" + ("  ·  COMBAT" if PotionDefs.combat_only(String(it.potion)) else ""),
 				MetaHud.POTION_COLORS.get(String(it.potion), UiPalette.HP_BRIGHT))
 		else:
 
 			c.set_icon(ICONS.get(id, "star"))
 			c.set_tag("", UiPalette.GOLD)
+			c.accent_rim = false
 		c.set_price(int(it.price), run.gold >= int(it.price))
 		if bool(it.sold):
 			c.set_sold(true)
@@ -103,6 +107,11 @@ func refresh(flow: GameFlow) -> void:
 	_picker.visible = false
 	_update_buy()
 	relayout()
+
+
+## Leaving is the shop's dismissal: the core closes it (UiRoot.sync), not the modal itself.
+func dismiss() -> void:
+	shop_leave_pressed.emit()
 
 
 func on_event(ev: Dictionary) -> void:

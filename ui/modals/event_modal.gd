@@ -38,9 +38,12 @@ func refresh(flow: GameFlow) -> void:
 	var id := String(o.get("id", ""))
 	var rim: Color = RIM.get(id, Color("9a7ae0"))
 	set_title(String(o.get("title", "Event")).to_upper(), rim)
+	# a colour without a native plaque family (steel, silver...): the white plaque x colour
+	if not ribbon.skinned():
+		ribbon.family = "white"
 	UiTheme.clear(_art)
 	var art: Array = ART.get(id, ["star", UiPalette.GOLD])
-	_art.add_child(OptionCard.Medallion.make(art[0], 132, art[1], rim))
+	_art.add_child(OptionCard.Medallion.make(art_icon(id, String(art[0])), 128, art[1], rim))
 	_text.text = String(o.get("text", ""))
 	UiTheme.clear(_choices)
 	var choices: Array = o.get("choices", [])
@@ -74,5 +77,11 @@ static func _choice_icon(id: String, ch: Dictionary, i: int) -> String:
 		"outbreak":
 			return "skull"
 		"garden":
-			return "3d:chest_gems"
+			return "chest"
 	return "arrow_right"
+
+
+## The event's art id: the pack's event_<id> icon when the map has one (spec 4.3), else the
+## per-event glyph from ART.
+static func art_icon(id: String, fallback: String) -> String:
+	return "event_" + id if Icons.is_mapped("event_" + id) else fallback

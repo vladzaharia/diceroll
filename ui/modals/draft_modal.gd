@@ -24,12 +24,14 @@ func _build() -> void:
 	_list = UiTheme.vbox(14)
 	body.add_child(_list)
 	body.add_child(UiTheme.spacer(2))
-	_take = GameButton.make("TAKE", "check", GameButton.Kind.PRIMARY, 38)
+	# forced modal (spec 3.2): no close, no Esc; TAKE is the decision (Enter)
+	_take = GameButton.make("TAKE", "check", GameButton.Kind.SUCCESS, 38)
 	_take.icon_tint = UiPalette.TEXT_DARK
 	_take.pressed.connect(func() -> void:
 		if _choice >= 0:
 			draft_picked.emit(_choice))
 	body.add_child(_take)
+	primary_action = _take
 
 
 func refresh(flow: GameFlow) -> void:
@@ -51,6 +53,7 @@ func refresh(flow: GameFlow) -> void:
 		else:
 			c.set_icon(ICONS.get(id, "star"))
 			c.set_tag("BOON", UiPalette.GOLD)
+			c.accent_rim = false  # a gold rim would read as "selected"
 		c.pressed.connect(select.bind(i))
 		_list.add_child(c)
 		_cards.append(c)

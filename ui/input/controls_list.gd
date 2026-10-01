@@ -11,11 +11,16 @@ extends VBoxContainer
 ## rows: 1-6, 1-3) shows its first and last key ([1] - [6]).
 
 const GLYPH_PX := 34.0
+
+var glyph_px := GLYPH_PX
 const LABEL_PX := 22
 
 
-static func make() -> ControlsList:
+## `glyph_px`: keycap height (Settings passes 40 so the key labels stay legible on the
+## 0.75 phone frame).
+static func make(glyph_px := GLYPH_PX) -> ControlsList:
 	var c := ControlsList.new()
+	c.glyph_px = glyph_px
 	c.rebuild()
 	return c
 
@@ -57,7 +62,7 @@ func _row(row: Dictionary) -> Control:
 			var l := UiTheme.label(sep, LABEL_PX, UiPalette.TEXT_DIM, false, 0, false, 700)
 			l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			keys.add_child(l)
-		var k := KeyGlyph.make(String(g[i]), GLYPH_PX)
+		var k := KeyGlyph.make(String(g[i]), glyph_px)
 		k.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		keys.add_child(k)
 	var t := UiTheme.label(String(row.label), LABEL_PX, UiPalette.TEXT, false, 0, false, 600)
