@@ -11,12 +11,15 @@ static func mechanic_badge(id: String, font := 20) -> PanelContainer:
 	var mech := ClassInfo.mechanic(id)
 	var col := ClassInfo.mechanic_color(mech) if mech != "" else UiPalette.class_color(id)
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(col.darkened(0.8), 0.92), 18, 2, Color(col, 0.65)), 14, 10))
+	# a card with the mechanic-colour rim (the colour coding lives on the frame)
+	p.add_theme_stylebox_override("panel", UiTheme.card_box("normal", col))
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var row := UiTheme.hbox(12)
 	p.add_child(row)
-	var icon := UiIcons.mechanic_icon(mech) if mech != "" else UiIcons.class_icon(id)
-	var med := OptionCard.Medallion.make(icon, 56, col, col)
+	# mechanic medallion: the tinted Flat White glyph (icon_map palette:auto); classes
+	# without a mechanic show their full-colour class icon
+	var icon := Icons.mechanic_icon(mech) if mech != "" else Icons.class_icon(id)
+	var med := Medal.make(icon, 56, col, col.lightened(0.25) if mech != "" else null)
 	med.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(med)
 	var c := UiTheme.vbox(2)
@@ -45,14 +48,14 @@ static func stats_row(id: String, font := 26) -> HBoxContainer:
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_child(_stat("heart", "%d" % int(d.hp), "HP", UiPalette.HP, font))
 	row.add_child(_stat("sword", "+%d" % int(d.atk), "ATK", UiPalette.TEXT, font))
-	row.add_child(_stat("reroll", "%d" % int(d.board_rerolls), "MOVE REROLL", UiPalette.GOLD_BRIGHT, font))
+	row.add_child(_stat("reroll", "%d" % int(d.board_rerolls), "MOVE REROLLS", UiPalette.GOLD_BRIGHT, font))
 	row.add_child(_stat("dice", "%d" % int(HeroDefs.field(id, "combat_rerolls")), "FIGHT REROLLS", UiPalette.DIE_BODY, font))
 	return row
 
 
 static func _stat(icon: String, value: String, label: String, col: Color, font: int) -> Control:
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(UiPalette.NAVY_2, 16, 2, Color(1, 1, 1, 0.06)), 8, 6))
+	p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.inset_box(), 8, 6))
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var v := UiTheme.vbox(0)
@@ -60,7 +63,7 @@ static func _stat(icon: String, value: String, label: String, col: Color, font: 
 	var r := UiTheme.hbox(5)
 	r.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_child(r)
-	r.add_child(UiIcons.rect(icon, int(font * 1.0)))
+	r.add_child(Icons.rect(icon, int(font * 1.1)))
 	r.add_child(UiTheme.label(value, font, col, true, 0))
 	var l := UiTheme.label(label, 16, UiPalette.TEXT_DIM, false, 0, false, 700)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -84,7 +87,7 @@ static func dice_rows(id: String, face_px := 30) -> VBoxContainer:
 
 static func die_row(kind: String, rune: String, tag: String, face_px := 30) -> PanelContainer:
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(0.03, 0.03, 0.09, 0.45), 16), 12, 8))
+	p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.inset_box(), 12, 8))
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var row := UiTheme.hbox(12)
 	p.add_child(row)
@@ -124,3 +127,44 @@ static func _face(v: int, rune: String, kind: String, px: float) -> DieFace:
 	f.star = pretend or rune == "wild"
 	f.kind = kind
 	return f
+
+
+## Round medallion behind a class / mechanic icon (class cards, the mechanic badge): a dark
+## disc with a `ring` rim and the pack icon. `tint` (Color) recolours a Flat White glyph (the
+## mechanic medallions); null keeps a full-colour Outline icon. `saturation` 0 = locked.
+class Medal:
+	extends Control
+	var icon := ""
+	var ring: Color = UiPalette.GOLD
+	var tint: Variant = null
+	var saturation := 1.0
+
+	static func make(p_icon: String, px: float, p_ring: Color, p_tint: Variant = null, p_sat := 1.0) -> Medal:
+		var m := Medal.new()
+		m.icon = p_icon
+		m.ring = p_ring
+		m.tint = p_tint
+		m.saturation = p_sat
+		m.custom_minimum_size = Vector2(px, px)
+		m.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		return m
+
+	func _draw() -> void:
+		var s := minf(size.x, size.y)
+		var c := size * 0.5
+		var r := s * 0.5
+		var rim := ring if saturation >= 1.0 else Color(0.42, 0.42, 0.5)
+		draw_circle(c, r, UiPalette.OUTLINE)
+		draw_circle(c, r - 2.0, rim.darkened(0.1))
+		var inner := r - maxf(4.0, s * 0.09)
+		draw_circle(c, inner, UiPalette.INK.lerp(rim, 0.14))
+		var gs := inner * 1.42
+		var opts := {"saturation": saturation}
+		if tint is Color:
+			opts["tint"] = tint
+		var tex := Icons.texture(icon, int(ceil(gs)), opts)
+		if tex != null:
+			var ts := tex.get_size()
+			var k := gs / maxf(ts.x, ts.y)
+			var d := ts * k
+			draw_texture_rect(tex, Rect2(c - d * 0.5, d), false)

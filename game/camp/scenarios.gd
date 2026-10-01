@@ -15,12 +15,14 @@ extends RefCounted
 ##                  (--profile=fresh|mid|max, default mid; --scroll=N scrolls the screen)
 ##  ui_results_win / ui_results_loss   the results screen after banking a run (the loss is a
 ##                  fresh profile's first run: milestone unlock cards; the win a mid profile)
+##  camp_toasts     the Camp (mid) with its toasts stacked above the bottom panel:
+##                  --toast=unlock|item|craft|skin|rank|error (default: unlock + craft + skin)
 ##  flow_first_run  title -> PLAY -> Camp (welcome) -> START RUN -> setup -> START -> route
 ##                  card, one shot per step: <shot>_step_NN.png
 
 const NAMES := ["camp_raw", "camp_first", "camp_mid", "camp_max", "ui_workshop", "ui_petden", "ui_arcade",
 	"ui_run_setup", "ui_results_win", "ui_results_loss", "flow_first_run", "camp_stage_0", "camp_stage_1", "camp_stage_2",
-	"camp_stage_3", "camp_reveal", "camp_life"]
+	"camp_stage_3", "camp_reveal", "camp_life", "camp_toasts"]
 const SCREENS := {"ui_workshop": "workshop", "ui_petden": "pet_den", "ui_arcade": "arcade",
 	"ui_run_setup": "setup"}
 
@@ -95,6 +97,27 @@ class _Driver extends Node:
 			"camp_mid", "camp_max", "camp_stage_0", "camp_stage_1", "camp_stage_2", "camp_stage_3":
 				c.profile = _preset(scenario.substr(5))
 				c.show_camp()
+			"camp_toasts":
+				c.profile = _preset(String(args.get("profile", "mid")))
+				c.show_camp()
+				c.ui.camp.toast_hold = 60.0  # keep them up for the shot
+				await get_tree().create_timer(0.4).timeout
+				var kinds: Array = [String(args.toast)] if args.has("toast") else ["unlock", "craft", "skin"]
+				for k in kinds:
+					match String(k):
+						"unlock":
+							c._camp_toast("Unlocked: %s" % CampInfo.name_of("pets", "wick"), CampInfo.glyph_of("pets", "wick"), UiPalette.GOLD_BRIGHT)
+						"item":
+							c._camp_toast("New item: %s" % ItemDefs.name_of("katana"), CampInfo.item_icon("katana"), UiPalette.GOLD_BRIGHT)
+						"craft":
+							c._camp_toast("Crafted: %s" % ItemDefs.name_of("sword"), "craft", UiPalette.GOLD_BRIGHT)
+						"skin":
+							c._camp_toast("New skin: Knight, Victor", "wardrobe_hats", Color("c79bff"))
+						"rank":
+							c._camp_toast("Weapon rank 5", "rank", UiPalette.HEAL)
+						"error":
+							c._camp_toast("Not enough Crowns", "", UiPalette.HP_BRIGHT)
+					await get_tree().create_timer(0.08).timeout
 			"camp_life":
 				c.profile = _preset(String(args.get("profile", "stage_3")))
 				c.show_camp()

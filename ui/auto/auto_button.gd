@@ -64,7 +64,7 @@ func set_active(on: bool, animate := true) -> void:
 
 
 func _apply() -> void:
-	_icon.texture = UiIcons.tex("auto", 76, UiPalette.TEXT_DARK if active else ACCENT)
+	_icon.texture = Icons.texture("auto", 38, _tint())
 	_label.label_settings = UiTheme.label_settings(28, UiPalette.TEXT_DARK if active else UiPalette.TEXT, true,
 		0 if active else 6)
 	if not active:
@@ -74,12 +74,22 @@ func _apply() -> void:
 	queue_redraw()
 
 
+func _tint() -> Color:
+	return UiPalette.TEXT_DARK if active else ACCENT
+
+
+## Spec 4.2: AUTO is a forestgreen pill with an ink label when on (reads "running") and the
+## grey-darker HUD pill when off.
+func _skinned() -> bool:
+	return UiSkin.has("chip_forestgreen") and UiSkin.has("chip_grey")
+
+
 func _place() -> void:
 	pivot_offset = size * 0.5
 	var sink := 3.0 if _down else 0.0
 	var lw := _label.get_minimum_size().x
 	# centre the visible glyph + label as one group (the icon has transparent margins)
-	var g := GameButton._glyph_rect(_icon.texture)
+	var g := GameButton._glyph_rect_of("auto", _tint())
 	var gw := 38.0 * g.size.x
 	var total := gw + 10.0 + lw
 	var x := (size.x - total) * 0.5
@@ -135,6 +145,11 @@ func _draw() -> void:
 	var r := size.y * 0.5
 	var full := Rect2(Vector2.ZERO, size)
 	var sink := 3.0 if _down else 0.0
+	if _skinned():
+		draw_style_box(UiTheme.chip_box("forestgreen" if active else "grey"), Rect2(0, sink * 0.5, size.x, size.y - sink * 0.5))
+		if _hover:
+			draw_style_box(UiTheme.box(Color(1, 1, 1, 0.08), int(r)), full.grow(-3))
+		return
 	if active:
 		# breathing glow: three soft rings
 		var k := 0.5 + 0.5 * sin(_t * 3.2)

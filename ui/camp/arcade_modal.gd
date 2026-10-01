@@ -30,14 +30,16 @@ func _slots(p: Profile) -> Control:
 		var locked := i >= p.loadout_slots()
 		if i < mg.size():
 			var id := String(mg[i])
-			var t := CampUi.tile(MinigameDefs.name_of(id), "Tap to remove", true, true, String(CampInfo.MINIGAME_ICON.get(id, "star")),
-				CampInfo.MINIGAME_COLOR.get(id, ACCENT))
+			var t := CampUi.tile(MinigameDefs.name_of(id), "Tap to remove", true, true, "", CampInfo.MINIGAME_COLOR.get(id, ACCENT))
+			CampArt.tile_icon(t, CampArt.icon(String(CampInfo.MINIGAME_GLYPH.get(id, "station_arcade")), 30))
 			var rest := mg.duplicate()
 			rest.remove_at(i)
 			t.pressed.connect(cmd.bind(["set_loadout", rest, String(p.loadout.get("pet", ""))]))
 			row.add_child(t)
 		elif not locked:
-			row.add_child(CampUi.tile("Empty slot", "Equip a minigame below", false, false, "plus", ACCENT))
+			var e := CampUi.tile("Empty slot", "Equip a minigame below", false, false, "", ACCENT)
+			CampArt.tile_icon(e, CampArt.icon("plus", 26, UiPalette.TEXT_MUTED))
+			row.add_child(e)
 		else:
 			row.add_child(_third_slot(p))
 	return row
@@ -49,7 +51,10 @@ func _third_slot(p: Profile) -> Control:
 	box.size_flags_vertical = Control.SIZE_FILL
 	var v := UiTheme.vbox(6)
 	box.add_child(v)
-	v.add_child(UiTheme.label("3RD SLOT", 20, UiPalette.TEXT_MUTED, true, 4))
+	var hr := UiTheme.hbox(8)
+	v.add_child(hr)
+	hr.add_child(CampArt.icon("upgrade_loadout_slot", 28, null, not p.owns("features", "loadout_slot")))
+	hr.add_child(UiTheme.label("3RD SLOT", 20, UiPalette.TEXT_MUTED, true, 4))
 	if p.owns("features", "loadout_slot"):
 		var b := CampUi.buy_button("", d.cost, p.can_afford(d.cost), 20)
 		b.pressed.connect(cmd.bind(["buy_upgrade", "arcade", "loadout_slot"]))
@@ -74,7 +79,7 @@ func _game_card(p: Profile, id: String) -> Control:
 	var sub := "SKILL : LUCK  %s" % String(d.skill)
 	if owned:
 		sub += "  ·  MASTERY %d" % mastery
-	var tr := CampUi.title_row(String(CampInfo.MINIGAME_ICON.get(id, "star")), col if owned else UiPalette.TEXT_MUTED, String(d.name), sub, 64)
+	var tr := CampArt.title_row(String(CampInfo.MINIGAME_GLYPH.get(id, "station_arcade")), col, String(d.name), sub, 64, not owned)
 	tr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(tr)
 	if owned:
@@ -104,7 +109,7 @@ func _game_card(p: Profile, id: String) -> Control:
 	v.add_child(UiTheme.para(String(d.desc), 19, UiPalette.TEXT_DIM if owned else UiPalette.TEXT_MUTED, 500))
 	var sig := UiTheme.hbox(8)
 	v.add_child(sig)
-	sig.add_child(CampUi.chip("GOLD TIER", Color("6e4214"), UiPalette.GOLD_BRIGHT, 15))
+	sig.add_child(CampArt.chip("GOLD TIER", "yellow", "trophy_gold" if Icons.is_mapped("trophy_gold") else "", 16))
 	var sl := UiTheme.para(String(d.signature_desc).trim_prefix("Gold: "), 19, UiPalette.TEXT if owned else UiPalette.TEXT_MUTED, 600)
 	sl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sig.add_child(sl)

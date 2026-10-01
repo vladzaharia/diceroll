@@ -1,8 +1,10 @@
 class_name TitleScreen
 extends Control
-## Title: animated DICEROLL logo, PLAY (opens the Camp hub), Continue (enabled when
-## user://save.json exists), Settings. Emits new_run_pressed (PLAY), continue_pressed,
-## settings_pressed.
+## Title: animated DICEROLL logo, PLAY (opens the Camp hub; primary pack button), CONTINUE
+## (secondary, shown only when user://save.json exists), SETTINGS (secondary: on phones the
+## title is the only way into Settings before a run). Portrait stacks the buttons; landscape
+## puts them in a row. Enter = PLAY (the menu_confirm action; hover keycap on desktop).
+## Emits new_run_pressed (PLAY), continue_pressed, settings_pressed.
 ## Hosts the hidden DevGesture (5 taps in the bottom-right corner open the Developer menu).
 
 signal new_run_pressed
@@ -16,7 +18,7 @@ var new_btn: GameButton
 var continue_btn: GameButton
 var settings_btn: GameButton
 var dev_gesture: DevGesture
-var _col: VBoxContainer
+var _col: BoxContainer
 var _logo_box: Control
 var _tag: Label
 var _dice: Array[DieFace] = []
@@ -45,20 +47,23 @@ func _init() -> void:
 	_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_logo_box.add_child(_tag)
 
-	_col = UiTheme.vbox(18)
+	_col = BoxContainer.new()
+	_col.vertical = true
+	_col.add_theme_constant_override("separation", 18)
+	_col.alignment = BoxContainer.ALIGNMENT_CENTER
+	_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_col)
 	new_btn = GameButton.make("PLAY", "campfire", GameButton.Kind.PRIMARY, 46)
-	new_btn.icon_tint = UiPalette.TEXT_DARK
 	new_btn.min_height = 116
+	new_btn.shortcut_hint = InputActions.glyph_for(InputActions.CONFIRM)
 	new_btn.pressed.connect(func() -> void: new_run_pressed.emit())
 	_col.add_child(new_btn)
 	continue_btn = GameButton.make("CONTINUE", "arrow_right", GameButton.Kind.SECONDARY, 36)
-	continue_btn.icon_tint = UiPalette.GOLD
-	continue_btn.min_height = 100
+	continue_btn.min_height = 96
 	continue_btn.pressed.connect(func() -> void: continue_pressed.emit())
 	_col.add_child(continue_btn)
-	settings_btn = GameButton.make("SETTINGS", "gear", GameButton.Kind.GHOST, 32)
-	settings_btn.icon_tint = UiPalette.GOLD
+	settings_btn = GameButton.make("SETTINGS", "gear", GameButton.Kind.SECONDARY, 32)
+	settings_btn.min_height = 88
 	settings_btn.pressed.connect(func() -> void: settings_pressed.emit())
 	_col.add_child(settings_btn)
 	_footer = UiTheme.label("v0.1  ·  Fredoka & Lilita One (OFL)  ·  KayKit & Kenney (CC0)", 18, UiPalette.TEXT_MUTED, false, 0, false, 500)
@@ -85,9 +90,20 @@ static func has_save() -> bool:
 	return FileAccess.file_exists(SAVE_PATH)
 
 
+## CONTINUE is hidden (not greyed) without a save, so the column is PLAY + SETTINGS.
 func refresh(_flow: GameFlow = null) -> void:
+	continue_btn.visible = has_save()
 	continue_btn.set_enabled(has_save())
-	continue_btn.sub_text = "" if has_save() else "no saved run"
+	_layout.call_deferred()
+
+
+## Enter = PLAY, while the title is the top screen (a modal such as Settings owns its keys).
+func _unhandled_key_input(event: InputEvent) -> void:
+	if not is_visible_in_tree() or InputActions.modal_open():
+		return
+	if InputActions.pressed(event, InputActions.CONFIRM) and not new_btn.disabled:
+		get_viewport().set_input_as_handled()
+		new_btn.pressed.emit()
 
 
 func _layout() -> void:
@@ -106,13 +122,26 @@ func _layout() -> void:
 	logo.size = Vector2(box_w, ls.y)
 	_tag.position = Vector2(0, 70 + ls.y + 4)
 	_tag.size = Vector2(box_w, 40)
-	var w := minf(460.0, size.x - safe.left - safe.right)
+	# portrait: a 460 px column at 56 %; landscape: one row under the logo (PLAY widest)
+	_col.vertical = portrait
+	var avail_w := size.x - safe.left - safe.right - 32.0
+	var w := minf(460.0, avail_w) if portrait else minf(avail_w, 360.0 * (3 if continue_btn.visible else 2))
+	for b: GameButton in [new_btn, continue_btn, settings_btn]:
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL if not portrait else Control.SIZE_FILL
+		b.size_flags_stretch_ratio = 1.4 if b == new_btn else 1.0
+		b.min_height = (116.0 if b == new_btn else (96.0 if b == continue_btn else 88.0)) if portrait else 96.0
+		b.update_minimum_size()
 	_col.reset_size()
 	var ch := _col.get_combined_minimum_size().y
 	_col.size = Vector2(w, ch)
-	_col.position = Vector2((size.x - w) * 0.5, size.y * (0.56 if portrait else 0.52))
-	_footer.size = Vector2(size.x, 30)
-	_footer.position = Vector2(0, size.y - safe.bottom - 30)
+	var y := size.y * (0.56 if portrait else 0.52)
+	if not portrait:
+		# keep the row clear of the tag line above and the footer below
+		y = clampf(y, _logo_box.position.y + _tag.position.y + 48.0, size.y - safe.bottom - 36.0 - ch)
+	_col.position = Vector2((size.x - w) * 0.5, y)
+	# inside the safe area on every side (landscape phones inset left / right)
+	_footer.size = Vector2(size.x - safe.left - safe.right, 30)
+	_footer.position = Vector2(safe.left, size.y - safe.bottom - 30)
 
 
 func _process(delta: float) -> void:

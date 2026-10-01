@@ -32,6 +32,7 @@ var _sheet_rows: Dictionary = {}
 var _panel: PanelContainer
 var _bottom: VBoxContainer
 var _last_combo := ""
+var _caption: Label
 ## True while the game plays events back: Reroll / Attack are disabled.
 var busy := false
 
@@ -60,6 +61,7 @@ func _init() -> void:
 	names.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_child(names)
 	var cap := UiTheme.label("COMBO", 18, UiPalette.TEXT_MUTED, false, 0, false, 700)
+	_caption = cap
 	names.add_child(cap)
 	var nr := UiTheme.hbox(12)
 	names.add_child(nr)
@@ -72,19 +74,25 @@ func _init() -> void:
 	class_tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	nr.add_child(class_tag)
 	var dmg := PanelContainer.new()
-	dmg.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(0.35, 0.06, 0.1, 0.8), 18, 2, Color(1, 0.45, 0.4, 0.4)), 14, 6))
+	dmg.name = "DamageChip"
+	var skinned := UiSkin.has("chip_red")
+	dmg.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.chip_box("red"), 16, 4) if skinned else \
+		UiTheme.pad(UiTheme.box(Color(0.35, 0.06, 0.1, 0.8), 18, 2, Color(1, 0.45, 0.4, 0.4)), 14, 6))
 	dmg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	dmg.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(dmg)
 	var dr := UiTheme.hbox(6)
 	dmg.add_child(dr)
-	dr.add_child(UiIcons.rect("sword", 34))
-	dmg_label = UiTheme.label("18", 36, UiPalette.TEXT, true, 6)
+	dr.add_child(Icons.rect("sword", 34))
+	# spec 1.3: labels on a bright pack face are ink, with no outline
+	dmg_label = UiTheme.label("18", 36, UiPalette.TEXT_DARK, true, 0) if skinned else UiTheme.label("18", 36, UiPalette.TEXT, true, 6)
 	dr.add_child(dmg_label)
-	help_btn = GameButton.round_icon("question", 72)
-	help_btn.icon_px = 40
+	# spec 4.2: the combo table button is a grey round button with the info glyph
+	help_btn = GameButton.round_icon("info" if Icons.is_mapped("info") else "question", 72)
+	help_btn.icon_px = 34
 	help_btn.kind = GameButton.Kind.GHOST
-	help_btn.icon_tint = UiPalette.GOLD
+	help_btn.icon_tint = UiPalette.TEXT if Icons.is_mapped("info") else UiPalette.GOLD
+	help_btn.tooltip_text = "Combos"
 	help_btn.toggle_mode = true
 	help_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	help_btn.toggled.connect(func(on: bool) -> void: show_sheet(on))
@@ -106,12 +114,14 @@ func _init() -> void:
 	reroll_btn = GameButton.make("REROLL", "reroll", GameButton.Kind.SECONDARY, 32)
 	reroll_btn.icon_tint = UiPalette.GOLD_BRIGHT
 	reroll_btn.min_height = 112
+	reroll_btn.shortcut_hint = InputActions.glyph_for(InputActions.REROLL)
 	reroll_btn.pad_x = 22
 	reroll_btn.pressed.connect(func() -> void: reroll_pressed.emit())
 	br.add_child(reroll_btn)
 	attack_btn = GameButton.make("ATTACK", "sword", GameButton.Kind.PRIMARY, 50)
 	attack_btn.icon_tint = UiPalette.TEXT
 	attack_btn.min_height = 112
+	attack_btn.shortcut_hint = InputActions.glyph_for(InputActions.PRIMARY)
 	attack_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	attack_btn.sfx_id = "swing"
 	attack_btn.pressed.connect(func() -> void: attack_pressed.emit())
@@ -182,13 +192,15 @@ func _layout() -> void:
 		return
 	var safe := UiTheme.safe_margins(self)
 	var w := minf(UiTheme.MODAL_MAX_W, size.x - safe.left - safe.right)
+	_fit_short()
 	_bottom.reset_size()
 	var h := _bottom.get_combined_minimum_size().y
 	var slot := UiTheme.side_slot(size, safe)
 	if slot.size.x > 0.0:
 		w = slot.size.x
 		_bottom.size = Vector2(w, h)
-		_bottom.position = Vector2(slot.position.x, slot.end.y - h)
+		# the slot ends at the tray's foot, which may dip under a home indicator: stay above it
+		_bottom.position = Vector2(slot.position.x, minf(slot.end.y, size.y - (safe.bottom if safe.bottom > UiTheme.EDGE else 0.0)) - h)
 	else:
 		_bottom.size = Vector2(w, h)
 		_bottom.position = Vector2((size.x - w) * 0.5, UiTheme.tray_rect(size, safe).position.y - 20.0 - h)
@@ -198,6 +210,19 @@ func _layout() -> void:
 		sheet.size.x = sw
 		var sh := sheet.get_combined_minimum_size().y
 		sheet.position = Vector2((size.x - sw) * 0.5, _bottom.position.y - sh - 14.0)
+
+
+## Short portrait screens (iPhone Duo outer, iPad portrait: canvas under 1.6:1): 96 px
+## buttons instead of 112 (still over the 88 px hit target) and no COMBO caption (plan L4).
+func _fit_short() -> void:
+	var short := UiTheme.is_tall(size) and size.y / maxf(size.x, 1.0) < 1.6
+	var bh := 96.0 if short else 112.0
+	if not is_equal_approx(attack_btn.min_height, bh):
+		attack_btn.min_height = bh
+		reroll_btn.min_height = bh
+		attack_btn.update_minimum_size()
+		reroll_btn.update_minimum_size()
+	_caption.visible = not short
 
 
 func refresh(flow: GameFlow) -> void:
@@ -221,7 +246,8 @@ func refresh(flow: GameFlow) -> void:
 	for id in _sheet_rows:
 		var on: bool = id == String(p.id)
 		var r: PanelContainer = _sheet_rows[id]
-		r.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(UiPalette.GOLD, 0.22) if on else Color(0, 0, 0, 0), 12, 2 if on else 0, UiPalette.GOLD_LINE), 12, 4))
+		var hi: StyleBox = UiTheme.chip_box(Color(UiPalette.GOLD, 0.3)) if UiSkin.has("chip_white") else UiTheme.box(Color(UiPalette.GOLD, 0.22), 12, 2, UiPalette.GOLD_LINE)
+		r.add_theme_stylebox_override("panel", UiTheme.pad(hi, 12, 4) if on else UiTheme.pad(UiTheme.box(Color(0, 0, 0, 0), 12), 12, 4))
 	var marked := 0
 	for m in c.marked:
 		if m:
@@ -230,8 +256,9 @@ func refresh(flow: GameFlow) -> void:
 	UiTheme.clear(pips)
 	for i in total:
 		var on := i < c.rerolls_left
-		var ic := UiIcons.rect("reroll", 30, UiPalette.GOLD_BRIGHT if on else Color(0.45, 0.43, 0.55))
-		ic.modulate.a = 1.0 if on else 0.55
+		# spent pips: the same icon greyed out (saturation 0), faded
+		var ic := Icons.rect("reroll", 30, UiPalette.GOLD_BRIGHT if on else {"tint": Color(0.45, 0.43, 0.55), "saturation": 0.0})
+		ic.modulate.a = 1.0 if on else 0.5
 		pips.add_child(ic)
 	reroll_btn.sub_text = "%d left" % c.rerolls_left
 	reroll_btn.set_enabled(not busy and marked > 0 and c.rerolls_left > 0)

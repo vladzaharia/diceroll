@@ -312,6 +312,21 @@ func scripted_input(args: Array, drv: Node) -> bool:
 	return true
 
 
+## Keyboard: 1 / 2 / 3 cast at the shallows / reeds / deep (scripted_input "cast"); Space
+## strikes now (the same click on the water as the scripted hook, without its wait).
+func key_input(event: InputEvent, drv: Node) -> bool:
+	var n := InputActions.pressed_index(event, InputActions.MG_PICK)
+	if n >= 0 and n < SPOT_NAMES.size():
+		if _mode == "aim" and not locked:
+			scripted_input(["cast", n], drv)
+		return true
+	if InputActions.pressed(event, InputActions.MG_ACTION):
+		if _mode == "wait":
+			drv.call("click", get_global_rect().position + size * Vector2(0.5, 0.55))
+		return true
+	return false
+
+
 func _script_tap(kind: String, s: int, drv: Node) -> void:
 	var t_end := Time.get_ticks_msec() + 7000
 	if kind == "cast":
@@ -1102,11 +1117,11 @@ func _draw_prompt() -> void:
 	var col := Color.WHITE
 	var hot := false
 	if _mode == "aim" and not locked:
-		txt = "TAP A SPOT TO CAST"
+		txt = ("%s A SPOT OR PRESS 1-3" % MgBoard.verb()) if InputMode.is_kbm() else "TAP A SPOT TO CAST"
 		col = Color("dff6ff")
 	elif _mode == "wait":
 		if _bitten and not _surfaced and not _struck:
-			txt = "STRIKE! TAP!"
+			txt = ("STRIKE! %s!" % MgBoard.key_name(InputActions.MG_ACTION)) if InputMode.is_kbm() else "STRIKE! TAP!"
 			col = Color("ffe07a")
 			hot = true
 		elif not _struck and not _surfaced:

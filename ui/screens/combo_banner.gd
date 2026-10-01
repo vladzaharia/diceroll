@@ -13,6 +13,8 @@ var tier := 0
 var hold := false
 var _name: Label
 var _mult: Label
+## The yellow 3D plaque behind the multiplier (spec 4.2), StyleBoxEmpty without the pack.
+var _plate: PanelContainer
 var _total: Label
 var _col: VBoxContainer
 var _rays: _Rays
@@ -36,9 +38,14 @@ func _init() -> void:
 	_name = UiTheme.label("", 80, UiPalette.GOLD_BRIGHT, true, 16)
 	_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_col.add_child(_name)
+	_plate = PanelContainer.new()
+	_plate.name = "MultPlaque"
+	_plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_plate.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_col.add_child(_plate)
 	_mult = UiTheme.label("", 96, UiPalette.TEXT, true, 16)
 	_mult.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_col.add_child(_mult)
+	_plate.add_child(_mult)
 	_total = UiTheme.label("", 40, UiPalette.TEXT, true, 10)
 	_total.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_col.add_child(_total)
@@ -72,7 +79,21 @@ func play(combo_name: String, mult: float, total := 0) -> void:
 	_name.text = combo_name.to_upper()
 	_name.label_settings = _ls(fs, name_col, outline_col, int(fs * 0.2))
 	_mult.text = "×" + CombatHud._fmt(mult)
-	_mult.label_settings = _ls(int(fs * 1.25), UiPalette.TEXT, outline_col, int(fs * 0.24))
+	if UiSkin.has("plaque_yellow"):
+		# the multiplier sits on the yellow plaque in ink (no outline: spec 1.3)
+		var mfs := int(fs * 1.05)
+		var sb := UiTheme.plaque_box("yellow")
+		sb.content_margin_left = mfs * 0.45
+		sb.content_margin_right = mfs * 0.45
+		sb.content_margin_top = mfs * 0.06
+		sb.content_margin_bottom = mfs * 0.3
+		_plate.add_theme_stylebox_override("panel", sb)
+		var ls := _ls(mfs, UiPalette.TEXT_DARK, outline_col, 0)
+		ls.shadow_size = 0
+		_mult.label_settings = ls
+	else:
+		_plate.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+		_mult.label_settings = _ls(int(fs * 1.25), UiPalette.TEXT, outline_col, int(fs * 0.24))
 	_total.text = "%d DAMAGE" % total if total > 0 else ""
 	_total.label_settings = _ls(int(40 * minf(scale_k, 1.1)), UiPalette.HP_BRIGHT, UiPalette.OUTLINE, 10)
 	_total.visible = total > 0

@@ -2,7 +2,7 @@ class_name ClassBadge
 extends PanelContainer
 ## The class mechanic badge at the head of the HUD's passives bar: mechanic icon + a live
 ## state line ("OATH 4", "AIM ×1.3", "STEP 2/2", "SEEDS 2", "BONES 1/2", "TURRET ×0.75",
-## "★ BOO!"). Classes without a mechanic show their class icon and name. It pulses on every
+## "BOO!", led by the mech_boo ghost, never a unicode star). Classes without a mechanic show their class icon and name. It pulses on every
 ## class_triggered event; tap / hover opens the rule (HudTop tooltip).
 
 signal tapped
@@ -28,7 +28,7 @@ func _init() -> void:
 	var row := UiTheme.hbox(6)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(row)
-	_icon = UiIcons.rect("star", 32)
+	_icon = Icons.rect("star", 32)
 	_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(_icon)
 	_label = UiTheme.label("", 20, UiPalette.TEXT, true, 5)
@@ -41,7 +41,9 @@ func set_class(p_class: String) -> void:
 	class_id = p_class
 	mechanic = HeroDefs.mechanic(p_class)
 	color = ClassInfo.mechanic_color(mechanic) if mechanic != "" else UiPalette.class_color(p_class)
-	_icon.texture = UiIcons.tex(UiIcons.mechanic_icon(mechanic) if mechanic != "" else UiIcons.class_icon(p_class), 64)
+	# mechanic: the Flat White glyph tinted the mechanic colour; else the full-colour class icon
+	_icon.texture = Icons.texture(Icons.mechanic_icon(mechanic), 32, color.lightened(0.2)) if mechanic != "" \
+		else Icons.texture(Icons.class_icon(p_class), 32)
 	_label.text = (ClassInfo.mechanic_name(mechanic) if mechanic != "" else String(HeroDefs.DATA.get(p_class, {}).get("name", ""))).to_upper()
 	_style()
 
@@ -95,8 +97,8 @@ static func state_text(flow: GameFlow) -> Array:
 				for i in c.enemies.size():
 					if c.alive(i) and not bool(c.enemies[i].get("brave", false)):
 						any = true
-				return ["★ BOO!", not any]
-			return ["★ BOO!", false]
+				return ["BOO!", not any]
+			return ["BOO!", false]
 	return [String(HeroDefs.DATA.get(run.class_id, {}).get("name", "")).to_upper(), false]
 
 
@@ -120,7 +122,13 @@ func rule_text() -> String:
 
 func _style() -> void:
 	var c := color.darkened(0.45) if _dim else color
-	add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(0.05, 0.05, 0.12, 0.88), 22, 2, Color(c, 0.9 if not _dim else 0.5)), 10, 4))
+	# ink tag with a Thin rim in the mechanic colour (the colour is the information)
+	var sb := UiTheme.tag_box(Color(c, 0.9 if not _dim else 0.5))
+	sb.content_margin_left = 12
+	sb.content_margin_right = 14
+	sb.content_margin_top = 4
+	sb.content_margin_bottom = 4
+	add_theme_stylebox_override("panel", sb)
 	_label.label_settings = UiTheme.label_settings(20, c.lightened(0.25) if not _dim else UiPalette.TEXT_MUTED, true, 5)
 	_icon.modulate = Color.WHITE if not _dim else Color(1, 1, 1, 0.5)
 

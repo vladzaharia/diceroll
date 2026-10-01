@@ -30,12 +30,14 @@ func _init() -> void:
 	theme = UiTheme.get_theme()
 	UiTheme.full_rect(self)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_panel = UiTheme.panel("hud")
+	# callout art (spec 4.3): ink + a Thin rim in the info blue
+	_panel = PanelContainer.new()
+	_panel.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.callout_box(UiPalette.PACK_BLUE), 20, 12))
 	_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_panel)
 	var row := UiTheme.hbox(12)
 	_panel.add_child(row)
-	row.add_child(UiIcons.rect("gear", 34, UiPalette.GOLD))
+	row.add_child(Icons.rect("gear", 34, UiPalette.TEXT))
 	_text = UiTheme.label("", 26, UiPalette.TEXT, true, 0)
 	_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

@@ -10,6 +10,9 @@
 #          height, so @3x phones can't render off-screen; the UI is vector, @2x covers it)
 #   zoom = UI zoom via content_scale_factor (--ui-scale), like OS scaling / a UI-size option
 #   e.g. tools/shoot_matrix.sh game_rolled /tmp/shots/m quick --wait=3
+#   Phones / tablets (rows with a safe area) shoot in touch input mode (--input=touch: no
+#   desktop hover keycaps, "Tap ..." copy); desktop rows in keyboard / mouse mode. An explicit
+#   --input=... in the extra args wins.
 #   --audit adds the no-spillover findings (AUDIT_OVERFLOW / AUDIT_SAFE / AUDIT_CLIP, see
 #   ui/theme/ui_audit.gd) under each device line; none printed = the gate passes.
 # iPhone 17 and 17 Pro share 402x874 pt, so one entry covers both.
@@ -81,7 +84,9 @@ echo "$list" | while read -r name res safe scale; do
 	[ -n "$name" ] || continue
 	png="$out/${scenario}__${name}.png"
 	zoom=""; [ -n "$scale" ] && zoom="--ui-scale=$scale"
-	log="$("$here/shoot.sh" "$scenario" "$png" "$res" --safe="$safe" $zoom "$@" 2>&1 || true)"
+	input=""
+	case " $* " in *" --input="*) ;; *) [ "$safe" = "0,0,0,0" ] && input="--input=kbm" || input="--input=touch" ;; esac
+	log="$("$here/shoot.sh" "$scenario" "$png" "$res" --safe="$safe" $zoom $input "$@" 2>&1 || true)"
 	if echo "$log" | grep -q "SHOT_SAVED"; then
 		echo "ok   $name ($res) -> $png"
 	else

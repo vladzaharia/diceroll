@@ -14,6 +14,7 @@ var _icon: TextureRect
 var _label: Label
 var _down := false
 var _hover := false
+var _icon_tint: Color = UiPalette.GOLD
 
 
 func _init() -> void:
@@ -57,7 +58,8 @@ func set_speed(s: float, animate := true) -> void:
 	_label.text = "%d×" % int(round(s)) if is_equal_approx(s, round(s)) else "%.1f×" % s
 	var hot := s >= 3.9
 	_label.label_settings = UiTheme.label_settings(28, UiPalette.HP_BRIGHT.lerp(UiPalette.GOLD_BRIGHT, 0.35) if hot else UiPalette.GOLD_BRIGHT, true, 6)
-	_icon.texture = UiIcons.tex("speed", 56, UiPalette.GOLD if not hot else Color("ff9a5a"))
+	_icon_tint = UiPalette.GOLD if not hot else Color("ff9a5a")
+	_icon.texture = Icons.texture("speed", 28, _icon_tint)
 	_place()
 	queue_redraw()
 	if animate and changed and is_inside_tree():
@@ -69,7 +71,7 @@ func _place() -> void:
 	var sink := 3.0 if _down else 0.0
 	var lw := _label.get_minimum_size().x
 	# centre the visible glyph + label as one group (the icon has transparent margins)
-	var g := GameButton._glyph_rect(_icon.texture)
+	var g := GameButton._glyph_rect_of("speed", _icon_tint)
 	var gw := 28.0 * g.size.x
 	var total := gw + 8.0 + lw
 	var x := (size.x - total) * 0.5
@@ -101,6 +103,13 @@ func _draw() -> void:
 	var r := size.y * 0.5
 	var full := Rect2(Vector2.ZERO, size)
 	var sink := 3.0 if _down else 0.0
+	if UiSkin.has("chip_grey"):
+		# spec 4.2: a grey-darker flat pill (HUD counter family), gold glyph + label
+		draw_style_box(UiTheme.chip_box("grey"), Rect2(0, sink * 0.5, size.x, size.y - sink * 0.5))
+		if _hover:
+			draw_style_box(UiTheme.box(Color(1, 1, 1, 0.07), int(r)), full.grow(-3))
+		_draw_dots(size.y - 11.0 + sink * 0.5)
+		return
 	draw_style_box(UiTheme.box(UiPalette.OUTLINE, int(r + 2)), full.grow(2))
 	draw_style_box(UiTheme.box(Color(0.02, 0.02, 0.06, 0.85), int(r)), full)
 	var face_rect := Rect2(0, sink, size.x, size.y - 5.0)
@@ -112,9 +121,12 @@ func _draw() -> void:
 	var rim := UiTheme.box(Color.TRANSPARENT, int(r), 2, UiPalette.GOLD_FAINT.lerp(UiPalette.GOLD_LINE, 0.4))
 	rim.draw_center = false
 	draw_style_box(rim, face_rect)
-	# three step dots under the label: which of 1× / 2× / 4× is on
+	_draw_dots(face_rect.end.y - 9.0)
+
+
+## Three step dots under the label: which of 1× / 2× / 4× is on.
+func _draw_dots(y: float) -> void:
 	var cx := size.x * 0.5
-	var y := face_rect.end.y - 9.0
 	for i in SPEEDS.size():
 		var on: bool = speed >= float(SPEEDS[i]) - 0.01
 		var p := Vector2(cx + (i - 1) * 11.0, y)

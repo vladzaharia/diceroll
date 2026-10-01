@@ -750,6 +750,23 @@ func clear_targets() -> void:
 	_path_lit.clear()
 
 
+static var _plaque: Texture2D
+static var _plaque_done := false
+
+
+## The landing badge's plaque art (the yellow 3D square button, rasterised once for 3D;
+## null without the pack: the drawn face + rim).
+static func _plaque_tex() -> Texture2D:
+	if not _plaque_done:
+		_plaque_done = true
+		var ls := UiSkin.layers("plaque_yellow")
+		if UiSkin.has("plaque_yellow") and not ls.is_empty():
+			var svg := UiSkin._layer_svg(ls[0])
+			if svg != "":
+				_plaque = UiSvg.raster(svg, 320)
+	return _plaque
+
+
 func _make_marker(idx: int, vals: Array, order: int, big := 1.0, col := Color(1.0, 0.86, 0.45)) -> Node3D:
 	var root := Node3D.new()
 	root.name = "Target%02d" % idx
@@ -789,13 +806,31 @@ func _make_marker(idx: int, vals: Array, order: int, big := 1.0, col := Color(1.
 	var badge := Node3D.new()
 	var bh := 1.45 + 0.35 * (big - 1.0)
 	badge.position.y = bh
-	badge.scale = Vector3.ONE * 1.9 * big
+	badge.scale = Vector3.ONE * 1.9 * big * UnitHud.world_ui_scale(self)
 	root.add_child(badge)
 	var chars := 0
 	for v in vals:
 		chars += str(v).length()
 	var w := 0.62 + 0.36 * float(vals.size() - 1) + 0.24 * float(chars - vals.size())
+	var plaque := _plaque_tex()
+	if plaque:
+		# the pack's yellow 3D plaque (9-sliced in plaque.gdshader) with an ink value
+		w += 0.12
+		var pq := MeshInstance3D.new()
+		var pqm := QuadMesh.new()
+		pqm.size = Vector2(w, 0.7)
+		pq.mesh = pqm
+		var sm := ShaderMaterial.new()
+		sm.shader = preload("res://game/world/shaders/plaque.gdshader")
+		sm.set_shader_parameter("tex", plaque)
+		sm.set_shader_parameter("quad_size", pqm.size)
+		sm.set_shader_parameter("unit", 0.7 / 64.0)
+		sm.render_priority = 14
+		pq.material_override = sm
+		pq.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		badge.add_child(pq)
 	var face := MeshInstance3D.new()
+	face.visible = plaque == null
 	var q := QuadMesh.new()
 	q.size = Vector2(w, 0.62)
 	face.mesh = q
@@ -811,6 +846,7 @@ func _make_marker(idx: int, vals: Array, order: int, big := 1.0, col := Color(1.
 	face.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	badge.add_child(face)
 	var rim := MeshInstance3D.new()
+	rim.visible = plaque == null
 	var q2 := QuadMesh.new()
 	q2.size = Vector2(w + 0.1, 0.72)
 	rim.mesh = q2
@@ -834,6 +870,10 @@ func _make_marker(idx: int, vals: Array, order: int, big := 1.0, col := Color(1.
 	lbl.no_depth_test = true
 	lbl.render_priority = 15
 	lbl.position.y = -0.01
+	if plaque:
+		# centred on the face above the 3D lip; label ink (spec 1.3)
+		lbl.modulate = UiPalette.TEXT_DARK
+		lbl.position.y = 0.05
 	badge.add_child(lbl)
 	var bt := badge.create_tween().set_loops()
 	bt.tween_property(badge, "position:y", bh + 0.1, 0.7).set_trans(Tween.TRANS_SINE)

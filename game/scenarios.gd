@@ -262,6 +262,10 @@ class _Driver extends Node:
 				f.run.lap = int(args.get("lap", "8"))
 				f.run.act = Balance.act_for_lap(f.run.lap)
 				c.ui.sync(f)
+				# finish the run's fade-in first: the pause freezes the overlay's tweens, which
+				# left a half-faded dim over the whole pause menu
+				c.overlay.fade_in(0.01)
+				await get_tree().create_timer(0.1, true, false, true).timeout
 				c.ui.open_pause()
 			"game_boss":
 				await c.play_events(f.debug_open("boss", String(args.get("boss", ""))))

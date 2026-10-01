@@ -42,6 +42,6 @@ func _draw() -> void:
 	draw_circle(c, inner, col.darkened(0.72))
 	draw_circle(c - Vector2(0, inner * 0.25), inner * 0.8, Color(col.darkened(0.55), 0.6))
 	var glyph_col := col.lightened(0.12) if rune != "wild" else Color.WHITE
-	var tex := UiIcons.tex("rune_" + rune, int(s * 1.6), glyph_col)
+	var tex := Icons.tex("rune_" + rune, int(s * 1.6), glyph_col)
 	var gs := inner * 1.42
 	draw_texture_rect(tex, Rect2(c - Vector2(gs, gs) * 0.5, Vector2(gs, gs)), false)

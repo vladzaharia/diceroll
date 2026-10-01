@@ -55,7 +55,8 @@ func _init() -> void:
 	UiTheme.full_rect(self)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	strip = PanelContainer.new()
-	strip.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(0.05, 0.05, 0.13, 0.72), 22, 2, UiPalette.GOLD_FAINT, 8, Color(0, 0, 0, 0.3), Vector2(0, 3)), 8, 6))
+	strip.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.panel_box("hud"), 8, 6) if UiSkin.has("panel_hud") else \
+		UiTheme.pad(UiTheme.box(Color(0.05, 0.05, 0.13, 0.72), 22, 2, UiPalette.GOLD_FAINT, 8, Color(0, 0, 0, 0.3), Vector2(0, 3)), 8, 6))
 	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(strip)
 	_row = UiTheme.hbox(6)
@@ -320,7 +321,7 @@ func fly_out(slot: int, type: String, to: Vector2, new_belt: Array) -> void:
 
 func _bottle(type: String, px: int) -> TextureRect:
 	var b := TextureRect.new()
-	b.texture = UiIcons.tex("potion_" + type if UiIcons.exists("potion_" + type) else "potion", px, Color.WHITE)
+	b.texture = Icons.tex("potion_" + type if Icons.exists("potion_" + type) else "potion", px, Color.WHITE)
 	b.size = Vector2(px, px)
 	b.pivot_offset = b.size * 0.5
 	b.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -333,18 +334,35 @@ func _bottle(type: String, px: int) -> TextureRect:
 func level_toast(level: int, hp_gained: int, healed := 0) -> void:
 	var top := _visible_top()
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(0.12, 0.07, 0.24, 0.95), 22, 3, UiPalette.XP, 12, Color(0.6, 0.35, 1.0, 0.45), Vector2.ZERO), 16, 8))
+	# spec 4.6: "LEVEL n" is the purple plaque (ink labels) with the level icon
+	var pack := UiSkin.has("plaque_purple")
+	if pack:
+		var sb := UiTheme.plaque_box("purple")
+		sb.content_margin_left = 20
+		sb.content_margin_right = 22
+		sb.content_margin_top = 8
+		sb.content_margin_bottom = 22
+		p.add_theme_stylebox_override("panel", sb)
+	else:
+		p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(0.12, 0.07, 0.24, 0.95), 22, 3, UiPalette.XP, 12, Color(0.6, 0.35, 1.0, 0.45), Vector2.ZERO), 16, 8))
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.z_index = 7
+	var ink := UiPalette.TEXT_DARK
+	var row := UiTheme.hbox(10)
+	p.add_child(row)
+	if pack and Icons.is_mapped("level"):
+		var li := Icons.rect("level", 52)
+		li.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(li)
 	var col := UiTheme.vbox(-2)
-	p.add_child(col)
-	col.add_child(UiTheme.label("LEVEL %d!" % level, 30, UiPalette.XP.lightened(0.45), true, 7))
+	row.add_child(col)
+	col.add_child(UiTheme.label("LEVEL %d!" % level, 30, ink, true, 0) if pack else UiTheme.label("LEVEL %d!" % level, 30, UiPalette.XP.lightened(0.45), true, 7))
 	var r := UiTheme.hbox(6)
 	col.add_child(r)
-	r.add_child(UiIcons.rect("heart", 30))
-	r.add_child(UiTheme.label("+%d MAX HP" % hp_gained, 26, UiPalette.HP_BRIGHT.lightened(0.2), true, 6))
+	r.add_child(Icons.rect("heart", 30))
+	r.add_child(UiTheme.label("+%d MAX HP" % hp_gained, 26, ink, true, 0) if pack else UiTheme.label("+%d MAX HP" % hp_gained, 26, UiPalette.HP_BRIGHT.lightened(0.2), true, 6))
 	if healed > 0:
-		r.add_child(UiTheme.label("·  +%d" % healed, 22, UiPalette.HEAL, true, 5))
+		r.add_child(UiTheme.label("·  +%d" % healed, 22, ink, true, 0) if pack else UiTheme.label("·  +%d" % healed, 22, UiPalette.HEAL, true, 5))
 	add_child(p)
 	p.reset_size()
 	var s := p.get_combined_minimum_size()
@@ -386,13 +404,14 @@ func _ring(at: Vector2, color: Color, r0 := 30.0, r1 := 90.0) -> void:
 ## A small chip (icon + text) popping at a canvas point: trait triggers, Crowns.
 func chip(at: Vector2, text: String, icon := "", color: Color = UiPalette.GOLD_BRIGHT, hold := 0.9) -> void:
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(0.06, 0.05, 0.14, 0.92), 18, 2, color, 8, Color(color, 0.35), Vector2.ZERO), 10, 4))
+	p.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.callout_box(color), 14, 6) if UiSkin.has("callout") else \
+		UiTheme.pad(UiTheme.box(Color(0.06, 0.05, 0.14, 0.92), 18, 2, color, 8, Color(color, 0.35), Vector2.ZERO), 10, 4))
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.z_index = 7
 	var r := UiTheme.hbox(6)
 	p.add_child(r)
-	if icon != "" and UiIcons.exists(icon):
-		r.add_child(UiIcons.rect(icon, 28))
+	if icon != "" and Icons.exists(icon):
+		r.add_child(Icons.rect(icon, 28))
 	r.add_child(UiTheme.label(text, 22, color.lightened(0.25), true, 5))
 	add_child(p)
 	p.reset_size()
@@ -445,26 +464,10 @@ const POTION_COLORS := {
 
 
 func _show_tip(anchor: Control, title: String, body: String, color: Color, status: String) -> void:
-	UiTheme.clear(_tip)
-	_tip.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(0.05, 0.05, 0.12, 0.97), 16, 2, color, 10, Color(0, 0, 0, 0.4)), 16, 10))
-	var col := UiTheme.vbox(2)
-	_tip.add_child(col)
-	col.add_child(UiTheme.label(title, 26, color.lightened(0.2), true, 5))
-	var desc := UiTheme.para(body, 21, UiPalette.TEXT_DIM, 500)
-	desc.custom_minimum_size.x = minf(360.0, size.x - 60.0)
-	col.add_child(desc)
-	if status != "":
-		col.add_child(UiTheme.label(status, 20, UiPalette.GOLD_BRIGHT if status == "Tap to drink" else UiPalette.TEXT_MUTED, false, 0, false, 700))
+	UiTooltip.fill(_tip, title, "", body, color, {"status": status, "max_w": minf(360.0, size.x - 90.0),
+		"status_color": UiPalette.GOLD_BRIGHT if status == "Tap to drink" else UiPalette.TEXT_MUTED})
 	_tip.visible = true
-	_tip.reset_size()
-	var s := _tip.get_combined_minimum_size()
-	_tip.size = s
-	var r := anchor.get_global_rect()
-	var at := Vector2(r.get_center().x - s.x * 0.5, r.end.y + 10.0) - global_position
-	if at.y + s.y > size.y - 20.0:
-		at.y = r.position.y - s.y - 10.0 - global_position.y
-	at.x = clampf(at.x, 12.0, size.x - s.x - 12.0)
-	_tip.position = at
+	UiTooltip.place(_tip, self, anchor.get_global_rect(), 10.0)
 	_tip.modulate.a = 1.0
 	if _tip_tween and _tip_tween.is_valid():
 		_tip_tween.kill()
@@ -514,7 +517,7 @@ class _Slot:
 	func set_type(t: String) -> void:
 		type = t
 		var px := int(maxf(size.x, 48.0) * 1.6)
-		_icon.texture = UiIcons.tex("potion_" + t if t != "" and UiIcons.exists("potion_" + t) else "potion_empty", px, Color.WHITE)
+		_icon.texture = Icons.tex("potion_" + t if t != "" and Icons.exists("potion_" + t) else "potion_empty", px, Color.WHITE)
 		queue_redraw()
 
 	func set_enabled(on: bool) -> void:
@@ -528,6 +531,14 @@ class _Slot:
 
 	func _draw() -> void:
 		var r := Rect2(Vector2.ZERO, size)
+		if UiSkin.has("panel_inset"):
+			# spec 4.2: potion belt slots are insets; a ready potion gets a gold rim
+			draw_style_box(UiTheme.inset_box(), r)
+			if enabled and type != "":
+				var rim := UiTheme.box(Color.TRANSPARENT, 16, 2, UiPalette.GOLD_LINE)
+				rim.draw_center = false
+				draw_style_box(rim, r)
+			return
 		var c := UiPalette.NAVY_2 if type != "" else Color(0.03, 0.03, 0.09, 0.5)
 		var sb := UiTheme.box(c, 16, 2, UiPalette.GOLD_LINE if (enabled and type != "") else Color(1, 1, 1, 0.12))
 		draw_style_box(sb, r)
@@ -590,7 +601,7 @@ class _Meter:
 		pet = id
 		level = lvl
 		accent = PetView.LOOKS.get(id, [UiPalette.GOLD])[0]
-		_tex = UiIcons.tex("pet_" + id, 96, Color.WHITE) if UiIcons.exists("pet_" + id) else null
+		_tex = Icons.tex("pet_" + id, 96, Color.WHITE) if Icons.exists("pet_" + id) else null
 		queue_redraw()
 
 	func set_charge(c: int, n: int, animate: bool) -> void:

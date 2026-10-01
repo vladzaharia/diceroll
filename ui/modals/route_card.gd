@@ -25,6 +25,8 @@ func _build() -> void:
 	go.icon_tint = UiPalette.TEXT_DARK
 	go.pressed.connect(_begin)
 	body.add_child(go)
+	# forced (spec 3.2): BEGIN is the act's one exit (Enter)
+	primary_action = go
 
 
 func refresh(flow: GameFlow) -> void:

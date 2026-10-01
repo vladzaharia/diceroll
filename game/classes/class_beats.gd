@@ -45,7 +45,7 @@ static func after_board_roll(c: GameController) -> void:
 		var r := c.tray.get_die_screen_rect(int(i))
 		# under the die, inside the tray: the DOUBLES! pop owns the space above the dice
 		var at := Vector2(r.get_center().x, r.end.y + 44.0) if r.size != Vector2.ZERO else c.tray.die_top_screen(int(i))
-		c.overlay.popup(at, "★ = %d" % v, SCARE.lightened(0.2), "mech_boo", 28)
+		c.overlay.popup(at, "= %d" % v, SCARE.lightened(0.2), "die_wild_face" if Icons.is_mapped("die_wild_face") else "mech_boo", 28)
 	if not _pretend.is_empty():
 		Audio.play_sfx("pop")
 
@@ -67,7 +67,8 @@ static func after_combat_roll(c: GameController) -> void:
 	if star >= 0:
 		var t := cs.attack_target if cs.attack_target >= 0 else cs.target
 		var brave := t >= 0 and t < cs.enemies.size() and bool(cs.enemies[t].get("brave", false))
-		c.overlay.popup(c.tray.die_top_screen(star), "★ BOO ready!" if not brave else "★ Wild", SCARE, "mech_boo", 26)
+		# spec 5 rule 5: no unicode stars in UI chrome; the icon carries the star
+		c.overlay.popup(c.tray.die_top_screen(star), "BOO ready!" if not brave else "Wild", SCARE, "mech_boo" if not brave else "die_wild_face", 26)
 
 
 ## A temporary die (Bone) joins the pool at a turn start.
@@ -212,7 +213,7 @@ static func class_triggered(c: GameController, ev: Dictionary) -> void:
 			await _boo(c, int(ev.get("enemy_idx", -1)))
 		_:
 			if text != "":
-				c.overlay.popup(c.hero_screen(2.4), text, col, UiIcons.mechanic_icon(mech), 30)
+				c.overlay.popup(c.hero_screen(2.4), text, col, Icons.mechanic_icon(mech), 30)
 				await c.wait(0.3)
 
 

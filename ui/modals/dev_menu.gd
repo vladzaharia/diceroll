@@ -31,6 +31,7 @@ var _status: Label
 var _confirm: PanelContainer
 var _confirm_text: Label
 var _confirm_ok: GameButton
+var _confirm_cancel: GameButton
 var _pending_channel := ""
 var _check_btn: GameButton
 var _reset_btn: GameButton
@@ -87,14 +88,20 @@ static func _register_builtins() -> void:
 	register_section("build", "BUILD", 90)
 	register_row("build", "info", func(m: DevMenu) -> Control: return m._build_section(), 10)
 	register_row("build", "copy", func(m: DevMenu) -> Control:
-		return m.button_row("COPY DIAGNOSTICS", "", m.copy_diagnostics), 20)
+		var b := m.button_row("COPY DIAGNOSTICS", "copy", m.copy_diagnostics)
+		b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		return b, 20)
 
 
 # ---------------------------------------------------------------- build
 
 func _build() -> void:
-	set_title("DEVELOPER")
+	ScrollFade.attach(self, _scroll, UiPalette.NAVY_2, _frame)
+	set_title("DEVELOPER", "red")
 	max_width = 640.0
+	# one exit (spec 3.2): the header close button, Esc and the backdrop; the channel-switch
+	# confirm turns them off while it is up (its CANCEL / SWITCH are the exits, Esc = CANCEL)
+	dismissible = true
 	_register_builtins()
 	var first := true
 	for sid in section_ids():
@@ -109,11 +116,6 @@ func _build() -> void:
 			if c is Control:
 				(c as Control).name = "%s_%s" % [sid, r["id"]]
 				body.add_child(c)
-	body.add_child(UiTheme.spacer(4))
-	var done := GameButton.make("CLOSE", "close", GameButton.Kind.PRIMARY, 34)
-	done.icon_tint = UiPalette.TEXT_DARK
-	done.pressed.connect(func() -> void: close())
-	body.add_child(done)
 
 
 func _ready() -> void:
@@ -143,7 +145,6 @@ func info_row(label_text: String, value: String) -> HBoxContainer:
 
 func button_row(text: String, icon: String, action: Callable, kind := GameButton.Kind.SECONDARY) -> GameButton:
 	var b := GameButton.make(text, icon, kind, 26)
-	b.icon_tint = UiPalette.GOLD
 	b.min_height = 76
 	b.pressed.connect(action)
 	return b
@@ -159,7 +160,7 @@ func _channel_section() -> Control:
 	var col := UiTheme.vbox(10)
 	var r := UiTheme.hbox(10)
 	col.add_child(r)
-	r.add_child(UiIcons.rect("gear", 36, UiPalette.GOLD))
+	r.add_child(Icons.rect("gear", 36, UiPalette.TEXT))
 	var l := UiTheme.label("Channel", 28, UiPalette.TEXT, true, 0)
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	r.add_child(l)
@@ -185,23 +186,25 @@ func _channel_section() -> Control:
 	_confirm_text = note("", UiPalette.TEXT)
 	cv.add_child(_confirm_text)
 	var cr := UiTheme.hbox(10)
+	cr.alignment = BoxContainer.ALIGNMENT_CENTER
 	cv.add_child(cr)
 	_confirm_ok = GameButton.make("SWITCH", "check", GameButton.Kind.PRIMARY, 24)
 	_confirm_ok.icon_tint = UiPalette.TEXT_DARK
 	_confirm_ok.min_height = 68
-	_confirm_ok.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_confirm_ok.pressed.connect(func() -> void:
 		var ch := _pending_channel
 		_hide_confirm()
 		_switch(ch))
 	cr.add_child(_confirm_ok)
-	var cancel := GameButton.make("CANCEL", "", GameButton.Kind.SECONDARY, 24)
-	cancel.min_height = 68
-	cancel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	cancel.pressed.connect(func() -> void:
+	_confirm_cancel = GameButton.make("CANCEL", "", GameButton.Kind.SECONDARY, 24)
+	_confirm_cancel.name = "Cancel"
+	_confirm_cancel.min_height = 68
+	_confirm_cancel.pressed.connect(func() -> void:
 		_hide_confirm()
 		refresh())
-	cr.add_child(cancel)
+	# cancel first: the safe option leads
+	cr.add_child(_confirm_cancel)
+	cr.move_child(_confirm_cancel, 0)
 	col.add_child(_confirm)
 	_status = note("", UiPalette.GOLD_BRIGHT)
 	_status.name = "Status"
@@ -316,6 +319,7 @@ func _on_channel_pressed(ch: String) -> void:
 			running_version(), ch, running_version(), ch, ch]
 		_confirm_ok.text = "SWITCH TO %s" % ch.to_upper()
 		_confirm.visible = true
+		_set_confirming(true)
 		refresh()
 		return
 	_switch(ch)
@@ -325,7 +329,20 @@ func _hide_confirm() -> void:
 	_pending_channel = ""
 	if _confirm:
 		_confirm.visible = false
+	_set_confirming(false)
 	relayout()
+
+
+## While the channel-switch confirm is up the menu is a confirm dialog (spec 3.2): no close
+## button, no backdrop; Esc and Enter press CANCEL (the safe option).
+func _set_confirming(on: bool) -> void:
+	dismissible = not on
+	cancel_action = _confirm_cancel if on else null
+	primary_action = _confirm_cancel if on else null
+
+
+func is_confirming() -> bool:
+	return _confirm != null and _confirm.visible
 
 
 func _switch(ch: String) -> void:

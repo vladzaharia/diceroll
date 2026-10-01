@@ -137,7 +137,7 @@ static func _bottle_tip(c: GameController, world: Node3D, hp: Vector3, col: Colo
 ## Small icons flying across the screen (reroll pips, Crowns).
 static func _fly_icons(c: GameController, icon: String, from: Vector2, to: Vector2, n: int, tint: Color) -> void:
 	for i in n:
-		var r := UiIcons.rect(icon, 34, tint)
+		var r := Icons.rect(icon, 34, tint)
 		r.size = Vector2(34, 34)
 		r.pivot_offset = r.size * 0.5
 		r.position = from - r.size * 0.5 + Vector2(randf_range(-20, 20), randf_range(-10, 10))
@@ -198,7 +198,7 @@ static func _pet_acted(c: GameController, ev: Dictionary) -> void:
 		"fix": text = "FIXED!"
 		"rune": text = "RUNE ECHO!"
 	var at := c.pets.screen_point(0.45) if c.pets else c.hero_screen(2.4)
-	c.overlay.popup(at, text, accent.lightened(0.3), "pet_" + pet if UiIcons.exists("pet_" + pet) else "", 28)
+	c.overlay.popup(at, text, accent.lightened(0.3), "pet_" + pet if Icons.exists("pet_" + pet) else "", 28)
 	Audio.play_sfx("buff")
 	if view == null:
 		await c.wait(0.4)
@@ -315,7 +315,7 @@ static func _pet_fix(c: GameController, view: PetView, ev: Dictionary, accent: C
 
 ## A pet portrait that hops along an arc from -> to (screen), then pops.
 static func _hop_icon(c: GameController, icon: String, from: Vector2, to: Vector2) -> void:
-	var r := UiIcons.rect(icon, 72, Color.WHITE) if UiIcons.exists(icon) else UiIcons.rect("star", 40, UiPalette.GOLD_BRIGHT)
+	var r := Icons.rect(icon, 72, Color.WHITE) if Icons.exists(icon) else Icons.rect("star", 40, UiPalette.GOLD_BRIGHT)
 	r.size = Vector2(72, 72)
 	r.pivot_offset = r.size * 0.5
 	r.position = from - r.size * 0.5

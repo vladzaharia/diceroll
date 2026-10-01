@@ -1,7 +1,9 @@
 class_name ForgeModal
 extends UiModal
 ## Forge (offer {kind:"forge", ops}). Choose die → choose face → Raise (+1) or Mirror (copy
-## another face of the same die) with a before/after preview. Skip is always allowed.
+## another face of the same die) with a before/after preview. Skip is always allowed: one
+## exit (spec 3.2), the header close button (tooltip "Skip the forge"), Esc or the backdrop
+## skip; there is no SKIP button. Enter = FORGE.
 ## Emits forge_apply(die_idx, face_idx, op, src_face); skip = forge_apply(-1, -1, "skip", -1).
 
 signal forge_apply(die_idx: int, face_idx: int, op: String, src_face: int)
@@ -13,6 +15,7 @@ var _src_box: VBoxContainer
 var _src_row: HBoxContainer
 var _preview: HBoxContainer
 var _apply: GameButton
+## The skip control (= the header close button; AUTO highlights it).
 var _skip: GameButton
 var _raise_btn: GameButton
 var _mirror_btn: GameButton
@@ -29,14 +32,22 @@ var _src_btns: Array[_FaceButton] = []
 
 func _build() -> void:
 	body.add_theme_constant_override("separation", 14)
+	dismissible = true
+	close_tooltip = "Skip the forge"
+	_skip = close_button
 	body.add_child(UiModal.section_label("1 · Choose a die"))
 	_dice_row = UiTheme.hbox(10)
 	_dice_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	body.add_child(_dice_row)
 	body.add_child(UiModal.section_label("2 · Choose a face"))
+	# the die's faces sit in an inset well (spec 4.3)
+	var fw := PanelContainer.new()
+	fw.add_theme_stylebox_override("panel", UiTheme.inset_box())
+	fw.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	body.add_child(fw)
 	_faces_row = UiTheme.hbox(10)
 	_faces_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	body.add_child(_faces_row)
+	fw.add_child(_faces_row)
 	_ops_row = UiTheme.hbox(14)
 	_ops_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	body.add_child(_ops_row)
@@ -59,7 +70,7 @@ func _build() -> void:
 	_src_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	_src_box.add_child(_src_row)
 	var pv := PanelContainer.new()
-	pv.add_theme_stylebox_override("panel", UiTheme.panel_box("inset"))
+	pv.add_theme_stylebox_override("panel", UiTheme.inset_box())
 	pv.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	body.add_child(pv)
 	_preview = UiTheme.hbox(20)
@@ -68,9 +79,6 @@ func _build() -> void:
 	pv.add_child(_preview)
 	var foot := UiTheme.hbox(14)
 	body.add_child(foot)
-	_skip = GameButton.make("SKIP", "", GameButton.Kind.GHOST, 30)
-	_skip.pressed.connect(func() -> void: forge_apply.emit(-1, -1, "skip", -1))
-	foot.add_child(_skip)
 	_apply = GameButton.make("FORGE", "anvil", GameButton.Kind.PRIMARY, 36)
 	_apply.icon_tint = UiPalette.TEXT_DARK
 	_apply.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -79,6 +87,12 @@ func _build() -> void:
 		if _valid():
 			forge_apply.emit(_die, _face, _op, _src if _op == "mirror" else -1))
 	foot.add_child(_apply)
+	primary_action = _apply
+
+
+## Skipping is the forge's dismissal: the core closes it (UiRoot.sync).
+func dismiss() -> void:
+	forge_apply.emit(-1, -1, "skip", -1)
 
 
 func refresh(flow: GameFlow) -> void:
@@ -86,6 +100,9 @@ func refresh(flow: GameFlow) -> void:
 	_ops = flow.offer.get("ops", ["raise", "mirror"])
 	var draft := String(flow.offer.get("source", "tile")) == "draft"
 	set_title("FACE RAISE" if draft or not _ops.has("mirror") else "FORGE", Color("aab4c8"))
+	# a colour without a native plaque family (steel, silver...): the white plaque x colour
+	if not ribbon.skinned():
+		ribbon.family = "white"
 	_mirror_btn.visible = _ops.has("mirror")
 	UiTheme.clear(_dice_row)
 	_die_tabs.clear()
@@ -206,7 +223,7 @@ func _update() -> void:
 		var bf := DieFace.make(before, d.rune, d.edited[_face] == 1, 72)
 		bf.kind = d.kind
 		_preview.add_child(_captioned(bf, "Before"))
-		_preview.add_child(UiIcons.rect("arrow_right", 44, UiPalette.GOLD))
+		_preview.add_child(Icons.rect("arrow_right", 44, UiPalette.TEXT))
 		var af := DieFace.make(after, d.rune, after != before or d.edited[_face] == 1, 72)
 		af.kind = d.kind
 		if _op == "mirror" and _src < 0:
@@ -260,21 +277,29 @@ class _DieTab:
 		focus_mode = Control.FOCUS_NONE
 		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		pressed.connect(func() -> void: UiTheme.sfx("dice_select"))
+		mouse_entered.connect(queue_redraw)
+		mouse_exited.connect(queue_redraw)
 
 	func _draw() -> void:
 		var r := Rect2(Vector2.ZERO, size)
-		if selected:
-			draw_style_box(UiTheme.box(Color(0, 0, 0, 0), 18, 0, Color.TRANSPARENT, 14, Color(1, 0.75, 0.25, 0.45), Vector2.ZERO), r)
-		draw_style_box(UiTheme.box(UiPalette.NAVY_3 if selected else UiPalette.NAVY_2, 18, 3 if selected else 2,
-			UiPalette.GOLD_BRIGHT if selected else Color(1, 1, 1, 0.08)), r)
-		var s := minf(size.x - 16.0, size.y - 40.0)
+		if OptionCard.skinned():
+			draw_style_box(UiTheme.card_box("selected" if selected else ("hover" if is_hovered() else "normal")), r)
+		else:
+			if selected:
+				draw_style_box(UiTheme.box(Color(0, 0, 0, 0), 18, 0, Color.TRANSPARENT, 14, Color(1, 0.75, 0.25, 0.45), Vector2.ZERO), r)
+			draw_style_box(UiTheme.box(UiPalette.NAVY_3 if selected else UiPalette.NAVY_2, 18, 3 if selected else 2,
+				UiPalette.GOLD_BRIGHT if selected else Color(1, 1, 1, 0.08)), r)
+		# the card's 3D lip takes the bottom of the tab: the die and name sit above it
+		var lip := 8.0 if OptionCard.skinned() else 0.0
+		var s := minf(size.x - 20.0, size.y - 44.0 - lip)
 		var br := Rect2(Vector2((size.x - s) * 0.5, 8), Vector2(s, s))
 		# mini die body in rune tint with its best face
 		var body := DieFace.body_color(die.rune)
 		draw_style_box(UiTheme.box(UiPalette.OUTLINE, int(s * 0.22)), br.grow(2))
 		draw_style_box(UiTheme.box(body, int(s * 0.2)), br)
 		if die.rune != "":
-			var tex := UiIcons.tex("rune_" + die.rune, int(s * 1.4), UiPalette.rune_color(die.rune).darkened(0.35) if die.rune != "wild" else UiPalette.GOLD)
+			# die-face rune glyph: the tinted Flat White rune_face_* art (spec 5 rule 7)
+			var tex := Icons.tex("rune_face_" + die.rune, int(s * 1.4))
 			var gs := s * 0.62
 			draw_texture_rect(tex, Rect2(br.get_center() - Vector2(gs, gs) * 0.5, Vector2(gs, gs)), false)
 		else:
@@ -285,5 +310,5 @@ class _DieTab:
 		var f := UiTheme.display_font()
 		var t := ("DIE %d" % (idx + 1)) if die.kind == "standard" else String(DiceKinds.def(die.kind).name).to_upper()
 		var w := f.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
-		draw_string(f, Vector2((size.x - w) * 0.5, size.y - 10), t, HORIZONTAL_ALIGNMENT_LEFT, -1, 18,
+		draw_string(f, Vector2((size.x - w) * 0.5, size.y - 10 - lip), t, HORIZONTAL_ALIGNMENT_LEFT, -1, 18,
 			UiPalette.GOLD_BRIGHT if selected else UiPalette.TEXT_DIM)

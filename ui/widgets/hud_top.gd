@@ -49,7 +49,7 @@ var _boss_icon: TextureRect
 var route: Array = []
 var _block_label: Label
 var _row: HBoxContainer
-var _scrim: TextureRect
+var _scrim: _Scrim
 var _hp_wrap: Control
 var _block := 0
 ## Burn stacks on the hero (Magma): a flame badge with the count, left of the block shield.
@@ -78,10 +78,10 @@ var reserve_right := 0.0:
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	UiTheme.full_rect(self)
-	_scrim = TextureRect.new()
+	# a full-bleed backdrop drawn behind the HUD (under the notch too): decoration, not an icon,
+	# so it is drawn, not a TextureRect
+	_scrim = _Scrim.new()
 	_scrim.texture = UiTheme.vgradient(Color(0.02, 0.02, 0.07, 0.6), Color(0.02, 0.02, 0.07, 0.0))
-	_scrim.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_scrim.stretch_mode = TextureRect.STRETCH_SCALE
 	_scrim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_scrim)
 	_row = UiTheme.hbox(14)
@@ -94,13 +94,13 @@ func _init() -> void:
 	_row.add_child(mid)
 	# HP row: heart overlapping the bar's left end, block shield on the right end
 	_hp_wrap = Control.new()
-	_hp_wrap.custom_minimum_size = Vector2(200, 50)
+	_hp_wrap.custom_minimum_size = Vector2(200, 62)
 	_hp_wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	mid.add_child(_hp_wrap)
 	hp_bar = StatBar.make(UiPalette.HP, 44)
 	hp_bar.text_size = 28
 	_hp_wrap.add_child(hp_bar)
-	var heart := UiIcons.rect("heart", 58)
+	var heart := Icons.rect("heart", 58)
 	heart.name = "Heart"
 	_hp_wrap.add_child(heart)
 	block_badge = Control.new()
@@ -108,9 +108,10 @@ func _init() -> void:
 	block_badge.custom_minimum_size = Vector2(62, 62)
 	block_badge.visible = false
 	_hp_wrap.add_child(block_badge)
-	var sh := UiIcons.rect("shield", 62)
+	var sh := Icons.rect("shield", 62)
 	block_badge.add_child(sh)
 	_block_label = UiTheme.label("0", 26, UiPalette.TEXT, true, 6)
+	_block_label.name = "Value"
 	_block_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_block_label.size = Vector2(62, 56)
 	block_badge.add_child(_block_label)
@@ -119,7 +120,7 @@ func _init() -> void:
 	burn_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	burn_badge.visible = false
 	_hp_wrap.add_child(burn_badge)
-	burn_badge.add_child(UiIcons.rect("intent_burn", 54, Color("ff8a3a")))
+	burn_badge.add_child(Icons.rect("burn" if Icons.is_mapped("burn") else "intent_burn", 54, Color("ff8a3a")))
 	_burn_label = UiTheme.label("0", 24, UiPalette.TEXT, true, 6)
 	_burn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_burn_label.position = Vector2(0, 12)
@@ -141,6 +142,9 @@ func _init() -> void:
 	pause_btn.icon_tint = UiPalette.TEXT
 	pause_btn.kind = GameButton.Kind.GHOST
 	pause_btn.size_flags_horizontal = Control.SIZE_SHRINK_END
+	pause_btn.tooltip_text = "Pause"
+	# round button: no keycap; the shortcut goes in its tooltip ("Pause (Esc)", spec 6)
+	pause_btn.shortcut_hint = InputActions.glyph_for(InputActions.PAUSE)
 	pause_btn.pressed.connect(func() -> void: pause_pressed.emit())
 	right.add_child(pause_btn)
 
@@ -160,7 +164,7 @@ func _init() -> void:
 	var tr := UiTheme.hbox(4)
 	tr.alignment = BoxContainer.ALIGNMENT_CENTER
 	twist_chip.add_child(tr)
-	_twist_icon = UiIcons.rect("sun", 32)
+	_twist_icon = Icons.rect("sun", 32)
 	_twist_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	tr.add_child(_twist_icon)
 	_twist_moon = _MoonGlyph.new()
@@ -297,10 +301,10 @@ func content_bottom() -> float:
 
 func _place_hp() -> void:
 	var s := _hp_wrap.size
-	hp_bar.position = Vector2(30, (s.y - 44) * 0.5)
-	hp_bar.size = Vector2(s.x - 30 - (26.0 if block_badge.visible else 0.0), 44)
+	hp_bar.position = Vector2(32, (s.y - 44) * 0.5)
+	hp_bar.size = Vector2(s.x - 32 - (26.0 if block_badge.visible else 0.0), 44)
 	var heart := _hp_wrap.get_node("Heart") as Control
-	heart.position = Vector2(-4, (s.y - 58) * 0.5)
+	heart.position = Vector2(0, (s.y - 58) * 0.5)
 	heart.size = Vector2(58, 58)
 	block_badge.position = Vector2(s.x - 62, (s.y - 62) * 0.5)
 	block_badge.size = Vector2(62, 62)
@@ -466,27 +470,10 @@ func show_tip(id: String, anchor: Control = null) -> void:
 
 
 func _text_tip(title: String, tag: String, text: String, rc: Color, anchor: Control = null) -> void:
-	UiTheme.clear(_tip)
-	_tip.add_theme_stylebox_override("panel", UiTheme.pad(UiTheme.box(Color(0.05, 0.05, 0.12, 0.96), 16, 2, rc, 10, Color(0, 0, 0, 0.4)), 16, 10))
-	var col := UiTheme.vbox(2)
-	_tip.add_child(col)
-	var head := UiTheme.hbox(8)
-	col.add_child(head)
-	head.add_child(UiTheme.label(title, 26, rc.lightened(0.3), true, 5))
-	head.add_child(UiTheme.label(tag, 16, rc, false, 0, false, 800))
-	var desc := UiTheme.para(text, 21, UiPalette.TEXT_DIM, 500)
-	desc.custom_minimum_size.x = minf(380.0, size.x - 60.0)
-	col.add_child(desc)
+	UiTooltip.fill(_tip, title, tag, text, rc, {"max_w": minf(UiTooltip.MAX_W, size.x - 90.0)})
 	_tip.visible = true
-	_tip.reset_size()
-	var s := _tip.get_combined_minimum_size()
-	_tip.size = s
-	var at := Vector2(24, content_bottom() + 10.0)
-	if anchor:
-		var r := anchor.get_global_rect()
-		at = Vector2(r.position.x + r.size.x * 0.5 - s.x * 0.5, r.end.y + 8.0) - global_position
-	at.x = clampf(at.x, 12.0, size.x - s.x - 12.0)
-	_tip.position = at
+	var r := anchor.get_global_rect() if anchor else Rect2(global_position + Vector2(24, content_bottom()), Vector2(1, 1))
+	UiTooltip.place(_tip, self, r)
 	_tip.modulate.a = 1.0
 	if _tip_tween and _tip_tween.is_valid():
 		_tip_tween.kill()
@@ -583,25 +570,31 @@ func _show_twist(key: String, animate := false) -> void:
 			var n := int(parts[2])
 			_twist_moon.fill = float(MOON_FILL.get(ph, 0.3))
 			_twist_moon.queue_redraw()
+			# the pack's moon phases replace the drawn glyph when present
+			var mid := "moon_" + ph
+			if Icons.is_mapped(mid):
+				_twist_icon.texture = Icons.texture(mid, 32)
+				_twist_moon.visible = false
+				_twist_icon.visible = true
 			text = "FULL MOON" if ph == "full" else ("FULL IN %d" % n if n > 0 else "WANING")
 			tip = "Moonlit Woods: %s. Half moon: werewolves turn at 65%% HP. Full moon: they start changed, twice the elites, fights pay ×1.5 gold and a moon rune chest appears." % ph.capitalize()
 		"heat":
 			var cool := parts[1] == "cool"
 			col = TWIST_COLORS.cool if cool else TWIST_COLORS.heat
-			_twist_icon.texture = UiIcons.tex("oasis" if cool else "sun", 64)
+			_twist_icon.texture = Icons.texture("oasis" if cool else "sun", 32)
 			text = "COOL" if cool else "HOT"
 			tip = "Sunscorched Ruins: the heat costs %d%% max HP at this lap's end unless you land on an oasis. %s" % [
 				int(round(BiomeDefs.HEAT_PCT * 100.0)), "You're cooled for this lap." if cool else "Land on an oasis to cool off."]
 		"drums":
 			var d := int(parts[1])
-			_twist_icon.texture = UiIcons.tex("drum", 64)
+			_twist_icon.texture = Icons.texture("drum", 32)
 			text = "+%d ATK" % (d * BiomeDefs.DRUM_RALLY) if d > 0 else "SILENT"
 			col = col if d > 0 else UiPalette.TEXT_DIM
 			tip = "Orc Warcamp: %d war drum%s standing; every foe gets +%d ATK per drum at fight start. Land on a drum to smash it." % [
 				d, "" if d == 1 else "s", BiomeDefs.DRUM_RALLY]
 		"ore":
 			var o := int(parts[1])
-			_twist_icon.texture = UiIcons.tex("ore", 64)
+			_twist_icon.texture = Icons.texture("ore", 32)
 			text = "%d ORE" % o
 			tip = "Deep Mines: land on an ore vein for gold or a Face Raise; the vein then caves in and becomes a trap."
 	_twist_label.text = text
@@ -703,6 +696,19 @@ class _MoonGlyph:
 		draw_circle(c + Vector2(mr * 0.3, -mr * 0.25), mr * 0.14, Color(0.6, 0.66, 0.85, 0.5 if fill > 0.5 else 0.0))
 
 
+## The HUD's top gradient: a stretched texture drawn over the whole rect.
+class _Scrim:
+	extends Control
+	var texture: Texture2D
+
+	func _init() -> void:
+		resized.connect(queue_redraw)
+
+	func _draw() -> void:
+		if texture:
+			draw_texture_rect(texture, Rect2(Vector2.ZERO, size), false)
+
+
 class _Pip:
 	extends Control
 	## 0 = future, 1 = current, 2 = done
@@ -714,6 +720,8 @@ class _Pip:
 	func _draw() -> void:
 		var c := size * 0.5
 		var r := minf(size.x, size.y) * 0.5
+		if _draw_pack(c, r):
+			return
 		if boss:
 			var pts := PackedVector2Array([c + Vector2(0, -r), c + Vector2(r, 0), c + Vector2(0, r), c + Vector2(-r, 0)])
 			draw_colored_polygon(pts, UiPalette.OUTLINE)
@@ -730,4 +738,22 @@ class _Pip:
 				draw_circle(c, r - 5.5, color.lightened(0.45))
 			_:
 				draw_circle(c, r - 2.5, Color(1, 1, 1, 0.12))
+
+	## Spec 2.12: the lap pips are pack stars (gold when done, biome-lit for the current lap,
+	## slate when ahead) and the boss lap is the Horned Skull. False = no pack (drawn look).
+	func _draw_pack(c: Vector2, r: float) -> bool:
+		var id := "boss" if boss else "lap_pip"
+		if not Icons.is_mapped(id):
+			return false
+		var px := int(ceil(r * 2.0 + 4.0))
+		var tint: Variant = null
+		var a := 1.0
+		if not boss:
+			tint = UiPalette.GOLD if state == 2 else (color.lerp(UiPalette.GOLD_BRIGHT, 0.35) if state == 1 else UiPalette.SLATE_2)
+		elif state == 0:
+			a = 0.75
+		var t := Icons.tex(id, px * 3, tint)
+		var s := r * (2.3 if state == 1 or boss else 1.9)
+		draw_texture_rect(t, Rect2(c - Vector2(s, s) * 0.5, Vector2(s, s)), false, Color(1, 1, 1, a))
+		return true
 

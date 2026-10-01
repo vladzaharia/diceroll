@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <!-- Diceroll boot-screen glyph (hand-drawn, CC0): open door = "Quit" -->
+  <path d="M9 42 V8 A3 3 0 0 1 12 5 H32 A3 3 0 0 1 35 8 V42 Z" fill="#0b0c1a"/>
+  <path d="M13 39 V9 H31 V39 Z" fill="#14173a"/>
+  <path d="M13 9 L27 13 V43 L13 39 Z" fill="#fbf3df" stroke="#0b0c1a" stroke-width="3" stroke-linejoin="round"/>
+  <circle cx="23.5" cy="27" r="2" fill="#0b0c1a"/>
+  <path d="M36 24 H44 M40.5 20 L44 24 L40.5 28" fill="none" stroke="#0b0c1a" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
