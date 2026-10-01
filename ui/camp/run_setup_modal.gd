@@ -95,6 +95,24 @@ func _layout() -> void:
 			show_profile(profile)
 			return
 	super._layout()
+	_fit_to_screen()
+
+
+## CampModal lays out at its width and never scales: when the content is still wider than the
+## safe screen (zoomed phones), shrink the frame around its centre like UiModal does.
+func _fit_to_screen() -> void:
+	var safe := UiTheme.safe_margins(self)
+	var avail := size.x - safe.left - safe.right
+	var fw := _frame.size.x
+	var k := clampf(avail / fw, 0.6, 1.0) if fw > 0.0 else 1.0
+	if is_equal_approx(k, _fit):
+		return
+	var was := _fit
+	_fit = k
+	if is_equal_approx(_frame.scale.x, was):
+		_frame.scale = Vector2.ONE * k
+	_frame.position.x = (size.x - fw) * 0.5
+	_place_close()
 
 
 func _wants_wide() -> bool:
@@ -176,14 +194,14 @@ func _hero_section(p: Profile, cur: String) -> VBoxContainer:
 ## The chosen hero: the turning portrait in its Wardrobe look, name, stat chips, mechanic
 ## badge and the Armory kit (with the Armory shortcut). `portrait_w` < 0 = the phone size.
 func hero_card(p: Profile, id: String, portrait_w := 0.0) -> Control:
-	var c := CampUi.card(true)
+	var c := _panel("info", UiPalette.class_color(id))
 	c.name = "HeroCard"
 	var outer := UiTheme.vbox(12)
 	c.add_child(outer)
 	var row := UiTheme.hbox(16)
 	outer.add_child(row)
 	var por := HeroPortrait.new()
-	por.custom_minimum_size = Vector2(150, 190) if portrait_w < 0.0 else Vector2(180, 220)
+	por.custom_minimum_size = Vector2(136, 190) if portrait_w < 0.0 else Vector2(180, 220)
 	por.ring_color = UiPalette.class_color(id)
 	por.set_hero(id, p.equipped_skin(id), p.prestige_on(id), false, ArmoryLook.of_profile(p, id))
 	row.add_child(por)
@@ -205,7 +223,10 @@ func hero_card(p: Profile, id: String, portrait_w := 0.0) -> Control:
 	stats.add_child(stat_chip("sword", "+%d" % int(d.atk), "Attack bonus", UiPalette.TEXT))
 	stats.add_child(stat_chip("reroll", "%d" % int(d.board_rerolls), "Move rerolls per lap", UiPalette.GOLD_BRIGHT))
 	stats.add_child(stat_chip("dice", "%d" % int(HeroDefs.field(id, "combat_rerolls")), "Fight rerolls", UiPalette.DIE_BODY))
-	col.add_child(ClassDetail.mechanic_badge(id, 17))
+	var badge := ClassDetail.mechanic_badge(id, 17)
+	var mech := ClassInfo.mechanic(id)
+	badge.add_theme_stylebox_override("panel", surface("inset", ClassInfo.mechanic_color(mech) if mech != "" else UiPalette.class_color(id)))
+	col.add_child(badge)
 	outer.add_child(_kit_row(p, id))
 	return c
 
@@ -317,6 +338,45 @@ static func unlock_text(p: Profile, kind: String, id: String) -> String:
 	if not cost.is_empty():
 		t += " Or %d Sigils." % int(cost.sigils)
 	return t
+
+
+## Flat surfaces (user rule: popup tiles must not look like buttons; only real actions get the
+## 3D lip). No lip, no drop shadow, no bevel. state: "normal" | "hover" (selectable tiles) |
+## "selected" (yellow inner rim) | "info" (read-only card) | "inset" | "locked". `accent` = a
+## thin rim colour. Local until the shared flat card piece lands: swap the body of this func.
+static func surface(state: String, accent: Variant = null) -> StyleBox:
+	var bg := UiPalette.NAVY_2
+	var rim := Color(1, 1, 1, 0.07)
+	var bw := 2
+	match state:
+		"hover":
+			bg = UiPalette.NAVY_3
+			rim = Color(1, 1, 1, 0.16)
+		"selected":
+			bg = UiPalette.NAVY_3
+			rim = UiPalette.GOLD_BRIGHT
+			bw = 4
+		"inset":
+			bg = Color(0.03, 0.03, 0.09, 0.55)
+		"locked":
+			bg = Color(0.05, 0.05, 0.12, 0.85)
+			rim = Color(1, 1, 1, 0.04)
+	if accent is Color and state != "selected":
+		rim = Color(accent as Color, 0.6)
+	var sb := UiTheme.box(bg, 16, bw, rim)
+	sb.shadow_size = 0
+	sb.anti_aliasing = true
+	UiTheme.pad(sb, 14, 12)
+	return sb
+
+
+## A read-only PanelContainer on a flat surface (no hover).
+static func _panel(state: String, accent: Variant = null) -> PanelContainer:
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", surface(state, accent))
+	p.mouse_filter = Control.MOUSE_FILTER_PASS
+	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	return p
 
 
 static func _locked_has(list: Array, id: String) -> bool:
@@ -439,7 +499,7 @@ func _ascension(p: Profile) -> Control:
 	var unl := int(p.ascension.get("unlocked", 0))
 	var sel := int(p.ascension.get("selected", 0))
 	if unl <= 0:
-		var lc := CampUi.locked_card()
+		var lc := _panel("locked")
 		lc.name = "Ascension"
 		var row := UiTheme.hbox(14)
 		lc.add_child(row)
@@ -452,7 +512,7 @@ func _ascension(p: Profile) -> Control:
 		col.add_child(UiTheme.label("Ascension", 24, UiPalette.TEXT_MUTED, true, 4))
 		col.add_child(CampUi.lock_line("Win a run to unlock harder, richer runs.", 16))
 		return lc
-	var c := CampUi.card(false, UiPalette.DANGER if sel > 0 else null)
+	var c := _panel("info", UiPalette.DANGER if sel > 0 else null)
 	c.name = "Ascension"
 	var v := UiTheme.vbox(10)
 	c.add_child(v)
@@ -473,18 +533,18 @@ func _ascension(p: Profile) -> Control:
 	var head := UiTheme.hbox(8)
 	head.alignment = BoxContainer.ALIGNMENT_CENTER
 	mid.add_child(head)
-	var ai := CampArt.icon("ascension", 32, UiPalette.HP_BRIGHT, sel == 0)
-	head.add_child(ai)
-	var t := UiTheme.label("ASCENSION %d" % sel if sel > 0 else "ASCENSION OFF", 28, UiPalette.HP_BRIGHT if sel > 0 else UiPalette.TEXT_DIM, true, 5)
+	var t := UiTheme.label("ASCENSION %d" % sel if sel > 0 else "ASCENSION OFF", 26, UiPalette.HP_BRIGHT if sel > 0 else UiPalette.TEXT_DIM, true, 5)
 	t.name = "AscLevel"
 	head.add_child(t)
-	var sub := UiTheme.hbox(8)
+	# pips over the Crowns chip (stacked: a row of both is too wide for zoomed phones)
+	var sub := UiTheme.vbox(6)
 	sub.alignment = BoxContainer.ALIGNMENT_CENTER
 	mid.add_child(sub)
 	var pips := CampUi.pips(sel, unl, UiPalette.HP_BRIGHT)
-	pips.custom_minimum_size = Vector2(unl * 22, 20)
+	pips.custom_minimum_size = Vector2(unl * 19, 20)
 	pips.tooltip_text = "Unlocked up to %d of %d" % [unl, UnlockDefs.MAX_ASCENSION]
 	pips.mouse_filter = Control.MOUSE_FILTER_PASS
+	pips.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	sub.add_child(pips)
 	if sel > 0:
 		sub.add_child(CampArt.chip("+%d%%" % (ASC_CROWNS_PCT * sel), "yellow", "crown", 16))
@@ -570,7 +630,7 @@ func _loadout_tile(p: Profile, what: String, label: String, station: String) -> 
 			for i in maxi(slots, MAX_MG_SLOTS):
 				if i < eq.size():
 					var mid := String(eq[i])
-					var m := CampArt.medal(String(CampInfo.MINIGAME_GLYPH.get(mid, "station_arcade")), 52, CampInfo.MINIGAME_COLOR.get(mid, UiPalette.GOLD))
+					var m := CampArt.medal(String(CampInfo.MINIGAME_GLYPH.get(mid, "station_arcade")), 46, CampInfo.MINIGAME_COLOR.get(mid, UiPalette.GOLD))
 					m.tooltip_text = MinigameDefs.name_of(mid)
 					m.mouse_filter = Control.MOUSE_FILTER_PASS
 					row.add_child(m)
@@ -583,7 +643,7 @@ func _loadout_tile(p: Profile, what: String, label: String, station: String) -> 
 			t.set_count("%d" % cap)
 			for i in Balance.POTION_MAX_CAP:
 				if i < cap:
-					var ic := CampArt.icon("potion_healing", 48)
+					var ic := CampArt.icon("potion_healing", 44)
 					ic.tooltip_text = "Potion slot"
 					ic.mouse_filter = Control.MOUSE_FILTER_PASS
 					row.add_child(ic)
@@ -594,8 +654,8 @@ func _loadout_tile(p: Profile, what: String, label: String, station: String) -> 
 			t.set_count("%d / %d" % [packs.size(), UnlockDefs.PACK_IDS.size()])
 			var shown := 0
 			for id in UnlockDefs.PACK_IDS:
-				if packs.has(id) and shown < 4:
-					var ic := CampArt.icon(String(CampInfo.PACK_ICON.get(String(id), "pack")), 48)
+				if packs.has(id) and shown < 3:
+					var ic := CampArt.icon(String(CampInfo.PACK_ICON.get(String(id), "pack")), 44)
 					ic.tooltip_text = String(UnlockDefs.PACKS[id].name)
 					ic.mouse_filter = Control.MOUSE_FILTER_PASS
 					row.add_child(ic)
@@ -637,7 +697,7 @@ static func _wrap_lock(text: String) -> Label:
 
 
 static func _empty_slot(tip: String) -> Control:
-	var m := CampArt.medal("plus", 52, UiPalette.TEXT_MUTED, true)
+	var m := CampArt.medal("plus", 46, UiPalette.TEXT_MUTED, true)
 	m.modulate = Color(1, 1, 1, 0.6)
 	m.tooltip_text = tip
 	m.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -645,7 +705,7 @@ static func _empty_slot(tip: String) -> Control:
 
 
 static func _locked_slot(tip: String) -> Control:
-	var m := CampArt.medal("lock", 52, UiPalette.TEXT_MUTED, true)
+	var m := CampArt.medal("lock", 46, UiPalette.TEXT_MUTED, true)
 	m.modulate = Color(1, 1, 1, 0.75)
 	m.tooltip_text = "Locked: " + tip
 	m.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -724,10 +784,7 @@ class Pick:
 		add_theme_stylebox_override("panel", _box("selected" if sel else ("normal" if en else "locked")))
 
 	func _box(state: String) -> StyleBox:
-		var sb := UiTheme.card_box(state, accent if state in ["normal", "hover"] else null)
-		UiTheme.pad(sb, 12, 10)
-		sb.content_margin_bottom = 16
-		return sb
+		return RunSetupModal.surface(state, accent if state in ["normal", "hover"] else null)
 
 	func _hover(on: bool) -> void:
 		if not enabled:

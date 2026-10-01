@@ -247,3 +247,15 @@ func test_run_setup_icons_are_mapped() -> void:
 	for id in ["helmet", "flag", "pouch", "speed", "hourglass", "biome_glade", "crown", "minus", "plus", "ascension",
 			"chevron_right", "potion_healing", "lock", "check", "heart", "sword", "reroll", "dice", "question", "station_armory"]:
 		assert_true(map.has(id), "icon_map has %s" % id)
+
+
+func test_tiles_are_flat_not_buttons() -> void:
+	# user rule: only real actions get the 3D lip; tiles and info cards are flat surfaces
+	var rs := _modal(_mid())
+	for n in ["Hero_knight", "Hero_barbarian", "Mode_standard", "Mode_short", "Tile_pet", "HeroCard", "Ascension"]:
+		var c: PanelContainer = rs.body.find_child(n, true, false)
+		var sb := c.get_theme_stylebox("panel") as StyleBoxFlat
+		assert_true(sb != null and sb.shadow_size == 0, "%s is a flat surface (no lip / shadow)" % n)
+	var sel := (rs.body.find_child("Hero_knight", true, false) as Control).get_theme_stylebox("panel") as StyleBoxFlat
+	assert_eq(sel.border_color, UiPalette.GOLD_BRIGHT, "selected = yellow inner rim")
+	_done(rs)
