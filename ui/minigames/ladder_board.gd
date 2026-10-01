@@ -227,6 +227,26 @@ func scripted_input(args: Array, drv: Node) -> bool:
 	return true
 
 
+## Keyboard: Up = HIGHER, Down = LOWER, C = CASH OUT (a click on that button, as scripted_input
+## does, without its hover pause).
+func key_input(event: InputEvent, drv: Node) -> bool:
+	var g := ""
+	if InputActions.pressed(event, InputActions.MG_UP):
+		g = "higher"
+	elif InputActions.pressed(event, InputActions.MG_DOWN):
+		g = "lower"
+	elif InputActions.pressed(event, InputActions.MG_CASH):
+		g = "cash"
+	if g == "":
+		return false
+	if not _busy and not locked:
+		_layout()
+		var p := get_global_rect().position + button_rect(g).get_center()
+		drv.call("move", p, false)
+		drv.call("click", p)
+	return true
+
+
 # --- updates ---------------------------------------------------------------------------
 
 func play_update(ev: Dictionary) -> void:

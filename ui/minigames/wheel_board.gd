@@ -387,6 +387,17 @@ func scripted_input(args: Array, drv: Node) -> bool:
 	return true
 
 
+## Keyboard: Space spins; while it spins, Space brakes now. Both are the click on the SPIN /
+## BRAKE button that scripted_input ends with (without its harness waits).
+func key_input(event: InputEvent, drv: Node) -> bool:
+	if not InputActions.pressed(event, InputActions.MG_ACTION):
+		return false
+	if (_mode == "idle" and not locked) or _mode == "spinning":
+		_layout()
+		drv.call("click", get_global_rect().position + _btn.get_center())
+	return true
+
+
 func _scripted(args: Array, drv: Node) -> void:
 	var o := get_global_rect().position
 	if String(args[0]) == "spin":

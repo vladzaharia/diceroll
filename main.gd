@@ -9,6 +9,8 @@ var controller: GameController
 
 
 func _ready() -> void:
+	# Keyboard shortcuts live in one table (ui/input/input_actions.gd); register them first.
+	InputActions.ensure()
 	# Source checkouts without the git-ignored third-party assets get a plain explanation
 	# screen instead of a broken game (see game/boot/asset_check.gd).
 	if not AssetCheck.run().is_empty():

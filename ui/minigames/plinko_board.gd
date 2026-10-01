@@ -213,6 +213,25 @@ func scripted_input(args: Array, drv: Node) -> bool:
 	return true
 
 
+## Keyboard: Left / Right move the dropper one slot, Space drops it there (scripted_input:
+## the same press-slide-release a player makes).
+func key_input(event: InputEvent, drv: Node) -> bool:
+	var d := 0
+	if InputActions.pressed(event, InputActions.MG_LEFT):
+		d = -1
+	elif InputActions.pressed(event, InputActions.MG_RIGHT):
+		d = 1
+	if d != 0:
+		if _can_aim():
+			_set_aim(clampi(_aim + d, 0, BUCKETS - 1))
+		return true
+	if InputActions.pressed(event, InputActions.MG_ACTION):
+		if _can_aim() and not _animating and not locked:
+			scripted_input([_aim], drv)
+		return true
+	return false
+
+
 # --- animation -------------------------------------------------------------------------------
 
 func play_update(ev: Dictionary) -> void:

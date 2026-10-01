@@ -66,6 +66,26 @@ func scripted_input(_args: Array, _drv: Node) -> bool:
 	return false
 
 
+## Keyboard play (desktop, spec 6): MinigameScreen routes key presses here. Boards where keys
+## are natural (claw, wheel, fishing, shell, high-low, plinko, shooter) override it and act
+## through the real input path: scripted_input or the same synthetic clicks via `drv`
+## (a MgBoard.Driver). Grid games (fossil, bubble, memory, scratch) stay mouse / touch only.
+## Returns true when the key was used.
+func key_input(_event: InputEvent, _drv: Node) -> bool:
+	return false
+
+
+## Input-aware verb for prompts drawn inside the cabinets: "TAP" on touch, "CLICK" with a
+## keyboard / mouse (desktop). Drawn prompts stay text only (no key art).
+static func verb() -> String:
+	return "CLICK" if InputMode.is_kbm() else "TAP"
+
+
+## Upper-case key name of an action for drawn prompts ("SPACE", "1"), following the InputMap.
+static func key_name(action: String) -> String:
+	return InputActions.key_label(action).to_upper()
+
+
 ## Sends an action once (locks until the update arrives or a short timeout on refusal).
 func send(args: Array) -> void:
 	if locked:
@@ -302,3 +322,55 @@ func die_face(r: Rect2, v: int, body := UiPalette.DIE_BODY, pip := UiPalette.DIE
 		var c := inner.position + inner.size * p
 		draw_circle(c, s * 0.085, pip)
 		draw_circle(c + Vector2(-s * 0.02, -s * 0.02), s * 0.03, pip.lightened(0.35))
+
+
+## Synthetic mouse input at GLOBAL positions (the screenshot harness's driver contract):
+## keyboard play turns a key into the click / drag a player would make, so every board keeps
+## a single input path.
+class Driver:
+	extends Node
+
+	func click(p: Vector2) -> void:
+		_button(p, true)
+		_button(p, false)
+
+	func press(p: Vector2) -> void:
+		_button(p, true)
+
+	func release(p: Vector2) -> void:
+		_button(p, false)
+
+	func move(p: Vector2, held := true) -> void:
+		var m := InputEventMouseMotion.new()
+		m.position = p
+		m.global_position = p
+		m.button_mask = MOUSE_BUTTON_MASK_LEFT if held else 0
+		_push(m)
+
+	func drag(pts: Array) -> void:
+		if pts.is_empty():
+			return
+		_button(pts[0], true)
+		for k in range(1, pts.size()):
+			await get_tree().process_frame
+			var m := InputEventMouseMotion.new()
+			m.position = pts[k]
+			m.global_position = pts[k]
+			m.relative = Vector2(pts[k]) - Vector2(pts[k - 1])
+			m.button_mask = MOUSE_BUTTON_MASK_LEFT
+			_push(m)
+		_button(pts[-1], false)
+
+	func _button(p: Vector2, down: bool) -> void:
+		var e := InputEventMouseButton.new()
+		e.button_index = MOUSE_BUTTON_LEFT
+		e.pressed = down
+		e.position = p
+		e.global_position = p
+		e.button_mask = MOUSE_BUTTON_MASK_LEFT if down else 0
+		_push(e)
+
+	func _push(e: InputEvent) -> void:
+		if is_inside_tree():
+			get_viewport().push_input(e, true)
+
